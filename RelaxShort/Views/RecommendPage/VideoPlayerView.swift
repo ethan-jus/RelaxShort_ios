@@ -163,6 +163,8 @@ final class PlayerController: ObservableObject {
             pauseByUser()
         } else {
             player.play()
+            isPlaying = true
+            hasStartedPlayingOnce = true
             pauseReason = .none
         }
     }
@@ -204,7 +206,7 @@ final class PlayerController: ObservableObject {
         if thumbnailGenerator == nil {
             let gen = AVAssetImageGenerator(asset: asset)
             gen.appliesPreferredTrackTransform = true
-            gen.maximumSize = CGSize(width: 128, height: 72)
+            gen.maximumSize = CGSize(width: 320, height: 180)
             thumbnailGenerator = gen
         }
         guard let gen = thumbnailGenerator else { return }

@@ -32,6 +32,7 @@ struct RecommendView: View {
     @State private var showNotificationPrompt = false
     @State private var hasShownNotification = false
     @State private var wasPlayingBeforeScrub = false
+    @State private var isDraggingPage = false
 
     init(viewModel: RecommendViewModel? = nil, session: RecommendSession, isVisible: Bool = true) {
         self.viewModel = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
@@ -214,11 +215,10 @@ struct RecommendView: View {
                             feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
                         }
 
-                        // Synopsis with inline `... more`
-                        collapsedSynopsis(drama.synopsis)
-                            .lineLimit(2)
+                        // Synopsis toggle expand/collapse
+                        synopsisView(drama.synopsis)
                             .contentShape(Rectangle())
-                            .onTapGesture { isExpanded = true }
+                            .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() } }
                     }
                     .frame(width: contentWidth, alignment: .leading)
 
@@ -239,7 +239,11 @@ struct RecommendView: View {
                     .frame(width: actionRailWidth)
                 }
 
-                NavigationLink(value: SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))) {
+                // CTA as Button (not NavigationLink) for reliable tap
+                Button {
+                    session.controller.pauseForSystem()
+                    appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
+                } label: {
                     Text("Watch Full Series")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(.white)
@@ -252,15 +256,21 @@ struct RecommendView: View {
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, tabBarAvoidance)
         }
+        .zIndex(10)
     }
 
-    private func collapsedSynopsis(_ text: String) -> Text {
-        Text("Trailer | ")
-            .font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
-        + Text(truncatedSynopsis(text))
-            .font(.system(size: 13)).foregroundColor(.white.opacity(0.65))
-        + Text(" ... more")
-            .font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.9))
+    private func synopsisView(_ text: String) -> some View {
+        Group {
+            if isExpanded {
+                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
+                + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
+            } else {
+                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
+                + Text(truncatedSynopsis(text)).font(.system(size: 13)).foregroundColor(.white.opacity(0.65))
+                + Text("... more").font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.9)))
+            }
+        }
+        .lineLimit(isExpanded ? nil : 2)
     }
 
     private func truncatedSynopsis(_ text: String) -> String {
@@ -349,6 +359,7 @@ struct RecommendView: View {
     private func verticalDrag(count: Int) -> some Gesture {
         DragGesture(minimumDistance: 10)
             .onChanged { value in
+                isDraggingPage = true
                 let t = value.translation.height
                 if session.currentIndex == 0 && t > 0 { dragOffset = t * 0.4 }
                 else if session.currentIndex == count - 1 && t < 0 { dragOffset = t * 0.4 }
@@ -364,6 +375,7 @@ struct RecommendView: View {
                     }
                     dragOffset = 0
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { isDraggingPage = false }
             }
     }
 
@@ -385,11 +397,28 @@ struct RecommendView: View {
         }
     }
 
-    // MARK: - Long Press Speed-Up (disabled for v1 — conflicts with vertical swipe)
+    // MARK: - Long Press 2x Speed-Up
 
     private var longPressGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
-            .onEnded { _ in }
+        LongPressGesture(minimumDuration: 0.35)
+            .sequenced(before: DragGesture(minimumDistance: 0))
+            .onChanged { value in
+                guard !isScrubbing, !isDraggingPage else { return }
+                switch value {
+                case .second(true, _):
+                    if !isSpeeding {
+                        isSpeeding = true
+                        session.controller.setRate(2.0)
+                        withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
+                    }
+                default: break
+                }
+            }
+            .onEnded { _ in
+                isSpeeding = false
+                session.controller.setRate(1.0)
+                withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
+            }
     }
 
     // MARK: - Progress Bar
@@ -412,7 +441,7 @@ struct RecommendView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
                             .fill(Color.black.opacity(0.6))
-                            .frame(width: 112, height: 160)
+                            .frame(width: 160, height: 90)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(Color.white.opacity(0.5), lineWidth: 2)
@@ -420,7 +449,7 @@ struct RecommendView: View {
                         if let thumbnail = session.controller.thumbnailImage {
                             Image(uiImage: thumbnail)
                                 .resizable().aspectRatio(contentMode: .fill)
-                                .frame(width: 112, height: 160)
+                                .frame(width: 160, height: 90)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
