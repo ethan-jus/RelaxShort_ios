@@ -31,6 +31,7 @@ struct RecommendView: View {
     @State private var showAbout = false
     @State private var showNotificationPrompt = false
     @State private var hasShownNotification = false
+    @State private var didUserPause = false
 
     init(viewModel: RecommendViewModel? = nil, session: RecommendSession) {
         self.viewModel = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
@@ -50,7 +51,20 @@ struct RecommendView: View {
             .onChange(of: session.currentIndex) { oldValue, newValue in
                 isExpanded = false
                 isTruncated = false
+                didUserPause = false
                 session.handleTransition(from: oldValue, to: newValue, dramas: viewModel.dramas)
+            }
+            .onChange(of: appStore.selectedTab) { _, newTab in
+                if newTab == .forYou { didUserPause = false }
+            }
+            .onChange(of: appStore.isShowingSearch) { _, isShowing in
+                if !isShowing { didUserPause = false }
+            }
+            .onChange(of: appStore.isShowingMembership) { _, isShowing in
+                if !isShowing { didUserPause = false }
+            }
+            .onChange(of: appStore.navigationTarget) { _, target in
+                if target == nil { didUserPause = false }
             }
             .onAppear { setupAutoPlay() }
             .onDisappear { session.controller.pause() }
@@ -87,24 +101,23 @@ struct RecommendView: View {
             .padding(.trailing, 24)
             .padding(.top, searchTopPadding)
 
-        // Pause overlay
-        if !session.controller.isPlaying {
-            Button { session.controller.togglePlayPause() } label: {
+        // Pause overlay — only when user actively paused
+        if didUserPause, session.controller.hasStartedPlayingOnce {
+            Button {
+                resumeFromUserPause()
+            } label: {
                 Image(systemName: "play.fill")
                     .font(.system(size: 36, weight: .medium))
                     .foregroundColor(.white)
                     .frame(width: 72, height: 72)
-                    .background(Circle().fill(Color.black.opacity(0.4)))
+                    .background(Circle().fill(Color.black.opacity(0.42)))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .transition(.scale.combined(with: .opacity))
+            .zIndex(40)
         }
 
         bottomContent(in: geo)
-
-        progressBar(totalWidth: geo.size.width)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .padding(.horizontal, DT.Space.pageH)
-            .padding(.bottom, 56)
 
         if showSpeedHUD {
             SpeedHUDView()
@@ -139,6 +152,7 @@ struct RecommendView: View {
         await viewModel.loadData()
         if appStore.selectedTab == .forYou, !session.hasInitializedPool {
             session.initializePool(dramas: viewModel.dramas)
+            didUserPause = false
             // 首次进入For You延迟展示通知弹窗
             if !hasShownNotification {
                 hasShownNotification = true
@@ -264,8 +278,26 @@ struct RecommendView: View {
     private var tapGesture: some Gesture {
         TapGesture()
             .onEnded {
-                session.controller.togglePlayPause()
+                handleVideoTap()
             }
+    }
+
+    private func handleVideoTap() {
+        if session.controller.isPlaying {
+            session.controller.togglePlayPause()
+            withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
+                didUserPause = true
+            }
+        } else if didUserPause {
+            resumeFromUserPause()
+        }
+    }
+
+    private func resumeFromUserPause() {
+        session.controller.togglePlayPause()
+        withAnimation(.easeOut(duration: 0.18)) {
+            didUserPause = false
+        }
     }
 
     // MARK: - Long Press Speed-Up
@@ -294,30 +326,37 @@ struct RecommendView: View {
     // MARK: - Bottom Content
 
     private func bottomContent(in geo: GeometryProxy) -> some View {
-        let sidebarWidth: CGFloat = 44
-        let contentMaxWidth = geo.size.width - 24 * 2 - sidebarWidth - 16
+        let horizontalPadding: CGFloat = 24
+        let actionRailWidth: CGFloat = 56
+        let actionRailGap: CGFloat = 16
+        let tabBarAvoidance: CGFloat = 86
+        let contentMaxWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
         let uiHidden = isSpeeding || isScrubbing
 
         return VStack(spacing: 0) {
             Spacer()
-            HStack(alignment: .bottom, spacing: 16) {
-                infoSection(maxWidth: contentMaxWidth)
-                    .opacity(uiHidden ? 0 : 1)
-                    .allowsHitTesting(!uiHidden)
-                rightActionBar
-                    .opacity(uiHidden ? 0 : 1)
-                    .allowsHitTesting(!uiHidden)
-            }
-            .padding(.horizontal, 24)
 
-            if let drama = currentDrama {
-                ctaButton(drama: drama, maxWidth: geo.size.width - 48)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 10)
-                    .padding(.bottom, 12)
-                    .opacity(uiHidden ? 0 : 1)
-                    .allowsHitTesting(!uiHidden)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .bottom, spacing: actionRailGap) {
+                    infoSection(maxWidth: contentMaxWidth)
+                        .frame(maxWidth: contentMaxWidth, alignment: .leading)
+
+                    rightActionBar
+                        .frame(width: actionRailWidth)
+                }
+
+                if let drama = currentDrama {
+                    ctaButton(drama: drama, maxWidth: contentMaxWidth)
+                        .frame(maxWidth: contentMaxWidth, alignment: .leading)
+                }
+
+                progressBar(totalWidth: geo.size.width - horizontalPadding * 2)
+                    .frame(width: geo.size.width - horizontalPadding * 2)
             }
+            .opacity(uiHidden ? 0 : 1)
+            .allowsHitTesting(!uiHidden)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, tabBarAvoidance)
         }
         .frame(maxHeight: .infinity)
     }
@@ -388,11 +427,15 @@ struct RecommendView: View {
             Text("Watch Full Series")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
-                .frame(maxWidth: maxWidth)
-                .frame(height: 54)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.12))
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.black.opacity(0.42))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)

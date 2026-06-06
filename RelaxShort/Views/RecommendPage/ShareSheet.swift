@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - DramaBox Share Sheet
 
 /// DramaBox 风格底部分享面板
-/// 奖励提示 + 平台图标 + Copy Link
+/// 奖励提示 + 5 个平台图标 + Copy Link
 struct ShareSheet: View {
     @Environment(\.dismiss) private var dismiss
 
@@ -48,20 +48,28 @@ struct ShareSheet: View {
             .padding(.horizontal, 20)
             .padding(.bottom, 24)
 
-            // 平台列表
-            HStack(spacing: 24) {
-                sharePlatform(icon: "camera.circle.fill", name: "Instagram", color: Color(hex: "#E4405F"))
-                sharePlatform(icon: "message.circle.fill", name: "Messenger", color: Color(hex: "#0084FF"))
-                sharePlatform(icon: "ellipsis.message.fill", name: "WhatsApp", color: Color(hex: "#25D366"))
-                sharePlatform(icon: "link", name: "Copy Link", color: Color.white.opacity(0.3))
+            // 平台列表（横向滚动 5 个平台）
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 24) {
+                    sharePlatform(icon: "camera.circle.fill", name: "Instagram", color: Color(hex: "#E4405F"))
+                    sharePlatform(icon: "bolt.circle.fill", name: "Snapchat", color: Color(hex: "#FFFC00"), iconColor: .black)
+                    sharePlatform(icon: "message.circle.fill", name: "Facebook Messenger", color: Color(hex: "#0084FF"))
+                    sharePlatform(icon: "phone.circle.fill", name: "WhatsApp", color: Color(hex: "#25D366"))
+                    sharePlatform(icon: "link.circle.fill", name: "Copy Link", color: Color.white.opacity(0.28))
+                }
+                .padding(.horizontal, 20)
             }
-            .padding(.horizontal, 20)
             .padding(.bottom, 34)
         }
         .background(DB.panelElevated)
     }
 
-    private func sharePlatform(icon: String, name: String, color: Color) -> some View {
+    private func sharePlatform(
+        icon: String,
+        name: String,
+        color: Color,
+        iconColor: Color = .white
+    ) -> some View {
         Button {
             if name == "Copy Link" {
                 UIPasteboard.general.string = "https://relaxshort.app/drama/\(dramaTitle)"
@@ -71,13 +79,16 @@ struct ShareSheet: View {
             VStack(spacing: 8) {
                 Image(systemName: icon)
                     .font(.system(size: 36))
-                    .foregroundColor(color)
+                    .foregroundColor(iconColor)
                     .frame(width: 56, height: 56)
-                    .background(Circle().fill(color.opacity(0.15)))
+                    .background(Circle().fill(color.opacity(0.18)))
 
                 Text(name)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(width: 74)
             }
         }
     }

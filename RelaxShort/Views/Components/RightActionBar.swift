@@ -12,15 +12,15 @@ struct RightActionBar: View {
     var onEpisodes: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: 26) {
             // 收藏
             VStack(spacing: 4) {
                 Button(action: onBookmark) {
                     Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                         .font(.system(size: 34, weight: .medium))
                         .foregroundColor(isBookmarked ? DB.logoRed : .white)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Color.black.opacity(0.25)))
+                        .frame(width: 48, height: 48)
+                        .background(Circle().fill(Color.black.opacity(0.18)))
                 }
 
                 Text("Save")
@@ -35,8 +35,8 @@ struct RightActionBar: View {
                         Image(systemName: "list.bullet")
                             .font(.system(size: 34, weight: .medium))
                             .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(Color.black.opacity(0.25)))
+                            .frame(width: 48, height: 48)
+                            .background(Circle().fill(Color.black.opacity(0.18)))
                     }
 
                     Text(L10n.tabEpisodes)
@@ -51,8 +51,8 @@ struct RightActionBar: View {
                     Image(systemName: "arrowshape.turn.up.forward")
                         .font(.system(size: 34, weight: .medium))
                         .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Color.black.opacity(0.25)))
+                        .frame(width: 48, height: 48)
+                        .background(Circle().fill(Color.black.opacity(0.18)))
                 }
 
                 Text("Share")
