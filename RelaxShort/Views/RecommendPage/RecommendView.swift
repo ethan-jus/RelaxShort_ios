@@ -17,6 +17,7 @@ struct RecommendView: View {
     @EnvironmentObject private var appStore: AppStore
     @ObservedObject private var viewModel: RecommendViewModel
     @ObservedObject private var session: RecommendSession
+    let isVisible: Bool
 
     @State private var dragOffset: CGFloat = 0
     @State private var isExpanded = false
@@ -31,11 +32,21 @@ struct RecommendView: View {
     @State private var showAbout = false
     @State private var showNotificationPrompt = false
     @State private var hasShownNotification = false
-    @State private var didUserPause = false
 
-    init(viewModel: RecommendViewModel? = nil, session: RecommendSession) {
+    init(viewModel: RecommendViewModel? = nil, session: RecommendSession, isVisible: Bool = true) {
         self.viewModel = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
         self.session = session
+        self.isVisible = isVisible
+    }
+
+    // MARK: - Computed Route Block
+
+    private var routeBlocksPlayback: Bool {
+        appStore.isShowingSearch || appStore.isShowingMembership || appStore.navigationTarget != nil
+    }
+
+    private var isPlaybackVisible: Bool {
+        isVisible && !routeBlocksPlayback
     }
 
     // MARK: - Body
@@ -49,29 +60,23 @@ struct RecommendView: View {
                     .presentationDetents([.medium])
             }
             .onChange(of: session.currentIndex) { oldValue, newValue in
-                isExpanded = false
-                isTruncated = false
-                didUserPause = false
+                // Per-video transition reset
+                isExpanded = false; isTruncated = false
+                isScrubbing = false; scrubFraction = 0
+                isSpeeding = false; showSpeedHUD = false
+                session.controller.resetForNewPlayer()
                 session.handleTransition(from: oldValue, to: newValue, dramas: viewModel.dramas)
+                if isPlaybackVisible { session.controller.playAfterAttach() }
             }
-            .onChange(of: appStore.selectedTab) { _, newTab in
-                if newTab == .forYou { didUserPause = false }
-            }
-            .onChange(of: appStore.isShowingSearch) { _, isShowing in
-                if !isShowing { didUserPause = false }
-            }
-            .onChange(of: appStore.isShowingMembership) { _, isShowing in
-                if !isShowing { didUserPause = false }
-            }
-            .onChange(of: appStore.navigationTarget) { _, target in
-                if target == nil { didUserPause = false }
+            .onChange(of: isPlaybackVisible) { _, vis in
+                if vis { session.controller.playFromSystemResume() }
+                else { session.controller.pauseForSystem() }
             }
             .onAppear { setupAutoPlay() }
-            .onDisappear { session.controller.pause() }
             .modifier(TabLifecycleModifier(appStore: appStore, session: session, viewModel: viewModel))
     }
 
-    // MARK: - Content View (split to fix type-checking)
+    // MARK: - Content View
 
     private var contentView: some View {
         GeometryReader { geo in
@@ -81,85 +86,195 @@ struct RecommendView: View {
                 } else {
                     feedOverlayContent(in: geo)
                 }
+
+                // Fixed overlays
+                let searchTopPadding = geo.safeAreaInsets.top + 44
+                searchBarButton
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.trailing, 24)
+                    .padding(.top, searchTopPadding)
+
+                if session.controller.pauseReason == .user, session.controller.hasStartedPlayingOnce {
+                    Button { handleVideoTap() } label: {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 36, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 72, height: 72)
+                            .background(Circle().fill(Color.black.opacity(0.42)))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(40)
+                }
+
+                if showSpeedHUD {
+                    SpeedHUDView()
+                        .position(x: geo.size.width / 2, y: geo.size.height * 0.16)
+                        .transition(.opacity)
+                }
+
+                if showBookmarkToast {
+                    CollectToastView(
+                        message: isBookmarked ? "Added to 'My List'" : "Removed from 'My List'",
+                        systemImage: isBookmarked ? "bookmark.fill" : "bookmark.slash.fill"
+                    )
+                    .position(x: geo.size.width / 2, y: geo.size.height * 0.65)
+                    .zIndex(100)
+                    .transition(.opacity)
+                }
+
+                if showAbout, let drama = currentDrama {
+                    DramaAboutSheet(drama: drama, isPresented: $showAbout).zIndex(200)
+                }
+                if showNotificationPrompt {
+                    NotificationPromptView(isPresented: $showNotificationPrompt).zIndex(300)
+                }
             }
         }
     }
 
     @ViewBuilder
     private func feedOverlayContent(in geo: GeometryProxy) -> some View {
-        feedPager(in: geo)
+        let dramas = viewModel.dramas
+        let pageHeight = geo.size.height
+        let yOffset = -CGFloat(session.currentIndex) * pageHeight + dragOffset
 
-        LinearGradient(
-            colors: [.clear, .black.opacity(0.1), .black.opacity(0.85)],
-            startPoint: .top, endPoint: .bottom
-        )
-        .allowsHitTesting(false)
+        ZStack {
+            ForEach(visibleIndices(for: session.currentIndex, count: dramas.count), id: \.self) { idx in
+                let isCurrent = idx == session.currentIndex
+                ZStack {
+                    VideoPlayerView(
+                        coverURL: dramas[idx].coverURL,
+                        player: isCurrent ? session.pool.current : nil,
+                        controller: isCurrent ? session.controller : nil
+                    )
+                        .allowsHitTesting(false)
 
-        let searchTopPadding = geo.safeAreaInsets.top + 44
-        searchBarButton
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(.trailing, 24)
-            .padding(.top, searchTopPadding)
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.1), .black.opacity(0.85)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
 
-        // Pause overlay — only when user actively paused
-        if didUserPause, session.controller.hasStartedPlayingOnce {
-            Button {
-                resumeFromUserPause()
-            } label: {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 36, weight: .medium))
-                    .foregroundColor(.white)
-                    .frame(width: 72, height: 72)
-                    .background(Circle().fill(Color.black.opacity(0.42)))
+                    // Per-page bottom overlay
+                    if !isScrubbing, !isSpeeding {
+                        pageBottomOverlay(drama: dramas[idx], isCurrent: isCurrent, geo: geo)
+                    }
+                }
+                .frame(width: geo.size.width, height: pageHeight)
+                .position(x: geo.size.width / 2, y: CGFloat(idx) * pageHeight + pageHeight / 2 + yOffset)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .transition(.scale.combined(with: .opacity))
-            .zIndex(40)
-        }
 
-        bottomContent(in: geo)
+            // Always-visible progress bar
+            progressBar(totalWidth: geo.size.width - 24)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 86)
+                .frame(maxHeight: .infinity, alignment: .bottom)
 
-        if showSpeedHUD {
-            SpeedHUDView()
-                .position(x: geo.size.width / 2, y: geo.size.height * 0.16)
-                .transition(.opacity)
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(verticalDrag(count: dramas.count))
+                .simultaneousGesture(longPressGesture)
+                .simultaneousGesture(tapGesture)
         }
+        .frame(width: geo.size.width, height: pageHeight)
+        .clipped()
+    }
 
-        if showBookmarkToast {
-            CollectToastView(
-                message: isBookmarked ? "Added to 'My List'" : "Removed from 'My List'",
-                systemImage: isBookmarked ? "bookmark.fill" : "bookmark.slash.fill"
-            )
-            .position(x: geo.size.width / 2, y: geo.size.height * 0.65)
-            .zIndex(100)
-            .transition(.opacity)
-        }
+    private func pageBottomOverlay(drama: DramaItem, isCurrent: Bool, geo: GeometryProxy) -> some View {
+        let horizontalPadding: CGFloat = 12
+        let actionRailWidth: CGFloat = 44
+        let actionRailGap: CGFloat = 12
+        let contentMaxWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
 
-        // About Sheet
-        if showAbout, let drama = currentDrama {
-            DramaAboutSheet(drama: drama, isPresented: $showAbout)
-                .zIndex(200)
-        }
+        return VStack(spacing: 0) {
+            Spacer()
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .bottom, spacing: actionRailGap) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button {
+                            withAnimation(.easeOut(duration: 0.25)) { showAbout = true }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(drama.title)
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundColor(.white).lineLimit(1)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.7))
+                            }
+                        }.buttonStyle(.plain)
 
-        // Notification Prompt
-        if showNotificationPrompt {
-            NotificationPromptView(isPresented: $showNotificationPrompt)
-                .zIndex(300)
+                        // Tags
+                        HStack(spacing: 6) {
+                            feedTag("Members Only", bg: DB.gold.opacity(0.25), fg: DB.gold)
+                            feedTag("Exclusive", bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                            feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                        }
+
+                        // Trailer | synopsis
+                        VStack(alignment: .leading, spacing: 0) {
+                            (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
+                            + Text(drama.synopsis).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
+                            .lineLimit(isExpanded ? nil : 2)
+                            .contentShape(Rectangle())
+                            .onTapGesture { isExpanded.toggle() }
+                            if !isExpanded {
+                                Button { isExpanded = true } label: {
+                                    Text("more").font(.system(size: 12, weight: .medium)).foregroundColor(.white.opacity(0.5))
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxWidth: contentMaxWidth, alignment: .leading)
+
+                    // Action rail
+                    RightActionBar(
+                        isBookmarked: $isBookmarked,
+                        viewCount: drama.formattedViewCount,
+                        onBookmark: {
+                            withAnimation(.spring(response: 0.3)) {
+                                isBookmarked.toggle(); showBookmarkToast = true
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                                withAnimation(.easeOut(duration: 0.3)) { showBookmarkToast = false }
+                            }
+                        },
+                        onShare: { showShare = true }
+                    )
+                    .frame(width: actionRailWidth)
+                }
+
+                NavigationLink(value: SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))) {
+                    Text("Watch Full Series")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity).frame(height: 44)
+                        .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.black.opacity(0.42)))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, 100)
         }
+    }
+
+    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
+        Text(text).font(.system(size: 12, weight: .medium)).foregroundColor(fg)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(bg).clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     private func loadAndInit() async {
         await viewModel.loadData()
-        if appStore.selectedTab == .forYou, !session.hasInitializedPool {
+        if isVisible, !session.hasInitializedPool {
             session.initializePool(dramas: viewModel.dramas)
-            didUserPause = false
-            // 首次进入For You延迟展示通知弹窗
+            session.controller.playAfterAttach()
             if !hasShownNotification {
                 hasShownNotification = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showNotificationPrompt = true
-                    }
+                    withAnimation(.easeOut(duration: 0.3)) { showNotificationPrompt = true }
                 }
             }
         }
@@ -175,12 +290,13 @@ struct RecommendView: View {
     // MARK: - Auto Play Setup
 
     private func setupAutoPlay() {
-        session.controller.onPlaybackFinished = { [weak session, weak appStore] in
-            guard let session, let appStore else { return }
-            let idx = session.currentIndex
-            let dramas = viewModel.dramas
-            if dramas.indices.contains(idx) {
-                appStore.navigationTarget = SeriesPlayerNav(drama: dramas[idx], startEpisode: 2)
+        let s = session
+        let vm = viewModel
+        let store = appStore
+        s.controller.onPlaybackFinished = {
+            let idx = s.currentIndex
+            if vm.dramas.indices.contains(idx) {
+                store.navigationTarget = SeriesPlayerNav(drama: vm.dramas[idx], startEpisode: 2)
             }
         }
     }
@@ -283,20 +399,11 @@ struct RecommendView: View {
     }
 
     private func handleVideoTap() {
-        if session.controller.isPlaying {
-            session.controller.togglePlayPause()
-            withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
-                didUserPause = true
-            }
-        } else if didUserPause {
-            resumeFromUserPause()
-        }
-    }
-
-    private func resumeFromUserPause() {
-        session.controller.togglePlayPause()
-        withAnimation(.easeOut(duration: 0.18)) {
-            didUserPause = false
+        let ctrl = session.controller
+        if ctrl.isPlaying {
+            ctrl.pauseByUser()
+        } else if ctrl.pauseReason == .user {
+            ctrl.togglePlayPause()
         }
     }
 
@@ -322,129 +429,6 @@ struct RecommendView: View {
                 session.controller.setRate(1.0)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
             }
-    }
-
-    // MARK: - Bottom Content
-
-    private func bottomContent(in geo: GeometryProxy) -> some View {
-        let horizontalPadding: CGFloat = 12
-        let actionRailWidth: CGFloat = 44
-        let actionRailGap: CGFloat = 12
-        let tabBarAvoidance: CGFloat = 86
-        let contentMaxWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
-        let hideMetadata = isSpeeding || isScrubbing
-
-        return VStack(spacing: 0) {
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(alignment: .bottom, spacing: actionRailGap) {
-                    infoSection(maxWidth: contentMaxWidth)
-                        .frame(maxWidth: contentMaxWidth, alignment: .leading)
-                        .opacity(hideMetadata ? 0 : 1)
-                        .allowsHitTesting(!hideMetadata)
-
-                    rightActionBar
-                        .frame(width: actionRailWidth)
-                        .opacity(hideMetadata ? 0 : 1)
-                        .allowsHitTesting(!hideMetadata)
-                }
-
-                if let drama = currentDrama {
-                    ctaButton(drama: drama, maxWidth: contentMaxWidth)
-                        .frame(maxWidth: contentMaxWidth, alignment: .leading)
-                        .opacity(hideMetadata ? 0 : 1)
-                        .allowsHitTesting(!hideMetadata)
-                }
-
-                // Progress bar — always visible even during speed/scrub
-                progressBar(totalWidth: geo.size.width - horizontalPadding * 2)
-                    .frame(width: geo.size.width - horizontalPadding * 2)
-            }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.bottom, tabBarAvoidance)
-        }
-        .frame(maxHeight: .infinity)
-    }
-
-    // MARK: - Info Section (DramaBox style)
-
-    private func infoSection(maxWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let drama = currentDrama {
-                // Title + chevron → opens About
-                Button {
-                    withAnimation(.easeOut(duration: 0.25)) { showAbout = true }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(drama.title)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-            tagRow
-            if let drama = currentDrama {
-                synopsisBlock(drama.synopsis)
-            }
-        }
-        .frame(maxWidth: maxWidth, alignment: .leading)
-    }
-
-    // MARK: - Synopsis Block
-
-    @ViewBuilder
-    private func synopsisBlock(_ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Trailer | synopsis format
-            HStack(alignment: .top, spacing: 0) {
-                Text("Trailer | ")
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.8))
-                + Text(text)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.65))
-            }
-            .lineLimit(isExpanded ? nil : 2)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                isExpanded.toggle()
-            }
-
-            if !isExpanded {
-                Button { isExpanded = true } label: {
-                    Text("more")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-        }
-    }
-
-    // MARK: - CTA Button
-
-    private func ctaButton(drama: DramaItem, maxWidth: CGFloat) -> some View {
-        NavigationLink(value: SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))) {
-            Text("Watch Full Series")
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.black.opacity(0.42))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                )
-        }
-        .buttonStyle(.plain)
     }
 
     // MARK: - Progress Bar
@@ -538,70 +522,6 @@ struct RecommendView: View {
         let m = total / 60
         let s = total % 60
         return String(format: "%02d:%02d", m, s)
-    }
-
-    // MARK: - Tag Row
-
-    @ViewBuilder
-    private var tagRow: some View {
-        if let drama = currentDrama {
-            HStack(spacing: 6) {
-                // Members Only tag — gold
-                feedTag("Members Only", bg: DB.gold.opacity(0.25), fg: DB.gold)
-                // Exclusive tag
-                feedTag("Exclusive", bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
-                // Category or first tag
-                feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
-            }
-        }
-    }
-
-    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundColor(fg)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-
-    // MARK: - Right Action Bar
-
-    private var rightActionBar: some View {
-        RightActionBar(
-            isBookmarked: $isBookmarked,
-            viewCount: currentDrama?.formattedViewCount,
-            onBookmark: {
-                withAnimation(.spring(response: 0.3)) {
-                    isBookmarked.toggle()
-                    showBookmarkToast = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showBookmarkToast = false
-                    }
-                }
-            },
-            onShare: { showShare = true }
-        )
-    }
-
-    // MARK: - Bookmark Toast
-
-    private var bookmarkToastView: some View {
-        HStack(spacing: 6) {
-            Image(systemName: isBookmarked ? "checkmark.circle.fill" : "bookmark.slash")
-                .font(DT.Font.body(14, weight: .semibold))
-            Text(isBookmarked ? L10n.favoritesAddedToast : L10n.favoritesRemovedToast)
-                .font(DT.Font.body(14, weight: .medium))
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Capsule().fill(Color.black.opacity(0.75)))
-        .padding(.top, 60)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
 // MARK: - Tab & Navigation Lifecycle Modifier

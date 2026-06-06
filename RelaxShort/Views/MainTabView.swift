@@ -80,7 +80,7 @@ private struct TabContentHost: View {
                 .opacity(appStore.selectedTab == .home ? 1 : 0)
                 .disabled(appStore.selectedTab != .home)
 
-            RecommendView(viewModel: recommendVM, session: recommendSession)
+            RecommendView(viewModel: recommendVM, session: recommendSession, isVisible: appStore.selectedTab == .forYou)
                 .id(AppStore.Tab.forYou.rawValue)
                 .zIndex(appStore.selectedTab == .forYou ? 1 : 0)
                 .opacity(appStore.selectedTab == .forYou ? 1 : 0)

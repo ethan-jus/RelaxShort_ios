@@ -109,16 +109,22 @@ final class PlayerPool {
     deinit { cleanup() }
 }
 
+// MARK: - Pause Reason
+
+enum PauseReason: Hashable {
+    case none
+    case user
+    case system
+}
+
 // MARK: - 视频播放控制器
 
-/// 视频播放状态管理器 — 管理 AVPlayer，暴露播放状态给 SwiftUI
-/// 与 PlayerPool 协作：attach 绑定池的 current 播放器，池 rotate 后重新 attach
 final class PlayerController: ObservableObject {
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
     @Published var isPlaying: Bool = false
     @Published var hasStartedPlayingOnce: Bool = false
-    @Published var isUserPaused: Bool = false
+    @Published var pauseReason: PauseReason = .none
     @Published var bufferProgress: Double = 0
     @Published var thumbnailImage: UIImage?
 
@@ -128,77 +134,72 @@ final class PlayerController: ObservableObject {
     private var thumbnailGenerator: AVAssetImageGenerator?
     private var thumbnailTask: Task<Void, Never>?
 
-    /// 播放结束回调 — 用于自动连播
     var onPlaybackFinished: (() -> Void)?
 
-    /// 绑定播放器实例（由 VideoPlayerLayer 调用）
+    /// Attach only binds the AVPlayer — does NOT auto-play
     func attach(player: AVPlayer) {
         detach()
         self.player = player
-        player.play()
-        hasStartedPlayingOnce = true
-        isUserPaused = false
         startObserving()
     }
 
-    /// 仅移除观察者，不暂停播放器（池 rotate 时使用）
+    /// Explicit play after attach — called only when playback is genuinely needed
+    func playAfterAttach() {
+        player?.play()
+        hasStartedPlayingOnce = true
+        pauseReason = .none
+    }
+
     func detach() {
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
         if let obs = itemEndObserver { NotificationCenter.default.removeObserver(obs); itemEndObserver = nil }
         player = nil
     }
 
-    /// 切换播放 / 暂停（用户主动点击视频）
     func togglePlayPause() {
         guard let player = player else { return }
         if player.timeControlStatus == .playing {
             pauseByUser()
         } else {
             player.play()
-            isUserPaused = false
+            pauseReason = .none
         }
     }
 
-    /// 系统原因暂停（Tab切换/导航push/Search弹出等），不标记用户暂停
     func pauseForSystem() {
         player?.pause()
+        if pauseReason != .user { pauseReason = .system }
         isPlaying = false
     }
 
-    /// 用户主动暂停（点击视频）
     func pauseByUser() {
         player?.pause()
-        isUserPaused = true
+        pauseReason = .user
         isPlaying = false
     }
 
-    /// 系统恢复播放（Tab切回/导航pop等），仅在非用户暂停状态下恢复
     func playFromSystemResume() {
-        guard !isUserPaused else { return }
+        guard pauseReason != .user else { return }
         player?.play()
+        pauseReason = .none
         isPlaying = true
     }
 
-    /// 设置播放倍速
     func setRate(_ rate: Float) {
         player?.rate = rate
     }
 
-    /// 拖动跳转到指定进度 (0~1)
     func seek(to fraction: Double) {
         guard let player = player, let item = player.currentItem,
               item.duration.isNumeric else { return }
         let clamped = max(0, min(1, fraction))
-        let target = CMTime(seconds: clamped * item.duration.seconds,
-                            preferredTimescale: 600)
+        let target = CMTime(seconds: clamped * item.duration.seconds, preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
         currentTime = target.seconds
     }
 
-    /// 异步生成指定进度位置的缩略图 (0~1)，结果写入 thumbnailImage
     func generateThumbnail(at fraction: Double) {
         guard let player = player, let asset = player.currentItem?.asset else { return }
-        let clamped = max(0, min(1, fraction))
         if thumbnailGenerator == nil {
             let gen = AVAssetImageGenerator(asset: asset)
             gen.appliesPreferredTrackTransform = true
@@ -208,30 +209,28 @@ final class PlayerController: ObservableObject {
         guard let gen = thumbnailGenerator else { return }
         let duration = player.currentItem?.duration.seconds ?? 0
         guard duration > 0 else { return }
-        let time = CMTime(seconds: clamped * duration, preferredTimescale: 600)
+        let time = CMTime(seconds: CGFloat(fraction) * duration, preferredTimescale: 600)
         thumbnailTask?.cancel()
         thumbnailTask = Task { @MainActor [weak self] in
             guard let self = self else { return }
             do {
                 let (cgImage, _) = try await gen.image(at: time)
                 self.thumbnailImage = UIImage(cgImage: cgImage)
-            } catch {
-                // Cancellation or generation failure — ignore
-            }
+            } catch { }
         }
     }
 
-    /// 仅暂停播放，保留观察者和播放器引用（系统使用，不标记用户暂停）
-    func pause() {
-        pauseForSystem()
+    func pause() { pauseForSystem() }
+    func play() { playFromSystemResume() }
+
+    /// Reset for new player transition — clear stale progress state
+    func resetForNewPlayer() {
+        currentTime = 0
+        duration = 0
+        bufferProgress = 0
+        thumbnailImage = nil
     }
 
-    /// 恢复播放（系统使用，尊重用户暂停状态）
-    func play() {
-        playFromSystemResume()
-    }
-
-    /// 释放播放器资源
     func cleanup() {
         player?.pause()
         detach()
@@ -297,7 +296,7 @@ struct VideoPlayerView: View {
             }
 
             // 暂停图标 — ZStack 顶层，确保不被封面/视频层遮挡
-            if let controller, controller.hasStartedPlayingOnce && controller.isUserPaused {
+            if let controller, controller.hasStartedPlayingOnce, controller.pauseReason == .user {
                 Image(systemName: "play.circle.fill")
                     .font(DT.Font.largeTitle(60))
                     .foregroundColor(.white.opacity(0.7))
@@ -307,7 +306,7 @@ struct VideoPlayerView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: shouldShowCover)
-        .animation(.easeInOut(duration: 0.2), value: controller?.isUserPaused)
+        .animation(.easeInOut(duration: 0.2), value: controller?.pauseReason)
         .task { await loader.load(coverURL) }
     }
 
@@ -355,6 +354,7 @@ private struct VideoPlayerLayer: UIViewRepresentable {
         (view.layer as? AVPlayerLayer)?.player = player
         (view.layer as? AVPlayerLayer)?.videoGravity = .resizeAspectFill
         controller.attach(player: player)
+        controller.playAfterAttach()
         return view
     }
 
@@ -364,6 +364,7 @@ private struct VideoPlayerLayer: UIViewRepresentable {
             avLayer?.player = player
             avLayer?.videoGravity = .resizeAspectFill
             controller.attach(player: player)
+            controller.playAfterAttach()
         }
     }
 
