@@ -141,13 +141,21 @@ struct RecommendView: View {
         let yOffset = -CGFloat(session.currentIndex) * pageHeight + dragOffset
 
         ZStack {
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(verticalDrag(count: dramas.count))
+                .simultaneousGesture(longPressGesture)
+                .simultaneousGesture(tapGesture)
+                .zIndex(-1)
+
             ForEach(visibleIndices(for: session.currentIndex, count: dramas.count), id: \.self) { idx in
                 let isCurrent = idx == session.currentIndex
                 ZStack {
                     VideoPlayerView(
                         coverURL: dramas[idx].coverURL,
                         player: isCurrent ? session.pool.current : nil,
-                        controller: isCurrent ? session.controller : nil
+                        controller: isCurrent ? session.controller : nil,
+                        shouldPlay: isCurrent && isPlaybackVisible && session.controller.pauseReason != .user
                     )
                         .allowsHitTesting(false)
 
@@ -172,12 +180,6 @@ struct RecommendView: View {
                 .padding(.bottom, 86)
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .zIndex(30)
-
-            Color.clear
-                .contentShape(Rectangle())
-                .gesture(verticalDrag(count: dramas.count))
-                .simultaneousGesture(longPressGesture)
-                .simultaneousGesture(tapGesture)
         }
         .frame(width: geo.size.width, height: pageHeight)
         .clipped()
@@ -187,12 +189,12 @@ struct RecommendView: View {
         let horizontalPadding: CGFloat = 20
         let actionRailWidth: CGFloat = 58
         let actionRailGap: CGFloat = 14
-        let tabBarAvoidance: CGFloat = 92
+        let tabBarAvoidance: CGFloat = 104
         let contentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
 
         return VStack(spacing: 0) {
             Spacer()
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .bottom, spacing: actionRailGap) {
                     VStack(alignment: .leading, spacing: 6) {
                         Button {
@@ -217,6 +219,7 @@ struct RecommendView: View {
 
                         // Synopsis toggle expand/collapse
                         synopsisView(drama.synopsis)
+                            .lineSpacing(3)
                             .contentShape(Rectangle())
                             .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() } }
                     }
@@ -441,7 +444,7 @@ struct RecommendView: View {
                     ZStack {
                         RoundedRectangle(cornerRadius: 10)
                             .fill(Color.black.opacity(0.6))
-                            .frame(width: 160, height: 90)
+                        .frame(width: 112, height: 160)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(Color.white.opacity(0.5), lineWidth: 2)
@@ -449,7 +452,7 @@ struct RecommendView: View {
                         if let thumbnail = session.controller.thumbnailImage {
                             Image(uiImage: thumbnail)
                                 .resizable().aspectRatio(contentMode: .fill)
-                                .frame(width: 160, height: 90)
+                                .frame(width: 112, height: 160)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }

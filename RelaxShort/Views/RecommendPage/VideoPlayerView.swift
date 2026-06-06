@@ -206,7 +206,7 @@ final class PlayerController: ObservableObject {
         if thumbnailGenerator == nil {
             let gen = AVAssetImageGenerator(asset: asset)
             gen.appliesPreferredTrackTransform = true
-            gen.maximumSize = CGSize(width: 320, height: 180)
+            gen.maximumSize = CGSize(width: 336, height: 480)
             thumbnailGenerator = gen
         }
         guard let gen = thumbnailGenerator else { return }
@@ -232,6 +232,7 @@ final class PlayerController: ObservableObject {
         duration = 0
         bufferProgress = 0
         thumbnailImage = nil
+        hasStartedPlayingOnce = false
     }
 
     func cleanup() {
@@ -280,6 +281,7 @@ struct VideoPlayerView: View {
     let coverURL: String
     let player: AVPlayer?
     var controller: PlayerController?
+    var shouldPlay: Bool = false
 
     @StateObject private var loader = ImageLoader()
 
@@ -289,7 +291,7 @@ struct VideoPlayerView: View {
 
             // 视频播放层（仅当有控制器且有播放器时）
             if let player, let controller {
-                VideoPlayerLayer(player: player, controller: controller)
+                VideoPlayerLayer(player: player, controller: controller, shouldPlay: shouldPlay)
             }
 
             // 封面层 — 播放器未开始播放或没有播放器时始终显示
@@ -350,6 +352,7 @@ struct VideoPlayerView: View {
 private struct VideoPlayerLayer: UIViewRepresentable {
     let player: AVPlayer
     let controller: PlayerController
+    let shouldPlay: Bool
 
     func makeUIView(context: Context) -> PlayerUIView {
         let view = PlayerUIView()
@@ -357,6 +360,7 @@ private struct VideoPlayerLayer: UIViewRepresentable {
         (view.layer as? AVPlayerLayer)?.player = player
         (view.layer as? AVPlayerLayer)?.videoGravity = .resizeAspectFill
         controller.attach(player: player)
+        applyPlaybackIntent()
         return view
     }
 
@@ -366,6 +370,15 @@ private struct VideoPlayerLayer: UIViewRepresentable {
             avLayer?.player = player
             avLayer?.videoGravity = .resizeAspectFill
             controller.attach(player: player)
+        }
+        applyPlaybackIntent()
+    }
+
+    private func applyPlaybackIntent() {
+        if shouldPlay {
+            controller.playAfterAttach()
+        } else if controller.pauseReason != .user {
+            controller.pauseForSystem()
         }
     }
 
