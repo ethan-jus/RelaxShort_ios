@@ -306,6 +306,7 @@ struct RecommendView: View {
         LongPressGesture(minimumDuration: 0.3)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
+                guard !isScrubbing else { return }
                 switch value {
                 case .second(true, _):
                     if !isSpeeding {
@@ -326,35 +327,40 @@ struct RecommendView: View {
     // MARK: - Bottom Content
 
     private func bottomContent(in geo: GeometryProxy) -> some View {
-        let horizontalPadding: CGFloat = 24
-        let actionRailWidth: CGFloat = 56
-        let actionRailGap: CGFloat = 16
+        let horizontalPadding: CGFloat = 12
+        let actionRailWidth: CGFloat = 44
+        let actionRailGap: CGFloat = 12
         let tabBarAvoidance: CGFloat = 86
         let contentMaxWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
-        let uiHidden = isSpeeding || isScrubbing
+        let hideMetadata = isSpeeding || isScrubbing
 
         return VStack(spacing: 0) {
             Spacer()
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .bottom, spacing: actionRailGap) {
                     infoSection(maxWidth: contentMaxWidth)
                         .frame(maxWidth: contentMaxWidth, alignment: .leading)
+                        .opacity(hideMetadata ? 0 : 1)
+                        .allowsHitTesting(!hideMetadata)
 
                     rightActionBar
                         .frame(width: actionRailWidth)
+                        .opacity(hideMetadata ? 0 : 1)
+                        .allowsHitTesting(!hideMetadata)
                 }
 
                 if let drama = currentDrama {
                     ctaButton(drama: drama, maxWidth: contentMaxWidth)
                         .frame(maxWidth: contentMaxWidth, alignment: .leading)
+                        .opacity(hideMetadata ? 0 : 1)
+                        .allowsHitTesting(!hideMetadata)
                 }
 
+                // Progress bar — always visible even during speed/scrub
                 progressBar(totalWidth: geo.size.width - horizontalPadding * 2)
                     .frame(width: geo.size.width - horizontalPadding * 2)
             }
-            .opacity(uiHidden ? 0 : 1)
-            .allowsHitTesting(!uiHidden)
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, tabBarAvoidance)
         }
@@ -425,10 +431,10 @@ struct RecommendView: View {
     private func ctaButton(drama: DramaItem, maxWidth: CGFloat) -> some View {
         NavigationLink(value: SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))) {
             Text("Watch Full Series")
-                .font(.system(size: 18, weight: .bold))
+                .font(.system(size: 17, weight: .bold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: 52)
+                .frame(height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(Color.black.opacity(0.42))
@@ -444,51 +450,70 @@ struct RecommendView: View {
     // MARK: - Progress Bar
 
     private func progressBar(totalWidth: CGFloat) -> some View {
-        let barWidth = totalWidth - 32
+        let barWidth = totalWidth
         let fraction = session.controller.duration > 0
             ? (isScrubbing ? Double(scrubFraction) : session.controller.currentTime / session.controller.duration)
             : 0
         let buffered = session.controller.bufferProgress
-        let effectiveHeight: CGFloat = isScrubbing ? 6 : 3
+        let effectiveHeight: CGFloat = isScrubbing ? 8 : 3
         let clampedProgress = max(0, min(1, CGFloat(fraction)))
         let scrubSeconds = Double(clampedProgress) * session.controller.duration
+        let showSeekPreview = isScrubbing
 
         return VStack(spacing: 0) {
-            if isScrubbing {
-                VStack(spacing: 6) {
-                    if let thumbnail = session.controller.thumbnailImage {
-                        Image(uiImage: thumbnail)
-                            .resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: 64, height: 36)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+            if showSeekPreview {
+                VStack(spacing: 8) {
+                    // Thumbnail preview
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.black.opacity(0.6))
+                            .frame(width: 112, height: 160)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.5), lineWidth: 2)
+                            )
+                        if let thumbnail = session.controller.thumbnailImage {
+                            Image(uiImage: thumbnail)
+                                .resizable().aspectRatio(contentMode: .fill)
+                                .frame(width: 112, height: 160)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
+
+                    // Time text
                     Text("\(formatTime(scrubSeconds)) / \(formatTime(session.controller.duration))")
-                        .font(DT.Font.body(11, weight: .medium))
-                        .foregroundColor(.white)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundColor(.white.opacity(0.92))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.bottom, 6)
+                .padding(.bottom, 12)
+                .transition(.opacity)
             }
 
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.2)).frame(height: effectiveHeight)
-                Capsule().fill(Color.white.opacity(0.15))
+                Capsule().fill(Color.white.opacity(0.25)).frame(height: effectiveHeight)
+                Capsule().fill(Color.white.opacity(0.18))
                     .frame(width: max(0, barWidth * CGFloat(buffered)), height: effectiveHeight)
                 Capsule().fill(DT.logoRed)
                     .frame(width: max(effectiveHeight, barWidth * clampedProgress), height: effectiveHeight)
                 if isScrubbing {
                     Circle()
                         .fill(.white)
-                        .frame(width: 10, height: 10)
+                        .frame(width: 14, height: 14)
                         .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
                         .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - 7)
                 }
             }
-            .frame(height: max(24, effectiveHeight), alignment: .bottom)
+            .frame(height: max(36, effectiveHeight), alignment: .bottom)
             .contentShape(Rectangle())
-            .gesture(
+            .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
+                        if isSpeeding {
+                            isSpeeding = false
+                            session.controller.setRate(1.0)
+                            showSpeedHUD = false
+                        }
                         isScrubbing = true
                         let x = value.location.x
                         scrubFraction = max(0, min(1, x / barWidth))
@@ -593,23 +618,23 @@ private struct TabLifecycleModifier: ViewModifier {
                     if !session.hasInitializedPool, !viewModel.dramas.isEmpty {
                         session.initializePool(dramas: viewModel.dramas)
                     } else {
-                        session.controller.play()
+                        session.controller.playFromSystemResume()
                     }
                 } else {
-                    session.controller.pause()
+                    session.controller.pauseForSystem()
                 }
             }
             .onChange(of: appStore.isShowingSearch) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.controller.pause() } else { session.controller.play() }
+                if isShowing { session.controller.pauseForSystem() } else { session.controller.playFromSystemResume() }
             }
             .onChange(of: appStore.isShowingMembership) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.controller.pause() } else { session.controller.play() }
+                if isShowing { session.controller.pauseForSystem() } else { session.controller.playFromSystemResume() }
             }
             .onChange(of: appStore.navigationTarget) { _, target in
                 guard appStore.selectedTab == .forYou else { return }
-                if target != nil { session.controller.pause() } else { session.controller.play() }
+                if target != nil { session.controller.pauseForSystem() } else { session.controller.playFromSystemResume() }
             }
     }
 }

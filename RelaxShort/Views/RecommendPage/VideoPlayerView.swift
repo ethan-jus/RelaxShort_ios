@@ -148,16 +148,35 @@ final class PlayerController: ObservableObject {
         player = nil
     }
 
-    /// 切换播放 / 暂停
+    /// 切换播放 / 暂停（用户主动点击视频）
     func togglePlayPause() {
         guard let player = player else { return }
         if player.timeControlStatus == .playing {
-            player.pause()
-            isUserPaused = true
+            pauseByUser()
         } else {
             player.play()
             isUserPaused = false
         }
+    }
+
+    /// 系统原因暂停（Tab切换/导航push/Search弹出等），不标记用户暂停
+    func pauseForSystem() {
+        player?.pause()
+        isPlaying = false
+    }
+
+    /// 用户主动暂停（点击视频）
+    func pauseByUser() {
+        player?.pause()
+        isUserPaused = true
+        isPlaying = false
+    }
+
+    /// 系统恢复播放（Tab切回/导航pop等），仅在非用户暂停状态下恢复
+    func playFromSystemResume() {
+        guard !isUserPaused else { return }
+        player?.play()
+        isPlaying = true
     }
 
     /// 设置播放倍速
@@ -202,16 +221,14 @@ final class PlayerController: ObservableObject {
         }
     }
 
-    /// 仅暂停播放，保留观察者和播放器引用（Tab 切换时使用）
+    /// 仅暂停播放，保留观察者和播放器引用（系统使用，不标记用户暂停）
     func pause() {
-        player?.pause()
-        isUserPaused = true
+        pauseForSystem()
     }
 
-    /// 恢复播放（Tab 切回时使用）
+    /// 恢复播放（系统使用，尊重用户暂停状态）
     func play() {
-        player?.play()
-        isUserPaused = false
+        playFromSystemResume()
     }
 
     /// 释放播放器资源

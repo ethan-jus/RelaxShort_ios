@@ -12,20 +12,20 @@ struct RightActionBar: View {
     var onEpisodes: (() -> Void)?
 
     var body: some View {
-        VStack(spacing: 26) {
+        VStack(spacing: 22) {
             // 收藏
             VStack(spacing: 4) {
                 Button(action: onBookmark) {
                     Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                        .font(.system(size: 34, weight: .medium))
+                        .font(.system(size: 30, weight: .medium))
                         .foregroundColor(isBookmarked ? DB.logoRed : .white)
                         .frame(width: 48, height: 48)
-                        .background(Circle().fill(Color.black.opacity(0.18)))
+                        .background(Circle().fill(Color.black.opacity(0.08)))
                 }
 
-                Text("Save")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.85))
+                Text(viewCount ?? "4.5M")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.white)
             }
 
             // 选集（仅剧集播放页）
@@ -33,15 +33,15 @@ struct RightActionBar: View {
                 VStack(spacing: 4) {
                     Button(action: onEpisodes) {
                         Image(systemName: "list.bullet")
-                            .font(.system(size: 34, weight: .medium))
+                            .font(.system(size: 30, weight: .medium))
                             .foregroundColor(.white)
                             .frame(width: 48, height: 48)
-                            .background(Circle().fill(Color.black.opacity(0.18)))
+                            .background(Circle().fill(Color.black.opacity(0.08)))
                     }
 
                     Text(L10n.tabEpisodes)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.85))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
                 }
             }
 
@@ -49,15 +49,15 @@ struct RightActionBar: View {
             VStack(spacing: 4) {
                 Button(action: onShare) {
                     Image(systemName: "arrowshape.turn.up.forward")
-                        .font(.system(size: 34, weight: .medium))
+                        .font(.system(size: 30, weight: .medium))
                         .foregroundColor(.white)
                         .frame(width: 48, height: 48)
-                        .background(Circle().fill(Color.black.opacity(0.18)))
+                        .background(Circle().fill(Color.black.opacity(0.08)))
                 }
 
                 Text("Share")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.85))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
             }
         }
     }
