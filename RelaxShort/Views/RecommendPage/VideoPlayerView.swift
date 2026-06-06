@@ -143,9 +143,10 @@ final class PlayerController: ObservableObject {
         startObserving()
     }
 
-    /// Explicit play after attach — called only when playback is genuinely needed
+    /// Explicit play after attach — called only from lifecycle when playback is needed
     func playAfterAttach() {
         player?.play()
+        isPlaying = true
         hasStartedPlayingOnce = true
         pauseReason = .none
     }
@@ -354,7 +355,6 @@ private struct VideoPlayerLayer: UIViewRepresentable {
         (view.layer as? AVPlayerLayer)?.player = player
         (view.layer as? AVPlayerLayer)?.videoGravity = .resizeAspectFill
         controller.attach(player: player)
-        controller.playAfterAttach()
         return view
     }
 
@@ -364,7 +364,6 @@ private struct VideoPlayerLayer: UIViewRepresentable {
             avLayer?.player = player
             avLayer?.videoGravity = .resizeAspectFill
             controller.attach(player: player)
-            controller.playAfterAttach()
         }
     }
 

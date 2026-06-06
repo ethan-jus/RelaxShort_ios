@@ -26,12 +26,12 @@ struct RecommendView: View {
     @State private var showSpeedHUD = false
     @State private var isBookmarked = false
     @State private var showBookmarkToast = false
-    @State private var isTruncated = false
     @State private var isScrubbing = false
     @State private var scrubFraction: CGFloat = 0
     @State private var showAbout = false
     @State private var showNotificationPrompt = false
     @State private var hasShownNotification = false
+    @State private var wasPlayingBeforeScrub = false
 
     init(viewModel: RecommendViewModel? = nil, session: RecommendSession, isVisible: Bool = true) {
         self.viewModel = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
@@ -61,7 +61,7 @@ struct RecommendView: View {
             }
             .onChange(of: session.currentIndex) { oldValue, newValue in
                 // Per-video transition reset
-                isExpanded = false; isTruncated = false
+                isExpanded = false
                 isScrubbing = false; scrubFraction = 0
                 isSpeeding = false; showSpeedHUD = false
                 session.controller.resetForNewPlayer()
@@ -165,11 +165,12 @@ struct RecommendView: View {
                 .position(x: geo.size.width / 2, y: CGFloat(idx) * pageHeight + pageHeight / 2 + yOffset)
             }
 
-            // Always-visible progress bar
+            // Progress bar sits above gesture layer (zIndex 30)
             progressBar(totalWidth: geo.size.width - 24)
                 .padding(.horizontal, 12)
                 .padding(.bottom, 86)
                 .frame(maxHeight: .infinity, alignment: .bottom)
+                .zIndex(30)
 
             Color.clear
                 .contentShape(Rectangle())
@@ -182,14 +183,15 @@ struct RecommendView: View {
     }
 
     private func pageBottomOverlay(drama: DramaItem, isCurrent: Bool, geo: GeometryProxy) -> some View {
-        let horizontalPadding: CGFloat = 12
-        let actionRailWidth: CGFloat = 44
-        let actionRailGap: CGFloat = 12
-        let contentMaxWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
+        let horizontalPadding: CGFloat = 20
+        let actionRailWidth: CGFloat = 58
+        let actionRailGap: CGFloat = 14
+        let tabBarAvoidance: CGFloat = 92
+        let contentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
 
         return VStack(spacing: 0) {
             Spacer()
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .bottom, spacing: actionRailGap) {
                     VStack(alignment: .leading, spacing: 6) {
                         Button {
@@ -212,21 +214,13 @@ struct RecommendView: View {
                             feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
                         }
 
-                        // Trailer | synopsis
-                        VStack(alignment: .leading, spacing: 0) {
-                            (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
-                            + Text(drama.synopsis).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
-                            .lineLimit(isExpanded ? nil : 2)
+                        // Synopsis with inline `... more`
+                        collapsedSynopsis(drama.synopsis)
+                            .lineLimit(2)
                             .contentShape(Rectangle())
-                            .onTapGesture { isExpanded.toggle() }
-                            if !isExpanded {
-                                Button { isExpanded = true } label: {
-                                    Text("more").font(.system(size: 12, weight: .medium)).foregroundColor(.white.opacity(0.5))
-                                }
-                            }
-                        }
+                            .onTapGesture { isExpanded = true }
                     }
-                    .frame(maxWidth: contentMaxWidth, alignment: .leading)
+                    .frame(width: contentWidth, alignment: .leading)
 
                     // Action rail
                     RightActionBar(
@@ -249,15 +243,29 @@ struct RecommendView: View {
                     Text("Watch Full Series")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(maxWidth: .infinity).frame(height: 44)
+                        .frame(width: contentWidth, height: 44)
                         .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Color.black.opacity(0.42)))
                         .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(Color.white.opacity(0.08), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
             .padding(.horizontal, horizontalPadding)
-            .padding(.bottom, 100)
+            .padding(.bottom, tabBarAvoidance)
         }
+    }
+
+    private func collapsedSynopsis(_ text: String) -> Text {
+        Text("Trailer | ")
+            .font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
+        + Text(truncatedSynopsis(text))
+            .font(.system(size: 13)).foregroundColor(.white.opacity(0.65))
+        + Text(" ... more")
+            .font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.9))
+    }
+
+    private func truncatedSynopsis(_ text: String) -> String {
+        if text.count > 80 { String(text.prefix(80)) }
+        else { text }
     }
 
     private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
@@ -291,13 +299,10 @@ struct RecommendView: View {
 
     private func setupAutoPlay() {
         let s = session
-        let vm = viewModel
-        let store = appStore
         s.controller.onPlaybackFinished = {
-            let idx = s.currentIndex
-            if vm.dramas.indices.contains(idx) {
-                store.navigationTarget = SeriesPlayerNav(drama: vm.dramas[idx], startEpisode: 2)
-            }
+            s.controller.pauseForSystem()
+            s.controller.seek(to: 0)
+            // For You v1: do not auto-navigate to fullscreen
         }
     }
 
@@ -332,34 +337,7 @@ struct RecommendView: View {
         .frame(width: geo.size.width, height: geo.size.height)
     }
 
-    // MARK: - Vertical Feed Pager
-
-    private func feedPager(in geo: GeometryProxy) -> some View {
-        let pageHeight = geo.size.height
-        let dramas = viewModel.dramas
-        let yOffset = -CGFloat(session.currentIndex) * pageHeight + dragOffset
-
-        return ZStack {
-            ForEach(visibleIndices(for: session.currentIndex, count: dramas.count), id: \.self) { idx in
-                VideoPlayerView(
-                    coverURL: dramas[idx].coverURL,
-                    player: (idx == session.currentIndex) ? session.pool.current : nil,
-                    controller: (idx == session.currentIndex) ? session.controller : nil
-                )
-                    .allowsHitTesting(false)
-                    .frame(width: geo.size.width, height: pageHeight)
-                    .position(x: geo.size.width / 2, y: CGFloat(idx) * pageHeight + pageHeight / 2 + yOffset)
-            }
-
-            Color.clear
-                .contentShape(Rectangle())
-                .gesture(verticalDrag(count: dramas.count))
-                .simultaneousGesture(longPressGesture)
-                .simultaneousGesture(tapGesture)
-        }
-        .frame(width: geo.size.width, height: pageHeight)
-        .clipped()
-    }
+    // Old feedPager removed — feedOverlayContent is the single pager implementation
 
     private func visibleIndices(for current: Int, count: Int) -> [Int] {
         guard count > 0 else { return [] }
@@ -407,28 +385,11 @@ struct RecommendView: View {
         }
     }
 
-    // MARK: - Long Press Speed-Up
+    // MARK: - Long Press Speed-Up (disabled for v1 — conflicts with vertical swipe)
 
     private var longPressGesture: some Gesture {
         LongPressGesture(minimumDuration: 0.3)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .onChanged { value in
-                guard !isScrubbing else { return }
-                switch value {
-                case .second(true, _):
-                    if !isSpeeding {
-                        isSpeeding = true
-                        session.controller.setRate(2.0)
-                        withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
-                    }
-                default: break
-                }
-            }
-            .onEnded { _ in
-                isSpeeding = false
-                session.controller.setRate(1.0)
-                withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
-            }
+            .onEnded { _ in }
     }
 
     // MARK: - Progress Bar
@@ -488,15 +449,18 @@ struct RecommendView: View {
                         .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - 7)
                 }
             }
-            .frame(height: max(36, effectiveHeight), alignment: .bottom)
+            .frame(height: max(44, effectiveHeight), alignment: .bottom)
             .contentShape(Rectangle())
             .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
-                        if isSpeeding {
-                            isSpeeding = false
-                            session.controller.setRate(1.0)
-                            showSpeedHUD = false
+                        if !isScrubbing {
+                            wasPlayingBeforeScrub = session.controller.isPlaying
+                            if isSpeeding {
+                                isSpeeding = false
+                                session.controller.setRate(1.0)
+                                showSpeedHUD = false
+                            }
                         }
                         isScrubbing = true
                         let x = value.location.x
@@ -507,8 +471,10 @@ struct RecommendView: View {
                         let x = value.location.x
                         let clamped = max(0, min(1, x / barWidth))
                         session.controller.seek(to: Double(clamped))
+                        if wasPlayingBeforeScrub { session.controller.playFromSystemResume() }
                         isScrubbing = false
                         scrubFraction = 0
+                        wasPlayingBeforeScrub = false
                     }
             )
         }
