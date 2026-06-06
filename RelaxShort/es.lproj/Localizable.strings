@@ -1,0 +1,204 @@
+/* ============================================
+   Localizable.strings (Español)
+   RelaxShort iOS App
+   ============================================ */
+
+/* ---- General ---- */
+"general.more" = "Más";
+"general.share" = "Compartir";
+"general.comment" = "Comentar";
+"general.download" = "Descargar";
+"general.cancel" = "Cancelar";
+"general.confirm" = "Confirmar";
+"general.retry" = "Reintentar";
+"general.loading" = "Cargando...";
+"general.no_content" = "Sin contenido";
+
+/* ---- Search ---- */
+"search.hot_search_tab" = "Tendencias";
+"search.hot_play_tab" = "Más Vistos";
+"search.new_drama_tab" = "Nuevos";
+"search.no_hot_search" = "Sin tendencias";
+"search.no_hot_play" = "Sin más vistos";
+"search.no_new_drama" = "Sin nuevos dramas";
+"search.placeholder" = "Más allá de las nubes, nuestros corazones se conectan...";
+"search.no_results" = "Sin resultados";
+"search.try_different_keyword" = "Prueba con otra palabra clave";
+"search.hint" = "Buscar títulos, categorías o etiquetas";
+
+/* ---- Home ---- */
+"home.featured" = "Destacados";
+"home.rankings" = "Ranking";
+"home.you_are_watching" = "Estás viendo";
+"home.view_all" = "Ver todo";
+"home.episode_count" = " eps";
+
+/* ---- Rank ---- */
+"rank.search_placeholder" = "Qué casualidad, tú también volviste";
+"rank.no_data" = "Sin datos de ranking";
+
+/* ---- Coin Reward ---- */
+"coin.tab" = "Monedas de Recompensa";
+"coin.member_points_tab" = "Puntos de Miembro";
+"coin.my_coins" = "Mis Monedas";
+"coin.rules" = "Reglas";
+"coin.reward_rules" = "Reglas de Recompensa";
+"coin.checked_in_days" = "%d días registrado";
+"coin.watch_ad_for_coins" = "Ver anuncio por 30 monedas";
+"coin.earn_coins" = "Ganar Monedas";
+"coin.apple_disclaimer" = "Esta actividad no está asociada con Apple Inc.";
+
+/* ---- Membership ---- */
+"membership.join" = "Suscribirse";
+"membership.weekly" = "Semanal";
+"membership.monthly" = "Mensual";
+"membership.yearly" = "Anual";
+"membership.discount" = "Descuento";
+"membership.join_now" = "Suscribirse Ahora";
+"membership.recharge_info" = "Información de Recarga";
+"membership.service_agreement" = "Términos de Servicio y Política de Privacidad";
+"membership.terms_1" = "1. RelaxShort ofrece contenido gratuito y de pago.";
+"membership.terms_2" = "2. El contenido de pago se puede desbloquear con monedas o suscripción. Disfruta sin límites durante el período de suscripción.";
+"membership.terms_3" = "3. Para más detalles, consulta los avisos en la app. Contacta con soporte si tienes preguntas.";
+
+/* ---- Membership Benefits ---- */
+"benefit.all_shows" = "16.000+ series gratis\n100+ nuevas series cada semana";
+"benefit.download" = "Descargar";
+"benefit.vip_shows" = "Exclusivos VIP";
+"benefit.themes" = "Temas Exclusivos VIP";
+"benefit.quality" = "Calidad 1080p";
+"benefit.gift" = "Regalar a Amigos 3x/semana";
+"benefit.friend_gift" = "Regalar Suscripción 1x/semana";
+"benefit.no_ads" = "Sin Anuncios";
+
+/* ---- VIP ---- */
+"vip.unlock_all" = "Desbloquear Todo el Contenido";
+"vip.vip_expiry" = "VIP válido hasta %@";
+"vip.remaining_days" = "%d días restantes";
+"vip.recommended" = "Recomendado";
+"vip.subscribe_now" = "Suscribirse Ahora";
+"vip.renew" = "Renovar Suscripción";
+"vip.auto_renew_notice" = "Renovación automática, cancela cuando quieras";
+"vip.why_join" = "¿Por qué ser VIP?";
+
+/* ---- Profile ---- */
+"profile.recharge_now" = "Recargar";
+"profile.my_wallet" = "Mi Billetera";
+"profile.welfare_center" = "Centro de Beneficios";
+"profile.watch_history" = "Historial";
+"profile.download" = "Descargas";
+"profile.language" = "Idioma";
+"profile.customer_service" = "Atención al Cliente";
+"profile.simplified_chinese" = "Español";
+"profile.feature_in_development" = "En desarrollo";
+"profile.drama" = "Dramas";
+"profile.daily_points" = "Diario";
+"profile.points" = "Puntos";
+"profile.quality" = "Calidad";
+"profile.followed_count" = "Siguiendo %d";
+
+/* ---- Theme ---- */
+"theme.system" = "Sistema";
+"theme.light" = "Modo Claro";
+"theme.dark" = "Modo Oscuro";
+
+/* ---- Language Names ---- */
+"lang.zh_hans" = "简体中文";
+"lang.zh_hant" = "繁體中文";
+"lang.en" = "English";
+"lang.ko" = "한국어";
+"lang.ja" = "日本語";
+"lang.pt" = "Português";
+"lang.es" = "Español";
+"lang.ar" = "العربية";
+
+/* ---- Favorites ---- */
+"favorites.my_favorites" = "Mis Favoritos";
+"favorites.no_watch_history" = "Sin historial";
+"favorites.no_bookmarks" = "Sin marcadores";
+"favorites.login_to_view" = "Inicia sesión para ver favoritos";
+"favorites.login_to_sync" = "Inicia sesión para sincronizar tus favoritos";
+"favorites.login_now" = "Iniciar Sesión";
+"favorites.continue_watching" = "Continuar";
+"favorites.watch_now" = "Ver Ahora";
+"favorites.watched_percent" = "%d%% visto";
+"favorites.episode_progress" = "Ep.%d/%d";
+"favorites.total_episodes" = "%d Episodios";
+"favorites.save_your_list" = "Guarda tu lista";
+"favorites.login_recommendation" = "Para no perder tus favoritos,\nrecomendamos encarecidamente iniciar sesión";
+"favorites.login_google" = "Iniciar sesión con Google";
+"favorites.login_apple" = "Iniciar sesión con Apple";
+"favorites.login_agreement" = "Al iniciar sesión, aceptas nuestros\nTérminos de Servicio y Política de Privacidad";
+
+/* ---- Recommend ---- */
+"recommend.no_content" = "Sin recomendaciones";
+"recommend.pull_to_refresh" = "Desliza para actualizar";
+"recommend.watch_full_series" = "Ver Serie Completa";
+"recommend.episode_number" = "Ep.%d";
+"recommend.synopsis" = "Sinopsis";
+
+/* ---- Exit Guide ---- */
+"exit.new_drama_benefit" = "Nuevo Drama";
+"exit.reward_benefit" = "Recompensas";
+"exit.promo_benefit" = "Promociones";
+"exit.enable_title" = "¿Activar alertas diarias?";
+"exit.enable_body" = "Descubre dramas increíbles. ¡Activa las notificaciones para más recomendaciones!";
+"exit.enable_button" = "Activar Notificaciones";
+
+/* ---- Shared Components ---- */
+"shared.total_episodes_prefix" = "";
+
+/* ---- Tab Bar ----
+/* ---- Tab Bar ---- */
+"home.tab.title" = "Inicio";
+"recommend.tab.title" = "Recs";
+"vip.tab.title" = "VIP";
+"favorites.tab.title" = "Favs";
+"profile.tab.title" = "Yo";
+
+/* ---- Theme Menu ---- */
+"theme.menu.title" = "Theme";
+"theme.sheet.title" = "Theme";
+"theme.menu.title" = "Tema";
+"theme.sheet.title" = "Tema";
+/* ---- Player ---- */
+"player.views_count" = "%@ vistas";
+"player.no_rating" = "Sin calificación";
+"player.rating_arrow" = "Calificación >";
+"player.tab_introduction" = "Introducción";
+"player.tab_episodes" = "Episodios";
+"player.cast_and_crew" = "Reparto y equipo";
+"player.more_similar" = "Más como esto";
+"player.collapse" = "Contraer";
+"player.watch_full_series" = "Ver serie completa";
+"player.share" = "Compartir";
+"player.share_reward" = "Comparte con un amigo y gana 10 monedas";
+"player.copy_link" = "Copiar enlace";
+"player.speed" = "Velocidad";
+"player.playback_settings" = "Ajustes de reproducción";
+"player.current_resolution" = "Calidad actual";
+"player.picture_in_picture" = "Imagen en imagen";
+"player.subtitle_feedback_prefix" = "¿Error en subtítulos? ";
+"player.subtitle_feedback_link" = "Enviar comentarios";
+"player.episode_number" = "Ep.%d";
+
+/* ---- Episode ---- */
+"episode.total_count" = "Total %d Episodios";
+
+/* ---- Splash ---- */
+"splash.tagline" = "Dramas cortos. Relajación infinita.";
+
+/* ---- Login ---- */
+"login.tagline" = "Descubre historias que te conmueven";
+"login.agreement_prefix" = "Al continuar, aceptas nuestros ";
+"login.terms_of_service" = "Términos de servicio";
+"login.and" = " y la ";
+"login.privacy_policy" = "Política de privacidad";
+"login.period" = ".";
+
+/* ---- General (additional) ---- */
+"general.error" = "Error";
+"general.ok" = "OK";
+
+/* ---- VIP ---- */
+"vip.title" = "RelaxShort VIP";

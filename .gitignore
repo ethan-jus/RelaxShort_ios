@@ -1,0 +1,38 @@
+# macOS
+.DS_Store
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+
+# Xcode build products
+DerivedData/
+build/
+*.ipa
+*.xcarchive/
+*.dSYM
+*.dSYM.zip
+
+# Packaging and export artifacts
+Packaging.log
+DistributionSummary.plist
+exportOptions.plist
+
+# Local tools and agent state
+.mcp.json
+.xcodebuildmcp/
+memory/
+RelaxShort/MEMORY.md
+error.log
+
+# Local helper scripts generated during project repair
+add_files*.py
+*.bak
+
+# Swift Package Manager
+.build/
+
+# CocoaPods, if introduced later
+Pods/
+*.xcworkspace/xcuserdata/

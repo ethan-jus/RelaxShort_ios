@@ -1,0 +1,204 @@
+/* ============================================
+   Localizable.strings (日本語)
+   RelaxShort iOS App
+   ============================================ */
+
+/* ---- General ---- */
+"general.more" = "もっと見る";
+"general.share" = "共有";
+"general.comment" = "コメント";
+"general.download" = "ダウンロード";
+"general.cancel" = "キャンセル";
+"general.confirm" = "確認";
+"general.retry" = "再試行";
+"general.loading" = "読み込み中...";
+"general.no_content" = "コンテンツなし";
+
+/* ---- Search ---- */
+"search.hot_search_tab" = "急上昇";
+"search.hot_play_tab" = "人気放送";
+"search.new_drama_tab" = "新作";
+"search.no_hot_search" = "急上昇なし";
+"search.no_hot_play" = "人気放送なし";
+"search.no_new_drama" = "新作なし";
+"search.placeholder" = "雲の向こう、心が繋がる...";
+"search.no_results" = "検索結果が見つかりません";
+"search.try_different_keyword" = "別のキーワードで試してください";
+"search.hint" = "タイトル、ジャンル、タグで検索";
+
+/* ---- Home ---- */
+"home.featured" = "おすすめ";
+"home.rankings" = "ランキング";
+"home.you_are_watching" = "視聴中";
+"home.view_all" = "すべて見る";
+"home.episode_count" = "話";
+
+/* ---- Rank ---- */
+"rank.search_placeholder" = "偶然ですね、あなたも戻ってきた";
+"rank.no_data" = "ランキングデータなし";
+
+/* ---- Coin Reward ---- */
+"coin.tab" = "コイン報酬";
+"coin.member_points_tab" = "会員ポイント";
+"coin.my_coins" = "マイコイン";
+"coin.rules" = "ルール";
+"coin.reward_rules" = "報酬ルール";
+"coin.checked_in_days" = "%d日チェックイン済み";
+"coin.watch_ad_for_coins" = "広告を見て30コイン獲得";
+"coin.earn_coins" = "コインを貯める";
+"coin.apple_disclaimer" = "この活動はApple Inc.とは関係ありません。";
+
+/* ---- Membership ---- */
+"membership.join" = "メンバーシップ加入";
+"membership.weekly" = "週間";
+"membership.monthly" = "月間";
+"membership.yearly" = "年間";
+"membership.discount" = "割引";
+"membership.join_now" = "今すぐ加入";
+"membership.recharge_info" = "チャージ案内";
+"membership.service_agreement" = "利用規約とプライバシーポリシー";
+"membership.terms_1" = "1. RelaxShortには無料コンテンツと有料コンテンツがあります。";
+"membership.terms_2" = "2. 有料コンテンツはコインまたはメンバーシップで視聴でき、有効期間中は無制限にご利用いただけます。";
+"membership.terms_3" = "3. 詳細はアプリ内の案内をご参照ください。ご不明な点はカスタマーサポートまでお問い合わせください。";
+
+/* ---- Membership Benefits ---- */
+"benefit.all_shows" = "16,000以上の作品が見放題\n毎週100以上の新作を追加";
+"benefit.download" = "ダウンロード";
+"benefit.vip_shows" = "VIP限定";
+"benefit.themes" = "VIP専用テーマ";
+"benefit.quality" = "1080p 画質";
+"benefit.gift" = "友達にギフト 週3回";
+"benefit.friend_gift" = "メンバーシップギフト 週1回";
+"benefit.no_ads" = "広告なし";
+
+/* ---- VIP ---- */
+"vip.unlock_all" = "すべてのコンテンツを解放";
+"vip.vip_expiry" = "VIP有効期限: %@";
+"vip.remaining_days" = "残り %d 日";
+"vip.recommended" = "おすすめ";
+"vip.subscribe_now" = "今すぐ購読";
+"vip.renew" = "メンバーシップ更新";
+"vip.auto_renew_notice" = "自動更新、いつでもキャンセル可能";
+"vip.why_join" = "VIPメンバーシップのメリット";
+
+/* ---- Profile ---- */
+"profile.recharge_now" = "チャージする";
+"profile.my_wallet" = "マイウォレット";
+"profile.welfare_center" = "特典センター";
+"profile.watch_history" = "視聴履歴";
+"profile.download" = "ダウンロード";
+"profile.language" = "言語";
+"profile.customer_service" = "カスタマーサポート";
+"profile.simplified_chinese" = "日本語";
+"profile.feature_in_development" = "開発中の機能";
+"profile.drama" = "ドラマ";
+"profile.daily_points" = "毎日";
+"profile.points" = "ポイント";
+"profile.quality" = "画質";
+"profile.followed_count" = "フォロー %d";
+
+/* ---- Theme ---- */
+"theme.system" = "システム設定";
+"theme.light" = "ライトモード";
+"theme.dark" = "ダークモード";
+
+/* ---- Language Names ---- */
+"lang.zh_hans" = "简体中文";
+"lang.zh_hant" = "繁體中文";
+"lang.en" = "English";
+"lang.ko" = "한국어";
+"lang.ja" = "日本語";
+"lang.pt" = "Português";
+"lang.es" = "Español";
+"lang.ar" = "العربية";
+
+/* ---- Favorites ---- */
+"favorites.my_favorites" = "お気に入り";
+"favorites.no_watch_history" = "視聴履歴なし";
+"favorites.no_bookmarks" = "ブックマークなし";
+"favorites.login_to_view" = "ログインしてお気に入りを見る";
+"favorites.login_to_sync" = "ログインしてお気に入りを同期";
+"favorites.login_now" = "今すぐログイン";
+"favorites.continue_watching" = "続きを見る";
+"favorites.watch_now" = "今すぐ見る";
+"favorites.watched_percent" = "%d%%視聴済み";
+"favorites.episode_progress" = "第%d話 / %d話";
+"favorites.total_episodes" = "全%d話";
+"favorites.save_your_list" = "リストを保存";
+"favorites.login_recommendation" = "お気に入りリストを保護するために\nログインを強くお勧めします";
+"favorites.login_google" = "Googleでログイン";
+"favorites.login_apple" = "Appleでログイン";
+"favorites.login_agreement" = "ログインすると、利用規約と\nプライバシーポリシーに同意したことになります";
+
+/* ---- Recommend ---- */
+"recommend.no_content" = "おすすめなし";
+"recommend.pull_to_refresh" = "引っ張って更新";
+"recommend.watch_full_series" = "全話見る";
+"recommend.episode_number" = "第%d話";
+"recommend.synopsis" = "あらすじ";
+
+/* ---- Exit Guide ---- */
+"exit.new_drama_benefit" = "新作";
+"exit.reward_benefit" = "報酬";
+"exit.promo_benefit" = "プロモーション";
+"exit.enable_title" = "毎日のドラマ通知をオンにしますか？";
+"exit.enable_body" = "隠れた名作を発見しましょう。通知をオンにして、もっとおすすめを受け取りましょう！";
+"exit.enable_button" = "通知をオン";
+
+/* ---- Shared Components ---- */
+"shared.total_episodes_prefix" = "全";
+
+/* ---- Tab Bar ----
+/* ---- Tab Bar ---- */
+"home.tab.title" = "ホーム";
+"recommend.tab.title" = "おすすめ";
+"vip.tab.title" = "VIP";
+"favorites.tab.title" = "お気に入り";
+"profile.tab.title" = "マイ";
+
+/* ---- Theme Menu ---- */
+"theme.menu.title" = "Theme";
+"theme.sheet.title" = "Theme";
+"theme.menu.title" = "テーマ";
+"theme.sheet.title" = "テーマ設定";
+/* ---- Player ---- */
+"player.views_count" = "%@ 回視聴";
+"player.no_rating" = "評価なし";
+"player.rating_arrow" = "評価 >";
+"player.tab_introduction" = "紹介";
+"player.tab_episodes" = "エピソード";
+"player.cast_and_crew" = "キャスト＆スタッフ";
+"player.more_similar" = "似ている作品";
+"player.collapse" = "閉じる";
+"player.watch_full_series" = "全話見る";
+"player.share" = "共有";
+"player.share_reward" = "友達に共有して10コイン獲得";
+"player.copy_link" = "リンクをコピー";
+"player.speed" = "再生速度";
+"player.playback_settings" = "再生設定";
+"player.current_resolution" = "画質";
+"player.picture_in_picture" = "ピクチャーインピクチャー";
+"player.subtitle_feedback_prefix" = "字幕に誤りがある場合は、";
+"player.subtitle_feedback_link" = "こちらからフィードバック";
+"player.episode_number" = "第%d話";
+
+/* ---- Episode ---- */
+"episode.total_count" = "全%d話";
+
+/* ---- Splash ---- */
+"splash.tagline" = "短編ドラマ・無限のリラックス";
+
+/* ---- Login ---- */
+"login.tagline" = "心を動かすストーリーを見つけよう";
+"login.agreement_prefix" = "続行すると、";
+"login.terms_of_service" = "利用規約";
+"login.and" = " と ";
+"login.privacy_policy" = "プライバシーポリシー";
+"login.period" = " に同意したことになります。";
+
+/* ---- General (additional) ---- */
+"general.error" = "エラー";
+"general.ok" = "OK";
+
+/* ---- VIP ---- */
+"vip.title" = "RelaxShort VIP";

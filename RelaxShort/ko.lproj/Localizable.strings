@@ -1,0 +1,204 @@
+/* ============================================
+   Localizable.strings (한국어)
+   RelaxShort iOS App
+   ============================================ */
+
+/* ---- General ---- */
+"general.more" = "더보기";
+"general.share" = "공유";
+"general.comment" = "댓글";
+"general.download" = "다운로드";
+"general.cancel" = "취소";
+"general.confirm" = "확인";
+"general.retry" = "다시 시도";
+"general.loading" = "로딩 중...";
+"general.no_content" = "콘텐츠 없음";
+
+/* ---- Search ---- */
+"search.hot_search_tab" = "인기 검색";
+"search.hot_play_tab" = "인기 방영";
+"search.new_drama_tab" = "신작";
+"search.no_hot_search" = "인기 검색어 없음";
+"search.no_hot_play" = "인기 방영작 없음";
+"search.no_new_drama" = "신작 없음";
+"search.placeholder" = "구름 너머, 우리 마음이 연결됩니다...";
+"search.no_results" = "검색 결과 없음";
+"search.try_different_keyword" = "다른 키워드로 검색해보세요";
+"search.hint" = "제목, 장르 또는 태그 검색";
+
+/* ---- Home ---- */
+"home.featured" = "추천";
+"home.rankings" = "랭킹";
+"home.you_are_watching" = "시청 중";
+"home.view_all" = "전체 보기";
+"home.episode_count" = "화";
+
+/* ---- Rank ---- */
+"rank.search_placeholder" = "이런, 당신도 돌아왔군요";
+"rank.no_data" = "랭킹 데이터 없음";
+
+/* ---- Coin Reward ---- */
+"coin.tab" = "코인 보상";
+"coin.member_points_tab" = "회원 포인트";
+"coin.my_coins" = "내 코인";
+"coin.rules" = "규칙";
+"coin.reward_rules" = "보상 규칙";
+"coin.checked_in_days" = "%d일 출석 완료";
+"coin.watch_ad_for_coins" = "광고 시청하고 30코인 받기";
+"coin.earn_coins" = "코인 획득";
+"coin.apple_disclaimer" = "이 활동은 Apple Inc.와 관련이 없습니다.";
+
+/* ---- Membership ---- */
+"membership.join" = "멤버십 가입";
+"membership.weekly" = "주간";
+"membership.monthly" = "월간";
+"membership.yearly" = "연간";
+"membership.discount" = "할인";
+"membership.join_now" = "지금 가입";
+"membership.recharge_info" = "충전 안내";
+"membership.service_agreement" = "서비스 약관 및 개인정보 처리방침";
+"membership.terms_1" = "1. RelaxShort에는 무료 및 유료 콘텐츠가 있습니다.";
+"membership.terms_2" = "2. 유료 콘텐츠는 코인 또는 멤버십으로 이용 가능하며, 멤버십 기간 동안 무제한 시청할 수 있습니다.";
+"membership.terms_3" = "3. 자세한 내용은 앱 내 안내를 참조하세요. 문의사항은 고객센터로 연락해 주세요.";
+
+/* ---- Membership Benefits ---- */
+"benefit.all_shows" = "16,000+ 작품 무료 시청\n매주 100+ 신작 추가";
+"benefit.download" = "다운로드";
+"benefit.vip_shows" = "VIP 전용";
+"benefit.themes" = "VIP 전용 테마";
+"benefit.quality" = "1080p 화질";
+"benefit.gift" = "친구에게 선물하기 주3회";
+"benefit.friend_gift" = "멤버십 선물하기 주1회";
+"benefit.no_ads" = "광고 제거";
+
+/* ---- VIP ---- */
+"vip.unlock_all" = "모든 콘텐츠 잠금 해제";
+"vip.vip_expiry" = "VIP 만료일: %@";
+"vip.remaining_days" = "%d일 남음";
+"vip.recommended" = "추천";
+"vip.subscribe_now" = "지금 구독";
+"vip.renew" = "멤버십 갱신";
+"vip.auto_renew_notice" = "자동 갱신, 언제든지 취소 가능";
+"vip.why_join" = "VIP 멤버십 혜택";
+
+/* ---- Profile ---- */
+"profile.recharge_now" = "충전하기";
+"profile.my_wallet" = "내 지갑";
+"profile.welfare_center" = "복지 센터";
+"profile.watch_history" = "시청 기록";
+"profile.download" = "다운로드";
+"profile.language" = "언어";
+"profile.customer_service" = "고객센터";
+"profile.simplified_chinese" = "한국어";
+"profile.feature_in_development" = "개발 중인 기능";
+"profile.drama" = "드라마";
+"profile.daily_points" = "매일";
+"profile.points" = "포인트";
+"profile.quality" = "화질";
+"profile.followed_count" = "팔로우 %d";
+
+/* ---- Theme ---- */
+"theme.system" = "시스템 설정";
+"theme.light" = "라이트 모드";
+"theme.dark" = "다크 모드";
+
+/* ---- Language Names ---- */
+"lang.zh_hans" = "简体中文";
+"lang.zh_hant" = "繁體中文";
+"lang.en" = "English";
+"lang.ko" = "한국어";
+"lang.ja" = "日本語";
+"lang.pt" = "Português";
+"lang.es" = "Español";
+"lang.ar" = "العربية";
+
+/* ---- Favorites ---- */
+"favorites.my_favorites" = "내 즐겨찾기";
+"favorites.no_watch_history" = "시청 기록 없음";
+"favorites.no_bookmarks" = "북마크 없음";
+"favorites.login_to_view" = "로그인 후 즐겨찾기 보기";
+"favorites.login_to_sync" = "로그인하여 즐겨찾기를 동기화하세요";
+"favorites.login_now" = "지금 로그인";
+"favorites.continue_watching" = "이어보기";
+"favorites.watch_now" = "지금 보기";
+"favorites.watched_percent" = "%d%% 시청";
+"favorites.episode_progress" = "%d화 / %d화";
+"favorites.total_episodes" = "총 %d화";
+"favorites.save_your_list" = "목록 저장하기";
+"favorites.login_recommendation" = "즐겨찾기 목록을 보호하기 위해\n로그인을 강력히 권장합니다";
+"favorites.login_google" = "Google로 로그인";
+"favorites.login_apple" = "Apple로 로그인";
+"favorites.login_agreement" = "로그인하면 이용약관 및\n개인정보 처리방침에 동의하게 됩니다";
+
+/* ---- Recommend ---- */
+"recommend.no_content" = "추천 콘텐츠 없음";
+"recommend.pull_to_refresh" = "당겨서 새로고침";
+"recommend.watch_full_series" = "전편 보기";
+"recommend.episode_number" = "%d화";
+"recommend.synopsis" = "줄거리";
+
+/* ---- Exit Guide ---- */
+"exit.new_drama_benefit" = "신작";
+"exit.reward_benefit" = "보상";
+"exit.promo_benefit" = "프로모션";
+"exit.enable_title" = "매일 드라마 알림을 켜시겠습니까?";
+"exit.enable_body" = "숨은 명작을 발견하세요. 알림을 켜고 더 많은 추천을 받아보세요!";
+"exit.enable_button" = "알림 켜기";
+
+/* ---- Shared Components ---- */
+"shared.total_episodes_prefix" = "총 ";
+
+/* ---- Tab Bar ----
+/* ---- Tab Bar ---- */
+"home.tab.title" = "홈";
+"recommend.tab.title" = "추천";
+"vip.tab.title" = "VIP";
+"favorites.tab.title" = "즐겨찾기";
+"profile.tab.title" = "내정보";
+
+/* ---- Theme Menu ---- */
+"theme.menu.title" = "Theme";
+"theme.sheet.title" = "Theme";
+"theme.menu.title" = "테마";
+"theme.sheet.title" = "테마 설정";
+/* ---- Player ---- */
+"player.views_count" = "조회 %@회";
+"player.no_rating" = "평점 없음";
+"player.rating_arrow" = "평점 >";
+"player.tab_introduction" = "소개";
+"player.tab_episodes" = "에피소드";
+"player.cast_and_crew" = "출연진 및 제작진";
+"player.more_similar" = "비슷한 콘텐츠";
+"player.collapse" = "접기";
+"player.watch_full_series" = "전편 보기";
+"player.share" = "공유";
+"player.share_reward" = "친구에게 공유하고 10코인 받기";
+"player.copy_link" = "링크 복사";
+"player.speed" = "배속";
+"player.playback_settings" = "재생 설정";
+"player.current_resolution" = "현재 화질";
+"player.picture_in_picture" = "PIP";
+"player.subtitle_feedback_prefix" = "자막 오류가 있으면 ";
+"player.subtitle_feedback_link" = "여기를 클릭하여 피드백";
+"player.episode_number" = "제%d화";
+
+/* ---- Episode ---- */
+"episode.total_count" = "총 %d화";
+
+/* ---- Splash ---- */
+"splash.tagline" = "숏드라마 · 무한한 휴식";
+
+/* ---- Login ---- */
+"login.tagline" = "당신을 감동시킬 이야기를 발견하세요";
+"login.agreement_prefix" = "계속하면 ";
+"login.terms_of_service" = "서비스 약관";
+"login.and" = " 및 ";
+"login.privacy_policy" = "개인정보 처리방침";
+"login.period" = "에 동의하는 것입니다。";
+
+/* ---- General (additional) ---- */
+"general.error" = "오류";
+"general.ok" = "확인";
+
+/* ---- VIP ---- */
+"vip.title" = "RelaxShort VIP";

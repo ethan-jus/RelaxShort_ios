@@ -1,0 +1,204 @@
+/* ============================================
+   Localizable.strings (العربية)
+   RelaxShort iOS App
+   ============================================ */
+
+/* ---- General ---- */
+"general.more" = "المزيد";
+"general.share" = "مشاركة";
+"general.comment" = "تعليق";
+"general.download" = "تحميل";
+"general.cancel" = "إلغاء";
+"general.confirm" = "تأكيد";
+"general.retry" = "إعادة المحاولة";
+"general.loading" = "جارٍ التحميل...";
+"general.no_content" = "لا يوجد محتوى";
+
+/* ---- Search ---- */
+"search.hot_search_tab" = "الأكثر بحثاً";
+"search.hot_play_tab" = "الأكثر مشاهدة";
+"search.new_drama_tab" = "جديد";
+"search.no_hot_search" = "لا توجد عمليات بحث رائجة";
+"search.no_hot_play" = "لا توجد أعمال رائجة";
+"search.no_new_drama" = "لا توجد أعمال جديدة";
+"search.placeholder" = "خلف الغيوم، قلوبنا تتصل...";
+"search.no_results" = "لم يتم العثور على نتائج";
+"search.try_different_keyword" = "جرّب كلمة مفتاحية مختلفة";
+"search.hint" = "ابحث عن العناوين أو الفئات أو الوسوم";
+
+/* ---- Home ---- */
+"home.featured" = "مميز";
+"home.rankings" = "التصنيفات";
+"home.you_are_watching" = "أنت تشاهد";
+"home.view_all" = "عرض الكل";
+"home.episode_count" = " حلقات";
+
+/* ---- Rank ---- */
+"rank.search_placeholder" = "يا للمصادفة، لقد عدت أيضاً";
+"rank.no_data" = "لا توجد بيانات تصنيف";
+
+/* ---- Coin Reward ---- */
+"coin.tab" = "عملات المكافأة";
+"coin.member_points_tab" = "نقاط العضوية";
+"coin.my_coins" = "عملاتي";
+"coin.rules" = "القواعد";
+"coin.reward_rules" = "قواعد المكافأة";
+"coin.checked_in_days" = "تم تسجيل الدخول %d أيام";
+"coin.watch_ad_for_coins" = "شاهد إعلاناً لتحصل على 30 عملة";
+"coin.earn_coins" = "اربح عملات";
+"coin.apple_disclaimer" = "هذا النشاط غير مرتبط بشركة Apple Inc.";
+
+/* ---- Membership ---- */
+"membership.join" = "انضم للعضوية";
+"membership.weekly" = "أسبوعي";
+"membership.monthly" = "شهري";
+"membership.yearly" = "سنوي";
+"membership.discount" = "خصم";
+"membership.join_now" = "انضم الآن";
+"membership.recharge_info" = "معلومات الشحن";
+"membership.service_agreement" = "شروط الخدمة وسياسة الخصوصية";
+"membership.terms_1" = "١. يوفر RelaxShort محتوى مجاني ومدفوع.";
+"membership.terms_2" = "٢. يمكن فتح المحتوى المدفوع بالعملات أو بالاشتراك في العضوية. شاهد بلا حدود خلال فترة العضوية.";
+"membership.terms_3" = "٣. لمزيد من التفاصيل، راجع الإشعارات داخل التطبيق. اتصل بالدعم إذا كان لديك أسئلة.";
+
+/* ---- Membership Benefits ---- */
+"benefit.all_shows" = "أكثر من ١٦,٠٠٠ مسلسل مجاناً\nأكثر من ١٠٠ مسلسل جديد أسبوعياً";
+"benefit.download" = "تحميل";
+"benefit.vip_shows" = "حصريات VIP";
+"benefit.themes" = "سمات VIP حصرية";
+"benefit.quality" = "جودة 1080p";
+"benefit.gift" = "إهداء للأصدقاء ٣ مرات/أسبوع";
+"benefit.friend_gift" = "إهداء عضوية مرة/أسبوع";
+"benefit.no_ads" = "بدون إعلانات";
+
+/* ---- VIP ---- */
+"vip.unlock_all" = "افتح كل المحتوى";
+"vip.vip_expiry" = "VIP صالح حتى %@";
+"vip.remaining_days" = "%d يوم متبقي";
+"vip.recommended" = "موصى به";
+"vip.subscribe_now" = "اشترك الآن";
+"vip.renew" = "تجديد العضوية";
+"vip.auto_renew_notice" = "تجديد تلقائي، يمكنك الإلغاء في أي وقت";
+"vip.why_join" = "لماذا تنضم إلى VIP؟";
+
+/* ---- Profile ---- */
+"profile.recharge_now" = "شحن";
+"profile.my_wallet" = "محفظتي";
+"profile.welfare_center" = "مركز المزايا";
+"profile.watch_history" = "سجل المشاهدة";
+"profile.download" = "التنزيلات";
+"profile.language" = "اللغة";
+"profile.customer_service" = "خدمة العملاء";
+"profile.simplified_chinese" = "العربية";
+"profile.feature_in_development" = "قيد التطوير";
+"profile.drama" = "مسلسلات";
+"profile.daily_points" = "يومي";
+"profile.points" = "نقاط";
+"profile.quality" = "الجودة";
+"profile.followed_count" = "متابَع %d";
+
+/* ---- Theme ---- */
+"theme.system" = "النظام";
+"theme.light" = "الوضع الفاتح";
+"theme.dark" = "الوضع الداكن";
+
+/* ---- Language Names ---- */
+"lang.zh_hans" = "简体中文";
+"lang.zh_hant" = "繁體中文";
+"lang.en" = "English";
+"lang.ko" = "한국어";
+"lang.ja" = "日本語";
+"lang.pt" = "Português";
+"lang.es" = "Español";
+"lang.ar" = "العربية";
+
+/* ---- Favorites ---- */
+"favorites.my_favorites" = "المفضلة";
+"favorites.no_watch_history" = "لا يوجد سجل مشاهدة";
+"favorites.no_bookmarks" = "لا توجد علامات مرجعية";
+"favorites.login_to_view" = "سجل الدخول لعرض المفضلة";
+"favorites.login_to_sync" = "سجل الدخول لمزامنة مفضلاتك";
+"favorites.login_now" = "تسجيل الدخول";
+"favorites.continue_watching" = "متابعة";
+"favorites.watch_now" = "شاهد الآن";
+"favorites.watched_percent" = "تمت المشاهدة %d%%";
+"favorites.episode_progress" = "ح.%d/%d";
+"favorites.total_episodes" = "%d حلقات";
+"favorites.save_your_list" = "احفظ قائمتك";
+"favorites.login_recommendation" = "لحماية قائمة مفضلاتك،\nنوصي بشدة بتسجيل الدخول";
+"favorites.login_google" = "تسجيل الدخول بحساب Google";
+"favorites.login_apple" = "تسجيل الدخول بحساب Apple";
+"favorites.login_agreement" = "بتسجيل الدخول، أنت توافق على\nشروط الخدمة وسياسة الخصوصية";
+
+/* ---- Recommend ---- */
+"recommend.no_content" = "لا توجد توصيات";
+"recommend.pull_to_refresh" = "اسحب للتحديث";
+"recommend.watch_full_series" = "شاهد المسلسل كاملاً";
+"recommend.episode_number" = "ح.%d";
+"recommend.synopsis" = "ملخص القصة";
+
+/* ---- Exit Guide ---- */
+"exit.new_drama_benefit" = "مسلسل جديد";
+"exit.reward_benefit" = "مكافآت";
+"exit.promo_benefit" = "عروض ترويجية";
+"exit.enable_title" = "تفعيل تنبيهات المسلسلات اليومية؟";
+"exit.enable_body" = "اكتشف مسلسلات رائعة مخفية. فعّل الإشعارات للحصول على المزيد من التوصيات!";
+"exit.enable_button" = "تفعيل الإشعارات";
+
+/* ---- Shared Components ---- */
+"shared.total_episodes_prefix" = "";
+
+/* ---- Tab Bar ----
+/* ---- Tab Bar ---- */
+"home.tab.title" = "الرئيسية";
+"recommend.tab.title" = "توصيات";
+"vip.tab.title" = "VIP";
+"favorites.tab.title" = "المفضلة";
+"profile.tab.title" = "حسابي";
+
+/* ---- Theme Menu ---- */
+"theme.menu.title" = "Theme";
+"theme.sheet.title" = "Theme";
+"theme.menu.title" = "المظهر";
+"theme.sheet.title" = "إعدادات المظهر";
+/* ---- Player ---- */
+"player.views_count" = "%@ مشاهدة";
+"player.no_rating" = "لا يوجد تقييم";
+"player.rating_arrow" = "التقييم >";
+"player.tab_introduction" = "مقدمة";
+"player.tab_episodes" = "الحلقات";
+"player.cast_and_crew" = "طاقم العمل";
+"player.more_similar" = "المزيد مثل هذا";
+"player.collapse" = "طي";
+"player.watch_full_series" = "مشاهدة المسلسل كاملاً";
+"player.share" = "مشاركة";
+"player.share_reward" = "شارك مع صديق، اربح 10 عملات";
+"player.copy_link" = "نسخ الرابط";
+"player.speed" = "السرعة";
+"player.playback_settings" = "إعدادات التشغيل";
+"player.current_resolution" = "الجودة الحالية";
+"player.picture_in_picture" = "صورة داخل صورة";
+"player.subtitle_feedback_prefix" = "خطأ في الترجمة؟ ";
+"player.subtitle_feedback_link" = "أرسل ملاحظاتك";
+"player.episode_number" = "ح.%d";
+
+/* ---- Episode ---- */
+"episode.total_count" = "إجمالي %d حلقات";
+
+/* ---- Splash ---- */
+"splash.tagline" = "دراما قصيرة. استرخاء لا نهائي.";
+
+/* ---- Login ---- */
+"login.tagline" = "اكتشف قصصاً تلامس قلبك";
+"login.agreement_prefix" = "بالمتابعة، أنت توافق على ";
+"login.terms_of_service" = "شروط الخدمة";
+"login.and" = " و ";
+"login.privacy_policy" = "سياسة الخصوصية";
+"login.period" = ". ";
+
+/* ---- General (additional) ---- */
+"general.error" = "خطأ";
+"general.ok" = "موافق";
+
+/* ---- VIP ---- */
+"vip.title" = "RelaxShort VIP";

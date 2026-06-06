@@ -1,0 +1,204 @@
+/* ============================================
+   Localizable.strings (繁體中文)
+   RelaxShort iOS App
+   ============================================ */
+
+/* ---- General ---- */
+"general.more" = "更多";
+"general.share" = "分享";
+"general.comment" = "評論";
+"general.download" = "下載";
+"general.cancel" = "取消";
+"general.confirm" = "確認";
+"general.retry" = "重試";
+"general.loading" = "載入中...";
+"general.no_content" = "暫無內容";
+
+/* ---- Search ---- */
+"search.hot_search_tab" = "熱搜榜";
+"search.hot_play_tab" = "熱播榜";
+"search.new_drama_tab" = "新劇榜";
+"search.no_hot_search" = "暫無熱搜";
+"search.no_hot_play" = "暫無熱播";
+"search.no_new_drama" = "暫無新劇";
+"search.placeholder" = "與君遠相知，不道雲海深";
+"search.no_results" = "未找到相關劇集";
+"search.try_different_keyword" = "換個關鍵詞試試吧";
+"search.hint" = "搜索劇名、分類或標籤";
+
+/* ---- Home ---- */
+"home.featured" = "精選";
+"home.rankings" = "排行榜";
+"home.you_are_watching" = "你正在追";
+"home.view_all" = "查看全部";
+"home.episode_count" = "集";
+
+/* ---- Rank ---- */
+"rank.search_placeholder" = "好巧原來你也重來了";
+"rank.no_data" = "暫無排行數據";
+
+/* ---- Coin Reward ---- */
+"coin.tab" = "獎勵金幣";
+"coin.member_points_tab" = "會員積分";
+"coin.my_coins" = "我的金幣";
+"coin.rules" = "規則";
+"coin.reward_rules" = "獎勵規則";
+"coin.checked_in_days" = "已簽到%d天";
+"coin.watch_ad_for_coins" = "看廣告獲得 30 金幣";
+"coin.earn_coins" = "賺取金幣";
+"coin.apple_disclaimer" = "本活動與 Apple Inc.無關";
+
+/* ---- Membership ---- */
+"membership.join" = "加入會員";
+"membership.weekly" = "週會員";
+"membership.monthly" = "月會員";
+"membership.yearly" = "年會員";
+"membership.discount" = "折扣";
+"membership.join_now" = "立即加入";
+"membership.recharge_info" = "充值說明";
+"membership.service_agreement" = "服務協議和隱私條款";
+"membership.terms_1" = "1. RelaxShort內有免費和付費內容。";
+"membership.terms_2" = "2. 付費內容可以用金幣解鎖或購買會員觀看，會員有效期內無限次觀看。";
+"membership.terms_3" = "3. 其他說明請參考App內提示，如有疑問請聯繫客服。";
+
+/* ---- Membership Benefits ---- */
+"benefit.all_shows" = "16,000+ 部劇集免費看\n每週穩定上新 100+ 部新劇";
+"benefit.download" = "下載";
+"benefit.vip_shows" = "會員專享劇";
+"benefit.themes" = "會員專屬主題";
+"benefit.quality" = "1080p 畫質";
+"benefit.gift" = "贈送好友影片 每週3次機會";
+"benefit.friend_gift" = "送好友會員 每週1次機會";
+"benefit.no_ads" = "免廣告";
+
+/* ---- VIP ---- */
+"vip.unlock_all" = "解鎖全部精彩內容";
+"vip.vip_expiry" = "VIP 有效期至 %@";
+"vip.remaining_days" = "剩餘 %d 天";
+"vip.recommended" = "推薦";
+"vip.subscribe_now" = "立即訂閱";
+"vip.renew" = "續費會員";
+"vip.auto_renew_notice" = "自動續費，可隨時取消";
+"vip.why_join" = "為什麼加入會員？";
+
+/* ---- Profile ---- */
+"profile.recharge_now" = "立即充值";
+"profile.my_wallet" = "我的錢包";
+"profile.welfare_center" = "福利中心";
+"profile.watch_history" = "觀看歷史";
+"profile.download" = "下載";
+"profile.language" = "語言";
+"profile.customer_service" = "在線客服";
+"profile.simplified_chinese" = "繁體中文";
+"profile.feature_in_development" = "功能開發中";
+"profile.drama" = "劇集";
+"profile.daily_points" = "每日";
+"profile.points" = "積分";
+"profile.quality" = "畫質";
+"profile.followed_count" = "已關注 %d";
+
+/* ---- Theme ---- */
+"theme.system" = "跟隨系統";
+"theme.light" = "淺色模式";
+"theme.dark" = "深色模式";
+
+/* ---- Language Names ---- */
+"lang.zh_hans" = "简体中文";
+"lang.zh_hant" = "繁體中文";
+"lang.en" = "English";
+"lang.ko" = "한국어";
+"lang.ja" = "日本語";
+"lang.pt" = "Português";
+"lang.es" = "Español";
+"lang.ar" = "العربية";
+
+/* ---- Favorites ---- */
+"favorites.my_favorites" = "我的收藏";
+"favorites.no_watch_history" = "暫無觀看記錄";
+"favorites.no_bookmarks" = "暫無預約內容";
+"favorites.login_to_view" = "登錄後查看收藏";
+"favorites.login_to_sync" = "登錄後即可同步你的收藏內容";
+"favorites.login_now" = "立即登錄";
+"favorites.continue_watching" = "繼續觀看";
+"favorites.watch_now" = "立即觀看";
+"favorites.watched_percent" = "已看 %d%%";
+"favorites.episode_progress" = "第%d集 / %d集";
+"favorites.total_episodes" = "共%d集";
+"favorites.save_your_list" = "保存你的列表";
+"favorites.login_recommendation" = "為了防止你的收藏列表丟失，\n強烈建議您進行登錄";
+"favorites.login_google" = "使用 Google 登錄";
+"favorites.login_apple" = "使用 Apple 登錄";
+"favorites.login_agreement" = "登錄賬戶，您已閱讀並同意我們的\n服務協議 & 隱私條款";
+
+/* ---- Recommend ---- */
+"recommend.no_content" = "暫無推薦內容";
+"recommend.pull_to_refresh" = "下拉刷新試試";
+"recommend.watch_full_series" = "觀看全集";
+"recommend.episode_number" = "第%d集";
+"recommend.synopsis" = "劇情簡介";
+
+/* ---- Exit Guide ---- */
+"exit.new_drama_benefit" = "新劇";
+"exit.reward_benefit" = "獎勵";
+"exit.promo_benefit" = "活動優惠";
+"exit.enable_title" = "開啟每日劇集提醒?";
+"exit.enable_body" = "發現寶藏新劇，開啟通知，為你推薦更多潛力佳作!";
+"exit.enable_button" = "開啟通知";
+
+/* ---- Shared Components ---- */
+"shared.total_episodes_prefix" = "共";
+
+/* ---- Tab Bar ----
+/* ---- Tab Bar ---- */
+"home.tab.title" = "首頁";
+"recommend.tab.title" = "推薦";
+"vip.tab.title" = "會員";
+"favorites.tab.title" = "收藏";
+"profile.tab.title" = "我的";
+
+/* ---- Theme Menu ---- */
+"theme.menu.title" = "Theme";
+"theme.sheet.title" = "Theme";
+"theme.menu.title" = "主題";
+"theme.sheet.title" = "主題設定";
+/* ---- Player ---- */
+"player.views_count" = "%@ 次觀看";
+"player.no_rating" = "暫無評分";
+"player.rating_arrow" = "評分 >";
+"player.tab_introduction" = "簡介";
+"player.tab_episodes" = "選集";
+"player.cast_and_crew" = "演職人員";
+"player.more_similar" = "更多相似內容";
+"player.collapse" = "收起";
+"player.watch_full_series" = "觀看全集";
+"player.share" = "分享";
+"player.share_reward" = "分享給第一位朋友，獲得 10 金幣";
+"player.copy_link" = "複製連結";
+"player.speed" = "倍速";
+"player.playback_settings" = "播放設定";
+"player.current_resolution" = "目前解析度";
+"player.picture_in_picture" = "畫中畫";
+"player.subtitle_feedback_prefix" = "字幕語言如有錯漏，";
+"player.subtitle_feedback_link" = "點擊此處回饋";
+"player.episode_number" = "第%d集";
+
+/* ---- Episode ---- */
+"episode.total_count" = "共%d集";
+
+/* ---- Splash ---- */
+"splash.tagline" = "短劇 · 無限放鬆";
+
+/* ---- Login ---- */
+"login.tagline" = "發現打動你的故事";
+"login.agreement_prefix" = "繼續即表示您同意我們的 ";
+"login.terms_of_service" = "服務條款";
+"login.and" = " 和 ";
+"login.privacy_policy" = "隱私政策";
+"login.period" = "。";
+
+/* ---- General (additional) ---- */
+"general.error" = "錯誤";
+"general.ok" = "確定";
+
+/* ---- VIP ---- */
+"vip.title" = "RelaxShort VIP";
