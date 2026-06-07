@@ -1,16 +1,16 @@
 import SwiftUI
 
-// MARK: - Main Tab View
+// MARK: - 主标签视图
 
-/// 单NavigationStack + 自定义悬浮TabBar架构
-/// 外层一个NavigationStack管理所有push导航，Tab切换用ZStack叠加内容 + 悬浮TabBar
+/// 单导航栈和自定义悬浮标签栏架构
+/// 外层一个导航栈管理所有入栈导航，标签切换用叠加内容和悬浮标签栏实现
 ///
-/// ViewModel 实例保持在 MainTabView 级别，Tab 切换不丢失状态。
+/// 视图模型实例保持在主标签视图级别，标签切换不丢失状态。
 ///
-/// 二级页面（搜索/VIP/金币/SeriesPlayer）通过 navigationDestination push，系统原生返回按钮。
+/// 二级页面通过导航目标入栈，使用系统原生返回按钮。
 ///
-/// 架构要点：Tab 内容提取为独立 TabContentHost，隔离导航状态变化，
-/// 避免 showSearch/navigationTarget 变化导致 Tab 内容失去 SwiftUI identity。
+/// 架构要点：标签内容提取为独立内容容器，隔离导航状态变化，
+/// 避免搜索和播放页导航状态变化导致标签内容失去视图身份。
 struct MainTabView: View {
     @EnvironmentObject var appStore: AppStore
 
@@ -22,15 +22,18 @@ struct MainTabView: View {
         NavigationStack {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
-                    // 1. 内容层 — 独立 View 隔离导航状态变化
+                    // 1. 内容层 — 独立视图隔离导航状态变化
                     TabContentHost(homeVM: homeVM, recommendVM: recommendVM, recommendSession: recommendSession)
                         .frame(width: geo.size.width, height: geo.size.height)
-                    // 2. DramaBox Bottom TabBar
-                    DramaBoxBottomTabBar(
-                        selectedTab: $appStore.selectedTab,
-                        transparent: appStore.selectedTab == .forYou,
-                        bottomInset: geo.safeAreaInsets.bottom
-                    )
+                    // 2. 底部标签栏
+                    if !appStore.isBottomTabBarHidden {
+                        DramaBoxBottomTabBar(
+                            selectedTab: $appStore.selectedTab,
+                            transparent: appStore.selectedTab == .forYou,
+                            bottomInset: geo.safeAreaInsets.bottom
+                        )
+                        .transition(.opacity)
+                    }
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -46,7 +49,7 @@ struct MainTabView: View {
             .navigationDestination(isPresented: $appStore.isShowingMembership) {
                 MembershipView()
             }
-            // CoinRewardView is now a bottom tab; no longer a push destination
+            // 金币福利页已调整为底部标签，不再作为入栈页面
         }
         .persistentSystemOverlays(appStore.selectedTab == .forYou ? .hidden : .visible)
         .onReceive(NotificationCenter.default.publisher(for: .showSearch)) { _ in
@@ -59,13 +62,13 @@ struct MainTabView: View {
 
 }
 
-// MARK: - Tab Content Host
+// MARK: - 标签内容容器
 
-/// 常驻所有 Tab 视图，通过 opacity/zIndex/disabled 控制可见性
-/// 对标 DramaBox / TikTok 架构，确保视频播放状态不丢失
+/// 常驻所有标签视图，通过透明度、层级和禁用状态控制可见性
+/// 对标短视频应用架构，确保视频播放状态不丢失
 ///
-/// 从 MainTabView 中独立出来，隔离导航状态（showSearch 等）变化 —
-/// 导航状态变化只触发 MainTabView 重建，不影响 TabContentHost 的 SwiftUI identity。
+/// 从主标签视图中独立出来，隔离导航状态变化。
+/// 导航状态变化只触发主标签视图重建，不影响标签内容容器的视图身份。
 private struct TabContentHost: View {
     @EnvironmentObject var appStore: AppStore
     let homeVM: HomeViewModel

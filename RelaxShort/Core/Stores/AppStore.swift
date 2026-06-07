@@ -1,8 +1,8 @@
 import SwiftUI
 import Combine
 
-// MARK: - App Store
-/// 管理全局应用状态：当前 Tab、通知红点、主题、语言等
+// MARK: - 应用状态
+/// 管理全局应用状态：当前标签、通知红点、主题、语言等
 @MainActor
 final class AppStore: ObservableObject {
     @Published var selectedTab: Tab = .home
@@ -10,6 +10,7 @@ final class AppStore: ObservableObject {
     @Published var navigationTarget: SeriesPlayerNav?
     @Published var isShowingSearch = false
     @Published var isShowingMembership = false
+    @Published var isBottomTabBarHidden = false
     @Published var isFirstLaunch: Bool
     @Published var themeMode: ThemeMode = ThemeManager.shared.themeMode {
         didSet { ThemeManager.shared.themeMode = themeMode }
@@ -59,7 +60,7 @@ final class AppStore: ObservableObject {
         }
     }
 
-    /// 当前主题的 ColorScheme
+    /// 当前主题对应的配色方案
     var preferredColorScheme: ColorScheme? {
         themeMode.colorScheme
     }
@@ -74,10 +75,10 @@ final class AppStore: ObservableObject {
     }
 }
 
-// MARK: - String Extension for L10n
+// MARK: - 字符串本地化扩展
 
 extension String {
-    /// 便捷本地化方法 — 优先从 Bundle 读取 .strings，若返回 raw key 则回退到 L10n.zhFallback 硬编码中文
+    /// 便捷本地化方法 — 优先从资源包读取本地化文案，若返回原始键则回退到硬编码中文
     var localized: String {
         let bundleValue = Bundle.main.localizedString(forKey: self, value: "\u{0010}FALLBACK\u{0010}", table: nil)
         if bundleValue != "\u{0010}FALLBACK\u{0010}" {
@@ -88,7 +89,7 @@ extension String {
     }
 }
 
-/// L10n 回退字典的公开暴露（供 String.localized 使用）
+/// 本地化回退字典的公开暴露（供字符串本地化扩展使用）
 enum L10nFallback {
     fileprivate static func value(for key: String) -> String? {
         return fallbackDict[key]

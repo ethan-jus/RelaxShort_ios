@@ -1,10 +1,11 @@
 import SwiftUI
 import AVKit
+import Combine
 
 // MARK: - 推荐页播放会话
 
-/// 推荐页播放状态容器 — 由 MainTabView 持有，RecommendView 注入
-/// 解决 NavigationStack push/pop 导致 RecommendView 失去 identity 时状态清零的问题
+/// 推荐页播放状态容器 — 由外层标签页持有，并注入推荐页
+/// 解决导航入栈或出栈导致推荐页身份变化时状态清零的问题
 @MainActor
 final class RecommendSession: ObservableObject {
     let pool = PlayerPool()
@@ -13,6 +14,18 @@ final class RecommendSession: ObservableObject {
     @Published var currentIndex = 0
     @Published var hasInitializedPool = false
     @Published var poolVersion = 0
+
+    private var cancellables: Set<AnyCancellable> = []
+
+    init() {
+        controller.objectWillChange
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.objectWillChange.send()
+                }
+            }
+            .store(in: &cancellables)
+    }
 
     func initializePool(dramas: [DramaItem]) {
         guard !dramas.isEmpty else { return }
@@ -54,7 +67,7 @@ final class RecommendSession: ObservableObject {
 // MARK: - 三实例播放器池
 
 /// 预加载上一个/下一个视频，支持无缝切换
-/// 池内 3 个 AVPlayer：[prev, current, next]，滑动手势触发 advance/retreat
+/// 池内三个播放器分别对应上一个、当前、下一个视频，滑动手势触发前进或后退
 final class PlayerPool {
     private var pool: [AVPlayer?] = [nil, nil, nil]
 
@@ -79,22 +92,22 @@ final class PlayerPool {
         pool[0] = AVPlayer(url: url)
     }
 
-    /// 下翻：prev←current, current←next, next←nil
+    /// 下翻：上一个←当前，当前←下一个，下一个←空
     @discardableResult
     func advance() -> AVPlayer? {
         pool[0]?.pause()
-        pool[1]?.pause() // 暂停旧 current，避免后台继续播放
+        pool[1]?.pause() // 暂停旧当前播放器，避免后台继续播放
         pool[0] = pool[1]
         pool[1] = pool[2]
         pool[2] = nil
         return pool[1]
     }
 
-    /// 上翻：next←current, current←prev, prev←nil
+    /// 上翻：下一个←当前，当前←上一个，上一个←空
     @discardableResult
     func retreat() -> AVPlayer? {
         pool[2]?.pause()
-        pool[1]?.pause() // 暂停旧 current，避免后台继续播放
+        pool[1]?.pause() // 暂停旧当前播放器，避免后台继续播放
         pool[2] = pool[1]
         pool[1] = pool[0]
         pool[0] = nil
@@ -109,7 +122,7 @@ final class PlayerPool {
     deinit { cleanup() }
 }
 
-// MARK: - Pause Reason
+// MARK: - 暂停原因
 
 enum PauseReason: Hashable {
     case none
@@ -133,20 +146,27 @@ final class PlayerController: ObservableObject {
     private var itemEndObserver: Any?
     private var thumbnailGenerator: AVAssetImageGenerator?
     private var thumbnailTask: Task<Void, Never>?
+    private var statusObserver: NSKeyValueObservation?
+    private var timeControlObserver: NSKeyValueObservation?
+    private var pendingPlay = false
 
     var onPlaybackFinished: (() -> Void)?
 
-    /// Attach only binds the AVPlayer — does NOT auto-play
+    /// 仅绑定播放器，不自动播放
     func attach(player: AVPlayer) {
+        if self.player === player { return }
         detach()
         self.player = player
+        isPlaying = player.timeControlStatus == .playing
         startObserving()
+        if pendingPlay || pauseReason == .none {
+            playWhenReady()
+        }
     }
 
-    /// Explicit play after attach — called only from lifecycle when playback is needed
+    /// 绑定后显式播放，仅由生命周期控制触发
     func playAfterAttach() {
-        player?.play()
-        isPlaying = true
+        playWhenReady()
         hasStartedPlayingOnce = true
         pauseReason = .none
     }
@@ -154,6 +174,10 @@ final class PlayerController: ObservableObject {
     func detach() {
         if let obs = timeObserver { player?.removeTimeObserver(obs); timeObserver = nil }
         if let obs = itemEndObserver { NotificationCenter.default.removeObserver(obs); itemEndObserver = nil }
+        statusObserver?.invalidate()
+        statusObserver = nil
+        timeControlObserver?.invalidate()
+        timeControlObserver = nil
         player = nil
     }
 
@@ -162,20 +186,21 @@ final class PlayerController: ObservableObject {
         if player.timeControlStatus == .playing {
             pauseByUser()
         } else {
-            player.play()
-            isPlaying = true
+            playWhenReady()
             hasStartedPlayingOnce = true
             pauseReason = .none
         }
     }
 
     func pauseForSystem() {
+        pendingPlay = false
         player?.pause()
         if pauseReason != .user { pauseReason = .system }
         isPlaying = false
     }
 
     func pauseByUser() {
+        pendingPlay = false
         player?.pause()
         pauseReason = .user
         isPlaying = false
@@ -183,9 +208,8 @@ final class PlayerController: ObservableObject {
 
     func playFromSystemResume() {
         guard pauseReason != .user else { return }
-        player?.play()
+        playWhenReady()
         pauseReason = .none
-        isPlaying = true
     }
 
     func setRate(_ rate: Float) {
@@ -226,16 +250,18 @@ final class PlayerController: ObservableObject {
     func pause() { pauseForSystem() }
     func play() { playFromSystemResume() }
 
-    /// Reset for new player transition — clear stale progress state
+    /// 切换到新播放器前重置旧进度状态
     func resetForNewPlayer() {
         currentTime = 0
         duration = 0
         bufferProgress = 0
         thumbnailImage = nil
         hasStartedPlayingOnce = false
+        isPlaying = false
     }
 
     func cleanup() {
+        pendingPlay = false
         player?.pause()
         detach()
     }
@@ -245,7 +271,7 @@ final class PlayerController: ObservableObject {
     private func startObserving() {
         guard let player = player else { return }
 
-        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        let interval = CMTime(seconds: 0.5, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
             guard let self = self, let player = self.player else { return }
             self.currentTime = time.seconds
@@ -256,7 +282,27 @@ final class PlayerController: ObservableObject {
                     self.bufferProgress = self.duration > 0 ? buffered / self.duration : 0
                 }
             }
-            self.isPlaying = player.timeControlStatus == .playing
+        }
+
+        timeControlObserver = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self, weak player] _, _ in
+            DispatchQueue.main.async {
+                guard let self, let player, self.player === player else { return }
+                self.updatePlayingState(for: player)
+            }
+        }
+
+        statusObserver = player.currentItem?.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                if item.duration.isNumeric {
+                    self.duration = item.duration.seconds
+                }
+                if item.status == .readyToPlay, self.pendingPlay, self.pauseReason != .user {
+                    player.play()
+                    self.pendingPlay = false
+                    self.hasStartedPlayingOnce = true
+                }
+            }
         }
 
         itemEndObserver = NotificationCenter.default.addObserver(
@@ -269,13 +315,34 @@ final class PlayerController: ObservableObject {
         }
     }
 
+    private func playWhenReady() {
+        guard let player = player else {
+            pendingPlay = true
+            return
+        }
+        pendingPlay = true
+        if player.currentItem?.status == .readyToPlay {
+            player.play()
+            pendingPlay = false
+        } else if player.currentItem?.status == .unknown {
+            player.play()
+        } else if player.currentItem?.status == .failed {
+            pendingPlay = false
+        }
+    }
+
+    /// 同步当前播放器播放态，避免旧播放器异步回调覆盖封面显隐
+    private func updatePlayingState(for player: AVPlayer) {
+        isPlaying = player.timeControlStatus == .playing
+    }
+
     deinit { cleanup() }
 }
 
 // MARK: - 视频播放视图
 
-/// 视频播放层 + 封面 fallback
-/// - 有播放器 + 有控制器：AVPlayerLayer 播放，支持暂停/播放速度控制
+/// 视频播放层和封面兜底
+/// - 有播放器和控制器：使用系统播放层播放，支持暂停和播放速度控制
 /// - 无控制器：仅显示封面图（非当前视频）
 struct VideoPlayerView: View {
     let coverURL: String
@@ -283,46 +350,68 @@ struct VideoPlayerView: View {
     var controller: PlayerController?
     var shouldPlay: Bool = false
 
+    var body: some View {
+        if let player, let controller {
+            ActiveVideoPlayerView(
+                coverURL: coverURL,
+                player: player,
+                controller: controller,
+                shouldPlay: shouldPlay
+            )
+        } else {
+            CoverOnlyVideoView(coverURL: coverURL)
+        }
+    }
+}
+
+// MARK: - 当前视频播放视图
+
+/// 当前视频播放视图 — 直接订阅播放器控制器，播放态变化时立即刷新封面显隐
+private struct ActiveVideoPlayerView: View {
+    let coverURL: String
+    let player: AVPlayer
+    @ObservedObject var controller: PlayerController
+    let shouldPlay: Bool
+
     @StateObject private var loader = ImageLoader()
+    @State private var hasShownPlayback = false
+
+    private var playerID: ObjectIdentifier {
+        ObjectIdentifier(player)
+    }
 
     var body: some View {
         ZStack {
             Color.black
 
-            // 视频播放层（仅当有控制器且有播放器时）
-            if let player, let controller {
-                VideoPlayerLayer(player: player, controller: controller, shouldPlay: shouldPlay)
-            }
+            VideoPlayerLayer(
+                player: player,
+                controller: controller,
+                shouldPlay: shouldPlay
+            )
 
-            // 封面层 — 播放器未开始播放或没有播放器时始终显示
             if shouldShowCover {
                 coverView
-                    .transition(.opacity)
-            }
-
-            // 暂停图标 — ZStack 顶层，确保不被封面/视频层遮挡
-            if let controller, controller.hasStartedPlayingOnce, controller.pauseReason == .user {
-                Image(systemName: "play.circle.fill")
-                    .font(DT.Font.largeTitle(60))
-                    .foregroundColor(.white.opacity(0.7))
-                    .shadow(color: .black.opacity(0.4), radius: 8)
-                    .transition(.scale.combined(with: .opacity))
-                    .zIndex(10)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: shouldShowCover)
-        .animation(.easeInOut(duration: 0.2), value: controller?.pauseReason)
-        .task { await loader.load(coverURL) }
+        .animation(.easeInOut(duration: 0.18), value: hasShownPlayback)
+        .onChange(of: playerID) { _, _ in
+            hasShownPlayback = false
+        }
+        .onChange(of: controller.isPlaying, initial: true) { _, isPlaying in
+            if isPlaying {
+                hasShownPlayback = true
+            }
+        }
+        .task(id: coverURL) { await loader.load(coverURL) }
     }
 
-    /// 是否应该显示封面 — 无播放器时或尚未开始播放时
+    /// 是否应该显示封面 — 仅用于首次播放前遮住黑屏，暂停后不再显示
     private var shouldShowCover: Bool {
-        if player == nil { return true }
-        if let controller, !controller.hasStartedPlayingOnce { return true }
-        return false
+        !hasShownPlayback
     }
 
-    /// 封面图 — 无视频时或有视频但尚未开始播放时显示
+    /// 封面图 — 首次播放前显示，视频开始后不再盖回去
     @ViewBuilder
     private var coverView: some View {
         if let image = loader.image {
@@ -346,21 +435,63 @@ struct VideoPlayerView: View {
     }
 }
 
-// MARK: - AVPlayerLayer UIViewRepresentable
+// MARK: - 非当前视频封面视图
 
-/// 视频播放层 — 接收池提供的 AVPlayer，不自行创建
+/// 非当前页只显示封面，避免无关页面创建播放层
+private struct CoverOnlyVideoView: View {
+    let coverURL: String
+
+    @StateObject private var loader = ImageLoader()
+
+    var body: some View {
+        ZStack {
+            Color.black
+            coverView
+        }
+        .task(id: coverURL) { await loader.load(coverURL) }
+    }
+
+    @ViewBuilder
+    private var coverView: some View {
+        if let image = loader.image {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .clipped()
+        } else {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [DT.Color.bgCoverPlaceholderStart, DT.Color.bgCoverPlaceholderEnd],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    ProgressView().tint(DT.Color.textSecondary)
+                )
+        }
+    }
+}
+
+// MARK: - 系统播放层桥接视图
+
+/// 视频播放层 — 接收池提供的播放器，不自行创建
 private struct VideoPlayerLayer: UIViewRepresentable {
     let player: AVPlayer
     let controller: PlayerController
     let shouldPlay: Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeUIView(context: Context) -> PlayerUIView {
         let view = PlayerUIView()
         view.isUserInteractionEnabled = false
         (view.layer as? AVPlayerLayer)?.player = player
         (view.layer as? AVPlayerLayer)?.videoGravity = .resizeAspectFill
-        controller.attach(player: player)
-        applyPlaybackIntent()
+        context.coordinator.applyPlaybackIntent(controller: controller, player: player, shouldPlay: shouldPlay)
         return view
     }
 
@@ -369,25 +500,42 @@ private struct VideoPlayerLayer: UIViewRepresentable {
         if avLayer?.player !== player {
             avLayer?.player = player
             avLayer?.videoGravity = .resizeAspectFill
-            controller.attach(player: player)
         }
-        applyPlaybackIntent()
+        context.coordinator.applyPlaybackIntent(controller: controller, player: player, shouldPlay: shouldPlay)
     }
 
-    private func applyPlaybackIntent() {
-        if shouldPlay {
-            controller.playAfterAttach()
-        } else if controller.pauseReason != .user {
-            controller.pauseForSystem()
-        }
-    }
-
-    static func dismantleUIView(_ uiView: PlayerUIView, coordinator: ()) {
+    static func dismantleUIView(_ uiView: PlayerUIView, coordinator: Coordinator) {
+        coordinator.invalidate()
         (uiView.layer as? AVPlayerLayer)?.player = nil
+    }
+
+    final class Coordinator {
+        private var lastPlayerID: ObjectIdentifier?
+        private var lastShouldPlay: Bool?
+
+        func applyPlaybackIntent(controller: PlayerController, player: AVPlayer, shouldPlay: Bool) {
+            let playerID = ObjectIdentifier(player)
+            guard lastPlayerID != playerID || lastShouldPlay != shouldPlay else { return }
+            lastPlayerID = playerID
+            lastShouldPlay = shouldPlay
+            DispatchQueue.main.async {
+                controller.attach(player: player)
+                if shouldPlay {
+                    controller.playAfterAttach()
+                } else if controller.pauseReason != .user {
+                    controller.pauseForSystem()
+                }
+            }
+        }
+
+        func invalidate() {
+            lastPlayerID = nil
+            lastShouldPlay = nil
+        }
     }
 }
 
-// MARK: - Player UIView
+// MARK: - 播放器视图
 
 private final class PlayerUIView: UIView {
     override class var layerClass: AnyClass { AVPlayerLayer.self }
