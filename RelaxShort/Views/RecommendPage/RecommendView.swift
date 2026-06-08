@@ -176,14 +176,13 @@ struct RecommendView: View {
                 .simultaneousGesture(tapGesture)
                 .zIndex(-1)
 
-            ForEach(visibleIndices(for: session.currentIndex, count: dramas.count), id: \.self) { idx in
+            ForEach(Array(visibleIndices(for: session.currentIndex, count: dramas.count)), id: \.self) { idx in
                 let isCurrent = idx == session.currentIndex
                 ZStack {
                     VideoPlayerView(
                         coverURL: dramas[idx].coverURL,
                         player: isCurrent ? session.pool.current : nil,
-                        controller: isCurrent ? session.controller : nil,
-                        shouldPlay: isCurrent && isPlaybackVisible && session.controller.pauseReason != .user
+                        controller: isCurrent ? session.controller : nil
                     )
                         .allowsHitTesting(false)
 

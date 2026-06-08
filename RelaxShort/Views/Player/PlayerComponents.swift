@@ -1,358 +1,78 @@
 import SwiftUI
-import AVKit
+import AVFoundation
 
-// MARK: - Video Player Bridge
+// MARK: - PlayerKit 播放器视图
 
-/// 通过 UIViewRepresentable 将 AVPlayerLayer 桥接到 SwiftUI
-struct VideoPlayerRepresentable: UIViewRepresentable {
-    let player: AVPlayer
+struct ShortVideoPlayerView: View { let player: AVPlayer?; let coverURL: String; @ObservedObject var engine: ShortVideoPlayerEngine; @StateObject private var loader = ImageLoader()
+    var body: some View { ZStack { Color.black; if let player { PLayerBridge(player: player) }; if showCover { coverView }; if engine.state == .preparing || engine.state == .waitingNetwork || engine.state == .recovering { ProgressView().tint(.white).scaleEffect(1.2) }; if engine.state == .pausedByUser { Image(systemName: "play.fill").font(.system(size: 36, weight: .medium)).foregroundColor(.white).frame(width: 72, height: 72).background(Circle().fill(Color.black.opacity(0.42))) }; if let t = engine.subtitleText, !t.isEmpty { VStack { Spacer(); Text(t).font(.system(size: 16, weight: .semibold)).foregroundColor(.white).shadow(color: .black.opacity(0.7), radius: 2).multilineTextAlignment(.center).padding(.horizontal, 24).padding(.bottom, 60) } } }.task { await loader.load(coverURL) } }
+    private var showCover: Bool { if player == nil { return true }; if !engine.isReadyForDisplay { return true }; switch engine.state { case .idle, .preparing, .failed: return true; default: return false } }
+    @ViewBuilder private var coverView: some View { if let i = loader.image { Image(uiImage: i).resizable().scaledToFill().clipped() } else { Rectangle().fill(LinearGradient(colors: [Color(hex: "#2D1B69"), Color(hex: "#1a1a3e")], startPoint: .topLeading, endPoint: .bottomTrailing)) } }
+}
+private struct PLayerBridge: UIViewRepresentable { let player: AVPlayer
+    func makeUIView(context: Context) -> PBUIView { let v = PBUIView(); (v.layer as? AVPlayerLayer)?.player = player; (v.layer as? AVPlayerLayer)?.videoGravity = .resizeAspectFill; return v }
+    func updateUIView(_ v: PBUIView, context: Context) { if (v.layer as? AVPlayerLayer)?.player !== player { (v.layer as? AVPlayerLayer)?.player = player } }
+}
+private final class PBUIView: UIView { override class var layerClass: AnyClass { AVPlayerLayer.self }; override func layoutSubviews() { super.layoutSubviews(); (layer as? AVPlayerLayer)?.frame = bounds } }
 
-    func makeUIView(context: Context) -> UIView {
-        PlayerUIView(player: player)
-    }
+// MARK: - PlayerKit 字幕解析
 
-    func updateUIView(_ uiView: UIView, context: Context) {
-        guard let playerView = uiView as? PlayerUIView, playerView.player !== player else { return }
-        playerView.player = player
+actor SubtitleParser { func parse(url: URL, format: PlayerSubtitleFormat) -> [PlayerSubtitleCue] { guard let c = try? String(contentsOf: url, encoding: .utf8) else { return [] }; return format == .vtt ? parseVTT(c) : parseSRT(c) }
+    private func parseSRT(_ c: String) -> [PlayerSubtitleCue] { var cues: [PlayerSubtitleCue] = []; for (idx, b) in c.components(separatedBy: "\n\n").enumerated() { let lines = b.components(separatedBy: "\n").filter { !$0.isEmpty }; guard lines.count >= 3 else { continue }; let parts = lines[1].components(separatedBy: " --> "); guard parts.count == 2, let s = parseTime(parts[0]), let e = parseTime(parts[1]) else { continue }; cues.append(PlayerSubtitleCue(index: idx, start: s, end: e, text: lines[2...].joined(separator: "\n"))) }; return cues }
+    private func parseVTT(_ c: String) -> [PlayerSubtitleCue] { var cues: [PlayerSubtitleCue] = []; var s: TimeInterval = 0; var e: TimeInterval = 0; var txt: [String] = []; var idx = 0; for line in c.components(separatedBy: "\n") { let t = line.trimmingCharacters(in: .whitespaces); if t.isEmpty || t.hasPrefix("WEBVTT") || t.hasPrefix("Kind:") || t.hasPrefix("Language:") { continue }; if t.contains(" --> ") { if !txt.isEmpty { cues.append(PlayerSubtitleCue(index: idx, start: s, end: e, text: txt.joined(separator: "\n"))); idx &+= 1; txt = [] }; let p = t.components(separatedBy: " --> "); s = parseTime(p[0]) ?? 0; e = parseTime(p.count > 1 ? p[1] : p[0]) ?? 0 } else if Int(t) == nil { txt.append(t.stripTags()) } }; if !txt.isEmpty { cues.append(PlayerSubtitleCue(index: idx, start: s, end: e, text: txt.joined(separator: "\n"))) }; return cues }
+    private func parseTime(_ r: String) -> TimeInterval? { let c = r.components(separatedBy: " ").first ?? r; let p = c.components(separatedBy: ":"); guard p.count == 3 else { return nil }; let sp = p[2].components(separatedBy: "."); guard let h = Double(p[0]), let m = Double(p[1]), let s = Double(sp[0]) else { return nil }; return h * 3600 + m * 60 + s + (sp.count > 1 ? (Double(sp[1]) ?? 0) / 1000 : 0) }
+}
+extension String { func stripTags() -> String { var t = self; for tag in ["<b>","</b>","<i>","</i>","<u>","</u>","<v>","</v>"] { t = t.replacingOccurrences(of: tag, with: "") }; if let r = try? NSRegularExpression(pattern: "<[^>]+>") { t = r.stringByReplacingMatches(in: t, range: NSRange(t.startIndex..., in: t), withTemplate: "") }; return t } }
+
+// MARK: - PlayerKit MP4 缓存
+
+final class HTTPRangeMediaCache { static let shared = HTTPRangeMediaCache(); private let root: URL; private let maxSize: Int64 = 500_000_000; private var meta: [String: CM] = [:]; private let metaFile: URL; private let q = DispatchQueue(label: "com.rs.cache", qos: .utility)
+    struct CM: Codable { var url: String = ""; var len: Int64?; var mime: String?; var ranges: [String] = []; var access: Date = Date() }
+    init() { root = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!.appendingPathComponent("PM"); metaFile = root.appendingPathComponent("m.json"); try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true); load() }
+    func cachedData(for url: URL, range: ClosedRange<Int64>) -> Data? { try? Data(contentsOf: file(key(url), range)) }
+    func write(data: Data, for url: URL, range: ClosedRange<Int64>, len: Int64?, mime: String?) { let k = key(url); let f = file(k, range); q.async { try? data.write(to: f); self.upd(k, url: url, range: range, len: len, mime: mime) } }
+    func hasCache(for url: URL) -> Bool { meta[key(url)]?.ranges.isEmpty == false }
+    func pruneIfNeeded() { q.async { self.prune() } }
+    private func key(_ u: URL) -> String { u.absoluteString.data(using: .utf8)?.base64EncodedString() ?? u.lastPathComponent }
+    private func file(_ k: String, _ r: ClosedRange<Int64>) -> URL { root.appendingPathComponent("\(k)_\(r.lowerBound)_\(r.upperBound)") }
+    private func upd(_ k: String, url: URL, range: ClosedRange<Int64>, len: Int64?, mime: String?) { var m = meta[k] ?? CM(); m.url = url.absoluteString; m.ranges.append("\(range.lowerBound)-\(range.upperBound)"); m.access = Date(); if let len { m.len = len }; if let mime { m.mime = mime }; meta[k] = m; save(); prune() }
+    private func save() { if let d = try? JSONEncoder().encode(meta) { try? d.write(to: metaFile) } }
+    private func load() { if let d = try? Data(contentsOf: metaFile) { meta = (try? JSONDecoder().decode([String: CM].self, from: d)) ?? [:] } }
+    private func prune() { let sorted = meta.sorted { $0.value.access < $1.value.access }; var size = totalSize(); for (k, _) in sorted where size > maxSize { for f in (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? [] where f.lastPathComponent.hasPrefix(k) { try? FileManager.default.removeItem(at: f) }; meta.removeValue(forKey: k); size = totalSize() }; save() }
+    private func totalSize() -> Int64 { (try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey]))?.reduce(0) { $0 + (Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)) } ?? 0 }
+}
+
+// MARK: - PlayerKit 资源加载代理
+
+final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegate { private let origURL: URL; private let cache = HTTPRangeMediaCache.shared; private var session: URLSession?
+    init(originalURL: URL) { origURL = originalURL; super.init(); session = URLSession(configuration: .default) }
+    func resourceLoader(_: AVAssetResourceLoader, shouldWaitForLoadingOfRequestedResource r: AVAssetResourceLoadingRequest) -> Bool { guard let dr = r.dataRequest else { return false }; let range = dr.requestedOffset...(dr.requestedOffset + Int64(dr.requestedLength) - 1); if let d = cache.cachedData(for: origURL, range: range) { dr.respond(with: d); r.finishLoading(); return true }; let url = origURL; var req = URLRequest(url: url); req.setValue("bytes=\(range.lowerBound)-\(range.upperBound)", forHTTPHeaderField: "Range"); session?.dataTask(with: req) { [weak self] d, resp, err in if let err { r.finishLoading(with: err); return }; guard let self, let d else { return }; self.cache.write(data: d, for: url, range: range, len: (resp as? HTTPURLResponse)?.expectedContentLength, mime: (resp as? HTTPURLResponse)?.mimeType); dr.respond(with: d); r.finishLoading() }.resume(); return true }
+    func resourceLoader(_: AVAssetResourceLoader, didCancel _: AVAssetResourceLoadingRequest) {}
+}
+
+// MARK: - PlayerKit 指标
+
+struct PlayerMetrics { var ttffMs: Double = 0; var preloadHitCount = 0; var preloadMissCount = 0; var cacheHitCount = 0; var cacheMissCount = 0; var stallCount = 0; var stallDurationMs: Double = 0; var failedItemCount = 0; var recoveryCount = 0; var recoveryDurationMs: Double = 0; var canceledPreloadCount = 0; var currentSlotCount = 3; var memoryWarningCount = 0 }
+struct PlayerMetricsLogger { var m = PlayerMetrics(); private let p = "[PlayerKit]"
+    mutating func logTTFF(_ ms: Double) { m.ttffMs = ms; log("TTFF: \(String(format: "%.0f", ms))ms") }
+    mutating func logPreloadHit() { m.preloadHitCount += 1 }
+    mutating func logCacheHit() { m.cacheHitCount += 1; log("cache hit #\(m.cacheHitCount)") }
+    mutating func logCacheMiss() { m.cacheMissCount += 1; log("cache miss #\(m.cacheMissCount)") }
+    mutating func logStall(ms: Double) { m.stallCount += 1; m.stallDurationMs += ms; log("stall #\(m.stallCount)") }
+    mutating func logFailed() { m.failedItemCount += 1 }
+    mutating func logRecovery(ms: Double) { m.recoveryCount += 1; m.recoveryDurationMs += ms; log("recovery #\(m.recoveryCount)") }
+    mutating func logCanceledPreload(_ n: Int) { m.canceledPreloadCount += n; log("canceled preload: \(n) total: \(m.canceledPreloadCount)") }
+    mutating func logMemoryWarning() { m.memoryWarningCount += 1 }
+    func summary() { log("summary: TTFF=\(String(format: "%.0f", m.ttffMs))ms cache:hit=\(m.cacheHitCount) miss=\(m.cacheMissCount) stalls=\(m.stallCount) failed=\(m.failedItemCount) recoveries=\(m.recoveryCount)") }
+    private func log(_ msg: String) {
+        #if DEBUG
+        print("\(p) \(msg)")
+        #endif
     }
 }
 
-/// 承载 AVPlayerLayer 的 UIView
-private final class PlayerUIView: UIView {
-    var player: AVPlayer {
-        get { playerLayer?.player ?? AVPlayer() }
-        set { playerLayer?.player = newValue }
-    }
-    var playerLayer: AVPlayerLayer? { layer as? AVPlayerLayer }
-    override class var layerClass: AnyClass { AVPlayerLayer.self }
+// MARK: - 兼容旧 PlayerComponents
 
-    init(player: AVPlayer) {
-        super.init(frame: .zero)
-        self.player = player
-        playerLayer?.videoGravity = .resizeAspectFill
-        backgroundColor = .black
-    }
+struct VideoPlayerRepresentable: UIViewRepresentable { let player: AVPlayer; func makeUIView(context: Context) -> UIView { OldPUIView(player: player) }; func updateUIView(_ v: UIView, context: Context) { if let pv = v as? OldPUIView, pv.pl !== player { pv.pl = player } } }
+private final class OldPUIView: UIView { var pl: AVPlayer { get { (layer as? AVPlayerLayer)?.player ?? AVPlayer() } set { (layer as? AVPlayerLayer)?.player = newValue } }; override class var layerClass: AnyClass { AVPlayerLayer.self }; init(player: AVPlayer) { super.init(frame: .zero); self.pl = player; (layer as? AVPlayerLayer)?.videoGravity = .resizeAspectFill; backgroundColor = .black }; required init?(coder: NSCoder) { fatalError() } }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
-}
-
-// MARK: - Mock Video View
-
-/// Mock 视频播放区域：显示静态封面图 + 中央播放图标
-/// 用于模拟视频播放的 UI 占位
-struct MockVideoView: View {
-    let dramaTitle: String
-    let episodeNumber: Int
-    let isPlaying: Bool
-
-    var body: some View {
-        ZStack {
-            // 封面背景渐变
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(hex: "#1a1a2e"),
-                    Color(hex: "#2D1B69"),
-                    Color(hex: "#16213e"),
-                    Color(hex: "#0f3460")
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            // 封面图案装饰
-            VStack(spacing: 8) {
-                // 模拟短剧封面图
-                ZStack {
-                    RoundedRectangle(cornerRadius: DT.Radius.xl)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [
-                                    DT.Color.bgCoverPlaceholderStart,
-                                    DT.Color.bgCoverPlaceholderEnd
-                                ]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(width: 180, height: 240)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: DT.Radius.xl)
-                                .stroke(DT.Color.textPrimary.opacity(0.15), lineWidth: 1)
-                        )
-
-                    // 中央播放/暂停图标
-                    if !isPlaying {
-                        Circle()
-                            .fill(DT.Color.bgPrimary.opacity(0.45))
-                            .frame(width: 64, height: 64)
-                        Image(systemName: "play.fill")
-                            .font(DT.Font.body(28, weight: .medium))
-                            .foregroundColor(DT.Color.textPrimary)
-                            .offset(x: 2)
-                    }
-                }
-
-                // 剧名
-                Text(dramaTitle)
-                    .font(DT.Font.subtitle)
-                    .foregroundColor(DT.Color.textPrimary.opacity(0.85))
-                    .multilineTextAlignment(.center)
-
-                // 集数
-                Text(L10n.playerEpisodeNumber(episodeNumber))
-                    .font(DT.Font.caption)
-                    .foregroundColor(DT.Color.textSecondary)
-            }
-
-            // 底部轻微渐变遮罩（模拟播放进度视觉）
-            VStack {
-                Spacer()
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.clear,
-                        DT.Color.bgPrimary.opacity(0.15)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 80)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-// MARK: - Custom Progress Bar
-
-/// iOS 原生风格细进度条 + 可拖拽手柄
-struct CustomProgressBar: View {
-    /// 当前进度 0–1
-    let progress: CGFloat
-    /// 总宽度
-    let totalWidth: CGFloat
-    /// 是否正在拖拽
-    let isScrubbing: Bool
-    /// 拖拽变更回调
-    var onDragChanged: ((CGFloat) -> Void)?
-    /// 拖拽结束回调
-    var onDragEnded: (() -> Void)?
-
-    private let barHeight: CGFloat = 4
-    private let scrubbedBarHeight: CGFloat = 6
-
-    var body: some View {
-        let effectiveHeight: CGFloat = isScrubbing ? scrubbedBarHeight : barHeight
-        let clampedProgress = max(0, min(1, progress))
-
-        ZStack(alignment: .leading) {
-            // 背景轨道
-            Capsule()
-                .fill(DT.Color.textPrimary.opacity(0.18))
-                .frame(height: effectiveHeight)
-
-            // 播放进度
-            Capsule()
-                .fill(isScrubbing ? DT.brandPink.opacity(0.9) : DT.Color.textPrimary.opacity(0.75))
-                .frame(
-                    width: max(totalWidth * clampedProgress, effectiveHeight),
-                    height: effectiveHeight
-                )
-
-            // 拖拽手柄（只在拖拽时显示）
-            if isScrubbing {
-                Circle()
-                    .fill(DT.Color.textPrimary)
-                    .frame(width: 14, height: 14)
-                    .shadow(color: DT.Color.bgPrimary.opacity(0.3), radius: 3, x: 0, y: 1)
-                    .offset(x: totalWidth * clampedProgress - 7)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    let raw = max(0, min(1, value.location.x / totalWidth))
-                    onDragChanged?(raw)
-                }
-                .onEnded { _ in
-                    onDragEnded?()
-                }
-        )
-    }
-}
-
-// MARK: - Time Label
-
-/// 时间标签：显示 "03:25 / 12:40"
-struct TimeLabel: View {
-    let currentTime: TimeInterval
-    let duration: TimeInterval
-
-    var body: some View {
-        HStack(spacing: 2) {
-            Text(formatTime(currentTime))
-                .font(DT.Font.caption)
-                .foregroundColor(DT.Color.textPrimary)
-                .monospacedDigit()
-
-            Text(" / ")
-                .font(DT.Font.caption)
-                .foregroundColor(DT.Color.textSecondary)
-
-            Text(formatTime(duration))
-                .font(DT.Font.caption)
-                .foregroundColor(DT.Color.textSecondary)
-                .monospacedDigit()
-        }
-    }
-
-    private func formatTime(_ t: TimeInterval) -> String {
-        guard t.isFinite, t >= 0 else { return "00:00" }
-        let m = Int(t) / 60
-        let s = Int(t) % 60
-        return String(format: "%02d:%02d", m, s)
-    }
-}
-
-// MARK: - Control Button
-
-/// 统一圆形 44pt 图标控制按钮
-struct ControlButton: View {
-    let icon: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(DT.Font.body(20, weight: .medium))
-                .foregroundColor(DT.Color.textPrimary)
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle()
-                        .fill(DT.Color.bgPrimary.opacity(0.25))
-                )
-        }
-    }
-}
-
-// MARK: - Small Control Button
-
-/// 较小尺寸的控制按钮（用于底部栏）
-struct SmallControlButton: View {
-    let icon: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(DT.Font.body(18, weight: .medium))
-                .foregroundColor(DT.Color.textPrimary)
-                .frame(width: 40, height: 40)
-        }
-    }
-}
-
-// MARK: - Tag View
-
-/// 短剧标签胶囊（独家、现代言情、甜宠 等）
-struct TagView: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(DT.Font.tabLabel)
-            .foregroundColor(DT.Color.textPrimary)
-            .padding(.horizontal, DT.Space.sm)
-            .padding(.vertical, 3)
-            .background(DT.Color.bgDivider)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(DT.Color.textPrimary.opacity(0.2), lineWidth: 0.5)
-            )
-    }
-}
-
-// MARK: - Share Platform Button
-
-/// 分享面板平台按钮
-struct SharePlatformButton: View {
-    let color: SwiftUI.Color
-    let icon: String
-    let name: String
-
-    var body: some View {
-        Button {
-            // TODO: 实际分享逻辑
-        } label: {
-            VStack(spacing: DT.Space.sm) {
-                ZStack {
-                    Circle()
-                        .fill(color)
-                        .frame(width: 52, height: 52)
-                    Image(systemName: icon)
-                        .font(DT.Font.body(22, weight: .medium))
-                        .foregroundColor(DT.Color.textPrimary)
-                }
-                Text(name)
-                    .font(DT.Font.small)
-                    .foregroundColor(DT.Color.textSecondary)
-                    .lineLimit(1)
-            }
-        }
-    }
-}
-
-#if DEBUG
-#Preview("MockVideoView") {
-    MockVideoView(dramaTitle: "我的老板四岁半", episodeNumber: 3, isPlaying: false)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-}
-
-#Preview("CustomProgressBar") {
-    VStack(spacing: 30) {
-        CustomProgressBar(progress: 0.0, totalWidth: 300, isScrubbing: false)
-        CustomProgressBar(progress: 0.45, totalWidth: 300, isScrubbing: false)
-        CustomProgressBar(progress: 0.45, totalWidth: 300, isScrubbing: true)
-        CustomProgressBar(progress: 1.0, totalWidth: 300, isScrubbing: false)
-    }
-    .padding()
-    .background(DT.Color.bgPrimary)
-}
-
-#Preview("TimeLabel") {
-    TimeLabel(currentTime: 225, duration: 760)
-        .padding()
-        .background(DT.Color.bgPrimary)
-}
-
-#Preview("ControlButton") {
-    HStack(spacing: 16) {
-        ControlButton(icon: "chevron.left") {}
-        ControlButton(icon: "play.fill") {}
-        ControlButton(icon: "forward.fill") {}
-    }
-    .padding()
-    .background(DT.Color.bgPrimary)
-}
-
-#Preview("TagView") {
-    HStack(spacing: 8) {
-        TagView(text: "独家")
-        TagView(text: "现代言情")
-        TagView(text: "甜宠")
-    }
-    .padding()
-    .background(DT.Color.bgPrimary)
-}
-
-#Preview("SharePlatformButton") {
-    HStack(spacing: 20) {
-        SharePlatformButton(color: .pink, icon: "camera.fill", name: "Instagram")
-        SharePlatformButton(color: .green, icon: "phone.fill", name: "WhatsApp")
-    }
-    .padding()
-    .background(DT.Color.bgPrimary)
-}
-#endif
+struct SubtitleRenderer: View { let text: String?; var body: some View { if let t = text, !t.isEmpty { VStack { Spacer(); Text(t).font(.system(size: 16, weight: .semibold)).foregroundColor(.white).shadow(color: .black.opacity(0.7), radius: 2).multilineTextAlignment(.center).padding(.horizontal, 24).padding(.bottom, 60) } } } }
