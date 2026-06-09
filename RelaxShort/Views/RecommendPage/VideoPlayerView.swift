@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Network
+import Combine
 
 // MARK: - 推荐页播放会话（迁移壳 — 委托给 ShortVideoPlayerEngine）
 
@@ -11,6 +12,15 @@ import Network
     @Published var currentIndex = 0
     @Published var hasInitializedPool = false
     @Published var poolVersion = 0
+    private var engineSink: Any? // 转发 engine 的 objectWillChange
+
+    init() {
+        // 关键修复：engine 是 let，SwiftUI 不自动追踪它的变化
+        // 手动订阅 engine.objectWillChange，转发到 session.objectWillChange
+        engineSink = engine.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
+    }
 
     func initializePool(dramas: [DramaItem]) {
         guard !dramas.isEmpty else { return }
