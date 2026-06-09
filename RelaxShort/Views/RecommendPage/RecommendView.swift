@@ -1,22 +1,23 @@
 import SwiftUI
 
-// MARK: - Drama Feed View (DramaBox-style)
+// MARK: - 沉浸式短剧流
 
-/// 推荐页 — 沉浸式短剧 Feed 流，对标 DramaBox
+/// 推荐页 — 沉浸式短剧信息流，对标短剧应用
 ///
 /// **布局**：
 /// - 全屏视频区，顶部无黑边，延伸至状态栏
 /// - 右上角搜索按钮，毛玻璃圆形背景
-/// - 底部渐变遮罩 + 标题/标签/简介 + CTA 按钮
-/// - 右侧收藏+分享操作按钮（半透明圆形背景）
+/// - 底部渐变遮罩、标题、标签、简介和转化按钮
+/// - 右侧收藏和分享操作按钮
 /// - 底部视频播放进度条（紧贴底部，拖动时显示时间预览+拇指图）
 ///
-/// 播放状态由 MainTabView 持有的 RecommendSession 管理，本 View 即使被 SwiftUI 重建也不会丢失状态。
+/// 播放状态由外层标签页持有的推荐会话管理，本视图重建时也不会丢失状态。
 struct RecommendView: View {
 
     @EnvironmentObject private var appStore: AppStore
     @ObservedObject private var viewModel: RecommendViewModel
     @ObservedObject private var session: RecommendSession
+    let isVisible: Bool
 
     @State private var dragOffset: CGFloat = 0
     @State private var isExpanded = false
@@ -25,19 +26,32 @@ struct RecommendView: View {
     @State private var showSpeedHUD = false
     @State private var isBookmarked = false
     @State private var showBookmarkToast = false
-    @State private var isTruncated = false
     @State private var isScrubbing = false
     @State private var scrubFraction: CGFloat = 0
     @State private var showAbout = false
     @State private var showNotificationPrompt = false
     @State private var hasShownNotification = false
+    @State private var wasPlayingBeforeScrub = false
+    @State private var isDraggingPage = false
+    @State private var scrubThumbnail: UIImage?
 
-    init(viewModel: RecommendViewModel? = nil, session: RecommendSession) {
+    init(viewModel: RecommendViewModel? = nil, session: RecommendSession, isVisible: Bool = true) {
         self.viewModel = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
         self.session = session
+        self.isVisible = isVisible
     }
 
-    // MARK: - Body
+    // MARK: - 路由遮挡状态
+
+    private var routeBlocksPlayback: Bool {
+        appStore.isShowingSearch || appStore.isShowingMembership || appStore.navigationTarget != nil
+    }
+
+    private var isPlaybackVisible: Bool {
+        isVisible && !routeBlocksPlayback
+    }
+
+    // MARK: - 主视图
 
     var body: some View {
         contentView
@@ -48,16 +62,41 @@ struct RecommendView: View {
                     .presentationDetents([.medium])
             }
             .onChange(of: session.currentIndex) { oldValue, newValue in
+                // 单视频切换状态重置
                 isExpanded = false
-                isTruncated = false
+                isScrubbing = false; scrubFraction = 0
+                isSpeeding = false; showSpeedHUD = false
+                // engine handles reset internally
                 session.handleTransition(from: oldValue, to: newValue, dramas: viewModel.dramas)
+                if isPlaybackVisible { session.engine.play() }
+            }
+            .onChange(of: isPlaybackVisible) { _, vis in
+                if vis {
+                    initializePlaybackIfNeeded()
+                    session.engine.playFromSystemResume()
+                } else {
+                    session.engine.pause(reason: .system)
+                }
+            }
+            .onChange(of: viewModel.dramas.count) { _, count in
+                guard count > 0 else { return }
+                if isPlaybackVisible {
+                    initializePlaybackIfNeeded()
+                }
+            }
+            .onChange(of: showAbout) { _, isShowing in
+                withAnimation(.easeOut(duration: 0.18)) {
+                    appStore.isBottomTabBarHidden = isShowing
+                }
+            }
+            .onDisappear {
+                appStore.isBottomTabBarHidden = false
             }
             .onAppear { setupAutoPlay() }
-            .onDisappear { session.controller.pause() }
             .modifier(TabLifecycleModifier(appStore: appStore, session: session, viewModel: viewModel))
     }
 
-    // MARK: - Content View (split to fix type-checking)
+    // MARK: - 内容视图
 
     private var contentView: some View {
         GeometryReader { geo in
@@ -67,125 +106,281 @@ struct RecommendView: View {
                 } else {
                     feedOverlayContent(in: geo)
                 }
+
+                // 固定浮层
+                let searchTopPadding = geo.safeAreaInsets.top + 86
+                searchBarButton
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.trailing, 14)
+                    .padding(.top, searchTopPadding)
+
+                if session.engine.state == .pausedByUser, session.engine.isReadyForDisplay {
+                    Button { handleVideoTap() } label: {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 36, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 72, height: 72)
+                            .background(Circle().fill(Color.black.opacity(0.42)))
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(40)
+                }
+
+                if showSpeedHUD {
+                    SpeedHUDView()
+                        .position(x: geo.size.width / 2, y: geo.size.height * 0.16)
+                        .transition(.opacity)
+                }
+
+                if showBookmarkToast {
+                    CollectToastView(
+                        message: isBookmarked ? "Added to 'My List'" : "Removed from 'My List'",
+                        systemImage: isBookmarked ? "bookmark.fill" : "bookmark.slash.fill"
+                    )
+                    .position(x: geo.size.width / 2, y: geo.size.height * 0.65)
+                    .zIndex(100)
+                    .transition(.opacity)
+                }
+
+                if showAbout, let drama = currentDrama {
+                    DramaAboutSheet(
+                        drama: drama,
+                        relatedDramas: relatedDramas(for: drama),
+                        isPresented: $showAbout,
+                        onWatchFullSeries: {
+                            showAbout = false
+                            session.engine.pause(reason: .system)
+                            appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
+                        }
+                    )
+                    .zIndex(200)
+                }
+                if showNotificationPrompt {
+                    NotificationPromptView(isPresented: $showNotificationPrompt).zIndex(300)
+                }
             }
         }
     }
 
     @ViewBuilder
     private func feedOverlayContent(in geo: GeometryProxy) -> some View {
-        feedPager(in: geo)
+        let dramas = viewModel.dramas
+        let pageHeight = geo.size.height
+        let yOffset = -CGFloat(session.currentIndex) * pageHeight + dragOffset
 
-        LinearGradient(
-            colors: [.clear, .black.opacity(0.1), .black.opacity(0.85)],
-            startPoint: .top, endPoint: .bottom
-        )
-        .allowsHitTesting(false)
+        ZStack {
+            Color.clear
+                .contentShape(Rectangle())
+                .gesture(verticalDrag(count: dramas.count))
+                .simultaneousGesture(longPressGesture)
+                .simultaneousGesture(tapGesture)
+                .zIndex(-1)
 
-        let searchTopPadding = geo.safeAreaInsets.top + 44
-        searchBarButton
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(.trailing, 24)
-            .padding(.top, searchTopPadding)
+            ForEach(Array(visibleIndices(for: session.currentIndex, count: dramas.count)), id: \.self) { idx in
+                let isCurrent = idx == session.currentIndex
+                ZStack {
+                    ShortVideoPlayerView(
+                        player: isCurrent ? session.engine.currentPlayer : nil,
+                        coverURL: dramas[idx].coverURL,
+                        engine: session.engine
+                    )
+                        .allowsHitTesting(false)
 
-        // Pause overlay
-        if !session.controller.isPlaying {
-            Button { session.controller.togglePlayPause() } label: {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 36, weight: .medium))
-                    .foregroundColor(.white)
-                    .frame(width: 72, height: 72)
-                    .background(Circle().fill(Color.black.opacity(0.4)))
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.1), .black.opacity(0.85)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .allowsHitTesting(false)
+
+                    // 每页独立底部浮层
+                    if !isSpeeding, !showAbout, !showNotificationPrompt {
+                        pageBottomOverlay(drama: dramas[idx], isCurrent: isCurrent, geo: geo)
+                    }
+                }
+                .frame(width: geo.size.width, height: pageHeight)
+                .position(x: geo.size.width / 2, y: CGFloat(idx) * pageHeight + pageHeight / 2 + yOffset)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(width: geo.size.width, height: pageHeight)
+        .clipped()
+    }
 
-        bottomContent(in: geo)
+    private func pageBottomOverlay(drama: DramaItem, isCurrent: Bool, geo: GeometryProxy) -> some View {
+        let horizontalPadding: CGFloat = 14
+        let actionRailWidth: CGFloat = 42
+        let actionRailGap: CGFloat = 10
+        let tabBarAvoidance: CGFloat = 86
+        let contentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
 
-        progressBar(totalWidth: geo.size.width)
-            .frame(maxHeight: .infinity, alignment: .bottom)
-            .padding(.horizontal, DT.Space.pageH)
-            .padding(.bottom, 56)
+        return VStack(spacing: 0) {
+            Spacer()
+            VStack(alignment: .leading, spacing: 3) {
+                if !isScrubbing {
+                    HStack(alignment: .bottom, spacing: actionRailGap) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Button {
+                                withAnimation(.easeOut(duration: 0.25)) { showAbout = true }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(drama.title)
+                                        .font(.system(size: 22, weight: .bold))
+                                        .foregroundColor(.white).lineLimit(1)
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                            }
+                            .buttonStyle(.plain)
 
-        if showSpeedHUD {
-            SpeedHUDView()
-                .position(x: geo.size.width / 2, y: geo.size.height * 0.16)
-                .transition(.opacity)
+                            // 标签
+                            HStack(spacing: 6) {
+                                feedTag("Members Only", bg: DB.gold.opacity(0.25), fg: DB.gold)
+                                feedTag("Exclusive", bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                                feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                            }
+
+                            // 简介展开和收起
+                            synopsisView(drama.synopsis)
+                                .lineSpacing(3)
+                                .contentShape(Rectangle())
+                                .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() } }
+                        }
+                        .frame(width: contentWidth, alignment: .leading)
+
+                        // 右侧操作栏
+                        RightActionBar(
+                            isBookmarked: $isBookmarked,
+                            viewCount: drama.formattedViewCount,
+                            onBookmark: {
+                                withAnimation(.spring(response: 0.3)) {
+                                    isBookmarked.toggle(); showBookmarkToast = true
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                                    withAnimation(.easeOut(duration: 0.3)) { showBookmarkToast = false }
+                                }
+                            },
+                            onShare: { showShare = true }
+                        )
+                        .frame(width: actionRailWidth)
+                    }
+
+                    // 使用按钮显式跳转，避免手势层抢占点击
+                    Button {
+                        session.engine.pause(reason: .system)
+                        appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
+                    } label: {
+                        Text("Watch Full Series")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: contentWidth, height: 38)
+                            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Color.white.opacity(0.22)))
+                            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 10)
+                }
+
+                if isCurrent {
+                    progressBar(totalWidth: geo.size.width - horizontalPadding * 2)
+                        .frame(width: geo.size.width - horizontalPadding * 2)
+                        .zIndex(30)
+                } else {
+                    Capsule()
+                        .fill(Color.white.opacity(0.22))
+                        .frame(width: geo.size.width - horizontalPadding * 2, height: 3)
+                }
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, tabBarAvoidance)
         }
+        .zIndex(10)
+    }
 
-        if showBookmarkToast {
-            CollectToastView(
-                message: isBookmarked ? "Added to 'My List'" : "Removed from 'My List'",
-                systemImage: isBookmarked ? "bookmark.fill" : "bookmark.slash.fill"
-            )
-            .position(x: geo.size.width / 2, y: geo.size.height * 0.65)
-            .zIndex(100)
-            .transition(.opacity)
+    private func synopsisView(_ text: String) -> some View {
+        Group {
+            if isExpanded {
+                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
+                + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.82)))
+            } else {
+                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
+                + Text(truncatedSynopsis(text)).font(.system(size: 13)).foregroundColor(.white.opacity(0.82))
+                + Text("... more").font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.96)))
+            }
         }
+        .lineLimit(isExpanded ? nil : 2)
+    }
 
-        // About Sheet
-        if showAbout, let drama = currentDrama {
-            DramaAboutSheet(drama: drama, isPresented: $showAbout)
-                .zIndex(200)
-        }
+    private func truncatedSynopsis(_ text: String) -> String {
+        if text.count > 80 { String(text.prefix(80)) }
+        else { text }
+    }
 
-        // Notification Prompt
-        if showNotificationPrompt {
-            NotificationPromptView(isPresented: $showNotificationPrompt)
-                .zIndex(300)
-        }
+    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
+        Text(text).font(.system(size: 12, weight: .medium)).foregroundColor(fg)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(bg).clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     private func loadAndInit() async {
         await viewModel.loadData()
-        if appStore.selectedTab == .forYou, !session.hasInitializedPool {
-            session.initializePool(dramas: viewModel.dramas)
-            // 首次进入For You延迟展示通知弹窗
+        if isPlaybackVisible {
+            initializePlaybackIfNeeded()
             if !hasShownNotification {
                 hasShownNotification = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showNotificationPrompt = true
-                    }
+                    withAnimation(.easeOut(duration: 0.3)) { showNotificationPrompt = true }
                 }
             }
         }
     }
 
-    // MARK: - Computed
+    private func initializePlaybackIfNeeded() {
+        guard !session.hasInitializedPool, !viewModel.dramas.isEmpty else { return }
+        session.initializePool(dramas: viewModel.dramas)
+        session.engine.play()
+    }
+
+    // MARK: - 计算属性
 
     private var currentDrama: DramaItem? {
         guard viewModel.dramas.indices.contains(session.currentIndex) else { return nil }
         return viewModel.dramas[session.currentIndex]
     }
 
-    // MARK: - Auto Play Setup
+    private func relatedDramas(for drama: DramaItem) -> [DramaItem] {
+        viewModel.dramas
+            .filter { $0.id != drama.id }
+            .prefix(12)
+            .map { $0 }
+    }
+
+    // MARK: - 自动播放配置
 
     private func setupAutoPlay() {
-        session.controller.onPlaybackFinished = { [weak session, weak appStore] in
-            guard let session, let appStore else { return }
-            let idx = session.currentIndex
-            let dramas = viewModel.dramas
-            if dramas.indices.contains(idx) {
-                appStore.navigationTarget = SeriesPlayerNav(drama: dramas[idx], startEpisode: 2)
-            }
+        session.engine.onPlaybackFinished = { [weak engine = session.engine] in
+            engine?.pause(reason: .system)
+            engine?.seek(to: 0)
+            // 推荐页第一版：播放结束不自动跳转到全屏
         }
     }
 
-    // MARK: - Search Bar Button
+    // MARK: - 搜索按钮
 
     private var searchBarButton: some View {
         Button {
             NotificationCenter.default.post(name: .showSearch, object: nil)
         } label: {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 20, weight: .medium))
+                .font(.system(size: 26, weight: .light))
                 .foregroundColor(.white)
-                .frame(width: 36, height: 36)
-                .background(Circle().fill(Color.black.opacity(0.2)))
+                .shadow(color: .black.opacity(0.28), radius: 3, x: 0, y: 1)
+                .frame(width: 42, height: 42)
         }
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Empty State
+    // MARK: - 空状态
 
     private func emptyState(in geo: GeometryProxy) -> some View {
         VStack(spacing: DT.Space.lg) {
@@ -202,45 +397,19 @@ struct RecommendView: View {
         .frame(width: geo.size.width, height: geo.size.height)
     }
 
-    // MARK: - Vertical Feed Pager
-
-    private func feedPager(in geo: GeometryProxy) -> some View {
-        let pageHeight = geo.size.height
-        let dramas = viewModel.dramas
-        let yOffset = -CGFloat(session.currentIndex) * pageHeight + dragOffset
-
-        return ZStack {
-            ForEach(visibleIndices(for: session.currentIndex, count: dramas.count), id: \.self) { idx in
-                VideoPlayerView(
-                    coverURL: dramas[idx].coverURL,
-                    player: (idx == session.currentIndex) ? session.pool.current : nil,
-                    controller: (idx == session.currentIndex) ? session.controller : nil
-                )
-                    .allowsHitTesting(false)
-                    .frame(width: geo.size.width, height: pageHeight)
-                    .position(x: geo.size.width / 2, y: CGFloat(idx) * pageHeight + pageHeight / 2 + yOffset)
-            }
-
-            Color.clear
-                .contentShape(Rectangle())
-                .gesture(verticalDrag(count: dramas.count))
-                .simultaneousGesture(longPressGesture)
-                .simultaneousGesture(tapGesture)
-        }
-        .frame(width: geo.size.width, height: pageHeight)
-        .clipped()
-    }
+    // 旧分页器已移除，统一使用当前信息流浮层
 
     private func visibleIndices(for current: Int, count: Int) -> [Int] {
         guard count > 0 else { return [] }
         return Array(max(0, current - 1)...min(count - 1, current + 1))
     }
 
-    // MARK: - Drag Gesture
+    // MARK: - 拖拽手势
 
     private func verticalDrag(count: Int) -> some Gesture {
         DragGesture(minimumDistance: 10)
             .onChanged { value in
+                isDraggingPage = true
                 let t = value.translation.height
                 if session.currentIndex == 0 && t > 0 { dragOffset = t * 0.4 }
                 else if session.currentIndex == count - 1 && t < 0 { dragOffset = t * 0.4 }
@@ -256,29 +425,40 @@ struct RecommendView: View {
                     }
                     dragOffset = 0
                 }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { isDraggingPage = false }
             }
     }
 
-    // MARK: - Tap Gesture
+    // MARK: - 点击手势
 
     private var tapGesture: some Gesture {
         TapGesture()
             .onEnded {
-                session.controller.togglePlayPause()
+                handleVideoTap()
             }
     }
 
-    // MARK: - Long Press Speed-Up
+    private func handleVideoTap() {
+        let e = session.engine
+        if e.state == .playing {
+            e.pause(reason: .user)
+        } else if e.state == .pausedByUser {
+            e.play()
+        }
+    }
+
+    // MARK: - 长按二倍速
 
     private var longPressGesture: some Gesture {
-        LongPressGesture(minimumDuration: 0.3)
+        LongPressGesture(minimumDuration: 0.35)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
+                guard !isScrubbing, !isDraggingPage else { return }
                 switch value {
                 case .second(true, _):
                     if !isSpeeding {
                         isSpeeding = true
-                        session.controller.setRate(2.0)
+                        session.engine.setRate(2.0)
                         withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
                     }
                 default: break
@@ -286,183 +466,120 @@ struct RecommendView: View {
             }
             .onEnded { _ in
                 isSpeeding = false
-                session.controller.setRate(1.0)
+                session.engine.setRate(1.0)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
             }
     }
 
-    // MARK: - Bottom Content
-
-    private func bottomContent(in geo: GeometryProxy) -> some View {
-        let sidebarWidth: CGFloat = 44
-        let contentMaxWidth = geo.size.width - 24 * 2 - sidebarWidth - 16
-        let uiHidden = isSpeeding || isScrubbing
-
-        return VStack(spacing: 0) {
-            Spacer()
-            HStack(alignment: .bottom, spacing: 16) {
-                infoSection(maxWidth: contentMaxWidth)
-                    .opacity(uiHidden ? 0 : 1)
-                    .allowsHitTesting(!uiHidden)
-                rightActionBar
-                    .opacity(uiHidden ? 0 : 1)
-                    .allowsHitTesting(!uiHidden)
-            }
-            .padding(.horizontal, 24)
-
-            if let drama = currentDrama {
-                ctaButton(drama: drama, maxWidth: geo.size.width - 48)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 10)
-                    .padding(.bottom, 12)
-                    .opacity(uiHidden ? 0 : 1)
-                    .allowsHitTesting(!uiHidden)
-            }
-        }
-        .frame(maxHeight: .infinity)
-    }
-
-    // MARK: - Info Section (DramaBox style)
-
-    private func infoSection(maxWidth: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if let drama = currentDrama {
-                // Title + chevron → opens About
-                Button {
-                    withAnimation(.easeOut(duration: 0.25)) { showAbout = true }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(drama.title)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-            tagRow
-            if let drama = currentDrama {
-                synopsisBlock(drama.synopsis)
-            }
-        }
-        .frame(maxWidth: maxWidth, alignment: .leading)
-    }
-
-    // MARK: - Synopsis Block
-
-    @ViewBuilder
-    private func synopsisBlock(_ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Trailer | synopsis format
-            HStack(alignment: .top, spacing: 0) {
-                Text("Trailer | ")
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.8))
-                + Text(text)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.65))
-            }
-            .lineLimit(isExpanded ? nil : 2)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                isExpanded.toggle()
-            }
-
-            if !isExpanded {
-                Button { isExpanded = true } label: {
-                    Text("more")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.5))
-                }
-            }
-        }
-    }
-
-    // MARK: - CTA Button
-
-    private func ctaButton(drama: DramaItem, maxWidth: CGFloat) -> some View {
-        NavigationLink(value: SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))) {
-            Text("Watch Full Series")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
-                .frame(maxWidth: maxWidth)
-                .frame(height: 54)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.white.opacity(0.12))
-                )
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - Progress Bar
+    // MARK: - 进度条
 
     private func progressBar(totalWidth: CGFloat) -> some View {
-        let barWidth = totalWidth - 32
-        let fraction = session.controller.duration > 0
-            ? (isScrubbing ? Double(scrubFraction) : session.controller.currentTime / session.controller.duration)
+        let barWidth = totalWidth
+        let fraction = session.engine.progress.duration > 0
+            ? (isScrubbing ? Double(scrubFraction) : session.engine.progress.currentTime / session.engine.progress.duration)
             : 0
-        let buffered = session.controller.bufferProgress
-        let effectiveHeight: CGFloat = isScrubbing ? 6 : 3
+        let buffered = session.engine.progress.bufferProgress
+        let effectiveHeight: CGFloat = isScrubbing ? 8 : 3
         let clampedProgress = max(0, min(1, CGFloat(fraction)))
-        let scrubSeconds = Double(clampedProgress) * session.controller.duration
+        let scrubSeconds = Double(clampedProgress) * session.engine.progress.duration
+        let showSeekPreview = isScrubbing
 
         return VStack(spacing: 0) {
-            if isScrubbing {
-                VStack(spacing: 6) {
-                    if let thumbnail = session.controller.thumbnailImage {
-                        Image(uiImage: thumbnail)
-                            .resizable().aspectRatio(contentMode: .fill)
-                            .frame(width: 64, height: 36)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+            if showSeekPreview {
+                VStack(spacing: 8) {
+                    // 缩略图预览
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.black.opacity(0.6))
+                        .frame(width: 112, height: 160)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.white.opacity(0.5), lineWidth: 2)
+                            )
+                        if let thumbnail = scrubThumbnail {
+                            Image(uiImage: thumbnail)
+                                .resizable().aspectRatio(contentMode: .fill)
+                                .frame(width: 112, height: 160)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
-                    Text("\(formatTime(scrubSeconds)) / \(formatTime(session.controller.duration))")
-                        .font(DT.Font.body(11, weight: .medium))
-                        .foregroundColor(.white)
+
+                    // 时间文本
+                    Text("\(formatTime(scrubSeconds)) / \(formatTime(session.engine.progress.duration))")
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundColor(.white.opacity(0.92))
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.bottom, 6)
+                .padding(.bottom, 12)
+                .transition(.opacity)
             }
 
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.2)).frame(height: effectiveHeight)
-                Capsule().fill(Color.white.opacity(0.15))
+                Capsule().fill(Color.white.opacity(0.25)).frame(height: effectiveHeight)
+                Capsule().fill(Color.white.opacity(0.18))
                     .frame(width: max(0, barWidth * CGFloat(buffered)), height: effectiveHeight)
                 Capsule().fill(DT.logoRed)
                     .frame(width: max(effectiveHeight, barWidth * clampedProgress), height: effectiveHeight)
                 if isScrubbing {
                     Circle()
                         .fill(.white)
-                        .frame(width: 10, height: 10)
+                        .frame(width: 14, height: 14)
                         .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
                         .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - 7)
                 }
             }
-            .frame(height: max(24, effectiveHeight), alignment: .bottom)
+            .frame(height: isScrubbing ? 28 : 16, alignment: .bottom)
             .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
+            .simultaneousGesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        guard !isScrubbing, session.engine.progress.duration > 0 else { return }
+                        let clamped = max(0, min(1, value.location.x / barWidth))
+                        session.engine.seek(to: Double(clamped))
+                    }
+            )
+            .highPriorityGesture(
+                LongPressGesture(minimumDuration: 0.28)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
                     .onChanged { value in
-                        isScrubbing = true
-                        let x = value.location.x
-                        scrubFraction = max(0, min(1, x / barWidth))
-                        session.controller.generateThumbnail(at: scrubFraction)
+                        guard session.engine.progress.duration > 0 else { return }
+                        switch value {
+                        case .second(true, let drag?):
+                            if !isScrubbing {
+                                wasPlayingBeforeScrub = session.engine.state == .playing
+                                if isSpeeding {
+                                    isSpeeding = false
+                                    session.engine.setRate(1.0)
+                                    showSpeedHUD = false
+                                }
+                            }
+                            isScrubbing = true
+                            let x = drag.location.x
+                            scrubFraction = max(0, min(1, x / barWidth))
+                            session.engine.generateThumbnail(at: scrubFraction) { img in scrubThumbnail = img }
+                        default:
+                            break
+                        }
                     }
                     .onEnded { value in
-                        let x = value.location.x
-                        let clamped = max(0, min(1, x / barWidth))
-                        session.controller.seek(to: Double(clamped))
-                        isScrubbing = false
+                        if case .second(true, let drag?) = value {
+                            let x = drag.location.x
+                            let clamped = max(0, min(1, x / barWidth))
+                            session.engine.seek(to: Double(clamped))
+                            if wasPlayingBeforeScrub { session.engine.playFromSystemResume() }
+                        }
+                        withAnimation(.easeOut(duration: 0.12)) {
+                            isScrubbing = false
+                        }
                         scrubFraction = 0
+                        scrubThumbnail = nil
+                        wasPlayingBeforeScrub = false
                     }
             )
         }
     }
 
-    // MARK: - Time Format
+    // MARK: - 时间格式
 
     private func formatTime(_ seconds: Double) -> String {
         guard seconds.isFinite && seconds >= 0 else { return "00:00" }
@@ -472,71 +589,7 @@ struct RecommendView: View {
         return String(format: "%02d:%02d", m, s)
     }
 
-    // MARK: - Tag Row
-
-    @ViewBuilder
-    private var tagRow: some View {
-        if let drama = currentDrama {
-            HStack(spacing: 6) {
-                // Members Only tag — gold
-                feedTag("Members Only", bg: DB.gold.opacity(0.25), fg: DB.gold)
-                // Exclusive tag
-                feedTag("Exclusive", bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
-                // Category or first tag
-                feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
-            }
-        }
-    }
-
-    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundColor(fg)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-    }
-
-    // MARK: - Right Action Bar
-
-    private var rightActionBar: some View {
-        RightActionBar(
-            isBookmarked: $isBookmarked,
-            viewCount: currentDrama?.formattedViewCount,
-            onBookmark: {
-                withAnimation(.spring(response: 0.3)) {
-                    isBookmarked.toggle()
-                    showBookmarkToast = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        showBookmarkToast = false
-                    }
-                }
-            },
-            onShare: { showShare = true }
-        )
-    }
-
-    // MARK: - Bookmark Toast
-
-    private var bookmarkToastView: some View {
-        HStack(spacing: 6) {
-            Image(systemName: isBookmarked ? "checkmark.circle.fill" : "bookmark.slash")
-                .font(DT.Font.body(14, weight: .semibold))
-            Text(isBookmarked ? L10n.favoritesAddedToast : L10n.favoritesRemovedToast)
-                .font(DT.Font.body(14, weight: .medium))
-        }
-        .foregroundColor(.white)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Capsule().fill(Color.black.opacity(0.75)))
-        .padding(.top, 60)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-// MARK: - Tab & Navigation Lifecycle Modifier
+// MARK: - 标签页和导航生命周期
 
 private struct TabLifecycleModifier: ViewModifier {
     let appStore: AppStore
@@ -550,30 +603,30 @@ private struct TabLifecycleModifier: ViewModifier {
                     if !session.hasInitializedPool, !viewModel.dramas.isEmpty {
                         session.initializePool(dramas: viewModel.dramas)
                     } else {
-                        session.controller.play()
+                        session.engine.playFromSystemResume()
                     }
                 } else {
-                    session.controller.pause()
+                    session.engine.pause(reason: .system)
                 }
             }
             .onChange(of: appStore.isShowingSearch) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.controller.pause() } else { session.controller.play() }
+                if isShowing { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
             }
             .onChange(of: appStore.isShowingMembership) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.controller.pause() } else { session.controller.play() }
+                if isShowing { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
             }
             .onChange(of: appStore.navigationTarget) { _, target in
                 guard appStore.selectedTab == .forYou else { return }
-                if target != nil { session.controller.pause() } else { session.controller.play() }
+                if target != nil { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
             }
     }
 }
 
-// MARK: - DramaBox Collect Toast
+// MARK: - 收藏提示
 
-/// DramaBox 风格收藏 Toast — 中央偏下暗色气泡
+/// 短剧应用风格收藏提示 — 中央偏下暗色气泡
 private struct CollectToastView: View {
     let message: String
     let systemImage: String
@@ -592,94 +645,313 @@ private struct CollectToastView: View {
     }
 }
 
-// MARK: - DramaBox About Sheet
+// MARK: - 剧集详情弹层
 
-/// DramaBox 风格剧集详情弹层
+/// 短剧应用风格剧集详情弹层
 private struct DramaAboutSheet: View {
+    private enum Tab {
+        case synopsis
+        case episodes
+    }
+
     let drama: DramaItem
+    let relatedDramas: [DramaItem]
     @Binding var isPresented: Bool
+    var onWatchFullSeries: () -> Void
+
+    @State private var selectedTab: Tab = .synopsis
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.black.opacity(0.5)
-                .ignoresSafeArea()
-                .onTapGesture { dismiss() }
+        GeometryReader { geo in
+            let sheetHeight = min(geo.size.height * 0.78, max(geo.size.height * 0.6, geo.size.height - geo.safeAreaInsets.top - 24))
 
-            VStack(spacing: 0) {
-                Capsule()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 36, height: 5)
-                    .padding(.top, 10)
-                    .padding(.bottom, 16)
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.5)
+                    .ignoresSafeArea()
+                    .onTapGesture { dismiss() }
 
-                HStack(alignment: .top, spacing: 16) {
-                    CoverImageView(
-                        url: drama.coverURL,
-                        aspectRatio: 2.0 / 3.0,
-                        cornerRadius: DB.posterRadius,
-                        width: 100,
-                        height: 150
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
+                VStack(spacing: 0) {
+                    sheetChrome
+                    header
+                    tabBar
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(drama.title)
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-
-                        HStack(spacing: 6) {
-                            aboutTag(drama.category, color: DB.pink.opacity(0.8))
+                    ScrollView(showsIndicators: false) {
+                        Group {
+                            if selectedTab == .synopsis {
+                                synopsisContent
+                            } else {
+                                episodesContent
+                            }
                         }
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 22)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: sheetHeight, alignment: .top)
+                .background(
+                    LinearGradient(
+                        colors: [Color(hex: "#232323"), Color(hex: "#111111")],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 22, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 22, style: .continuous))
+                .ignoresSafeArea(edges: .bottom)
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
 
-                        HStack(spacing: 8) {
-                            Label("\(drama.episodeCount) EP", systemImage: "play.rectangle")
-                                .font(.system(size: 12))
-                                .foregroundColor(DB.mutedText)
-                            Label(String(format: "%.1f", drama.rating), systemImage: "star.fill")
-                                .font(.system(size: 12))
-                                .foregroundColor(DB.gold)
+    private var sheetChrome: some View {
+        ZStack {
+            Capsule()
+                .fill(Color.white.opacity(0.14))
+                .frame(width: 40, height: 5)
+
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 21, weight: .light))
+                    .foregroundColor(.white.opacity(0.62))
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.top, 7)
+        .padding(.horizontal, 18)
+        .padding(.bottom, 12)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 14) {
+            CoverImageView(
+                url: drama.coverURL,
+                aspectRatio: 2.0 / 3.0,
+                cornerRadius: 6,
+                width: 92,
+                height: 124
+            )
+
+            VStack(alignment: .leading, spacing: 9) {
+                Text(drama.title)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+
+                Text("\(drama.formattedViewCount) Views")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(.white.opacity(0.42))
+
+                HStack(spacing: 5) {
+                    Image(systemName: "star")
+                        .font(.system(size: 14, weight: .regular))
+                    Text(String(format: "%.1f(5.5K)", drama.rating))
+                    Text("Rate")
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .font(.system(size: 16, weight: .regular))
+                .foregroundColor(.white.opacity(0.52))
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 20)
+    }
+
+    private var tabBar: some View {
+        HStack(alignment: .bottom, spacing: 32) {
+            tabButton("Synopsis", tab: .synopsis)
+            tabButton("Episodes", tab: .episodes)
+            Spacer()
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 20)
+    }
+
+    private func tabButton(_ title: String, tab: Tab) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.18)) { selectedTab = tab }
+        } label: {
+            VStack(spacing: 7) {
+                Text(title)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.45))
+                Capsule()
+                    .fill(selectedTab == tab ? Color.white : Color.clear)
+                    .frame(width: 34, height: 3)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var synopsisContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(drama.synopsis)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundColor(.white.opacity(0.78))
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+
+            tagCloud
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Cast")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                castRow(name: "Xinhui Zhu", color: DB.gold.opacity(0.8))
+                castRow(name: "Yadi Zhang", color: DB.pink.opacity(0.75))
+            }
+
+            if !relatedDramas.isEmpty {
+                VStack(spacing: 16) {
+                    HStack {
+                        Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
+                        Text("More Like This")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white.opacity(0.42))
+                            .fixedSize()
+                        Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
+                    }
+
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 16) {
+                        ForEach(relatedDramas, id: \.id) { item in
+                            relatedDramaCard(item)
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-
-                Text(drama.synopsis)
-                    .font(.system(size: 13))
-                    .foregroundColor(.white.opacity(0.75))
-                    .lineLimit(6)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-
-                Button {
-                    dismiss()
-                } label: {
-                    Text("Watch Full Series")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(DB.pink)
-                        .cornerRadius(DB.ctaRadius)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 34)
             }
-            .background(DB.panel)
-            .clipShape(RoundedRectangle(cornerRadius: DB.sheetCornerRadius, style: .continuous))
         }
-        .transition(.opacity)
     }
 
-    private func aboutTag(_ text: String, color: Color) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.3))
-            .cornerRadius(4)
+    private var tagCloud: some View {
+        HStack(spacing: 8) {
+            aboutTag("Revenge")
+            aboutTag("Counterattack")
+            aboutTag("Hidden Identity")
+            aboutTag(L10n.categoryDisplayName(drama.category))
+        }
+    }
+
+    private func aboutTag(_ text: String) -> some View {
+        HStack(spacing: 3) {
+            Text(text)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 8, weight: .bold))
+        }
+        .font(.system(size: 12, weight: .medium))
+        .foregroundColor(.white.opacity(0.56))
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.08)))
+    }
+
+    private func castRow(name: String, color: Color) -> some View {
+        HStack(spacing: 14) {
+            Circle()
+                .fill(color)
+                .frame(width: 54, height: 54)
+                .overlay(
+                    Text(String(name.prefix(1)))
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                )
+
+            Text(name)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white.opacity(0.9))
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(.white.opacity(0.36))
+        }
+    }
+
+    private var episodesContent: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 34) {
+                Text("1-30")
+                    .foregroundColor(.white)
+                Text("31-60")
+                    .foregroundColor(.white.opacity(0.38))
+            }
+            .font(.system(size: 18, weight: .medium))
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
+                ForEach(1...max(60, drama.episodeCount), id: \.self) { episode in
+                    episodeButton(episode)
+                }
+            }
+        }
+    }
+
+    private func episodeButton(_ episode: Int) -> some View {
+        Button {
+            if episode <= 3 {
+                onWatchFullSeries()
+            }
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color.white.opacity(0.075))
+                    .frame(height: 54)
+
+                Text("\(episode)")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if episode > 11 {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.82))
+                        .padding(5)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func relatedDramaCard(_ item: DramaItem) -> some View {
+        Button {
+            dismiss()
+        } label: {
+            VStack(alignment: .leading, spacing: 6) {
+                ZStack(alignment: .bottomTrailing) {
+                    CoverImageView(
+                        url: item.coverURL,
+                        aspectRatio: 2.0 / 3.0,
+                        cornerRadius: 3
+                    )
+                    .frame(height: 150)
+                    .clipped()
+
+                    Label(item.formattedViewCount, systemImage: "play.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(5)
+                        .shadow(color: .black.opacity(0.7), radius: 2)
+                }
+
+                Text(item.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(2)
+
+                Text(L10n.categoryDisplayName(item.category))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundColor(.white.opacity(0.42))
+                    .lineLimit(1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func dismiss() {
@@ -687,9 +959,9 @@ private struct DramaAboutSheet: View {
     }
 }
 
-// MARK: - DramaBox Notification Prompt
+// MARK: - 通知引导弹窗
 
-/// DramaBox 风格通知弹窗 (mock only)
+/// 短剧应用风格通知弹窗，仅用于模拟
 private struct NotificationPromptView: View {
     @Binding var isPresented: Bool
 
