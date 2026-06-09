@@ -83,7 +83,8 @@ final class PlayerRecoveryController {
 
     // MARK: - 状态快照
 
-    private func snapshot() {
+    /// 公开 — engine item status KVO 需要快照
+    func snapshot() {
         guard let engine else { return }
         lastTime = engine.progress.currentTime
         lastItem = engine.currentItem
@@ -145,7 +146,8 @@ final class PlayerRecoveryController {
 
     // MARK: - 恢复逻辑
 
-    private func attemptRecovery() {
+    /// 公开 — engine item status failed 时调用
+    func attemptRecovery() {
         guard let engine, let _ = lastItem, wasPlaying else { return }
 
         let startTime = CACurrentMediaTime()

@@ -42,6 +42,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     // TTFF 计时
     private var ttffStart: Double = 0
+    // item status KVO
+    private var itemStatusObs: NSKeyValueObservation?
 
     init() {
         recoveryController.engine = self
@@ -268,6 +270,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     func cleanup() {
         wantsPlayback = false
+        itemStatusObs?.invalidate(); itemStatusObs = nil
         cancelAllPreloadTasks()
         subtitleTask?.cancel()
         removeObservers()
@@ -315,25 +318,63 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private func attach(player: AVPlayer) {
         removeObservers()
         currentPlayer = player
+        setupItemStatusKVO(player)
         startObserving()
         recoveryController.attachObservers(to: player)
 
-        // 异步读取内封字幕
-        if let asset = player.currentItem?.asset {
-            Task { [weak self] in
-                let subs = await PlayerItemFactory.embeddedSubtitles(from: asset)
-                self?.availableSubtitles = subs
+        // 设置播放策略：current 优先稳定播放
+        player.currentItem?.preferredForwardBufferDuration = 4.0
+        player.automaticallyWaitsToMinimizeStalling = true
+
+        // 自动加载字幕（按 source 类型）
+        if let item = currentItem {
+            switch item.source {
+            case .mp4WithExternalSubtitles(_, let subtitles):
+                loadExternalSubtitles(subtitles)
+            case .mp4WithEmbeddedSubtitles, .hls, .hlsWithFallback:
+                if let asset = player.currentItem?.asset {
+                    Task { [weak self] in
+                        let subs = await PlayerItemFactory.embeddedSubtitles(from: asset)
+                        self?.availableSubtitles = subs
+                    }
+                }
+            default: break
             }
         }
 
         state = .ready
         log("attach: status=\(statusString(player.currentItem?.status)) timeControl=\(tcsString(player.timeControlStatus))")
 
-        // 关键修复：如果有播放意图，attach 后立即播放
+        // 如果有播放意图，attach 后立即播放
         if wantsPlayback {
             player.play()
             state = .playing
             log("attach: 自动播放（wantsPlayback=true）")
+        }
+    }
+
+    /// 监听 AVPlayerItem.status，failed 时触发 fallback
+    private func setupItemStatusKVO(_ player: AVPlayer) {
+        itemStatusObs?.invalidate()
+        itemStatusObs = player.currentItem?.observe(\.status, options: [.new]) { [weak self] item, change in
+            guard let self, self.currentPlayer === player else { return }
+            guard item.status == .failed else { return }
+            let err = item.error?.localizedDescription ?? "未知错误"
+            self.log("itemStatusKVO: failed err=\(err)")
+            // 只对当前 current item 做 fallback
+            guard let cur = self.currentItem else { return }
+            // HLS fallback
+            if case .hlsWithFallback(_, let mp4URL) = cur.source {
+                self.log("itemStatusKVO: HLS→MP4 fallback url=\(mp4URL)")
+                let fallback = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL))
+                self.currentManagedItem = fallback
+                player.replaceCurrentItem(with: fallback.item)
+                if self.wantsPlayback { player.play(); self.state = .playing }
+            } else {
+                self.recoveryController.detachObservers()
+                self.recoveryController.snapshot()
+                self.recoveryController.attemptRecovery()
+            }
         }
     }
 
