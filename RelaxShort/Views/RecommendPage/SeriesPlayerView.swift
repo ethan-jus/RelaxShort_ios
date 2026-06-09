@@ -1,18 +1,8 @@
 import SwiftUI
 import AVKit
 
-// MARK: - Series Player View
+// MARK: - Series Player View (接入 ShortVideoPlayerEngine)
 
-/// 剧集沉浸播放页 — 同一部剧的 EP 播放流
-///
-/// **导航**：NavigationStack push，系统返回按钮 + 边缘右滑
-/// **产品定位**：连续剧模式，提升连续观看 & 付费率
-/// - 上下滑 = 上一集 / 下一集（同一部剧）
-/// - 长按 = 2.0x 倍速
-/// - 顶部：系统导航栏（剧名 + EP）
-/// - 底部：解锁按钮 + 选集入口 → push 选集网格页
-///
-/// → 入口：RecommendView 点击「观看全集」
 struct SeriesPlayerView: View {
 
     let drama: DramaItem
@@ -27,11 +17,9 @@ struct SeriesPlayerView: View {
     @State private var isBookmarked = false
     @State private var showShare = false
     @State private var episodes: [Episode] = []
-    /// 当前 session 内解锁的剧集
     @State private var unlockedEpisodes: Set<Int> = []
 
-    @State private var playerPool = PlayerPool()
-    @StateObject private var playerController = PlayerController()
+    @StateObject private var playerEngine = ShortVideoPlayerEngine()
 
     private var totalEpisodes: Int
 
@@ -47,11 +35,8 @@ struct SeriesPlayerView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                //Color.black.ignoresSafeArea()
-
                 episodePager(in: geo)
 
-                // 底部渐变 — 让按钮区可读
                 LinearGradient(
                     colors: [.clear, .black.opacity(0.8)],
                     startPoint: .top, endPoint: .bottom
@@ -60,13 +45,11 @@ struct SeriesPlayerView: View {
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .allowsHitTesting(false)
 
-                // ── 底部左侧：解锁 + 选集 ──
                 bottomBar
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .padding(.leading, DT.Space.pageH)
                     .padding(.bottom, geo.safeAreaInsets.bottom + 10)
 
-                // ── 右侧操作按钮栏 ──
                 RightActionBar(
                     isBookmarked: $isBookmarked,
                     viewCount: drama.formattedViewCount,
@@ -78,13 +61,11 @@ struct SeriesPlayerView: View {
                 .padding(.trailing, DT.Space.pageH)
                 .padding(.bottom, geo.safeAreaInsets.bottom + 10)
 
-                // ── 2.0x 倍速 HUD ──
                 if showSpeedHUD {
                     SpeedHUDView()
                         .transition(.scale.combined(with: .opacity))
                 }
 
-                // ── 选集底部弹层 ──
                 if showEpisodeList {
                     EpisodePickerSheet(
                         episodes: episodes,
@@ -103,7 +84,6 @@ struct SeriesPlayerView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                // ── 解锁弹层 ──
                 if showUnlockSheet {
                     UnlockEpisodeSheet(
                         episodeNumber: unlockTargetEpisode,
@@ -136,48 +116,43 @@ struct SeriesPlayerView: View {
             handleEpisodeTransition(from: oldValue, to: newValue)
         }
         .onDisappear {
-            playerController.cleanup()
-            playerPool.cleanup()
+            playerEngine.cleanup()
         }
     }
+
+    // MARK: - Episode Loading
 
     private func loadEpisodes() async {
         let repo = MockDetailRepository()
         episodes = (try? await repo.fetchEpisodes(dramaId: drama.id)) ?? []
-        initializeEpisodePool()
+        initializeEpisodePlayer()
     }
 
-    // MARK: - PlayerPool 管理
+    private func playerItems(from eps: [Episode]) -> [PlayerMediaItem] {
+        eps.compactMap { ep -> PlayerMediaItem? in
+            guard let url = URL(string: ep.videoURL) else { return nil }
+            return PlayerMediaItem(
+                id: "\(drama.id)-\(ep.episodeNumber)",
+                title: drama.title,
+                episodeNumber: ep.episodeNumber,
+                coverURL: drama.coverURL,
+                source: .mp4(url),
+                resumeTime: nil
+            )
+        }
+    }
 
-    private func initializeEpisodePool() {
-        guard let url = episodeVideoURL(for: currentEpisode) else { return }
-        playerPool.setCurrent(url: url)
-        preloadEpisodeAdjacent(for: currentEpisode)
+    private func initializeEpisodePlayer() {
+        let items = playerItems(from: episodes)
+        guard !items.isEmpty else { return }
+        let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
+        playerEngine.prepare(items: items, index: startIndex)
     }
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {
-        if new > old {
-            playerPool.advance()
-        } else if new < old {
-            playerPool.retreat()
-        }
-        preloadEpisodeAdjacent(for: new)
-    }
-
-    private func preloadEpisodeAdjacent(for ep: Int) {
-        let nextEp = ep + 1
-        if nextEp <= totalEpisodes, let url = episodeVideoURL(for: nextEp) {
-            playerPool.preloadNext(url: url)
-        }
-        let prevEp = ep - 1
-        if prevEp >= 1, let url = episodeVideoURL(for: prevEp) {
-            playerPool.preloadPrevious(url: url)
-        }
-    }
-
-    private func episodeVideoURL(for ep: Int) -> URL? {
-        guard let episode = episodes.first(where: { $0.episodeNumber == ep }) else { return nil }
-        return URL(string: episode.videoURL)
+        guard old != new else { return }
+        let targetIndex = max(0, new - 1)
+        playerEngine.move(to: targetIndex)
     }
 
     // MARK: - Episode Pager
@@ -188,10 +163,11 @@ struct SeriesPlayerView: View {
 
         return ZStack {
             ForEach(visibleEpisodeIndices(), id: \.self) { ep in
-                VideoPlayerView(
+                let isCurrent = ep == currentEpisode
+                ShortVideoPlayerView(
+                    player: isCurrent ? playerEngine.currentPlayer : nil,
                     coverURL: drama.coverURL,
-                    player: (ep == currentEpisode) ? playerPool.current : nil,
-                    controller: (ep == currentEpisode) ? playerController : nil
+                    engine: playerEngine
                 )
                 .allowsHitTesting(false)
                 .frame(width: geo.size.width, height: pageHeight)
@@ -211,7 +187,7 @@ struct SeriesPlayerView: View {
         return Array(lo...hi)
     }
 
-    // MARK: - Drag Gesture (Episode Navigation)
+    // MARK: - Gestures
 
     private var episodeDragGesture: some Gesture {
         DragGesture(minimumDistance: 10)
@@ -234,23 +210,21 @@ struct SeriesPlayerView: View {
             }
     }
 
-    // MARK: - Long Press Speed-Up
-
     private var longPressGesture: some Gesture {
         LongPressGesture(minimumDuration: 0.3)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
                 switch value {
                 case .second(true, _):
-                    if playerController.isPlaying && playerController.currentTime > 0 {
-                        playerController.setRate(2.0)
+                    if playerEngine.state == .playing, playerEngine.progress.currentTime > 0 {
+                        playerEngine.setRate(2.0)
                         withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
                     }
                 default: break
                 }
             }
             .onEnded { _ in
-                playerController.setRate(1.0)
+                playerEngine.setRate(1.0)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
             }
     }
@@ -258,7 +232,11 @@ struct SeriesPlayerView: View {
     private var tapPauseGesture: some Gesture {
         TapGesture()
             .onEnded {
-                playerController.togglePlayPause()
+                if playerEngine.state == .playing {
+                    playerEngine.pause(reason: .user)
+                } else if playerEngine.state == .pausedByUser {
+                    playerEngine.play()
+                }
             }
     }
 
@@ -270,7 +248,7 @@ struct SeriesPlayerView: View {
         return !freeRange.contains(ep)
     }
 
-    // MARK: - Bottom Bar (左侧解锁按钮)
+    // MARK: - Bottom Bar
 
     private var bottomBar: some View {
         VStack(spacing: 8) {
@@ -280,14 +258,12 @@ struct SeriesPlayerView: View {
                     showUnlockSheet = true
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "lock.fill")
-                            .font(.system(size: 12))
+                        Image(systemName: "lock.fill").font(.system(size: 12))
                         Text("Unlock EP \(currentEpisode)")
                             .font(DT.Font.body(15, weight: .semibold))
                     }
                     .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .frame(height: 40)
+                    .padding(.horizontal, 20).frame(height: 40)
                     .background(DB.pink)
                     .clipShape(RoundedRectangle(cornerRadius: DT.Radius.xl))
                 }
@@ -296,196 +272,53 @@ struct SeriesPlayerView: View {
     }
 }
 
-// MARK: - Episode Picker Sheet (底部弹层，非push)
+// MARK: - Episode Picker Sheet (unchanged)
 
-/// DramaBox 风格选集底部弹层 — 视频留在底层，弹层展示选集网格
 private struct EpisodePickerSheet: View {
-    let episodes: [Episode]
-    @Binding var currentEpisode: Int
-    let unlockedEpisodes: Set<Int>
-    @Binding var isPresented: Bool
-    var onUnlock: (Int) -> Void
-
-    private let columns: [GridItem] = Array(
-        repeating: GridItem(.flexible(), spacing: 8),
-        count: 5
-    )
-
+    let episodes: [Episode]; @Binding var currentEpisode: Int; let unlockedEpisodes: Set<Int>; @Binding var isPresented: Bool; var onUnlock: (Int) -> Void
+    private let columns: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
     var body: some View {
         ZStack(alignment: .bottom) {
-            Color.black.opacity(0.5)
-                .ignoresSafeArea()
-                .onTapGesture { dismiss() }
-
+            Color.black.opacity(0.5).ignoresSafeArea().onTapGesture { dismiss() }
             VStack(spacing: 0) {
-                Capsule()
-                    .fill(Color.white.opacity(0.3))
-                    .frame(width: 36, height: 5)
-                    .padding(.top, 10)
-                    .padding(.bottom, 12)
-
-                Text("Episodes")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(1...episodes.count, id: \.self) { ep in
-                            episodeCell(for: ep)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .frame(maxHeight: 300)
-            }
-            .padding(.bottom, 20)
-            .background(DB.panel)
-            .clipShape(RoundedRectangle(cornerRadius: DB.sheetCornerRadius, style: .continuous))
+                Capsule().fill(Color.white.opacity(0.3)).frame(width: 36, height: 5).padding(.top, 10).padding(.bottom, 12)
+                Text("Episodes").font(.system(size: 18, weight: .bold)).foregroundColor(.white).frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20).padding(.bottom, 12)
+                ScrollView { LazyVGrid(columns: columns, spacing: 10) { ForEach(1...episodes.count, id: \.self) { ep in episodeCell(for: ep) } }.padding(.horizontal, 20) }.frame(maxHeight: 300)
+            }.padding(.bottom, 20).background(DB.panel).clipShape(RoundedRectangle(cornerRadius: DB.sheetCornerRadius, style: .continuous))
         }
     }
-
-    @ViewBuilder
-    private func episodeCell(for ep: Int) -> some View {
-        let isCurrent = ep == currentEpisode
-        let isLocked = !unlockedEpisodes.contains(ep) && ep > 3
-
-        Button {
-            if isLocked {
-                onUnlock(ep)
-            } else {
-                currentEpisode = ep
-                dismiss()
-            }
-        } label: {
-            VStack(spacing: 4) {
-                if isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 10))
-                        .foregroundColor(DB.mutedText)
-                }
-                Text("\(ep)")
-                    .font(.system(size: 14, weight: isCurrent ? .bold : .regular))
-                    .foregroundColor(isCurrent ? .white : (isLocked ? DB.mutedText : .white.opacity(0.8)))
-            }
-            .frame(width: 52, height: 44)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(isCurrent ? DB.pink : (isLocked ? Color.white.opacity(0.05) : Color.white.opacity(0.12)))
-            )
+    @ViewBuilder private func episodeCell(for ep: Int) -> some View {
+        let isCurrent = ep == currentEpisode; let isLocked = !unlockedEpisodes.contains(ep) && ep > 3
+        Button { if isLocked { onUnlock(ep) } else { currentEpisode = ep; dismiss() } } label: {
+            VStack(spacing: 4) { if isLocked { Image(systemName: "lock.fill").font(.system(size: 10)).foregroundColor(DB.mutedText) }; Text("\(ep)").font(.system(size: 14, weight: isCurrent ? .bold : .regular)).foregroundColor(isCurrent ? .white : (isLocked ? DB.mutedText : .white.opacity(0.8))) }
+                .frame(width: 52, height: 44).background(RoundedRectangle(cornerRadius: 6).fill(isCurrent ? DB.pink : (isLocked ? Color.white.opacity(0.05) : Color.white.opacity(0.12))))
         }
     }
-
-    private func dismiss() {
-        withAnimation(.easeOut(duration: 0.25)) { isPresented = false }
-    }
+    private func dismiss() { withAnimation(.easeOut(duration: 0.25)) { isPresented = false } }
 }
 
-// MARK: - Unlock Episode Sheet
+// MARK: - Unlock Episode Sheet (unchanged)
 
-/// DramaBox 风格解锁弹层 — 金币解锁 或 看广告解锁
 private struct UnlockEpisodeSheet: View {
-    let episodeNumber: Int
-    let coinPrice: Int
-    @Binding var isPresented: Bool
-    var onUnlockWithCoins: () -> Void
-    var onWatchAd: () -> Void
-
+    let episodeNumber: Int; let coinPrice: Int; @Binding var isPresented: Bool; var onUnlockWithCoins: () -> Void; var onWatchAd: () -> Void
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-                .onTapGesture { dismiss() }
-
+        ZStack { Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { dismiss() }
             VStack(spacing: 0) {
-                Image(systemName: "lock.shield.fill")
-                    .font(.system(size: 40))
-                    .foregroundColor(DB.gold)
-                    .padding(.top, 28)
-                    .padding(.bottom, 16)
-
-                Text("Unlock Episode \(episodeNumber)")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.bottom, 8)
-
-                Text("This episode requires coins to unlock. Choose your method below.")
-                    .font(.system(size: 13))
-                    .foregroundColor(DB.mutedText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 24)
-
-                // 金币解锁
-                Button {
-                    onUnlockWithCoins()
-                    dismiss()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "bitcoinsign.circle.fill")
-                        Text("Unlock with \(coinPrice) Coins")
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(DB.gold)
-                    .cornerRadius(DB.ctaRadius)
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 10)
-
-                // 看广告解锁
-                Button {
-                    onWatchAd()
-                    dismiss()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "play.rectangle.fill")
-                        Text("Watch Ad to Unlock")
-                            .font(.system(size: 15, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: DB.ctaRadius)
-                            .stroke(DB.pink, lineWidth: 1.5)
-                    )
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
-            }
-            .frame(width: 300)
-            .background(DB.panelElevated)
-            .clipShape(RoundedRectangle(cornerRadius: DB.sheetCornerRadius))
+                Image(systemName: "lock.shield.fill").font(.system(size: 40)).foregroundColor(DB.gold).padding(.top, 28).padding(.bottom, 16)
+                Text("Unlock Episode \(episodeNumber)").font(.system(size: 20, weight: .bold)).foregroundColor(.white).padding(.bottom, 8)
+                Text("This episode requires coins to unlock. Choose your method below.").font(.system(size: 13)).foregroundColor(DB.mutedText).multilineTextAlignment(.center).padding(.horizontal, 24).padding(.bottom, 24)
+                Button { onUnlockWithCoins(); dismiss() } label: { HStack(spacing: 8) { Image(systemName: "bitcoinsign.circle.fill"); Text("Unlock with \(coinPrice) Coins").font(.system(size: 15, weight: .semibold)) }.foregroundColor(.black).frame(maxWidth: .infinity).frame(height: 48).background(DB.gold).cornerRadius(DB.ctaRadius) }.padding(.horizontal, 24).padding(.bottom, 10)
+                Button { onWatchAd(); dismiss() } label: { HStack(spacing: 8) { Image(systemName: "play.rectangle.fill"); Text("Watch Ad to Unlock").font(.system(size: 15, weight: .semibold)) }.foregroundColor(.white).frame(maxWidth: .infinity).frame(height: 48).background(RoundedRectangle(cornerRadius: DB.ctaRadius).stroke(DB.pink, lineWidth: 1.5)) }.padding(.horizontal, 24).padding(.bottom, 24)
+            }.frame(width: 300).background(DB.panelElevated).clipShape(RoundedRectangle(cornerRadius: DB.sheetCornerRadius))
         }
     }
-
-    private func dismiss() {
-        withAnimation(.easeOut(duration: 0.25)) { isPresented = false }
-    }
+    private func dismiss() { withAnimation(.easeOut(duration: 0.25)) { isPresented = false } }
 }
 
 #if DEBUG
 #Preview("Series Player") {
     NavigationStack {
-        SeriesPlayerView(drama: DramaItem(
-            id: "1",
-            title: "友情博弈",
-            coverURL: "",
-            category: "都市",
-            tags: ["独家", "现代言情"],
-            viewCount: 234000,
-            episodeCount: 63,
-            currentEpisode: 3,
-            synopsis: "温栀妍跟沈霁寒隐婚四年，却从未见过公公婆婆。",
-            isHot: true,
-            isTrending: false,
-            rating: 4.8
-        ))
+        SeriesPlayerView(drama: DramaItem(id: "1", title: "友情博弈", coverURL: "", category: "都市", tags: ["独家", "现代言情"], viewCount: 234000, episodeCount: 63, currentEpisode: 3, synopsis: "...", isHot: true, isTrending: false, rating: 4.8))
     }
 }
 #endif

@@ -110,6 +110,11 @@ final class ShortVideoPlayerEngine: ObservableObject {
         state = .playing
     }
 
+    func playFromSystemResume() {
+        guard state != .pausedByUser else { return }
+        play()
+    }
+
     func pause(reason: PlayerPauseReason) {
         currentPlayer?.pause()
         state = reason == .user ? .pausedByUser : .pausedBySystem

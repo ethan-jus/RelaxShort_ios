@@ -33,6 +33,7 @@ struct RecommendView: View {
     @State private var hasShownNotification = false
     @State private var wasPlayingBeforeScrub = false
     @State private var isDraggingPage = false
+    @State private var scrubThumbnail: UIImage?
 
     init(viewModel: RecommendViewModel? = nil, session: RecommendSession, isVisible: Bool = true) {
         self.viewModel = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
@@ -65,16 +66,16 @@ struct RecommendView: View {
                 isExpanded = false
                 isScrubbing = false; scrubFraction = 0
                 isSpeeding = false; showSpeedHUD = false
-                session.controller.resetForNewPlayer()
+                // engine handles reset internally
                 session.handleTransition(from: oldValue, to: newValue, dramas: viewModel.dramas)
-                if isPlaybackVisible { session.controller.playAfterAttach() }
+                if isPlaybackVisible { session.engine.play() }
             }
             .onChange(of: isPlaybackVisible) { _, vis in
                 if vis {
                     initializePlaybackIfNeeded()
-                    session.controller.playFromSystemResume()
+                    session.engine.playFromSystemResume()
                 } else {
-                    session.controller.pauseForSystem()
+                    session.engine.pause(reason: .system)
                 }
             }
             .onChange(of: viewModel.dramas.count) { _, count in
@@ -113,7 +114,7 @@ struct RecommendView: View {
                     .padding(.trailing, 14)
                     .padding(.top, searchTopPadding)
 
-                if session.controller.pauseReason == .user, session.controller.hasStartedPlayingOnce {
+                if session.engine.state == .pausedByUser, session.engine.isReadyForDisplay {
                     Button { handleVideoTap() } label: {
                         Image(systemName: "play.fill")
                             .font(.system(size: 36, weight: .medium))
@@ -149,7 +150,7 @@ struct RecommendView: View {
                         isPresented: $showAbout,
                         onWatchFullSeries: {
                             showAbout = false
-                            session.controller.pauseForSystem()
+                            session.engine.pause(reason: .system)
                             appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
                         }
                     )
@@ -179,10 +180,10 @@ struct RecommendView: View {
             ForEach(Array(visibleIndices(for: session.currentIndex, count: dramas.count)), id: \.self) { idx in
                 let isCurrent = idx == session.currentIndex
                 ZStack {
-                    VideoPlayerView(
+                    ShortVideoPlayerView(
+                        player: isCurrent ? session.engine.currentPlayer : nil,
                         coverURL: dramas[idx].coverURL,
-                        player: isCurrent ? session.pool.current : nil,
-                        controller: isCurrent ? session.controller : nil
+                        engine: session.engine
                     )
                         .allowsHitTesting(false)
 
@@ -266,7 +267,7 @@ struct RecommendView: View {
 
                     // 使用按钮显式跳转，避免手势层抢占点击
                     Button {
-                        session.controller.pauseForSystem()
+                        session.engine.pause(reason: .system)
                         appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
                     } label: {
                         Text("Watch Full Series")
@@ -337,7 +338,7 @@ struct RecommendView: View {
     private func initializePlaybackIfNeeded() {
         guard !session.hasInitializedPool, !viewModel.dramas.isEmpty else { return }
         session.initializePool(dramas: viewModel.dramas)
-        session.controller.playAfterAttach()
+        session.engine.play()
     }
 
     // MARK: - 计算属性
@@ -357,10 +358,9 @@ struct RecommendView: View {
     // MARK: - 自动播放配置
 
     private func setupAutoPlay() {
-        let s = session
-        s.controller.onPlaybackFinished = {
-            s.controller.pauseForSystem()
-            s.controller.seek(to: 0)
+        session.engine.onPlaybackFinished = { [weak engine = session.engine] in
+            engine?.pause(reason: .system)
+            engine?.seek(to: 0)
             // 推荐页第一版：播放结束不自动跳转到全屏
         }
     }
@@ -439,11 +439,11 @@ struct RecommendView: View {
     }
 
     private func handleVideoTap() {
-        let ctrl = session.controller
-        if ctrl.isPlaying {
-            ctrl.pauseByUser()
-        } else if ctrl.pauseReason == .user {
-            ctrl.togglePlayPause()
+        let e = session.engine
+        if e.state == .playing {
+            e.pause(reason: .user)
+        } else if e.state == .pausedByUser {
+            e.play()
         }
     }
 
@@ -458,7 +458,7 @@ struct RecommendView: View {
                 case .second(true, _):
                     if !isSpeeding {
                         isSpeeding = true
-                        session.controller.setRate(2.0)
+                        session.engine.setRate(2.0)
                         withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
                     }
                 default: break
@@ -466,7 +466,7 @@ struct RecommendView: View {
             }
             .onEnded { _ in
                 isSpeeding = false
-                session.controller.setRate(1.0)
+                session.engine.setRate(1.0)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
             }
     }
@@ -475,13 +475,13 @@ struct RecommendView: View {
 
     private func progressBar(totalWidth: CGFloat) -> some View {
         let barWidth = totalWidth
-        let fraction = session.controller.duration > 0
-            ? (isScrubbing ? Double(scrubFraction) : session.controller.currentTime / session.controller.duration)
+        let fraction = session.engine.progress.duration > 0
+            ? (isScrubbing ? Double(scrubFraction) : session.engine.progress.currentTime / session.engine.progress.duration)
             : 0
-        let buffered = session.controller.bufferProgress
+        let buffered = session.engine.progress.bufferProgress
         let effectiveHeight: CGFloat = isScrubbing ? 8 : 3
         let clampedProgress = max(0, min(1, CGFloat(fraction)))
-        let scrubSeconds = Double(clampedProgress) * session.controller.duration
+        let scrubSeconds = Double(clampedProgress) * session.engine.progress.duration
         let showSeekPreview = isScrubbing
 
         return VStack(spacing: 0) {
@@ -496,7 +496,7 @@ struct RecommendView: View {
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(Color.white.opacity(0.5), lineWidth: 2)
                             )
-                        if let thumbnail = session.controller.thumbnailImage {
+                        if let thumbnail = scrubThumbnail {
                             Image(uiImage: thumbnail)
                                 .resizable().aspectRatio(contentMode: .fill)
                                 .frame(width: 112, height: 160)
@@ -505,7 +505,7 @@ struct RecommendView: View {
                     }
 
                     // 时间文本
-                    Text("\(formatTime(scrubSeconds)) / \(formatTime(session.controller.duration))")
+                    Text("\(formatTime(scrubSeconds)) / \(formatTime(session.engine.progress.duration))")
                         .font(.system(size: 30, weight: .bold))
                         .foregroundColor(.white.opacity(0.92))
                 }
@@ -534,23 +534,23 @@ struct RecommendView: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         if !isScrubbing {
-                            wasPlayingBeforeScrub = session.controller.isPlaying
+                            wasPlayingBeforeScrub = session.engine.state == .playing
                             if isSpeeding {
                                 isSpeeding = false
-                                session.controller.setRate(1.0)
+                                session.engine.setRate(1.0)
                                 showSpeedHUD = false
                             }
                         }
                         isScrubbing = true
                         let x = value.location.x
                         scrubFraction = max(0, min(1, x / barWidth))
-                        session.controller.generateThumbnail(at: scrubFraction)
+                        session.engine.generateThumbnail(at: scrubFraction) { img in scrubThumbnail = img }
                     }
                     .onEnded { value in
                         let x = value.location.x
                         let clamped = max(0, min(1, x / barWidth))
-                        session.controller.seek(to: Double(clamped))
-                        if wasPlayingBeforeScrub { session.controller.playFromSystemResume() }
+                        session.engine.seek(to: Double(clamped))
+                        if wasPlayingBeforeScrub { session.engine.playFromSystemResume() }
                         isScrubbing = false
                         scrubFraction = 0
                         wasPlayingBeforeScrub = false
@@ -583,23 +583,23 @@ private struct TabLifecycleModifier: ViewModifier {
                     if !session.hasInitializedPool, !viewModel.dramas.isEmpty {
                         session.initializePool(dramas: viewModel.dramas)
                     } else {
-                        session.controller.playFromSystemResume()
+                        session.engine.playFromSystemResume()
                     }
                 } else {
-                    session.controller.pauseForSystem()
+                    session.engine.pause(reason: .system)
                 }
             }
             .onChange(of: appStore.isShowingSearch) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.controller.pauseForSystem() } else { session.controller.playFromSystemResume() }
+                if isShowing { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
             }
             .onChange(of: appStore.isShowingMembership) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.controller.pauseForSystem() } else { session.controller.playFromSystemResume() }
+                if isShowing { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
             }
             .onChange(of: appStore.navigationTarget) { _, target in
                 guard appStore.selectedTab == .forYou else { return }
-                if target != nil { session.controller.pauseForSystem() } else { session.controller.playFromSystemResume() }
+                if target != nil { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
             }
     }
 }
