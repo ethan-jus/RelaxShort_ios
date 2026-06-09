@@ -530,29 +530,49 @@ struct RecommendView: View {
             }
             .frame(height: isScrubbing ? 28 : 16, alignment: .bottom)
             .contentShape(Rectangle())
+            .simultaneousGesture(
+                SpatialTapGesture()
+                    .onEnded { value in
+                        guard !isScrubbing, session.engine.progress.duration > 0 else { return }
+                        let clamped = max(0, min(1, value.location.x / barWidth))
+                        session.engine.seek(to: Double(clamped))
+                    }
+            )
             .highPriorityGesture(
-                DragGesture(minimumDistance: 0)
+                LongPressGesture(minimumDuration: 0.28)
+                    .sequenced(before: DragGesture(minimumDistance: 0))
                     .onChanged { value in
-                        if !isScrubbing {
-                            wasPlayingBeforeScrub = session.engine.state == .playing
-                            if isSpeeding {
-                                isSpeeding = false
-                                session.engine.setRate(1.0)
-                                showSpeedHUD = false
+                        guard session.engine.progress.duration > 0 else { return }
+                        switch value {
+                        case .second(true, let drag?):
+                            if !isScrubbing {
+                                wasPlayingBeforeScrub = session.engine.state == .playing
+                                if isSpeeding {
+                                    isSpeeding = false
+                                    session.engine.setRate(1.0)
+                                    showSpeedHUD = false
+                                }
                             }
+                            isScrubbing = true
+                            let x = drag.location.x
+                            scrubFraction = max(0, min(1, x / barWidth))
+                            session.engine.generateThumbnail(at: scrubFraction) { img in scrubThumbnail = img }
+                        default:
+                            break
                         }
-                        isScrubbing = true
-                        let x = value.location.x
-                        scrubFraction = max(0, min(1, x / barWidth))
-                        session.engine.generateThumbnail(at: scrubFraction) { img in scrubThumbnail = img }
                     }
                     .onEnded { value in
-                        let x = value.location.x
-                        let clamped = max(0, min(1, x / barWidth))
-                        session.engine.seek(to: Double(clamped))
-                        if wasPlayingBeforeScrub { session.engine.playFromSystemResume() }
-                        isScrubbing = false
+                        if case .second(true, let drag?) = value {
+                            let x = drag.location.x
+                            let clamped = max(0, min(1, x / barWidth))
+                            session.engine.seek(to: Double(clamped))
+                            if wasPlayingBeforeScrub { session.engine.playFromSystemResume() }
+                        }
+                        withAnimation(.easeOut(duration: 0.12)) {
+                            isScrubbing = false
+                        }
                         scrubFraction = 0
+                        scrubThumbnail = nil
                         wasPlayingBeforeScrub = false
                     }
             )
