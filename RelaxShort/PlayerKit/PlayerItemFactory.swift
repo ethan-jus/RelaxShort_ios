@@ -35,10 +35,26 @@ enum PlayerItemFactory {
 
         case .hls(let masterURL):
             return PlayerManagedItem(item: AVPlayerItem(url: masterURL), resourceLoaderDelegate: nil)
-        case .hlsWithFallback(let masterURL, let fallbackMP4URL):
-            // HLS 优先，携带 fallbackURL 备用（由 engine tryDirectFallback 使用）
+        case .hlsWithFallback(let masterURL, _):
+            // HLS 优先，fallback URL 由 engine 在失败恢复时读取
             return PlayerManagedItem(item: AVPlayerItem(url: masterURL), resourceLoaderDelegate: nil)
         }
+    }
+
+    /// 创建直连播放条目：当前视频优先保证出画，缓存代理不能阻塞主播放链路
+    static func makeDirectItem(from source: PlayerMediaSource) -> PlayerManagedItem {
+        let url: URL
+        switch source {
+        case .mp4(let value), .mp4WithEmbeddedSubtitles(let value):
+            url = value
+        case .mp4WithExternalSubtitles(let videoURL, _):
+            url = videoURL
+        case .hls(let masterURL):
+            url = masterURL
+        case .hlsWithFallback(let masterURL, _):
+            url = masterURL
+        }
+        return PlayerManagedItem(item: AVPlayerItem(url: url), resourceLoaderDelegate: nil)
     }
 
     /// 读取内封字幕（异步）

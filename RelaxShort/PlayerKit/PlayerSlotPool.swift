@@ -38,7 +38,9 @@ final class PlayerSlotPool {
         cancel(slot)
         let idx = slot.rawValue
 
-        let managed = PlayerItemFactory.makeManagedItem(from: item.source)
+        let managed = slot == .current
+            ? PlayerItemFactory.makeDirectItem(from: item.source)
+            : PlayerItemFactory.makeManagedItem(from: item.source)
         let player = AVPlayer(playerItem: managed.item)
         slots[idx] = PlayerSlotContext(
             player: player,
