@@ -41,6 +41,7 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
 
         // 缓存命中
         if let cached = cache.cachedData(for: originalURL, range: range) {
+            print("[PlayerKit] cache hit url=\(originalURL.lastPathComponent) range=\(lower)-\(upper)")
             fillContentInfo(
                 loadingRequest.contentInformationRequest,
                 response: nil,
@@ -50,6 +51,7 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
             loadingRequest.finishLoading()
             return true
         }
+        print("[PlayerKit] cache miss url=\(originalURL.lastPathComponent) range=\(lower)-\(upper)")
 
         // 网络请求
         var request = URLRequest(url: originalURL)

@@ -15,7 +15,30 @@ final class HTTPRangeMediaCache {
         metaFile = root.appendingPathComponent("meta.json")
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true); load()
     }
-    func cachedData(for url: URL, range: ClosedRange<Int64>) -> Data? { try? Data(contentsOf: file(key(url), range)) }
+    func cachedData(for url: URL, range: ClosedRange<Int64>) -> Data? {
+        let k = key(url)
+        let ranges = meta[k]?.ranges.compactMap { parseRange($0) } ?? []
+        // 精确匹配
+        let f = file(k, range)
+        if let d = try? Data(contentsOf: f) { return d }
+        // 子区间：从已缓存的更大 range 中读取
+        for cached in ranges where cached.lowerBound <= range.lowerBound && cached.upperBound >= range.upperBound {
+            let f2 = file(k, cached)
+            if let full = try? Data(contentsOf: f2) {
+                let offset = Int(range.lowerBound - cached.lowerBound)
+                let length = Int(range.upperBound - range.lowerBound + 1)
+                guard offset + length <= full.count else { continue }
+                return full.subdata(in: offset..<(offset + length))
+            }
+        }
+        return nil
+    }
+
+    private func parseRange(_ s: String) -> ClosedRange<Int64>? {
+        let parts = s.components(separatedBy: "-")
+        guard parts.count == 2, let lo = Int64(parts[0]), let hi = Int64(parts[1]) else { return nil }
+        return lo...hi
+    }
     func write(data: Data, for url: URL, range: ClosedRange<Int64>, len: Int64?, mime: String?) {
         let k = key(url); let f = file(k, range)
         q.async { [weak self] in try? data.write(to: f); self?.update(k, url: url, range: range, len: len, mime: mime) }

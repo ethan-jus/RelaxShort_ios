@@ -152,6 +152,14 @@ struct SeriesPlayerView: View {
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {
         guard old != new else { return }
+        // 锁定集不能播放，弹出解锁面板
+        guard !isEpisodeLocked(new) else {
+            unlockTargetEpisode = new
+            showUnlockSheet = true
+            // 回退 currentEpisode 防止跳转
+            currentEpisode = old
+            return
+        }
         let targetIndex = max(0, new - 1)
         playerEngine.move(to: targetIndex)
     }

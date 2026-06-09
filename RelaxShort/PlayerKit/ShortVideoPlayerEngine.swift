@@ -26,7 +26,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var currentManagedItem: PlayerManagedItem?
 
     /// 播放意图：即使 player 还没准备好，我们也记住了用户想播放
-    private var wantsPlayback = false
+    internal var wantsPlayback = false
 
     // MARK: 内部
 
