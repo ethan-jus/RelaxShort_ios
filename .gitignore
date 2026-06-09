@@ -23,6 +23,8 @@ exportOptions.plist
 .mcp.json
 .xcodebuildmcp/
 memory/
+AGENTS.md
+CLAUDE.md
 RelaxShort/MEMORY.md
 error.log
 docs/plans/
