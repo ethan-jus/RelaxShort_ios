@@ -175,12 +175,14 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     func selectSubtitle(_ id: String?) {
         selectedSubtitleID = id
-        guard let player = currentPlayer, let item = player.currentItem else { return }
-        if let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
-            if let id, let option = group.options.first(where: { $0.displayName == id }) {
-                item.select(option, in: group)
-            } else {
-                item.select(nil, in: group)
+        guard let item = currentPlayer?.currentItem else { return }
+        Task {
+            if let group = try? await item.asset.loadMediaSelectionGroup(for: .legible) {
+                if let id, let option = group.options.first(where: { $0.displayName == id }) {
+                    item.select(option, in: group)
+                } else {
+                    item.select(nil, in: group)
+                }
             }
         }
     }
@@ -299,8 +301,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
             return url
         case .mp4WithExternalSubtitles(let videoURL, _):
             return videoURL
-        case .hls(let masterURL), .hlsWithFallback(let masterURL, _):
+        case .hls(let masterURL):
             return masterURL
+        case .hlsWithFallback(_, let fallbackMP4URL):
+            // HLS 失败 → 回退到 MP4
+            log("fallback: HLS→MP4 url=\(fallbackMP4URL)")
+            return fallbackMP4URL
         }
     }
 
@@ -312,8 +318,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
         startObserving()
         recoveryController.attachObservers(to: player)
 
+        // 异步读取内封字幕
         if let asset = player.currentItem?.asset {
-            availableSubtitles = PlayerItemFactory.embeddedSubtitles(from: asset)
+            Task { [weak self] in
+                let subs = await PlayerItemFactory.embeddedSubtitles(from: asset)
+                self?.availableSubtitles = subs
+            }
         }
 
         state = .ready

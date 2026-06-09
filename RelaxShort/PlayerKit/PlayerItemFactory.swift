@@ -33,15 +33,17 @@ enum PlayerItemFactory {
             asset.resourceLoader.setDelegate(delegate, queue: .global(qos: .utility))
             return PlayerManagedItem(item: AVPlayerItem(asset: asset), resourceLoaderDelegate: delegate)
 
-        case .hls(let masterURL), .hlsWithFallback(let masterURL, _):
-            // HLS 不走 MP4 range cache，使用系统原生播放
+        case .hls(let masterURL):
+            return PlayerManagedItem(item: AVPlayerItem(url: masterURL), resourceLoaderDelegate: nil)
+        case .hlsWithFallback(let masterURL, let fallbackMP4URL):
+            // HLS 优先，携带 fallbackURL 备用（由 engine tryDirectFallback 使用）
             return PlayerManagedItem(item: AVPlayerItem(url: masterURL), resourceLoaderDelegate: nil)
         }
     }
 
-    /// 读取内封字幕
-    static func embeddedSubtitles(from asset: AVAsset) -> [PlayerSubtitleOption] {
-        guard let group = asset.mediaSelectionGroup(forMediaCharacteristic: .legible) else { return [] }
+    /// 读取内封字幕（异步）
+    static func embeddedSubtitles(from asset: AVAsset) async -> [PlayerSubtitleOption] {
+        guard let group = try? await asset.loadMediaSelectionGroup(for: .legible) else { return [] }
         return group.options.map {
             PlayerSubtitleOption(id: $0.displayName, displayName: $0.displayName, languageCode: $0.locale?.identifier ?? "")
         }
