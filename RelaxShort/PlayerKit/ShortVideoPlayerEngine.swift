@@ -23,6 +23,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
     var metrics = PlayerMetricsLogger()
     var onPlaybackFinished: (() -> Void)?
 
+    /// 强持有当前 ManagedItem（含 resourceLoaderDelegate），防止 delegate 被释放
+    private var currentManagedItem: PlayerManagedItem?
+
     // MARK: 内部
 
     private var items: [PlayerMediaItem] = []
@@ -146,8 +149,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
     }
 
     func selectQuality(_ option: PlayerQualityOption?) {
-        // HLS quality selection — 保留 API hooks
-        // 后续通过 preferredPeakBitRate 实现手动选择
+        guard let player = currentPlayer,
+              let item = player.currentItem else { return }
+        if let bitrate = option?.bitrate, bitrate > 0 {
+            // HLS: 设置峰值码率限制
+            item.preferredPeakBitRate = Double(bitrate)
+        } else {
+            // nil 或无码率 → 恢复自适应
+            item.preferredPeakBitRate = 0
+        }
     }
 
     /// 由 ShortVideoPlayerView coordinator 回调：AVPlayerLayer 首帧可显示
@@ -162,12 +172,32 @@ final class ShortVideoPlayerEngine: ObservableObject {
         state = newState
     }
 
-    /// 重建当前 item（弱网恢复用）
+    /// 重建当前 item（弱网恢复用），强持有 managed item，重绑所有观察者
     func rebuildCurrentItem() {
-        guard let item = currentItem else { return }
+        guard let item = currentItem, let player = currentPlayer else { return }
         resetReadyState()
+
+        // 新建 managed item 并强持有到 engine
         let managed = PlayerItemFactory.makeManagedItem(from: item.source)
-        currentPlayer?.replaceCurrentItem(with: managed.item)
+        currentManagedItem = managed
+
+        player.replaceCurrentItem(with: managed.item)
+
+        // 重建观察者绑定：end observer 绑新 item，recovery observer 重新 attach
+        if let o = itemEndObserver {
+            NotificationCenter.default.removeObserver(o)
+            itemEndObserver = nil
+        }
+        itemEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: managed.item, queue: .main
+        ) { [weak self] _ in
+            self?.state = .pausedBySystem
+            self?.onPlaybackFinished?()
+        }
+
+        recoveryController.detachObservers()
+        recoveryController.attachObservers(to: player)
     }
 
     /// 加载外挂字幕
@@ -211,6 +241,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         removeObservers()
         recoveryController.detachObservers()
         slotPool.cleanup()
+        currentManagedItem = nil
         currentPlayer = nil
         state = .idle
         generation &+= 1

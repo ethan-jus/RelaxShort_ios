@@ -20,7 +20,7 @@ final class PlayerRecoveryController {
     // observer tokens — 可 detach
     private var failObserver: Any?
     private var stallObserver: Any?
-    private var waitingObserver: Any?
+    private var timeControlObs: NSKeyValueObservation?
 
     deinit {
         monitor.cancel()
@@ -53,12 +53,32 @@ final class PlayerRecoveryController {
             forName: .AVPlayerItemPlaybackStalled,
             object: item, queue: .main
         ) { [weak self] _ in self?.onStalled() }
+
+        // KVO 监听 timeControlStatus
+        timeControlObs = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
+            guard let self else { return }
+            switch player.timeControlStatus {
+            case .waitingToPlayAtSpecifiedRate:
+                self.onWaiting()
+            case .playing:
+                // 从 waiting/stalled/recovering 恢复为正常播放
+                if let e = self.engine {
+                    switch e.state {
+                    case .waitingNetwork, .stalled, .recovering:
+                        e.updateState(.playing)
+                    default: break
+                    }
+                }
+            default: break
+            }
+        }
     }
 
     func detachObservers() {
         if let o = failObserver { NotificationCenter.default.removeObserver(o); failObserver = nil }
         if let o = stallObserver { NotificationCenter.default.removeObserver(o); stallObserver = nil }
-        if let o = waitingObserver { NotificationCenter.default.removeObserver(o); waitingObserver = nil }
+        timeControlObs?.invalidate()
+        timeControlObs = nil
     }
 
     // MARK: - 状态快照
@@ -85,11 +105,33 @@ final class PlayerRecoveryController {
         engine?.updateState(.stalled)
     }
 
+    private func onWaiting() {
+        snapshot()
+        guard let e = engine,
+              !wasUserPaused,
+              e.state != .pausedByUser,
+              e.state != .pausedBySystem else { return }
+
+        e.updateState(isOnline ? .stalled : .waitingNetwork)
+    }
+
     private func onNetworkChange(_ ok: Bool) {
-        let wasOffline = !isOnline && ok
+        let recovered = !isOnline && ok
         isOnline = ok
 
-        guard wasOffline, let engine else { return }
+        guard let engine else { return }
+
+        // 断网时 snapshot 播放中的状态
+        if !ok {
+            if engine.state == .playing {
+                snapshot()
+                engine.updateState(.waitingNetwork)
+            }
+            return
+        }
+
+        // 网络恢复
+        guard recovered else { return }
 
         switch engine.state {
         case .failed, .stalled, .waitingNetwork:

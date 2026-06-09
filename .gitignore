@@ -25,10 +25,16 @@ exportOptions.plist
 memory/
 RelaxShort/MEMORY.md
 error.log
+docs/plans/
 
 # Local helper scripts generated during project repair
 add_files*.py
 *.bak
+*.bak*/
+*.xcodeproj.bak*/
+*.xcodeproj/*.bak*
+tmp-*.png
+tmp-*.jpg
 
 # Swift Package Manager
 .build/
