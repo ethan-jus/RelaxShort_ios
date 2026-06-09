@@ -16,6 +16,7 @@ import Network
         guard !dramas.isEmpty else { return }
         let items = dramas.map { $0.toPlayerMediaItem() }
         engine.prepare(items: items, index: 0)
+        engine.play()  // 设置播放意图，prepare 异步完成后自动播放
         hasInitializedPool = true; poolVersion &+= 1
     }
 

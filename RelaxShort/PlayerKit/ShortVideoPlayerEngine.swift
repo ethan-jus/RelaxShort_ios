@@ -18,13 +18,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
     @Published private(set) var availableSubtitles: [PlayerSubtitleOption] = []
     @Published var selectedSubtitleID: String?
     @Published var isReadyForDisplay: Bool = false
-    @Published var coverOpacity: Double = 1.0
 
     var metrics = PlayerMetricsLogger()
     var onPlaybackFinished: (() -> Void)?
 
     /// 强持有当前 ManagedItem（含 resourceLoaderDelegate），防止 delegate 被释放
     private var currentManagedItem: PlayerManagedItem?
+
+    /// 播放意图：即使 player 还没准备好，我们也记住了用户想播放
+    private var wantsPlayback = false
 
     // MARK: 内部
 
@@ -44,6 +46,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     init() {
         recoveryController.engine = self
         recoveryController.startMonitoring()
+        log("引擎初始化")
     }
 
     // MARK: - 公开 API
@@ -62,18 +65,23 @@ final class ShortVideoPlayerEngine: ObservableObject {
         let gen = generation
         ttffStart = CACurrentMediaTime()
 
+        log("prepare: idx=\(index) id=\(items[index].id) gen=\(gen) url=\(String(describing: items[index].source))")
+
         slotPool.prepare(item: items[index], slot: .current, generation: gen) { [weak self] result in
             guard let self, self.generation == gen else {
+                self?.log("prepare: gen过期 idx=\(index) gen=\(gen)")
                 self?.metrics.logCanceledPreload(1)
                 return
             }
             switch result {
             case .success(let player):
+                self.log("prepare: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
                 self.preloadAdjacent(gen: gen)
                 self.logTTFF()
-            case .failure:
-                self.state = .failed(message: "加载失败")
+            case .failure(let err):
+                self.log("prepare: 失败 err=\(err.localizedDescription)")
+                self.tryDirectFallback(for: items[index], gen: gen)
             }
         }
     }
@@ -92,45 +100,66 @@ final class ShortVideoPlayerEngine: ObservableObject {
         let gen = generation
         ttffStart = CACurrentMediaTime()
 
+        log("move: \(oldIndex)→\(index) gen=\(gen)")
+
         slotPool.move(from: oldIndex, to: index, items: items, generation: gen) { [weak self] result in
             guard let self, self.generation == gen else {
+                self?.log("move: gen过期 gen=\(gen)")
                 self?.metrics.logCanceledPreload(1)
                 return
             }
             switch result {
             case .success(let player):
+                self.log("move: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
                 self.preloadAdjacent(gen: gen)
                 self.logTTFF()
-            case .failure:
-                self.state = .failed(message: "加载失败")
+            case .failure(let err):
+                self.log("move: 失败 err=\(err.localizedDescription)")
+                self.tryDirectFallback(for: items[index], gen: gen)
             }
         }
     }
 
     func play() {
-        currentPlayer?.play()
-        state = .playing
+        wantsPlayback = true
+        log("play: wantsPlayback=\(wantsPlayback) hasPlayer=\(currentPlayer != nil)")
+
+        if let player = currentPlayer {
+            player.play()
+            state = .playing
+            log("play: player.play() called rate=\(player.rate) status=\(statusString(player.currentItem?.status))")
+        }
+        // else: 等 attach 后由 wantsPlayback 驱动自动播放
     }
 
     func playFromSystemResume() {
-        guard state != .pausedByUser else { return }
-        play()
+        guard state != .pausedByUser else {
+            log("playFromSystemResume: 跳过（用户暂停中）")
+            return
+        }
+        wantsPlayback = true
+        if let player = currentPlayer {
+            player.play()
+            state = .playing
+            log("playFromSystemResume: 恢复播放")
+        }
     }
 
     func pause(reason: PlayerPauseReason) {
+        if reason == .user { wantsPlayback = false }
         currentPlayer?.pause()
         state = reason == .user ? .pausedByUser : .pausedBySystem
+        log("pause: reason=\(reason) wantsPlayback=\(wantsPlayback)")
     }
 
     func setRate(_ rate: Float) {
         currentPlayer?.rate = rate
+        log("setRate: \(rate)")
     }
 
     func seek(to fraction: Double) {
-        guard let player = currentPlayer,
-              let item = player.currentItem,
-              item.duration.isNumeric else { return }
+        guard let player = currentPlayer, let item = player.currentItem, item.duration.isNumeric else { return }
         let clamped = max(0, min(1, fraction))
         let target = CMTime(seconds: clamped * item.duration.seconds, preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
@@ -146,61 +175,66 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     func selectSubtitle(_ id: String?) {
         selectedSubtitleID = id
+        guard let player = currentPlayer, let item = player.currentItem else { return }
+        if let group = item.asset.mediaSelectionGroup(forMediaCharacteristic: .legible) {
+            if let id, let option = group.options.first(where: { $0.displayName == id }) {
+                item.select(option, in: group)
+            } else {
+                item.select(nil, in: group)
+            }
+        }
     }
 
     func selectQuality(_ option: PlayerQualityOption?) {
-        guard let player = currentPlayer,
-              let item = player.currentItem else { return }
+        guard let _ = currentPlayer, let item = currentPlayer?.currentItem else { return }
         if let bitrate = option?.bitrate, bitrate > 0 {
-            // HLS: 设置峰值码率限制
             item.preferredPeakBitRate = Double(bitrate)
         } else {
-            // nil 或无码率 → 恢复自适应
             item.preferredPeakBitRate = 0
         }
     }
 
-    /// 由 ShortVideoPlayerView coordinator 回调：AVPlayerLayer 首帧可显示
     func markReadyForDisplay() {
         guard !isReadyForDisplay else { return }
         isReadyForDisplay = true
-        withAnimation { self.coverOpacity = 0 }
+        log("isReadyForDisplay = true")
     }
 
-    /// 供 RecoveryController 访问：更新状态
     func updateState(_ newState: PlayerPlaybackState) {
         state = newState
+        log("updateState: \(newState)")
     }
 
-    /// 重建当前 item（弱网恢复用），强持有 managed item，重绑所有观察者
     func rebuildCurrentItem() {
         guard let item = currentItem, let player = currentPlayer else { return }
         resetReadyState()
+        log("rebuildItem: id=\(item.id)")
 
-        // 新建 managed item 并强持有到 engine
         let managed = PlayerItemFactory.makeManagedItem(from: item.source)
         currentManagedItem = managed
 
         player.replaceCurrentItem(with: managed.item)
 
-        // 重建观察者绑定：end observer 绑新 item，recovery observer 重新 attach
         if let o = itemEndObserver {
-            NotificationCenter.default.removeObserver(o)
-            itemEndObserver = nil
+            NotificationCenter.default.removeObserver(o); itemEndObserver = nil
         }
         itemEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: managed.item, queue: .main
         ) { [weak self] _ in
-            self?.state = .pausedBySystem
-            self?.onPlaybackFinished?()
+            self?.state = .pausedBySystem; self?.onPlaybackFinished?()
         }
 
         recoveryController.detachObservers()
         recoveryController.attachObservers(to: player)
+
+        if wantsPlayback {
+            player.play()
+            state = .playing
+            log("rebuildItem: 恢复播放")
+        }
     }
 
-    /// 加载外挂字幕
     func loadExternalSubtitles(_ tracks: [PlayerSubtitleTrack]) {
         guard let track = tracks.first(where: { $0.isDefault }) ?? tracks.first else { return }
         subtitleTask?.cancel()
@@ -211,31 +245,27 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
-    /// 生成缩略图
     func generateThumbnail(at fraction: Double, completion: @escaping (UIImage?) -> Void) {
         guard let player = currentPlayer, let asset = player.currentItem?.asset else {
-            completion(nil)
-            return
+            completion(nil); return
         }
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.maximumSize = CGSize(width: 320, height: 180)
         let dur = player.currentItem?.duration.seconds ?? 0
         guard dur > 0 else { completion(nil); return }
-
         let time = CMTime(seconds: CGFloat(fraction) * dur, preferredTimescale: 600)
-        let task = Task {
+        Task {
             do {
                 let (cg, _) = try await generator.image(at: time)
                 guard !Task.isCancelled else { return }
                 completion(UIImage(cgImage: cg))
-            } catch {
-                completion(nil)
-            }
+            } catch { completion(nil) }
         }
     }
 
     func cleanup() {
+        wantsPlayback = false
         cancelAllPreloadTasks()
         subtitleTask?.cancel()
         removeObservers()
@@ -245,6 +275,33 @@ final class ShortVideoPlayerEngine: ObservableObject {
         currentPlayer = nil
         state = .idle
         generation &+= 1
+        log("cleanup")
+    }
+
+    // MARK: - 直连兜底
+
+    private func tryDirectFallback(for item: PlayerMediaItem, gen: Int) {
+        guard let url = directURL(from: item.source) else {
+            state = .failed(message: "缓存和直连均失败")
+            return
+        }
+        log("fallback: 直连播放 url=\(url)")
+        let player = AVPlayer(url: url)
+        currentManagedItem = nil // 直连不需要 cache delegate
+        // 强持有到 local
+        let _player = player
+        self.attach(player: _player)
+    }
+
+    private func directURL(from source: PlayerMediaSource) -> URL? {
+        switch source {
+        case .mp4(let url), .mp4WithEmbeddedSubtitles(let url):
+            return url
+        case .mp4WithExternalSubtitles(let videoURL, _):
+            return videoURL
+        case .hls(let masterURL), .hlsWithFallback(let masterURL, _):
+            return masterURL
+        }
     }
 
     // MARK: - 内部
@@ -255,17 +312,25 @@ final class ShortVideoPlayerEngine: ObservableObject {
         startObserving()
         recoveryController.attachObservers(to: player)
 
-        // 读取内封字幕
         if let asset = player.currentItem?.asset {
             availableSubtitles = PlayerItemFactory.embeddedSubtitles(from: asset)
         }
 
         state = .ready
+        log("attach: status=\(statusString(player.currentItem?.status)) timeControl=\(tcsString(player.timeControlStatus))")
+
+        // 关键修复：如果有播放意图，attach 后立即播放
+        if wantsPlayback {
+            player.play()
+            state = .playing
+            log("attach: 自动播放（wantsPlayback=true）")
+        }
     }
 
     private func preloadAdjacent(gen: Int) {
         let nextIdx = currentIndex + 1
         if nextIdx < items.count {
+            log("preload: start next=\(nextIdx)")
             let task = Task { [weak self] in
                 guard let self else { return }
                 self.slotPool.prepare(item: self.items[nextIdx], slot: .next, generation: gen) { _ in }
@@ -274,6 +339,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
         let prevIdx = currentIndex - 1
         if prevIdx >= 0 {
+            log("preload: start prev=\(prevIdx)")
             let task = Task { [weak self] in
                 guard let self else { return }
                 self.slotPool.prepare(item: self.items[prevIdx], slot: .previous, generation: gen) { _ in }
@@ -284,7 +350,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     private func resetReadyState() {
         isReadyForDisplay = false
-        coverOpacity = 1.0
     }
 
     private func cancelAllPreloadTasks() {
@@ -308,7 +373,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
         ) { [weak self] time in
             guard let self, let player = self.currentPlayer else { return }
             self.progress.currentTime = time.seconds
-
             if let item = player.currentItem, item.duration.isNumeric {
                 self.progress.duration = item.duration.seconds
                 if let range = item.loadedTimeRanges.first?.timeRangeValue {
@@ -317,7 +381,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
                         ? buffered / self.progress.duration : 0
                 }
             }
-
             self.updateSubtitle(at: time.seconds)
         }
 
@@ -325,23 +388,14 @@ final class ShortVideoPlayerEngine: ObservableObject {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem, queue: .main
         ) { [weak self] _ in
-            self?.state = .pausedBySystem
-            self?.onPlaybackFinished?()
+            self?.state = .pausedBySystem; self?.onPlaybackFinished?()
         }
     }
 
     private func removeObservers() {
-        if let o = timeObserver {
-            currentPlayer?.removeTimeObserver(o)
-            timeObserver = nil
-        }
-        if let o = itemEndObserver {
-            NotificationCenter.default.removeObserver(o)
-            itemEndObserver = nil
-        }
+        if let o = timeObserver { currentPlayer?.removeTimeObserver(o); timeObserver = nil }
+        if let o = itemEndObserver { NotificationCenter.default.removeObserver(o); itemEndObserver = nil }
     }
-
-    // MARK: - 字幕更新
 
     private func updateSubtitle(at time: TimeInterval) {
         guard !subtitleCues.isEmpty else { return }
@@ -352,7 +406,30 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
-    private func withAnimation(_ block: @escaping () -> Void) {
-        SwiftUI.withAnimation(.easeOut(duration: 0.18)) { block() }
+    // MARK: - 诊断日志
+
+    private func log(_ msg: String) {
+        #if DEBUG
+        print("[PlayerKit] \(msg)")
+        #endif
+    }
+
+    private func statusString(_ status: AVPlayerItem.Status?) -> String {
+        guard let status else { return "nil" }
+        switch status {
+        case .unknown: return "unknown"
+        case .readyToPlay: return "readyToPlay"
+        case .failed: return "failed"
+        @unknown default: return "other"
+        }
+    }
+
+    private func tcsString(_ tcs: AVPlayer.TimeControlStatus) -> String {
+        switch tcs {
+        case .paused: return "paused"
+        case .waitingToPlayAtSpecifiedRate: return "waiting"
+        case .playing: return "playing"
+        @unknown default: return "unknown"
+        }
     }
 }
