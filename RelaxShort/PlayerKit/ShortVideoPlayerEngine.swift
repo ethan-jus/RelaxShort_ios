@@ -232,7 +232,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
             forName: .AVPlayerItemDidPlayToEndTime,
             object: managed.item, queue: .main
         ) { [weak self] _ in
-            self?.state = .pausedBySystem; self?.onPlaybackFinished?()
+            Task { @MainActor in
+                self?.state = .pausedBySystem
+                self?.onPlaybackFinished?()
+            }
         }
 
         recoveryController.detachObservers()
@@ -438,26 +441,31 @@ final class ShortVideoPlayerEngine: ObservableObject {
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: interval, queue: .main
         ) { [weak self] time in
-            guard let self, let player = self.currentPlayer else { return }
-            var nextProgress = self.progress
-            nextProgress.currentTime = time.seconds
-            if let item = player.currentItem, item.duration.isNumeric {
-                nextProgress.duration = item.duration.seconds
-                if let range = item.loadedTimeRanges.first?.timeRangeValue {
-                    let buffered = CMTimeGetSeconds(range.start) + CMTimeGetSeconds(range.duration)
-                    nextProgress.bufferProgress = nextProgress.duration > 0
-                        ? buffered / nextProgress.duration : 0
+            Task { @MainActor in
+                guard let self, let player = self.currentPlayer else { return }
+                var nextProgress = self.progress
+                nextProgress.currentTime = time.seconds
+                if let item = player.currentItem, item.duration.isNumeric {
+                    nextProgress.duration = item.duration.seconds
+                    if let range = item.loadedTimeRanges.first?.timeRangeValue {
+                        let buffered = CMTimeGetSeconds(range.start) + CMTimeGetSeconds(range.duration)
+                        nextProgress.bufferProgress = nextProgress.duration > 0
+                            ? buffered / nextProgress.duration : 0
+                    }
                 }
+                self.progress = nextProgress
+                self.updateSubtitle(at: time.seconds)
             }
-            self.progress = nextProgress
-            self.updateSubtitle(at: time.seconds)
         }
 
         itemEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
             object: player.currentItem, queue: .main
         ) { [weak self] _ in
-            self?.state = .pausedBySystem; self?.onPlaybackFinished?()
+            Task { @MainActor in
+                self?.state = .pausedBySystem
+                self?.onPlaybackFinished?()
+            }
         }
     }
 

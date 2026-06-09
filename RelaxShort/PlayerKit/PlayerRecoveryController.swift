@@ -47,29 +47,36 @@ final class PlayerRecoveryController {
         failObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime,
             object: item, queue: .main
-        ) { [weak self] _ in self?.onFailed() }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.onFailed() }
+        }
 
         stallObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemPlaybackStalled,
             object: item, queue: .main
-        ) { [weak self] _ in self?.onStalled() }
+        ) { [weak self] _ in
+            Task { @MainActor in self?.onStalled() }
+        }
 
         // KVO 监听 timeControlStatus
         timeControlObs = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
-            guard let self else { return }
-            switch player.timeControlStatus {
-            case .waitingToPlayAtSpecifiedRate:
-                self.onWaiting()
-            case .playing:
-                // 从 waiting/stalled/recovering 恢复为正常播放
-                if let e = self.engine {
-                    switch e.state {
-                    case .waitingNetwork, .stalled, .recovering:
-                        e.updateState(.playing)
-                    default: break
+            let status = player.timeControlStatus
+            Task { @MainActor in
+                guard let self else { return }
+                switch status {
+                case .waitingToPlayAtSpecifiedRate:
+                    self.onWaiting()
+                case .playing:
+                    // 从 waiting/stalled/recovering 恢复为正常播放
+                    if let e = self.engine {
+                        switch e.state {
+                        case .waitingNetwork, .stalled, .recovering:
+                            e.updateState(.playing)
+                        default: break
+                        }
                     }
+                default: break
                 }
-            default: break
             }
         }
     }

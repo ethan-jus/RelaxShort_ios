@@ -12,7 +12,7 @@ import Combine
     @Published var currentIndex = 0
     @Published var hasInitializedPool = false
     @Published var poolVersion = 0
-    private var engineSink: Any? // 转发 engine 的 objectWillChange
+    private var engineSink: AnyCancellable? // 转发 engine 的 objectWillChange
 
     init() {
         // 关键修复：engine 是 let，SwiftUI 不自动追踪它的变化

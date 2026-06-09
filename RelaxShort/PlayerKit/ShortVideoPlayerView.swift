@@ -134,7 +134,9 @@ private struct PlayerLayerViewRepresentable: UIViewRepresentable {
             stopObserving()
             observation = layer?.observe(\.isReadyForDisplay, options: [.new]) { [weak self] layer, _ in
                 guard let self, layer.isReadyForDisplay else { return }
-                self.engine?.markReadyForDisplay()
+                Task { @MainActor in
+                    self.engine?.markReadyForDisplay()
+                }
             }
         }
 
