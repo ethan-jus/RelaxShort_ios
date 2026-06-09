@@ -362,24 +362,30 @@ final class ShortVideoPlayerEngine: ObservableObject {
     /// 监听 AVPlayerItem.status，failed 时触发 fallback
     private func setupItemStatusKVO(_ player: AVPlayer) {
         itemStatusObs?.invalidate()
-        itemStatusObs = player.currentItem?.observe(\.status, options: [.new]) { [weak self] item, change in
-            guard let self, self.currentPlayer === player else { return }
+        itemStatusObs = player.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
             guard item.status == .failed else { return }
-            let err = item.error?.localizedDescription ?? "未知错误"
-            self.log("itemStatusKVO: failed err=\(err)")
-            // 只对当前 current item 做 fallback
-            guard let cur = self.currentItem else { return }
-            // HLS fallback
-            if case .hlsWithFallback(_, let mp4URL) = cur.source {
-                self.log("itemStatusKVO: HLS→MP4 fallback url=\(mp4URL)")
-                let fallback = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL))
-                self.currentManagedItem = fallback
-                player.replaceCurrentItem(with: fallback.item)
-                if self.wantsPlayback { player.play(); self.state = .playing }
-            } else {
-                self.recoveryController.detachObservers()
-                self.recoveryController.snapshot()
-                self.recoveryController.attemptRecovery()
+            Task { @MainActor [weak self] in
+                guard let self, self.currentPlayer === player else { return }
+                let err = item.error?.localizedDescription ?? "未知错误"
+                self.log("itemStatusKVO: failed err=\(err)")
+                guard let cur = self.currentItem else { return }
+                if case .hlsWithFallback(_, let mp4URL) = cur.source {
+                    self.log("itemStatusKVO: HLS→MP4 fallback url=\(mp4URL)")
+                    let fallback = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL))
+                    self.currentManagedItem = fallback
+                    player.replaceCurrentItem(with: fallback.item)
+                    // 重建观察者：end observer + recovery observer + status KVO
+                    if let o = self.itemEndObserver { NotificationCenter.default.removeObserver(o); self.itemEndObserver = nil }
+                    self.itemEndObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: fallback.item, queue: .main) { [weak self] _ in Task { @MainActor in self?.state = .pausedBySystem; self?.onPlaybackFinished?() } }
+                    self.recoveryController.detachObservers()
+                    self.recoveryController.attachObservers(to: player)
+                    self.setupItemStatusKVO(player)
+                    if self.wantsPlayback { player.play(); self.state = .playing }
+                } else {
+                    self.recoveryController.detachObservers()
+                    self.recoveryController.snapshot()
+                    self.recoveryController.attemptRecovery()
+                }
             }
         }
     }
