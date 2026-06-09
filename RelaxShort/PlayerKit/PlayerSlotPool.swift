@@ -81,9 +81,10 @@ final class PlayerSlotPool {
             slots[0] = nil
         }
 
-        if let ctx = slots[1] {
+        if let ctx = slots[1], ctx.resourceLoaderDelegate == nil {
             completion(.success(ctx.player))
         } else {
+            // 预加载槽走缓存代理，升为当前页时重建为直连播放器，避免当前视频被缓存代理阻塞出画
             prepare(item: items[newIndex], slot: .current, generation: generation, completion: completion)
         }
     }

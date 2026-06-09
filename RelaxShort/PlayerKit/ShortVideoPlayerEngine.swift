@@ -62,6 +62,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         currentItem = items[index]
 
         state = .preparing
+        resetProgress()
         resetReadyState()
         generation &+= 1
         let gen = generation
@@ -97,6 +98,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         currentItem = items[index]
 
         state = .preparing
+        resetProgress()
         resetReadyState()
         generation &+= 1
         let gen = generation
@@ -165,14 +167,18 @@ final class ShortVideoPlayerEngine: ObservableObject {
         let clamped = max(0, min(1, fraction))
         let target = CMTime(seconds: clamped * item.duration.seconds, preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
-        progress.currentTime = target.seconds
+        var nextProgress = progress
+        nextProgress.currentTime = target.seconds
+        progress = nextProgress
     }
 
     func seekTime(_ time: TimeInterval) {
         guard let player = currentPlayer else { return }
         let target = CMTime(seconds: time, preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
-        progress.currentTime = time
+        var nextProgress = progress
+        nextProgress.currentTime = time
+        progress = nextProgress
     }
 
     func selectSubtitle(_ id: String?) {
@@ -214,7 +220,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         resetReadyState()
         log("rebuildItem: id=\(item.id)")
 
-        let managed = PlayerItemFactory.makeManagedItem(from: item.source)
+        let managed = PlayerItemFactory.makeDirectItem(from: item.source)
         currentManagedItem = managed
 
         player.replaceCurrentItem(with: managed.item)
@@ -403,6 +409,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
         isReadyForDisplay = false
     }
 
+    private func resetProgress() {
+        progress = PlayerProgress()
+    }
+
     private func cancelAllPreloadTasks() {
         for task in preloadTasks { task.cancel() }
         preloadTasks.removeAll()
@@ -423,15 +433,17 @@ final class ShortVideoPlayerEngine: ObservableObject {
             forInterval: interval, queue: .main
         ) { [weak self] time in
             guard let self, let player = self.currentPlayer else { return }
-            self.progress.currentTime = time.seconds
+            var nextProgress = self.progress
+            nextProgress.currentTime = time.seconds
             if let item = player.currentItem, item.duration.isNumeric {
-                self.progress.duration = item.duration.seconds
+                nextProgress.duration = item.duration.seconds
                 if let range = item.loadedTimeRanges.first?.timeRangeValue {
                     let buffered = CMTimeGetSeconds(range.start) + CMTimeGetSeconds(range.duration)
-                    self.progress.bufferProgress = self.progress.duration > 0
-                        ? buffered / self.progress.duration : 0
+                    nextProgress.bufferProgress = nextProgress.duration > 0
+                        ? buffered / nextProgress.duration : 0
                 }
             }
+            self.progress = nextProgress
             self.updateSubtitle(at: time.seconds)
         }
 
