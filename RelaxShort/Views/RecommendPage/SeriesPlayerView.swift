@@ -147,6 +147,7 @@ struct SeriesPlayerView: View {
         guard !items.isEmpty else { return }
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
+        playerEngine.play()
     }
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {
