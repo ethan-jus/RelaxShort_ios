@@ -93,23 +93,12 @@ struct SeriesPlayerView: View {
                         onUnlockWithCoins: {
                             unlockedEpisodes.insert(unlockTargetEpisode)
                             showUnlockSheet = false
-                            // 解锁后进入目标集
-                            if let pending = pendingLockedEpisode {
-                                currentEpisode = pending
-                                let targetIndex = max(0, pending - 1)
-                                playerEngine.move(to: targetIndex)
-                                pendingLockedEpisode = nil
-                            }
+                            playUnlockedPendingEpisode()
                         },
                         onWatchAd: {
                             unlockedEpisodes.insert(unlockTargetEpisode)
                             showUnlockSheet = false
-                            if let pending = pendingLockedEpisode {
-                                currentEpisode = pending
-                                let targetIndex = max(0, pending - 1)
-                                playerEngine.move(to: targetIndex)
-                                pendingLockedEpisode = nil
-                            }
+                            playUnlockedPendingEpisode()
                         }
                     )
                     .zIndex(300)
@@ -128,6 +117,10 @@ struct SeriesPlayerView: View {
         .task { await loadEpisodes() }
         .onChange(of: currentEpisode) { oldValue, newValue in
             handleEpisodeTransition(from: oldValue, to: newValue)
+        }
+        .onChange(of: showUnlockSheet) { _, isShowing in
+            guard !isShowing, let pending = pendingLockedEpisode, isEpisodeLocked(pending) else { return }
+            pendingLockedEpisode = nil
         }
         .onDisappear {
             playerEngine.cleanup()
@@ -159,6 +152,13 @@ struct SeriesPlayerView: View {
     private func initializeEpisodePlayer() {
         let items = playerItems(from: episodes)
         guard !items.isEmpty else { return }
+        guard !isEpisodeLocked(currentEpisode) else {
+            pendingLockedEpisode = currentEpisode
+            unlockTargetEpisode = currentEpisode
+            showUnlockSheet = true
+            playerEngine.pause(reason: .system)
+            return
+        }
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
         playerEngine.play()
@@ -177,6 +177,25 @@ struct SeriesPlayerView: View {
         pendingLockedEpisode = nil
         let targetIndex = max(0, new - 1)
         playerEngine.move(to: targetIndex)
+    }
+
+    private func playUnlockedPendingEpisode() {
+        guard let pending = pendingLockedEpisode else { return }
+        pendingLockedEpisode = nil
+
+        let targetIndex = max(0, pending - 1)
+        if playerEngine.currentItem == nil {
+            let items = playerItems(from: episodes)
+            guard items.indices.contains(targetIndex) else { return }
+            currentEpisode = pending
+            playerEngine.prepare(items: items, index: targetIndex)
+            playerEngine.play()
+        } else if currentEpisode == pending {
+            playerEngine.move(to: targetIndex)
+            playerEngine.play()
+        } else {
+            currentEpisode = pending
+        }
     }
 
     // MARK: - Episode Pager

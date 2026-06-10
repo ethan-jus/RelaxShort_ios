@@ -219,7 +219,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         log("updateState: \(newState)")
     }
 
-    func rebuildCurrentItem() {
+    func rebuildCurrentItem(autoplay: Bool = true) {
         guard let item = currentItem, let player = currentPlayer else { return }
         resetReadyState()
         log("rebuildItem: id=\(item.id)")
@@ -245,7 +245,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         recoveryController.detachObservers()
         recoveryController.attachObservers(to: player)
 
-        if wantsPlayback {
+        if autoplay, wantsPlayback {
             player.play()
             state = .playing
             log("rebuildItem: 恢复播放")
@@ -435,8 +435,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 print("[PlayerKit] current readiness timeout canceled gen=\(gen)")
                 return
             }
-            guard !self.isReadyForDisplay,
-                  self.currentPlayer?.currentItem?.status != .readyToPlay else { return }
+            let item = self.currentPlayer?.currentItem
+            let isPlayingReadyItem = item?.status == .readyToPlay
+                && self.currentPlayer?.timeControlStatus == .playing
+            guard !self.isReadyForDisplay, !isPlayingReadyItem else { return }
             print("[PlayerKit] current rebuild reason=timeout idx=\(index) gen=\(gen)")
             guard let item = self.currentItem else { return }
             self.slotPool.rebuildCurrent(item: item, generation: gen) { result in

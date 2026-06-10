@@ -25,8 +25,10 @@ final class PlayerRecoveryController {
     private var failObserver: Any?
     private var stallObserver: Any?
     private var timeControlObs: NSKeyValueObservation?
+    private var recoveryTask: Task<Void, Never>?
 
     deinit {
+        recoveryTask?.cancel()
         monitor.cancel()
     }
 
@@ -110,8 +112,9 @@ final class PlayerRecoveryController {
         print("[PlayerKit] item failed at time=\(lastTime)")
         engine?.updateState(.failed(message: "播放失败"))
         if let e = engine, e.wantsPlayback, !wasUserPaused {
-            print("[PlayerKit] recovery start id=\(lastItem?.id ?? "?") time=\(lastTime) reason=itemFailed")
             attemptRecovery(reason: .itemFailed)
+        } else {
+            print("[PlayerKit] recovery skipped reason=userPaused")
         }
     }
 
@@ -165,17 +168,19 @@ final class PlayerRecoveryController {
     func attemptRecovery(reason: RecoveryReason = .networkRestored) {
         guard let engine, let _ = lastItem, wasPlaying else { return }
 
+        recoveryTask?.cancel()
         let startTime = CACurrentMediaTime()
         let recoverTime = lastTime
         print("[PlayerKit] recovery start id=\(lastItem?.id ?? "?") time=\(recoverTime) reason=\(reason.rawValue)")
 
         engine.updateState(.recovering)
-        engine.rebuildCurrentItem()
+        engine.rebuildCurrentItem(autoplay: false)
 
         // 等待新 item ready 后再 seek
-        Task { @MainActor in
+        recoveryTask = Task { @MainActor in
             // 给 item 一点时间加载
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
+            guard !Task.isCancelled else { return }
             guard let player = engine.currentPlayer, let item = player.currentItem else {
                 print("[PlayerKit] recovery failed reason=no-player")
                 engine.updateState(.failed(message: "恢复失败"))
@@ -186,6 +191,7 @@ final class PlayerRecoveryController {
             let deadline = Date().addingTimeInterval(5)
             while item.status != .readyToPlay, Date() < deadline {
                 try? await Task.sleep(nanoseconds: 100_000_000)
+                if Task.isCancelled { return }
             }
 
             guard item.status == .readyToPlay else {
@@ -193,23 +199,29 @@ final class PlayerRecoveryController {
                 engine.updateState(.failed(message: "恢复超时"))
                 return
             }
+            print("[PlayerKit] recovery ready id=\(self.lastItem?.id ?? "?")")
 
             // seek 到断点
             let target = CMTime(seconds: recoverTime, preferredTimescale: 600)
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
-                    print("[PlayerKit] recovery seek complete time=\(recoverTime) finished=\(finished)")
-                    if finished, engine.wantsPlayback {
-                        player.play()
-                        engine.updateState(.playing)
-                        print("[PlayerKit] recovery play resumed")
+                    Task { @MainActor in
+                        print("[PlayerKit] recovery seek complete time=\(recoverTime) finished=\(finished)")
+                        if finished, engine.wantsPlayback {
+                            player.play()
+                            engine.updateState(.playing)
+                            print("[PlayerKit] recovery play resumed")
+                        } else if !engine.wantsPlayback {
+                            print("[PlayerKit] recovery skipped reason=userPaused")
+                        }
+                        continuation.resume()
                     }
-                    continuation.resume()
                 }
             }
 
             let durationMs = (CACurrentMediaTime() - startTime) * 1000
             engine.metrics.logRecovery(ms: durationMs)
+            self.recoveryTask = nil
         }
     }
 }
