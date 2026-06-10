@@ -12,6 +12,7 @@ struct SeriesPlayerView: View {
     @State private var currentEpisode: Int
     @State private var dragOffset: CGFloat = 0
     @State private var showSpeedHUD = false
+    @State private var wasPausedBeforeSpeed = false
     @State private var showEpisodeList = false
     @State private var showUnlockSheet = false
     @State private var unlockTargetEpisode: Int = 0
@@ -267,7 +268,11 @@ struct SeriesPlayerView: View {
             .onChanged { value in
                 switch value {
                 case .second(true, _):
-                    if playerEngine.state == .playing, playerEngine.progress.currentTime > 0 {
+                    if !showSpeedHUD, playerEngine.progress.duration > 0 {
+                        wasPausedBeforeSpeed = playerEngine.state == .pausedByUser
+                        if wasPausedBeforeSpeed {
+                            playerEngine.play()
+                        }
                         playerEngine.setRate(2.0)
                         withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
                     }
@@ -276,6 +281,10 @@ struct SeriesPlayerView: View {
             }
             .onEnded { _ in
                 playerEngine.setRate(1.0)
+                if wasPausedBeforeSpeed {
+                    playerEngine.pause(reason: .user)
+                }
+                wasPausedBeforeSpeed = false
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
             }
     }
