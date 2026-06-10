@@ -15,6 +15,7 @@ import SwiftUI
 struct RecommendView: View {
 
     @EnvironmentObject private var appStore: AppStore
+    @EnvironmentObject var playerCoordinator: PlayerCoordinator
     @ObservedObject private var viewModel: RecommendViewModel
     @ObservedObject private var session: RecommendSession
     let isVisible: Bool
@@ -331,6 +332,8 @@ struct RecommendView: View {
     }
 
     private func loadAndInit() async {
+        // 连线：session.engine 指向共享 coordinator.engine
+        session.engine = playerCoordinator.engine
         await viewModel.loadData()
         if isPlaybackVisible {
             initializePlaybackIfNeeded()

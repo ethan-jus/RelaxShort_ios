@@ -14,14 +14,19 @@ final class PlayerCoordinator: ObservableObject {
     @Published private(set) var owner: Owner?
     @Published private(set) var engine = ShortVideoPlayerEngine()
 
-    /// For You 声明播放权
+    /// For You 声明播放权 — 同 item 不重建
     func claimForYou(items: [PlayerMediaItem], index: Int) {
+        let targetID = items[safe: index]?.id ?? ""
+        if owner == .forYou, engine.currentItem?.id == targetID {
+            engine.play()
+            return
+        }
         owner = .forYou
         engine.prepare(items: items, index: index)
         engine.play()
     }
 
-    /// Series 声明播放权 — handoff 场景：如果 engine 当前 item 匹配，直接接管不重建
+    /// Series 声明播放权 — 同 item 接管，不同 item fallback
     func claimSeries(
         drama: DramaItem,
         items: [PlayerMediaItem],
@@ -29,8 +34,6 @@ final class PlayerCoordinator: ObservableObject {
         handoff: PlayerHandoffContext?
     ) {
         owner = .series(dramaID: drama.id)
-
-        // 接管判断：engine 当前 item id 与目标剧集匹配
         let targetItemID = items[safe: startIndex]?.id ?? ""
         let currentMatches = engine.currentItem?.id == targetItemID
 
@@ -47,27 +50,41 @@ final class PlayerCoordinator: ObservableObject {
             let resumeTime = handoff.resumeTime
             let eng = engine
             Task { @MainActor in
+                var didStart = false
                 var obs: NSKeyValueObservation?
                 obs = eng.currentPlayer?.currentItem?.observe(\.status, options: [.new]) { item, _ in
                     guard item.status == .readyToPlay else { return }
                     obs?.invalidate()
                     Task { @MainActor in
-                        eng.seekTime(resumeTime) { _ in
-                            if wasPlaying { eng.play() }
-                        }
+                        guard !didStart else { return }; didStart = true
+                        eng.seekTime(resumeTime) { _ in if wasPlaying { eng.play() } }
                     }
                 }
+                // 如果已经 ready
+                if !didStart, eng.currentPlayer?.currentItem?.status == .readyToPlay {
+                    didStart = true
+                    eng.seekTime(resumeTime) { _ in if wasPlaying { eng.play() } }
+                }
+                // 超时兜底
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
-                obs?.invalidate()
+                if !didStart {
+                    didStart = true
+                    eng.seekTime(resumeTime) { _ in if wasPlaying { eng.play() } }
+                }
             }
         } else {
             engine.play()
         }
     }
 
+    /// 释放播放权 — 返回 For You 时不清理，只改变 owner
     func release(_ owner: Owner) {
-        if self.owner == owner { self.owner = nil }
-        engine.cleanup()
+        if case .series = owner {
+            // 从 Series 返回 → 恢复 For You 所有权，不清理 engine
+            self.owner = .forYou
+        } else if self.owner == owner {
+            self.owner = nil
+        }
     }
 }
 

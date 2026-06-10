@@ -125,7 +125,7 @@ struct SeriesPlayerView: View {
             pendingLockedEpisode = nil
         }
         .onDisappear {
-            playerCoordinator.engine.cleanup()
+            playerCoordinator.release(.series(dramaID: drama.id))
         }
     }
 
@@ -141,7 +141,7 @@ struct SeriesPlayerView: View {
         eps.compactMap { ep -> PlayerMediaItem? in
             guard let url = URL(string: ep.videoURL) else { return nil }
             return PlayerMediaItem(
-                id: "\(drama.id)-\(ep.episodeNumber)",
+                id: PlayerMediaItem.stableID(dramaID: drama.id, episodeNumber: ep.episodeNumber),
                 title: drama.title,
                 episodeNumber: ep.episodeNumber,
                 coverURL: drama.coverURL,

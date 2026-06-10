@@ -23,8 +23,8 @@ struct MainTabView: View {
         NavigationStack {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
-                    // 1. 内容层 — 独立视图隔离导航状态变化
                     TabContentHost(homeVM: homeVM, recommendVM: recommendVM, recommendSession: recommendSession)
+                        .environmentObject(playerCoordinator)
                         .frame(width: geo.size.width, height: geo.size.height)
                     // 2. 底部标签栏
                     if !appStore.isBottomTabBarHidden {
