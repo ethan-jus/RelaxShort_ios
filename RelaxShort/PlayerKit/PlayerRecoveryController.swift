@@ -1,6 +1,10 @@
 import AVFoundation
 import Network
 
+// MARK: - 恢复原因
+
+enum RecoveryReason: String { case networkRestored, itemFailed, stalledTimeout }
+
 // MARK: - 播放器恢复控制器
 
 /// 监听 AVPlayerItem 失败、卡顿和网络变化，自动恢复播放
@@ -95,7 +99,7 @@ final class PlayerRecoveryController {
         guard let engine else { return }
         lastTime = engine.progress.currentTime
         lastItem = engine.currentItem
-        wasPlaying = engine.state == .playing
+        wasPlaying = engine.wantsPlayback && engine.state != .pausedByUser
         wasUserPaused = engine.state == .pausedByUser
     }
 
@@ -105,6 +109,10 @@ final class PlayerRecoveryController {
         snapshot()
         print("[PlayerKit] item failed at time=\(lastTime)")
         engine?.updateState(.failed(message: "播放失败"))
+        if let e = engine, e.wantsPlayback, !wasUserPaused {
+            print("[PlayerKit] recovery start id=\(lastItem?.id ?? "?") time=\(lastTime) reason=itemFailed")
+            attemptRecovery(reason: .itemFailed)
+        }
     }
 
     private func onStalled() {
@@ -154,12 +162,12 @@ final class PlayerRecoveryController {
     // MARK: - 恢复逻辑
 
     /// 公开 — engine item status failed 时调用
-    func attemptRecovery() {
+    func attemptRecovery(reason: RecoveryReason = .networkRestored) {
         guard let engine, let _ = lastItem, wasPlaying else { return }
 
         let startTime = CACurrentMediaTime()
         let recoverTime = lastTime
-        print("[PlayerKit] recovery start id=\(lastItem?.id ?? "?") time=\(recoverTime) reason=network")
+        print("[PlayerKit] recovery start id=\(lastItem?.id ?? "?") time=\(recoverTime) reason=\(reason.rawValue)")
 
         engine.updateState(.recovering)
         engine.rebuildCurrentItem()

@@ -44,6 +44,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var ttffStart: Double = 0
     // item status KVO
     private var itemStatusObs: NSKeyValueObservation?
+    // 预加载升 current 的超时检测
+    private var readinessTimeoutTask: Task<Void, Never>?
 
     init() {
         recoveryController.engine = self
@@ -118,6 +120,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 self.attach(player: player)
                 self.preloadAdjacent(gen: gen)
                 self.logTTFF()
+                // 预加载升 current 超时检测：800ms 未 ready 则重建
+                self.startReadinessTimeout(gen: gen, index: index)
             case .failure(let err):
                 self.log("move: 失败 err=\(err.localizedDescription)")
                 self.tryDirectFallback(for: items[index], gen: gen)
@@ -422,7 +426,29 @@ final class ShortVideoPlayerEngine: ObservableObject {
         progress = PlayerProgress()
     }
 
+    /// 预加载升 current 的 readiness 超时检测
+    private func startReadinessTimeout(gen: Int, index: Int) {
+        readinessTimeoutTask?.cancel()
+        readinessTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 800_000_000) // 800ms
+            guard let self, self.generation == gen else {
+                print("[PlayerKit] current readiness timeout canceled gen=\(gen)")
+                return
+            }
+            guard !self.isReadyForDisplay,
+                  self.currentPlayer?.currentItem?.status != .readyToPlay else { return }
+            print("[PlayerKit] current rebuild reason=timeout idx=\(index) gen=\(gen)")
+            guard let item = self.currentItem else { return }
+            self.slotPool.rebuildCurrent(item: item, generation: gen) { result in
+                guard case .success(let player) = result else { return }
+                self.attach(player: player)
+                if self.wantsPlayback { player.play(); self.state = .playing }
+            }
+        }
+    }
+
     private func cancelAllPreloadTasks() {
+        readinessTimeoutTask?.cancel(); readinessTimeoutTask = nil
         for task in preloadTasks { task.cancel() }
         preloadTasks.removeAll()
     }

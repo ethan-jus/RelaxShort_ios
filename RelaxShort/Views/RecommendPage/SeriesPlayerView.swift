@@ -18,6 +18,7 @@ struct SeriesPlayerView: View {
     @State private var showShare = false
     @State private var episodes: [Episode] = []
     @State private var unlockedEpisodes: Set<Int> = []
+    @State private var pendingLockedEpisode: Int?
 
     @StateObject private var playerEngine = ShortVideoPlayerEngine()
 
@@ -92,10 +93,23 @@ struct SeriesPlayerView: View {
                         onUnlockWithCoins: {
                             unlockedEpisodes.insert(unlockTargetEpisode)
                             showUnlockSheet = false
+                            // 解锁后进入目标集
+                            if let pending = pendingLockedEpisode {
+                                currentEpisode = pending
+                                let targetIndex = max(0, pending - 1)
+                                playerEngine.move(to: targetIndex)
+                                pendingLockedEpisode = nil
+                            }
                         },
                         onWatchAd: {
                             unlockedEpisodes.insert(unlockTargetEpisode)
                             showUnlockSheet = false
+                            if let pending = pendingLockedEpisode {
+                                currentEpisode = pending
+                                let targetIndex = max(0, pending - 1)
+                                playerEngine.move(to: targetIndex)
+                                pendingLockedEpisode = nil
+                            }
                         }
                     )
                     .zIndex(300)
@@ -152,14 +166,15 @@ struct SeriesPlayerView: View {
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {
         guard old != new else { return }
-        // 锁定集不能播放，弹出解锁面板
+        // 锁定集不能播放 → 记录 pending，弹解锁，回退 episode
         guard !isEpisodeLocked(new) else {
+            pendingLockedEpisode = new
             unlockTargetEpisode = new
             showUnlockSheet = true
-            // 回退 currentEpisode 防止跳转
             currentEpisode = old
             return
         }
+        pendingLockedEpisode = nil
         let targetIndex = max(0, new - 1)
         playerEngine.move(to: targetIndex)
     }
