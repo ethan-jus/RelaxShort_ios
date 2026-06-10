@@ -8,7 +8,18 @@ actor SubtitleParser {
     func parse(url: URL, format: PlayerSubtitleFormat) async -> [PlayerSubtitleCue] {
         currentTask?.cancel()
         let task = Task<[PlayerSubtitleCue], Never> {
-            guard let content = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+            // 使用 URLSession 异步获取字幕，带 8 秒超时
+            let content: String
+            if url.isFileURL {
+                guard let c = try? String(contentsOf: url, encoding: .utf8) else { return [] }
+                content = c
+            } else {
+                var req = URLRequest(url: url, timeoutInterval: 8)
+                guard let (data, _) = try? await URLSession.shared.data(for: req),
+                      let c = String(data: data, encoding: .utf8) else { return [] }
+                content = c
+            }
+            guard !Task.isCancelled else { return [] }
             return format == .vtt ? parseVTT(content) : parseSRT(content)
         }
         currentTask = task

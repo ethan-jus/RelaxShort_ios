@@ -7,6 +7,7 @@ struct SeriesPlayerView: View {
 
     let drama: DramaItem
     let startEpisode: Int
+    let resumeTime: TimeInterval?
 
     @State private var currentEpisode: Int
     @State private var dragOffset: CGFloat = 0
@@ -18,15 +19,17 @@ struct SeriesPlayerView: View {
     @State private var showShare = false
     @State private var episodes: [Episode] = []
     @State private var unlockedEpisodes: Set<Int> = []
+    @State private var pendingLockedEpisode: Int?
 
     @StateObject private var playerEngine = ShortVideoPlayerEngine()
 
     private var totalEpisodes: Int
 
-    init(drama: DramaItem, startEpisode: Int? = nil) {
+    init(drama: DramaItem, startEpisode: Int? = nil, resumeTime: TimeInterval? = nil) {
         self.drama = drama
         self.totalEpisodes = drama.episodeCount
         self.startEpisode = startEpisode ?? max(1, drama.currentEpisode)
+        self.resumeTime = resumeTime
         self._currentEpisode = State(initialValue: self.startEpisode)
     }
 
@@ -92,10 +95,12 @@ struct SeriesPlayerView: View {
                         onUnlockWithCoins: {
                             unlockedEpisodes.insert(unlockTargetEpisode)
                             showUnlockSheet = false
+                            playUnlockedPendingEpisode()
                         },
                         onWatchAd: {
                             unlockedEpisodes.insert(unlockTargetEpisode)
                             showUnlockSheet = false
+                            playUnlockedPendingEpisode()
                         }
                     )
                     .zIndex(300)
@@ -114,6 +119,10 @@ struct SeriesPlayerView: View {
         .task { await loadEpisodes() }
         .onChange(of: currentEpisode) { oldValue, newValue in
             handleEpisodeTransition(from: oldValue, to: newValue)
+        }
+        .onChange(of: showUnlockSheet) { _, isShowing in
+            guard !isShowing, let pending = pendingLockedEpisode, isEpisodeLocked(pending) else { return }
+            pendingLockedEpisode = nil
         }
         .onDisappear {
             playerEngine.cleanup()
@@ -145,15 +154,56 @@ struct SeriesPlayerView: View {
     private func initializeEpisodePlayer() {
         let items = playerItems(from: episodes)
         guard !items.isEmpty else { return }
+        guard !isEpisodeLocked(currentEpisode) else {
+            pendingLockedEpisode = currentEpisode
+            unlockTargetEpisode = currentEpisode
+            showUnlockSheet = true
+            playerEngine.pause(reason: .system)
+            return
+        }
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
+        if let resumeTime, resumeTime > 0 {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                playerEngine.seekTime(resumeTime)
+            }
+        }
         playerEngine.play()
     }
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {
         guard old != new else { return }
+        // 锁定集不能播放 → 记录 pending，弹解锁，回退 episode
+        guard !isEpisodeLocked(new) else {
+            pendingLockedEpisode = new
+            unlockTargetEpisode = new
+            showUnlockSheet = true
+            currentEpisode = old
+            return
+        }
+        pendingLockedEpisode = nil
         let targetIndex = max(0, new - 1)
         playerEngine.move(to: targetIndex)
+    }
+
+    private func playUnlockedPendingEpisode() {
+        guard let pending = pendingLockedEpisode else { return }
+        pendingLockedEpisode = nil
+
+        let targetIndex = max(0, pending - 1)
+        if playerEngine.currentItem == nil {
+            let items = playerItems(from: episodes)
+            guard items.indices.contains(targetIndex) else { return }
+            currentEpisode = pending
+            playerEngine.prepare(items: items, index: targetIndex)
+            playerEngine.play()
+        } else if currentEpisode == pending {
+            playerEngine.move(to: targetIndex)
+            playerEngine.play()
+        } else {
+            currentEpisode = pending
+        }
     }
 
     // MARK: - Episode Pager
@@ -217,7 +267,10 @@ struct SeriesPlayerView: View {
             .onChanged { value in
                 switch value {
                 case .second(true, _):
-                    if playerEngine.state == .playing, playerEngine.progress.currentTime > 0 {
+                    if !showSpeedHUD, playerEngine.progress.duration > 0 {
+                        if playerEngine.state == .pausedByUser {
+                            playerEngine.play()
+                        }
                         playerEngine.setRate(2.0)
                         withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
                     }

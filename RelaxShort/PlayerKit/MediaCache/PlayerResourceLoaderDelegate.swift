@@ -40,16 +40,18 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
         let range = lower...upper
 
         // 缓存命中
-        if let cached = cache.cachedData(for: originalURL, range: range) {
+        if let result = cache.cachedData(for: originalURL, range: range) {
+            print("[PlayerKit] cache hit url=\(originalURL.lastPathComponent) range=\(lower)-\(upper) source=\(result.source.rawValue)")
             fillContentInfo(
                 loadingRequest.contentInformationRequest,
                 response: nil,
                 totalLength: nil
             )
-            dataRequest.respond(with: cached)
+            dataRequest.respond(with: result.data)
             loadingRequest.finishLoading()
             return true
         }
+        print("[PlayerKit] cache miss url=\(originalURL.lastPathComponent) range=\(lower)-\(upper)")
 
         // 网络请求
         var request = URLRequest(url: originalURL)

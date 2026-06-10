@@ -5,35 +5,69 @@ import SwiftUI
 /// 长按倍速提示 — 三角形推进动画
 struct SpeedHUDView: View {
 
-    @State private var phase = 0
-
-    private let timer = Timer.publish(every: 0.22, on: .main, in: .common).autoconnect()
-
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Text("2.0x")
-                .font(.system(size: 23, weight: .heavy))
+                .font(.system(size: 16, weight: .bold))
 
-            HStack(spacing: -1) {
-                ForEach(0..<3) { i in
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 15, weight: .black))
-                        .scaleEffect(phase == i ? 1.18 : 0.92)
-                        .opacity(phase == i ? 1 : 0.42)
+            TimelineView(.animation) { context in
+                let rawPhase = context.date.timeIntervalSinceReferenceDate / 0.65
+                let phase = rawPhase - floor(rawPhase)
+
+                HStack(spacing: 1) {
+                    ForEach(0..<3) { i in
+                        let opacity = triangleOpacity(index: i, phase: phase)
+
+                        SharpTriangle()
+                            .frame(width: 10, height: 13)
+                            .opacity(opacity)
+                            .scaleEffect(0.96 + 0.04 * opacity)
+                    }
                 }
             }
+            .frame(width: 36, height: 16)
         }
         .foregroundColor(.white)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(Capsule().fill(Color.black.opacity(0.22)))
-        .shadow(color: .black.opacity(0.45), radius: 8, x: 0, y: 2)
-        .onReceive(timer) { _ in
-            withAnimation(.easeInOut(duration: 0.18)) {
-                phase = (phase + 1) % 3
-            }
+        .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
+        .transition(.opacity.combined(with: .scale(scale: 0.96)))
+    }
+
+    private func triangleOpacity(index: Int, phase: Double) -> Double {
+        let fadeOut = 0.13
+        let hideStart = [0.0, 0.22, 0.44][index]
+        let revealStart = 0.68
+        let revealEnd = 0.98
+
+        if phase >= revealStart {
+            return smoothStep((phase - revealStart) / (revealEnd - revealStart))
         }
-        .transition(.scale(scale: 0.96).combined(with: .opacity))
+
+        if phase < hideStart {
+            return 1
+        }
+
+        if phase < hideStart + fadeOut {
+            return 1 - smoothStep((phase - hideStart) / fadeOut)
+        }
+
+        return 0
+    }
+
+    private func smoothStep(_ value: Double) -> Double {
+        let x = min(1, max(0, value))
+        return x * x * (3 - 2 * x)
+    }
+}
+
+private struct SharpTriangle: Shape {
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 
