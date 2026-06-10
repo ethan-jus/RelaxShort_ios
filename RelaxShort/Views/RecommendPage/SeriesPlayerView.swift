@@ -7,6 +7,7 @@ struct SeriesPlayerView: View {
 
     let drama: DramaItem
     let startEpisode: Int
+    let resumeTime: TimeInterval?
 
     @State private var currentEpisode: Int
     @State private var dragOffset: CGFloat = 0
@@ -24,10 +25,11 @@ struct SeriesPlayerView: View {
 
     private var totalEpisodes: Int
 
-    init(drama: DramaItem, startEpisode: Int? = nil) {
+    init(drama: DramaItem, startEpisode: Int? = nil, resumeTime: TimeInterval? = nil) {
         self.drama = drama
         self.totalEpisodes = drama.episodeCount
         self.startEpisode = startEpisode ?? max(1, drama.currentEpisode)
+        self.resumeTime = resumeTime
         self._currentEpisode = State(initialValue: self.startEpisode)
     }
 
@@ -161,6 +163,12 @@ struct SeriesPlayerView: View {
         }
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
+        if let resumeTime, resumeTime > 0 {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 250_000_000)
+                playerEngine.seekTime(resumeTime)
+            }
+        }
         playerEngine.play()
     }
 

@@ -151,7 +151,11 @@ struct RecommendView: View {
                         onWatchFullSeries: {
                             showAbout = false
                             session.engine.pause(reason: .system)
-                            appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
+                            appStore.navigationTarget = SeriesPlayerNav(
+                                drama: drama,
+                                startEpisode: max(1, drama.currentEpisode),
+                                resumeTime: session.engine.progress.currentTime
+                            )
                         }
                     )
                     .zIndex(200)
@@ -267,8 +271,13 @@ struct RecommendView: View {
 
                     // 使用按钮显式跳转，避免手势层抢占点击
                     Button {
+                        let resumeTime = session.engine.progress.currentTime
                         session.engine.pause(reason: .system)
-                        appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
+                        appStore.navigationTarget = SeriesPlayerNav(
+                            drama: drama,
+                            startEpisode: max(1, drama.currentEpisode),
+                            resumeTime: resumeTime
+                        )
                     } label: {
                         Text("Watch Full Series")
                             .font(.system(size: 16, weight: .bold))
@@ -528,7 +537,7 @@ struct RecommendView: View {
                         .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - 7)
                 }
             }
-            .frame(height: isScrubbing ? 28 : 16, alignment: .bottom)
+            .frame(height: isScrubbing ? 32 : 28, alignment: .center)
             .contentShape(Rectangle())
             .simultaneousGesture(
                 SpatialTapGesture()
