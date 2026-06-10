@@ -32,7 +32,6 @@ struct RecommendView: View {
     @State private var showNotificationPrompt = false
     @State private var hasShownNotification = false
     @State private var wasPlayingBeforeScrub = false
-    @State private var wasPausedBeforeSpeed = false
     @State private var isDraggingPage = false
     @State private var scrubThumbnail: UIImage?
 
@@ -66,7 +65,7 @@ struct RecommendView: View {
                 // 单视频切换状态重置
                 isExpanded = false
                 isScrubbing = false; scrubFraction = 0
-                isSpeeding = false; showSpeedHUD = false; wasPausedBeforeSpeed = false
+                isSpeeding = false; showSpeedHUD = false
                 // engine handles reset internally
                 session.handleTransition(from: oldValue, to: newValue, dramas: viewModel.dramas)
                 if isPlaybackVisible { session.engine.play() }
@@ -468,8 +467,7 @@ struct RecommendView: View {
                 case .second(true, _):
                     if !isSpeeding {
                         isSpeeding = true
-                        wasPausedBeforeSpeed = session.engine.state == .pausedByUser
-                        if wasPausedBeforeSpeed {
+                        if session.engine.state == .pausedByUser {
                             session.engine.play()
                         }
                         session.engine.setRate(2.0)
@@ -481,10 +479,6 @@ struct RecommendView: View {
             .onEnded { _ in
                 isSpeeding = false
                 session.engine.setRate(1.0)
-                if wasPausedBeforeSpeed {
-                    session.engine.pause(reason: .user)
-                }
-                wasPausedBeforeSpeed = false
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
             }
     }
@@ -572,7 +566,6 @@ struct RecommendView: View {
                                     isSpeeding = false
                                     session.engine.setRate(1.0)
                                     showSpeedHUD = false
-                                    wasPausedBeforeSpeed = false
                                 }
                             }
                             isScrubbing = true
