@@ -14,7 +14,7 @@ struct SpeedHUDView: View {
                 let rawPhase = context.date.timeIntervalSinceReferenceDate / 0.92
                 let phase = rawPhase - floor(rawPhase)
 
-                HStack(spacing: -1) {
+                HStack(spacing: 1) {
                     ForEach(0..<3) { i in
                         let opacity = triangleOpacity(index: i, phase: phase)
 
@@ -25,7 +25,7 @@ struct SpeedHUDView: View {
                     }
                 }
             }
-            .frame(width: 34, height: 16)
+            .frame(width: 36, height: 16)
         }
         .foregroundColor(.white)
         .shadow(color: .black.opacity(0.55), radius: 2, x: 0, y: 1)
@@ -33,20 +33,21 @@ struct SpeedHUDView: View {
     }
 
     private func triangleOpacity(index: Int, phase: Double) -> Double {
-        let fade = 0.08
-        let hideStart = [0.24, 0.42, 0.6][index]
-        let resetStart = 0.82
+        let fade = 0.1
+        let hideStart = [0.16, 0.34, 0.52][index]
+        let revealStart = 0.72
+        let revealEnd = 0.94
 
-        if phase >= resetStart {
-            return smoothStep((phase - resetStart) / fade)
-        }
-
-        if phase < hideStart {
+        if phase >= revealEnd || phase < hideStart {
             return 1
         }
 
         if phase < hideStart + fade {
             return 1 - smoothStep((phase - hideStart) / fade)
+        }
+
+        if phase >= revealStart {
+            return smoothStep((phase - revealStart) / (revealEnd - revealStart))
         }
 
         return 0
