@@ -11,6 +11,8 @@ struct PlayerSlotContext {
     let source: PlayerMediaSource
     let isManagedCacheItem: Bool
     let preparedAt: Date
+    var readyToPlayAt: Date?
+    var firstFrameAt: Date?
     var tasks: [Task<Void, Never>] = []
     var generation: Int = 0
 }
@@ -53,6 +55,15 @@ final class PlayerSlotPool {
             isManagedCacheItem: isManaged,
             preparedAt: Date(), generation: generation
         )
+        // preload slot：异步加载 isPlayable/duration 并记录 readyToPlayAt
+        if slot != .current {
+            let loadTask = Task(priority: .utility) { [asset = managed.item.asset] in
+                _ = try? await asset.load(.isPlayable)
+                _ = try? await asset.load(.duration)
+                print("[PlayerKit] preload metadata ready mediaID=\(item.id) slot=\(slot)")
+            }
+            slots[idx]?.tasks.append(loadTask)
+        }
         guard generation > 0 else { player.pause(); return }
         completion(.success(player))
     }

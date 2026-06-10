@@ -52,7 +52,8 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
             loadingRequest.finishLoading()
             return true
         }
-        print("[PlayerKit] cache miss url=\(originalURL.lastPathComponent) range=\(lower)-\(upper)")
+        let summary = cache.debugSummary(for: originalURL)
+        print("[PlayerKit] cache miss url=\(originalURL.lastPathComponent) range=\(lower)-\(upper) \(summary)")
 
         // 网络请求
         var request = URLRequest(url: originalURL)

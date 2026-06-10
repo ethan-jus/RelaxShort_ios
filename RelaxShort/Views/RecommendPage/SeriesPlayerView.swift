@@ -164,34 +164,38 @@ struct SeriesPlayerView: View {
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
         if let handoff, handoff.resumeTime > 0 {
-            // 使用 KVO 等待 item ready，不用轮询
+            // handoff 场景：不立即 play，等 item ready → seek completion → 按 wasPlaying 播放
             Task { @MainActor in
-                guard let player = playerEngine.currentPlayer else { return }
-                // 如果 item 已 ready，直接 seek
-                if player.currentItem?.status == .readyToPlay {
-                    playerEngine.seekTime(handoff.resumeTime)
-                    if handoff.wasPlaying { playerEngine.play() }
-                    return
-                }
-                // 否则用 KVO 等待
                 var obs: NSKeyValueObservation?
-                obs = player.currentItem?.observe(\.status, options: [.new]) { item, _ in
-                    if item.status == .readyToPlay {
-                        Task { @MainActor in
-                            playerEngine.seekTime(handoff.resumeTime)
-                            if handoff.wasPlaying { playerEngine.play() }
-                        }
-                        obs?.invalidate()
+                let cleanup = { obs?.invalidate() }
+                // KVO 等待 item readyToPlay
+                obs = playerEngine.currentPlayer?.currentItem?.observe(\.status, options: [.new]) { item, _ in
+                    guard item.status == .readyToPlay else { return }
+                    cleanup()
+                    // seek completion 确认后再按 wasPlaying 决定播放
+                    playerEngine.seekTime(handoff.resumeTime) { _ in
+                        if handoff.wasPlaying { playerEngine.play() }
                     }
                 }
-                // 3 秒超时保护
-                Task {
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    obs?.invalidate()
+                // 如果已 ready，直接 seek
+                if playerEngine.currentPlayer?.currentItem?.status == .readyToPlay {
+                    cleanup()
+                    playerEngine.seekTime(handoff.resumeTime) { _ in
+                        if handoff.wasPlaying { playerEngine.play() }
+                    }
+                }
+                // 3 秒超时兜底
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                cleanup()
+                if !playerEngine.isReadyForDisplay {
+                    playerEngine.seekTime(handoff.resumeTime) { _ in
+                        if handoff.wasPlaying { playerEngine.play() }
+                    }
                 }
             }
+        } else {
+            playerEngine.play()
         }
-        playerEngine.play()
     }
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {

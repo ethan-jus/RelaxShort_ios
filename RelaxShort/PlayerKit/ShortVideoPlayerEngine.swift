@@ -190,6 +190,18 @@ final class ShortVideoPlayerEngine: ObservableObject {
         progress = nextProgress
     }
 
+    /// seek 带 completion 确认（handoff 场景使用）
+    func seekTime(_ time: TimeInterval, completion: @escaping (Bool) -> Void) {
+        guard let player = currentPlayer else { completion(false); return }
+        let target = CMTime(seconds: time, preferredTimescale: 600)
+        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
+            var nextProgress = self.progress
+            nextProgress.currentTime = time
+            self.progress = nextProgress
+            completion(finished)
+        }
+    }
+
     func selectSubtitle(_ id: String?) {
         selectedSubtitleID = id
         guard let item = currentPlayer?.currentItem else { return }
@@ -488,13 +500,21 @@ final class ShortVideoPlayerEngine: ObservableObject {
             // 校验 HTTP 206 / Content-Range
             let httpResp = response as? HTTPURLResponse
             if httpResp?.statusCode == 206 {
-                let actualRange = httpResp?.value(forHTTPHeaderField: "Content-Range")
+                // 按 Content-Range 解析实际返回区间
+                let contentRange = httpResp?.value(forHTTPHeaderField: "Content-Range")
+                let actualRange: ClosedRange<Int64> = contentRange
                     .flatMap { $0.components(separatedBy: "/").first }
                     .flatMap { $0.replacingOccurrences(of: "bytes ", with: "") }
-                let len = Int64(httpResp?.expectedContentLength ?? Int64(data.count))
-                let writeRange: ClosedRange<Int64> = requestedRange  // 使用请求的 range
-                HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: len, mime: "video/mp4")
-                self?.log("warmCache: wrote \(writeRange.lowerBound)-\(writeRange.upperBound) len=\(data.count) status=206")
+                    .flatMap { part -> ClosedRange<Int64>? in
+                        let bounds = part.components(separatedBy: "-")
+                        guard bounds.count == 2, let lo = Int64(bounds[0]), let hi = Int64(bounds[1]) else { return nil }
+                        return lo...hi
+                    } ?? requestedRange
+                let totalLen = contentRange
+                    .flatMap { $0.components(separatedBy: "/").last }
+                    .flatMap(Int64.init)
+                HTTPRangeMediaCache.shared.write(data: data, for: url, range: actualRange, len: totalLen, mime: "video/mp4")
+                self?.log("warmCache: wrote \(actualRange.lowerBound)-\(actualRange.upperBound) len=\(data.count) status=206 total=\(totalLen ?? -1)")
             } else if httpResp?.statusCode == 200 {
                 // 服务器忽略 Range，只写实际返回长度
                 let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
