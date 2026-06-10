@@ -6,7 +6,7 @@ import SwiftUI
 struct SpeedHUDView: View {
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 4) {
             Text("2.0x")
                 .font(.system(size: 16, weight: .bold))
 
@@ -18,8 +18,8 @@ struct SpeedHUDView: View {
                     ForEach(0..<3) { i in
                         let opacity = triangleOpacity(index: i, phase: phase)
 
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 11, weight: .black))
+                        SharpTriangle()
+                            .frame(width: 10, height: 13)
                             .opacity(opacity)
                             .scaleEffect(0.96 + 0.04 * opacity)
                     }
@@ -55,6 +55,18 @@ struct SpeedHUDView: View {
     private func smoothStep(_ value: Double) -> Double {
         let x = min(1, max(0, value))
         return x * x * (3 - 2 * x)
+    }
+}
+
+private struct SharpTriangle: Shape {
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 
