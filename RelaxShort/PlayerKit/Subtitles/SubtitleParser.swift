@@ -14,7 +14,7 @@ actor SubtitleParser {
                 guard let c = try? String(contentsOf: url, encoding: .utf8) else { return [] }
                 content = c
             } else {
-                var req = URLRequest(url: url, timeoutInterval: 8)
+                let req = URLRequest(url: url, timeoutInterval: 8)
                 guard let (data, _) = try? await URLSession.shared.data(for: req),
                       let c = String(data: data, encoding: .utf8) else { return [] }
                 content = c
