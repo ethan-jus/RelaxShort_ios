@@ -88,7 +88,39 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
 
             let httpResponse = response as? HTTPURLResponse
             let totalLength = self.totalLength(from: httpResponse)
-                ?? httpResponse?.expectedContentLength
+                ?? (httpResponse?.expectedContentLength).flatMap { $0 > 0 ? $0 : nil }
+
+            let responseRange: ClosedRange<Int64>
+            let responseData: Data
+            if httpResponse?.statusCode == 206 {
+                guard let parsedRange = self.contentRange(from: httpResponse),
+                      parsedRange.upperBound - parsedRange.lowerBound + 1 == Int64(data.count) else {
+                    loadingRequest.finishLoading(
+                        with: NSError(domain: "PlayerResourceLoader", code: -2)
+                    )
+                    return
+                }
+                responseRange = parsedRange
+                responseData = data
+            } else if httpResponse?.statusCode == 200 {
+                let fullRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
+                guard fullRange.lowerBound <= range.lowerBound,
+                      fullRange.upperBound >= range.upperBound else {
+                    loadingRequest.finishLoading(
+                        with: NSError(domain: "PlayerResourceLoader", code: -3)
+                    )
+                    return
+                }
+                responseRange = fullRange
+                let start = Int(range.lowerBound)
+                let end = Int(range.upperBound) + 1
+                responseData = data.subdata(in: start..<end)
+            } else {
+                loadingRequest.finishLoading(
+                    with: NSError(domain: "PlayerResourceLoader", code: httpResponse?.statusCode ?? -4)
+                )
+                return
+            }
 
             self.fillContentInfo(
                 loadingRequest.contentInformationRequest,
@@ -100,12 +132,12 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
             self.cache.write(
                 data: data,
                 for: self.originalURL,
-                range: range,
+                range: responseRange,
                 len: totalLength,
                 mime: httpResponse?.mimeType
             )
 
-            dataRequest.respond(with: data)
+            dataRequest.respond(with: responseData)
             loadingRequest.finishLoading()
         }
 
@@ -156,5 +188,20 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
             return nil
         }
         return Int64(contentRange[contentRange.index(after: slashIndex)...])
+    }
+
+    private func contentRange(from response: HTTPURLResponse?) -> ClosedRange<Int64>? {
+        guard let contentRange = response?.value(forHTTPHeaderField: "Content-Range") else {
+            return nil
+        }
+        let parts = contentRange.components(separatedBy: "/")
+        guard let byteRange = parts.first?.replacingOccurrences(of: "bytes ", with: ""),
+              let dashIndex = byteRange.firstIndex(of: "-"),
+              let lower = Int64(byteRange[..<dashIndex]),
+              let upper = Int64(byteRange[byteRange.index(after: dashIndex)...]),
+              upper >= lower else {
+            return nil
+        }
+        return lower...upper
     }
 }

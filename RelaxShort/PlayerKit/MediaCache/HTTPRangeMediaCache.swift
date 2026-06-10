@@ -65,6 +65,11 @@ final class HTTPRangeMediaCache {
         }
         return bytes
     }
+    func hasPlayableLeadCache(for url: URL, minimumBytes: Int64) -> Bool {
+        let m = metadata(for: url)
+        guard let len = m.len, len > 0 else { return false }
+        return leadingCachedBytes(for: url) >= minimumBytes
+    }
     func metadata(for url: URL) -> CacheMetadata {
         lock.lock()
         let m = meta[key(url)]

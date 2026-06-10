@@ -46,7 +46,7 @@ enum PlayerItemFactory {
     static func makePlaybackItem(from source: PlayerMediaSource) -> PlayerManagedItem {
         if let url = mp4URL(from: source) {
             let leadingBytes = HTTPRangeMediaCache.shared.leadingCachedBytes(for: url)
-            if leadingBytes >= minimumPlayableLeadCacheBytes {
+            if HTTPRangeMediaCache.shared.hasPlayableLeadCache(for: url, minimumBytes: minimumPlayableLeadCacheBytes) {
                 print("[PlayerKit] playback item cache-ready url=\(url.lastPathComponent) leading=\(leadingBytes)")
                 return makeManagedItem(from: source)
             }
