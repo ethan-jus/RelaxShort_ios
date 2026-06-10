@@ -99,6 +99,7 @@
 		F675DC72662B935D840C12B4 /* SubtitleRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E419E4384060BF195ED3C9DF /* SubtitleRenderer.swift */; };
 		FC841D8C8509F712A341D3E8 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A18DCB4AC5C2EA9ACBB0D8 /* ShareSheet.swift */; };
 		FD1C40888BB779A0CA0078DF /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7B5D6833951FB561F5C8BC0 /* FavoritesView.swift */; };
+		5C5D9C3E2148403992266DD2 /* PlayerCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -203,6 +204,7 @@
 		FC0C433189F580254B652F5E /* RecommendView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendView.swift; sourceTree = "<group>"; };
 		FC6168F0CDBC3B3FE810F657 /* SeriesPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesPlayerView.swift; sourceTree = "<group>"; };
 		FF389AD770099338D3F8AAF2 /* AdService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdService.swift; sourceTree = "<group>"; };
+		89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -455,6 +457,7 @@
 		E7392DF108CDD71ED853A42A /* PlayerKit */ = {
 			isa = PBXGroup;
 			children = (
+				89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */,
 				7F346D49AC21BBB76750BDC4 /* PlayerItemFactory.swift */,
 				185258248DA764936F58AAB2 /* PlayerMediaModels.swift */,
 				33FF53CF2CD4F740B93648B2 /* PlayerRecoveryController.swift */,
@@ -627,6 +630,7 @@
 				35ACFDD66549ADA723C21EE5 /* DSComponents.swift in Sources */,
 				7EA1F16846A1632410CBFF6B /* DependencyContainer.swift in Sources */,
 				2E9BFA93C65881A7FF34909B /* DesignToken.swift in Sources */,
+				5C5D9C3E2148403992266DD2 /* PlayerCoordinator.swift in Sources */,
 				9F2B5CBD100A06A160CF773C /* DramaBoxBottomTabBar.swift in Sources */,
 				EAED2751AE505BF8D3469214 /* DramaBoxPosterCard.swift in Sources */,
 				90222D64B0E6198783ABF0E4 /* DramaBoxSectionHeader.swift in Sources */,

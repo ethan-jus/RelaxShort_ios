@@ -21,7 +21,7 @@ struct SeriesPlayerView: View {
     @State private var unlockedEpisodes: Set<Int> = []
     @State private var pendingLockedEpisode: Int?
 
-    @StateObject private var playerEngine = ShortVideoPlayerEngine()
+    @EnvironmentObject var playerCoordinator: PlayerCoordinator
 
     private var totalEpisodes: Int
 
@@ -125,7 +125,7 @@ struct SeriesPlayerView: View {
             pendingLockedEpisode = nil
         }
         .onDisappear {
-            playerEngine.cleanup()
+            playerCoordinator.engine.cleanup()
         }
     }
 
@@ -158,50 +158,11 @@ struct SeriesPlayerView: View {
             pendingLockedEpisode = currentEpisode
             unlockTargetEpisode = currentEpisode
             showUnlockSheet = true
-            playerEngine.pause(reason: .system)
+            playerCoordinator.engine.pause(reason: .system)
             return
         }
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
-        playerEngine.prepare(items: items, index: startIndex)
-        if let handoff, handoff.resumeTime > 0 {
-            Task { @MainActor in
-                var didStartHandoffSeek = false
-                var obs: NSKeyValueObservation?
-                let engine = playerEngine
-                // KVO 路径
-                obs = engine.currentPlayer?.currentItem?.observe(\.status, options: [.new]) { item, _ in
-                    guard item.status == .readyToPlay else { return }
-                    Task { @MainActor in
-                        guard !didStartHandoffSeek else { return }
-                        didStartHandoffSeek = true; obs?.invalidate()
-                        engine.seekTime(handoff.resumeTime) { finished in
-                            guard finished, handoff.wasPlaying else { return }
-                            engine.play()
-                        }
-                    }
-                }
-                // 立即 ready 路径
-                if !didStartHandoffSeek,
-                   engine.currentPlayer?.currentItem?.status == .readyToPlay {
-                    didStartHandoffSeek = true; obs?.invalidate()
-                    engine.seekTime(handoff.resumeTime) { finished in
-                        guard finished, handoff.wasPlaying else { return }
-                        engine.play()
-                    }
-                }
-                // 3 秒超时兜底
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                if !didStartHandoffSeek {
-                    didStartHandoffSeek = true; obs?.invalidate()
-                    engine.seekTime(handoff.resumeTime) { finished in
-                        guard finished, handoff.wasPlaying else { return }
-                        engine.play()
-                    }
-                }
-            }
-        } else {
-            playerEngine.play()
-        }
+        playerCoordinator.claimSeries(drama: drama, items: items, startIndex: startIndex, handoff: handoff)
     }
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {
@@ -216,7 +177,7 @@ struct SeriesPlayerView: View {
         }
         pendingLockedEpisode = nil
         let targetIndex = max(0, new - 1)
-        playerEngine.move(to: targetIndex)
+        playerCoordinator.engine.move(to: targetIndex)
     }
 
     private func playUnlockedPendingEpisode() {
@@ -224,15 +185,15 @@ struct SeriesPlayerView: View {
         pendingLockedEpisode = nil
 
         let targetIndex = max(0, pending - 1)
-        if playerEngine.currentItem == nil {
+        if playerCoordinator.engine.currentItem == nil {
             let items = playerItems(from: episodes)
             guard items.indices.contains(targetIndex) else { return }
             currentEpisode = pending
-            playerEngine.prepare(items: items, index: targetIndex)
-            playerEngine.play()
+            playerCoordinator.engine.prepare(items: items, index: targetIndex)
+            playerCoordinator.engine.play()
         } else if currentEpisode == pending {
-            playerEngine.move(to: targetIndex)
-            playerEngine.play()
+            playerCoordinator.engine.move(to: targetIndex)
+            playerCoordinator.engine.play()
         } else {
             currentEpisode = pending
         }
@@ -248,9 +209,9 @@ struct SeriesPlayerView: View {
             ForEach(visibleEpisodeIndices(), id: \.self) { ep in
                 let isCurrent = ep == currentEpisode
                 ShortVideoPlayerView(
-                    player: isCurrent ? playerEngine.currentPlayer : nil,
+                    player: isCurrent ? playerCoordinator.engine.currentPlayer : nil,
                     coverURL: drama.coverURL,
-                    engine: playerEngine
+                    engine: playerCoordinator.engine
                 )
                 .allowsHitTesting(false)
                 .frame(width: geo.size.width, height: pageHeight)
@@ -299,18 +260,18 @@ struct SeriesPlayerView: View {
             .onChanged { value in
                 switch value {
                 case .second(true, _):
-                    if !showSpeedHUD, playerEngine.progress.duration > 0 {
-                        if playerEngine.state == .pausedByUser {
-                            playerEngine.play()
+                    if !showSpeedHUD, playerCoordinator.engine.progress.duration > 0 {
+                        if playerCoordinator.engine.state == .pausedByUser {
+                            playerCoordinator.engine.play()
                         }
-                        playerEngine.setRate(2.0)
+                        playerCoordinator.engine.setRate(2.0)
                         withAnimation(.spring(response: 0.3)) { showSpeedHUD = true }
                     }
                 default: break
                 }
             }
             .onEnded { _ in
-                playerEngine.setRate(1.0)
+                playerCoordinator.engine.setRate(1.0)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
             }
     }
@@ -318,10 +279,10 @@ struct SeriesPlayerView: View {
     private var tapPauseGesture: some Gesture {
         TapGesture()
             .onEnded {
-                if playerEngine.state == .playing {
-                    playerEngine.pause(reason: .user)
-                } else if playerEngine.state == .pausedByUser {
-                    playerEngine.play()
+                if playerCoordinator.engine.state == .playing {
+                    playerCoordinator.engine.pause(reason: .user)
+                } else if playerCoordinator.engine.state == .pausedByUser {
+                    playerCoordinator.engine.play()
                 }
             }
     }

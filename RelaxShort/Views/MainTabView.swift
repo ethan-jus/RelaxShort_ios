@@ -13,6 +13,7 @@ import SwiftUI
 /// 避免搜索和播放页导航状态变化导致标签内容失去视图身份。
 struct MainTabView: View {
     @EnvironmentObject var appStore: AppStore
+    @StateObject private var playerCoordinator = PlayerCoordinator()
 
     @StateObject private var homeVM = HomeViewModel(repository: MockHomeRepository())
     @StateObject private var recommendVM = RecommendViewModel(repository: MockHomeRepository())
@@ -39,9 +40,11 @@ struct MainTabView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SeriesPlayerNav.self) { nav in
                 SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, handoff: nav.handoff)
+                    .environmentObject(playerCoordinator)
             }
             .navigationDestination(item: $appStore.navigationTarget) { nav in
                 SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, handoff: nav.handoff)
+                    .environmentObject(playerCoordinator)
             }
             .navigationDestination(isPresented: $appStore.isShowingSearch) {
                 SearchView()
