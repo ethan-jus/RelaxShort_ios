@@ -11,7 +11,7 @@ struct SpeedHUDView: View {
                 .font(.system(size: 16, weight: .bold))
 
             TimelineView(.animation) { context in
-                let rawPhase = context.date.timeIntervalSinceReferenceDate / 0.78
+                let rawPhase = context.date.timeIntervalSinceReferenceDate / 0.65
                 let phase = rawPhase - floor(rawPhase)
 
                 HStack(spacing: 1) {
