@@ -164,33 +164,30 @@ struct SeriesPlayerView: View {
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
         if let handoff, handoff.resumeTime > 0 {
-            // handoff 场景：不立即 play，等 item ready → seek completion → 按 wasPlaying 播放
+            // handoff 场景：一次性完成保护，三条路径只有一条执行
             Task { @MainActor in
+                var didCompleteHandoff = false
                 var obs: NSKeyValueObservation?
-                let cleanup = { obs?.invalidate() }
+                let complete = { (finished: Bool) in
+                    guard !didCompleteHandoff else { return }
+                    didCompleteHandoff = true
+                    obs?.invalidate()
+                    if handoff.wasPlaying, finished { playerEngine.play() }
+                }
                 // KVO 等待 item readyToPlay
                 obs = playerEngine.currentPlayer?.currentItem?.observe(\.status, options: [.new]) { item, _ in
-                    guard item.status == .readyToPlay else { return }
-                    cleanup()
-                    // seek completion 确认后再按 wasPlaying 决定播放
-                    playerEngine.seekTime(handoff.resumeTime) { _ in
-                        if handoff.wasPlaying { playerEngine.play() }
-                    }
+                    guard item.status == .readyToPlay, !didCompleteHandoff else { return }
+                    playerEngine.seekTime(handoff.resumeTime, completion: complete)
                 }
                 // 如果已 ready，直接 seek
-                if playerEngine.currentPlayer?.currentItem?.status == .readyToPlay {
-                    cleanup()
-                    playerEngine.seekTime(handoff.resumeTime) { _ in
-                        if handoff.wasPlaying { playerEngine.play() }
-                    }
+                if !didCompleteHandoff,
+                   playerEngine.currentPlayer?.currentItem?.status == .readyToPlay {
+                    playerEngine.seekTime(handoff.resumeTime, completion: complete)
                 }
-                // 3 秒超时兜底
+                // 3 秒超时兜底，只在尚未完成时执行
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
-                cleanup()
-                if !playerEngine.isReadyForDisplay {
-                    playerEngine.seekTime(handoff.resumeTime) { _ in
-                        if handoff.wasPlaying { playerEngine.play() }
-                    }
+                if !didCompleteHandoff {
+                    playerEngine.seekTime(handoff.resumeTime, completion: complete)
                 }
             }
         } else {

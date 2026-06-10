@@ -190,15 +190,18 @@ final class ShortVideoPlayerEngine: ObservableObject {
         progress = nextProgress
     }
 
-    /// seek 带 completion 确认（handoff 场景使用）
-    func seekTime(_ time: TimeInterval, completion: @escaping (Bool) -> Void) {
+    /// seek 带 completion 确认（handoff 场景使用），completion 在 MainActor 回调
+    func seekTime(_ time: TimeInterval, completion: @escaping @MainActor (Bool) -> Void) {
         guard let player = currentPlayer else { completion(false); return }
         let target = CMTime(seconds: time, preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
-            var nextProgress = self.progress
-            nextProgress.currentTime = time
-            self.progress = nextProgress
-            completion(finished)
+            Task { @MainActor [weak self] in
+                guard let self else { completion(finished); return }
+                var nextProgress = self.progress
+                nextProgress.currentTime = time
+                self.progress = nextProgress
+                completion(finished)
+            }
         }
     }
 
@@ -498,28 +501,34 @@ final class ShortVideoPlayerEngine: ObservableObject {
             guard let (data, response) = try? await URLSession.shared.data(for: req),
                   !Task.isCancelled else { return }
             // 校验 HTTP 206 / Content-Range
+            guard !data.isEmpty else { self?.log("warmCache skipped: empty data"); return }
             let httpResp = response as? HTTPURLResponse
             if httpResp?.statusCode == 206 {
-                // 按 Content-Range 解析实际返回区间
-                let contentRange = httpResp?.value(forHTTPHeaderField: "Content-Range")
-                let actualRange: ClosedRange<Int64> = contentRange
-                    .flatMap { $0.components(separatedBy: "/").first }
-                    .flatMap { $0.replacingOccurrences(of: "bytes ", with: "") }
-                    .flatMap { part -> ClosedRange<Int64>? in
-                        let bounds = part.components(separatedBy: "-")
-                        guard bounds.count == 2, let lo = Int64(bounds[0]), let hi = Int64(bounds[1]) else { return nil }
-                        return lo...hi
-                    } ?? requestedRange
-                let totalLen = contentRange
-                    .flatMap { $0.components(separatedBy: "/").last }
-                    .flatMap(Int64.init)
+                guard let contentRange = httpResp?.value(forHTTPHeaderField: "Content-Range"),
+                      let byteRange = contentRange.components(separatedBy: "/").first?
+                          .replacingOccurrences(of: "bytes ", with: ""),
+                      let dashIdx = byteRange.firstIndex(of: "-") else {
+                    self?.log("warmCache skipped: 206 missing/malformed Content-Range")
+                    return
+                }
+                let loStr = String(byteRange[..<dashIdx])
+                let hiStr = String(byteRange[byteRange.index(after: dashIdx)...])
+                guard let lo = Int64(loStr), let hi = Int64(hiStr),
+                      hi - lo + 1 == Int64(data.count) else {
+                    self?.log("warmCache skipped: 206 range \(loStr)-\(hiStr) != data.count \(data.count)")
+                    return
+                }
+                let actualRange = lo...hi
+                let totalLen = contentRange.components(separatedBy: "/").last.flatMap(Int64.init)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: actualRange, len: totalLen, mime: "video/mp4")
-                self?.log("warmCache: wrote \(actualRange.lowerBound)-\(actualRange.upperBound) len=\(data.count) status=206 total=\(totalLen ?? -1)")
+                self?.log("warmCache: wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen ?? -1)")
             } else if httpResp?.statusCode == 200 {
-                // 服务器忽略 Range，只写实际返回长度
+                guard !data.isEmpty else { self?.log("warmCache skipped: 200 empty data"); return }
                 let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: Int64(data.count), mime: "video/mp4")
-                self?.log("warmCache: wrote 0-\(data.count-1) status=200 (server ignored Range)")
+                self?.log("warmCache: wrote 0-\(data.count-1) status=200")
+            } else {
+                self?.log("warmCache skipped: status=\(httpResp?.statusCode ?? 0)")
             }
         }
     }

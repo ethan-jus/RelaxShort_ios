@@ -55,14 +55,22 @@ final class PlayerSlotPool {
             isManagedCacheItem: isManaged,
             preparedAt: Date(), generation: generation
         )
-        // preload slot：异步加载 isPlayable/duration 并记录 readyToPlayAt
+        // preload slot：异步加载 isPlayable/duration，捕获真实结果
         if slot != .current {
             let loadTask = Task(priority: .utility) { [asset = managed.item.asset] in
-                _ = try? await asset.load(.isPlayable)
-                _ = try? await asset.load(.duration)
-                print("[PlayerKit] preload metadata ready mediaID=\(item.id) slot=\(slot)")
+                guard !Task.isCancelled else { return }
+                let isPlayable = (try? await asset.load(.isPlayable)) == true
+                let durResult = try? await asset.load(.duration)
+                guard !Task.isCancelled else { return }
+                if isPlayable {
+                    print("[PlayerKit] preload metadata ready mediaID=\(managed.item.asset.duration.seconds)s")
+                } else {
+                    print("[PlayerKit] preload metadata failed mediaID=\(item.id)")
+                }
             }
-            slots[idx]?.tasks.append(loadTask)
+            if let idx = slots.firstIndex(where: { $0?.generation == generation }) {
+                slots[idx]?.tasks.append(loadTask)
+            }
         }
         guard generation > 0 else { player.pause(); return }
         completion(.success(player))
