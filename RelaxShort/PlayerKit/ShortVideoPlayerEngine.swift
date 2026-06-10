@@ -373,9 +373,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
         startObserving()
         recoveryController.attachObservers(to: player)
 
-        // 设置播放策略：current 优先稳定播放
-        player.currentItem?.preferredForwardBufferDuration = 4.0
-        player.automaticallyWaitsToMinimizeStalling = true
+        // 设置播放策略：短剧优先快速出画，卡顿恢复由状态机兜底
+        player.currentItem?.preferredForwardBufferDuration = 1.5
+        player.automaticallyWaitsToMinimizeStalling = false
 
         // 自动加载字幕（按 source 类型）
         if let item = currentItem {
@@ -395,9 +395,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
         state = .ready
         log("attach: status=\(statusString(player.currentItem?.status)) timeControl=\(tcsString(player.timeControlStatus))")
-
-        // 后台 warm cache：对 MP4 source 预热首段数据
-        if let item = currentItem { startWarmCache(for: item) }
 
         // 如果有播放意图，attach 后立即播放
         if wantsPlayback {
@@ -447,6 +444,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 self.slotPool.prepare(item: self.items[nextIdx], slot: .next, generation: gen) { _ in }
             }
             preloadTasks.append(task)
+            startWarmCache(for: items[nextIdx], byteCount: 1_048_576, reason: "next")
         }
         let prevIdx = currentIndex - 1
         if prevIdx >= 0 {
@@ -490,45 +488,45 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
-    /// 后台 warm cache：对 MP4 source 预热首段数据（512KB）
-    private func startWarmCache(for item: PlayerMediaItem) {
+    /// 后台 warm cache：当前视频播放链路不走这里，只为下一条提前缓存首段
+    private func startWarmCache(for item: PlayerMediaItem, byteCount: Int64, reason: String) {
         guard case .mp4(let url) = item.source else { return }
         warmCacheTask?.cancel()
         warmCacheTask = Task(priority: .background) { [weak self] in
             var req = URLRequest(url: url)
-            let requestedRange: ClosedRange<Int64> = 0...524287 // 512KB
+            let requestedRange: ClosedRange<Int64> = 0...(byteCount - 1)
             req.setValue("bytes=\(requestedRange.lowerBound)-\(requestedRange.upperBound)", forHTTPHeaderField: "Range")
             guard let (data, response) = try? await URLSession.shared.data(for: req),
                   !Task.isCancelled else { return }
             // 校验 HTTP 206 / Content-Range
-            guard !data.isEmpty else { self?.log("warmCache skipped: empty data"); return }
+            guard !data.isEmpty else { self?.log("warmCache skipped reason=\(reason) empty data"); return }
             let httpResp = response as? HTTPURLResponse
             if httpResp?.statusCode == 206 {
                 guard let contentRange = httpResp?.value(forHTTPHeaderField: "Content-Range"),
                       let byteRange = contentRange.components(separatedBy: "/").first?
                           .replacingOccurrences(of: "bytes ", with: ""),
                       let dashIdx = byteRange.firstIndex(of: "-") else {
-                    self?.log("warmCache skipped: 206 missing/malformed Content-Range")
+                    self?.log("warmCache skipped reason=\(reason) 206 missing/malformed Content-Range")
                     return
                 }
                 let loStr = String(byteRange[..<dashIdx])
                 let hiStr = String(byteRange[byteRange.index(after: dashIdx)...])
                 guard let lo = Int64(loStr), let hi = Int64(hiStr), hi >= lo,
                       hi - lo + 1 == Int64(data.count) else {
-                    self?.log("warmCache skipped: 206 range \(loStr)-\(hiStr) != data.count \(data.count)")
+                    self?.log("warmCache skipped reason=\(reason) 206 range \(loStr)-\(hiStr) != data.count \(data.count)")
                     return
                 }
                 let actualRange = lo...hi
                 let totalLen = contentRange.components(separatedBy: "/").last.flatMap(Int64.init)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: actualRange, len: totalLen, mime: "video/mp4")
-                self?.log("warmCache: wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen?.description ?? "unknown")")
+                self?.log("warmCache reason=\(reason) wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen?.description ?? "unknown")")
             } else if httpResp?.statusCode == 200 {
-                guard !data.isEmpty else { self?.log("warmCache skipped: 200 empty data"); return }
+                guard !data.isEmpty else { self?.log("warmCache skipped reason=\(reason) 200 empty data"); return }
                 let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: Int64(data.count), mime: "video/mp4")
-                self?.log("warmCache: wrote 0-\(data.count-1) status=200")
+                self?.log("warmCache reason=\(reason) wrote 0-\(data.count-1) status=200")
             } else {
-                self?.log("warmCache skipped: status=\(httpResp?.statusCode ?? 0)")
+                self?.log("warmCache skipped reason=\(reason) status=\(httpResp?.statusCode ?? 0)")
             }
         }
     }

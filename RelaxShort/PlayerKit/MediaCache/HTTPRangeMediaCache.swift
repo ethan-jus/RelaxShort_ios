@@ -53,6 +53,18 @@ final class HTTPRangeMediaCache {
         lock.unlock()
         return result
     }
+    func leadingCachedBytes(for url: URL) -> Int64 {
+        let ranges = cachedRanges(for: url).sorted { $0.lowerBound < $1.lowerBound }
+        var expectedStart: Int64 = 0
+        var bytes: Int64 = 0
+        for range in ranges {
+            guard range.lowerBound <= expectedStart else { break }
+            guard range.upperBound >= expectedStart else { continue }
+            bytes += range.upperBound - expectedStart + 1
+            expectedStart = range.upperBound + 1
+        }
+        return bytes
+    }
     func metadata(for url: URL) -> CacheMetadata {
         lock.lock()
         let m = meta[key(url)]

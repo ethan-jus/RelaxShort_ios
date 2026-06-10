@@ -43,16 +43,17 @@ final class PlayerSlotPool {
     ) {
         cancel(slot)
         let idx = slot.rawValue
-        let isManaged = slot != .current
-        let managed = isManaged
-            ? PlayerItemFactory.makeManagedItem(from: item.source)
+        let managed = slot == .current
+            ? PlayerItemFactory.makePlaybackItem(from: item.source)
             : PlayerItemFactory.makeDirectItem(from: item.source)
         let player = AVPlayer(playerItem: managed.item)
+        player.currentItem?.preferredForwardBufferDuration = slot == .current ? 1.5 : 1.0
+        player.automaticallyWaitsToMinimizeStalling = slot == .current
         slots[idx] = PlayerSlotContext(
             player: player, item: managed.item,
             resourceLoaderDelegate: managed.resourceLoaderDelegate,
             mediaID: item.id, source: item.source,
-            isManagedCacheItem: isManaged,
+            isManagedCacheItem: managed.resourceLoaderDelegate != nil,
             preparedAt: Date(), generation: generation
         )
         // preload slot：异步加载 isPlayable/duration，捕获真实结果
@@ -67,6 +68,9 @@ final class PlayerSlotPool {
                 } else {
                     print("[PlayerKit] preload metadata failed mediaID=\(item.id) slot=\(slot) playable=\(isPlayable) duration=\(String(format: "%.1f", duration))s")
                 }
+            }
+            player.preroll(atRate: 1.0) { ok in
+                print("[PlayerKit] preload preroll mediaID=\(item.id) slot=\(slot) ok=\(ok)")
             }
             slots[idx]?.tasks.append(loadTask)
         }
