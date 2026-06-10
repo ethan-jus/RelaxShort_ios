@@ -164,30 +164,39 @@ struct SeriesPlayerView: View {
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
         if let handoff, handoff.resumeTime > 0 {
-            // handoff 场景：一次性完成保护，三条路径只有一条执行
             Task { @MainActor in
-                var didCompleteHandoff = false
+                var didStartHandoffSeek = false
                 var obs: NSKeyValueObservation?
-                let complete = { (finished: Bool) in
-                    guard !didCompleteHandoff else { return }
-                    didCompleteHandoff = true
-                    obs?.invalidate()
-                    if handoff.wasPlaying, finished { playerEngine.play() }
+                let engine = playerEngine
+                // KVO 路径
+                obs = engine.currentPlayer?.currentItem?.observe(\.status, options: [.new]) { item, _ in
+                    guard item.status == .readyToPlay else { return }
+                    Task { @MainActor in
+                        guard !didStartHandoffSeek else { return }
+                        didStartHandoffSeek = true; obs?.invalidate()
+                        engine.seekTime(handoff.resumeTime) { finished in
+                            guard finished, handoff.wasPlaying else { return }
+                            engine.play()
+                        }
+                    }
                 }
-                // KVO 等待 item readyToPlay
-                obs = playerEngine.currentPlayer?.currentItem?.observe(\.status, options: [.new]) { item, _ in
-                    guard item.status == .readyToPlay, !didCompleteHandoff else { return }
-                    playerEngine.seekTime(handoff.resumeTime, completion: complete)
+                // 立即 ready 路径
+                if !didStartHandoffSeek,
+                   engine.currentPlayer?.currentItem?.status == .readyToPlay {
+                    didStartHandoffSeek = true; obs?.invalidate()
+                    engine.seekTime(handoff.resumeTime) { finished in
+                        guard finished, handoff.wasPlaying else { return }
+                        engine.play()
+                    }
                 }
-                // 如果已 ready，直接 seek
-                if !didCompleteHandoff,
-                   playerEngine.currentPlayer?.currentItem?.status == .readyToPlay {
-                    playerEngine.seekTime(handoff.resumeTime, completion: complete)
-                }
-                // 3 秒超时兜底，只在尚未完成时执行
+                // 3 秒超时兜底
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
-                if !didCompleteHandoff {
-                    playerEngine.seekTime(handoff.resumeTime, completion: complete)
+                if !didStartHandoffSeek {
+                    didStartHandoffSeek = true; obs?.invalidate()
+                    engine.seekTime(handoff.resumeTime) { finished in
+                        guard finished, handoff.wasPlaying else { return }
+                        engine.play()
+                    }
                 }
             }
         } else {

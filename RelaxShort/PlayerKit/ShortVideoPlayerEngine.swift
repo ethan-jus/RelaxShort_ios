@@ -513,7 +513,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 }
                 let loStr = String(byteRange[..<dashIdx])
                 let hiStr = String(byteRange[byteRange.index(after: dashIdx)...])
-                guard let lo = Int64(loStr), let hi = Int64(hiStr),
+                guard let lo = Int64(loStr), let hi = Int64(hiStr), hi >= lo,
                       hi - lo + 1 == Int64(data.count) else {
                     self?.log("warmCache skipped: 206 range \(loStr)-\(hiStr) != data.count \(data.count)")
                     return
@@ -521,7 +521,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 let actualRange = lo...hi
                 let totalLen = contentRange.components(separatedBy: "/").last.flatMap(Int64.init)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: actualRange, len: totalLen, mime: "video/mp4")
-                self?.log("warmCache: wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen ?? -1)")
+                self?.log("warmCache: wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen?.description ?? "unknown")")
             } else if httpResp?.statusCode == 200 {
                 guard !data.isEmpty else { self?.log("warmCache skipped: 200 empty data"); return }
                 let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)

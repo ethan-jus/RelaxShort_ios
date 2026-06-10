@@ -60,17 +60,15 @@ final class PlayerSlotPool {
             let loadTask = Task(priority: .utility) { [asset = managed.item.asset] in
                 guard !Task.isCancelled else { return }
                 let isPlayable = (try? await asset.load(.isPlayable)) == true
-                let durResult = try? await asset.load(.duration)
+                let duration = (try? await asset.load(.duration)).map { CMTimeGetSeconds($0) } ?? 0
                 guard !Task.isCancelled else { return }
-                if isPlayable {
-                    print("[PlayerKit] preload metadata ready mediaID=\(managed.item.asset.duration.seconds)s")
+                if isPlayable, duration > 0 {
+                    print("[PlayerKit] preload metadata ready mediaID=\(item.id) slot=\(slot) duration=\(String(format: "%.1f", duration))s playable=\(isPlayable)")
                 } else {
-                    print("[PlayerKit] preload metadata failed mediaID=\(item.id)")
+                    print("[PlayerKit] preload metadata failed mediaID=\(item.id) slot=\(slot) playable=\(isPlayable) duration=\(String(format: "%.1f", duration))s")
                 }
             }
-            if let idx = slots.firstIndex(where: { $0?.generation == generation }) {
-                slots[idx]?.tasks.append(loadTask)
-            }
+            slots[idx]?.tasks.append(loadTask)
         }
         guard generation > 0 else { player.pause(); return }
         completion(.success(player))
