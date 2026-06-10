@@ -50,6 +50,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var itemStatusObs: NSKeyValueObservation?
     // 预加载升 current 的超时检测
     private var readinessTimeoutTask: Task<Void, Never>?
+    // 单个媒体只做一次直连降级，避免坏缓存和坏网络之间反复重建
+    private var directFallbackMediaIDs = Set<String>()
 
     init() {
         recoveryController.engine = self
@@ -282,6 +284,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
         recoveryController.detachObservers()
         recoveryController.attachObservers(to: player)
+        setupItemStatusKVO(player)
 
         if autoplay, wantsPlayback {
             player.play()
@@ -427,6 +430,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
                     self.setupItemStatusKVO(player)
                     if self.wantsPlayback { player.play(); self.state = .playing }
                 } else {
+                    if !self.directFallbackMediaIDs.contains(cur.id) {
+                        self.directFallbackMediaIDs.insert(cur.id)
+                        self.log("itemStatusKVO: 降级直连重建 id=\(cur.id)")
+                        self.rebuildCurrentItem(autoplay: true)
+                        return
+                    }
                     self.recoveryController.detachObservers()
                     self.recoveryController.snapshot()
                     self.recoveryController.attemptRecovery()
