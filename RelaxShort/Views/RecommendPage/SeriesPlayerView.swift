@@ -165,7 +165,12 @@ struct SeriesPlayerView: View {
         playerEngine.prepare(items: items, index: startIndex)
         if let resumeTime, resumeTime > 0 {
             Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 250_000_000)
+                // 等待 item readyToPlay 后再 seek，不用固定延迟
+                let deadline = Date().addingTimeInterval(3)
+                while let item = playerEngine.currentPlayer?.currentItem,
+                      item.status != .readyToPlay, Date() < deadline {
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
                 playerEngine.seekTime(resumeTime)
             }
         }

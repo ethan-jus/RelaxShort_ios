@@ -93,6 +93,19 @@ struct PlayerProgress {
     var bufferProgress: Double = 0
 }
 
+// MARK: - 播放器页面衔接上下文
+
+struct PlayerHandoffContext {
+    let mediaID: String
+    let dramaID: String?
+    let episodeNumber: Int?
+    let resumeTime: TimeInterval
+    let duration: TimeInterval
+    let wasPlaying: Bool
+    let coverURL: String
+    let createdAt: Date
+}
+
 // MARK: - 字幕 Cue
 
 struct PlayerSubtitleCue: Sendable {

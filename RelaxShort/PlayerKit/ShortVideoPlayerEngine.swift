@@ -42,6 +42,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     // TTFF 计时
     private var ttffStart: Double = 0
+    // move TTFF 计时
+    private var moveTTFFStart: Double = 0
+    // cache warm task
+    private var warmCacheTask: Task<Void, Never>?
     // item status KVO
     private var itemStatusObs: NSKeyValueObservation?
     // 预加载升 current 的超时检测
@@ -107,6 +111,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         ttffStart = CACurrentMediaTime()
 
         log("move: \(oldIndex)→\(index) gen=\(gen)")
+        moveTTFFStart = CACurrentMediaTime()
 
         slotPool.move(from: oldIndex, to: index, items: items, generation: gen) { [weak self] result in
             guard let self, self.generation == gen else {
@@ -199,6 +204,20 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
+    /// 生成页面衔接上下文（For You → Series handoff）
+    func makeHandoffContext(dramaID: String? = nil, episodeNumber: Int? = nil) -> PlayerHandoffContext {
+        return PlayerHandoffContext(
+            mediaID: currentItem?.id ?? "unknown",
+            dramaID: dramaID,
+            episodeNumber: episodeNumber,
+            resumeTime: progress.currentTime,
+            duration: progress.duration,
+            wasPlaying: state == .playing,
+            coverURL: currentItem?.coverURL ?? "",
+            createdAt: Date()
+        )
+    }
+
     func selectQuality(_ option: PlayerQualityOption?) {
         guard let _ = currentPlayer, let item = currentPlayer?.currentItem else { return }
         if let bitrate = option?.bitrate, bitrate > 0 {
@@ -211,7 +230,11 @@ final class ShortVideoPlayerEngine: ObservableObject {
     func markReadyForDisplay() {
         guard !isReadyForDisplay else { return }
         isReadyForDisplay = true
-        log("isReadyForDisplay = true")
+        if moveTTFFStart > 0 {
+            let ms = (CACurrentMediaTime() - moveTTFFStart) * 1000
+            log("moveTTFF: \(String(format: "%.0f", ms))ms")
+            moveTTFFStart = 0
+        }
     }
 
     func updateState(_ newState: PlayerPlaybackState) {
@@ -358,6 +381,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
         state = .ready
         log("attach: status=\(statusString(player.currentItem?.status)) timeControl=\(tcsString(player.timeControlStatus))")
 
+        // 后台 warm cache：对 MP4 source 预热首段数据
+        if let item = currentItem { startWarmCache(for: item) }
+
         // 如果有播放意图，attach 后立即播放
         if wantsPlayback {
             player.play()
@@ -449,8 +475,23 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
+    /// 后台 warm cache：对 MP4 source 预热首段数据（512KB）
+    private func startWarmCache(for item: PlayerMediaItem) {
+        guard case .mp4(let url) = item.source else { return }
+        warmCacheTask?.cancel()
+        warmCacheTask = Task(priority: .background) { [weak self] in
+            var req = URLRequest(url: url)
+            req.setValue("bytes=0-524287", forHTTPHeaderField: "Range") // 512KB
+            guard let (data, _) = try? await URLSession.shared.data(for: req),
+                  !Task.isCancelled else { return }
+            HTTPRangeMediaCache.shared.write(data: data, for: url, range: 0...524287, len: nil, mime: "video/mp4")
+            self?.log("warmCache: wrote 0-524287 for \(url.lastPathComponent)")
+        }
+    }
+
     private func cancelAllPreloadTasks() {
         readinessTimeoutTask?.cancel(); readinessTimeoutTask = nil
+        warmCacheTask?.cancel(); warmCacheTask = nil
         for task in preloadTasks { task.cancel() }
         preloadTasks.removeAll()
     }
