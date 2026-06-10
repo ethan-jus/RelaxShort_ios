@@ -69,9 +69,6 @@ final class PlayerSlotPool {
                     print("[PlayerKit] preload metadata failed mediaID=\(item.id) slot=\(slot) playable=\(isPlayable) duration=\(String(format: "%.1f", duration))s")
                 }
             }
-            player.preroll(atRate: 1.0) { ok in
-                print("[PlayerKit] preload preroll mediaID=\(item.id) slot=\(slot) ok=\(ok)")
-            }
             slots[idx]?.tasks.append(loadTask)
         }
         guard generation > 0 else { player.pause(); return }
