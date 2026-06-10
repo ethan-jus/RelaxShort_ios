@@ -33,21 +33,21 @@ struct SpeedHUDView: View {
     }
 
     private func triangleOpacity(index: Int, phase: Double) -> Double {
-        let fade = 0.1
-        let hideStart = [0.16, 0.34, 0.52][index]
-        let revealStart = 0.72
-        let revealEnd = 0.94
-
-        if phase >= revealEnd || phase < hideStart {
-            return 1
-        }
-
-        if phase < hideStart + fade {
-            return 1 - smoothStep((phase - hideStart) / fade)
-        }
+        let fadeOut = 0.13
+        let hideStart = [0.0, 0.22, 0.44][index]
+        let revealStart = 0.68
+        let revealEnd = 0.98
 
         if phase >= revealStart {
             return smoothStep((phase - revealStart) / (revealEnd - revealStart))
+        }
+
+        if phase < hideStart {
+            return 1
+        }
+
+        if phase < hideStart + fadeOut {
+            return 1 - smoothStep((phase - hideStart) / fadeOut)
         }
 
         return 0
