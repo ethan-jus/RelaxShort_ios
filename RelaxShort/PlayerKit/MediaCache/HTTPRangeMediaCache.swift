@@ -53,6 +53,17 @@ final class HTTPRangeMediaCache {
         return result
     }
     func pruneIfNeeded() { q.async { [weak self] in self?.prune() } }
+    /// 已缓存区间列表（debug 用）
+    func cachedRanges(for url: URL) -> [ClosedRange<Int64>] {
+        lock.lock(); let ranges = meta[key(url)]?.ranges.compactMap { parseRange($0) } ?? []; lock.unlock()
+        return ranges
+    }
+    /// 缓存摘要（debug 用）
+    func debugSummary(for url: URL) -> String {
+        let ranges = cachedRanges(for: url)
+        let totalCached = ranges.reduce(0) { $0 + ($1.upperBound - $1.lowerBound + 1) }
+        return "[cache] \(url.lastPathComponent): \(ranges.count) ranges, \(totalCached) bytes"
+    }
     private func key(_ u: URL) -> String { u.absoluteString.data(using: .utf8)?.base64EncodedString() ?? u.lastPathComponent }
     private func file(_ k: String, _ r: ClosedRange<Int64>) -> URL { root.appendingPathComponent("\(k)_\(r.lowerBound)_\(r.upperBound)") }
     private func update(_ k: String, url: URL, range: ClosedRange<Int64>, len: Int64?, mime: String?) {

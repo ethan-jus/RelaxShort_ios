@@ -150,11 +150,11 @@ struct RecommendView: View {
                         isPresented: $showAbout,
                         onWatchFullSeries: {
                             showAbout = false
-                            session.engine.pause(reason: .system)
+                            let handoff = session.engine.makeHandoffContext(dramaID: drama.id, episodeNumber: max(1, drama.currentEpisode))
                             appStore.navigationTarget = SeriesPlayerNav(
                                 drama: drama,
                                 startEpisode: max(1, drama.currentEpisode),
-                                resumeTime: session.engine.progress.currentTime
+                                handoff: handoff
                             )
                         }
                     )
@@ -271,12 +271,11 @@ struct RecommendView: View {
 
                     // 使用按钮显式跳转，避免手势层抢占点击
                     Button {
-                        let resumeTime = session.engine.progress.currentTime
-                        session.engine.pause(reason: .system)
+                        let handoff = session.engine.makeHandoffContext(dramaID: drama.id, episodeNumber: max(1, drama.currentEpisode))
                         appStore.navigationTarget = SeriesPlayerNav(
                             drama: drama,
                             startEpisode: max(1, drama.currentEpisode),
-                            resumeTime: resumeTime
+                            handoff: handoff
                         )
                     } label: {
                         Text("Watch Full Series")

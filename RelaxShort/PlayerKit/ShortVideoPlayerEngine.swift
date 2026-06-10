@@ -481,11 +481,26 @@ final class ShortVideoPlayerEngine: ObservableObject {
         warmCacheTask?.cancel()
         warmCacheTask = Task(priority: .background) { [weak self] in
             var req = URLRequest(url: url)
-            req.setValue("bytes=0-524287", forHTTPHeaderField: "Range") // 512KB
-            guard let (data, _) = try? await URLSession.shared.data(for: req),
+            let requestedRange: ClosedRange<Int64> = 0...524287 // 512KB
+            req.setValue("bytes=\(requestedRange.lowerBound)-\(requestedRange.upperBound)", forHTTPHeaderField: "Range")
+            guard let (data, response) = try? await URLSession.shared.data(for: req),
                   !Task.isCancelled else { return }
-            HTTPRangeMediaCache.shared.write(data: data, for: url, range: 0...524287, len: nil, mime: "video/mp4")
-            self?.log("warmCache: wrote 0-524287 for \(url.lastPathComponent)")
+            // 校验 HTTP 206 / Content-Range
+            let httpResp = response as? HTTPURLResponse
+            if httpResp?.statusCode == 206 {
+                let actualRange = httpResp?.value(forHTTPHeaderField: "Content-Range")
+                    .flatMap { $0.components(separatedBy: "/").first }
+                    .flatMap { $0.replacingOccurrences(of: "bytes ", with: "") }
+                let len = Int64(httpResp?.expectedContentLength ?? Int64(data.count))
+                let writeRange: ClosedRange<Int64> = requestedRange  // 使用请求的 range
+                HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: len, mime: "video/mp4")
+                self?.log("warmCache: wrote \(writeRange.lowerBound)-\(writeRange.upperBound) len=\(data.count) status=206")
+            } else if httpResp?.statusCode == 200 {
+                // 服务器忽略 Range，只写实际返回长度
+                let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
+                HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: Int64(data.count), mime: "video/mp4")
+                self?.log("warmCache: wrote 0-\(data.count-1) status=200 (server ignored Range)")
+            }
         }
     }
 

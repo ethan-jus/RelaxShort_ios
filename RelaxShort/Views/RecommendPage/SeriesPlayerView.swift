@@ -7,7 +7,7 @@ struct SeriesPlayerView: View {
 
     let drama: DramaItem
     let startEpisode: Int
-    let resumeTime: TimeInterval?
+    let handoff: PlayerHandoffContext?
 
     @State private var currentEpisode: Int
     @State private var dragOffset: CGFloat = 0
@@ -25,11 +25,11 @@ struct SeriesPlayerView: View {
 
     private var totalEpisodes: Int
 
-    init(drama: DramaItem, startEpisode: Int? = nil, resumeTime: TimeInterval? = nil) {
+    init(drama: DramaItem, startEpisode: Int? = nil, handoff: PlayerHandoffContext? = nil) {
         self.drama = drama
         self.totalEpisodes = drama.episodeCount
         self.startEpisode = startEpisode ?? max(1, drama.currentEpisode)
-        self.resumeTime = resumeTime
+        self.handoff = handoff
         self._currentEpisode = State(initialValue: self.startEpisode)
     }
 
@@ -163,15 +163,32 @@ struct SeriesPlayerView: View {
         }
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerEngine.prepare(items: items, index: startIndex)
-        if let resumeTime, resumeTime > 0 {
+        if let handoff, handoff.resumeTime > 0 {
+            // 使用 KVO 等待 item ready，不用轮询
             Task { @MainActor in
-                // 等待 item readyToPlay 后再 seek，不用固定延迟
-                let deadline = Date().addingTimeInterval(3)
-                while let item = playerEngine.currentPlayer?.currentItem,
-                      item.status != .readyToPlay, Date() < deadline {
-                    try? await Task.sleep(nanoseconds: 100_000_000)
+                guard let player = playerEngine.currentPlayer else { return }
+                // 如果 item 已 ready，直接 seek
+                if player.currentItem?.status == .readyToPlay {
+                    playerEngine.seekTime(handoff.resumeTime)
+                    if handoff.wasPlaying { playerEngine.play() }
+                    return
                 }
-                playerEngine.seekTime(resumeTime)
+                // 否则用 KVO 等待
+                var obs: NSKeyValueObservation?
+                obs = player.currentItem?.observe(\.status, options: [.new]) { item, _ in
+                    if item.status == .readyToPlay {
+                        Task { @MainActor in
+                            playerEngine.seekTime(handoff.resumeTime)
+                            if handoff.wasPlaying { playerEngine.play() }
+                        }
+                        obs?.invalidate()
+                    }
+                }
+                // 3 秒超时保护
+                Task {
+                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    obs?.invalidate()
+                }
             }
         }
         playerEngine.play()

@@ -95,7 +95,7 @@ struct PlayerProgress {
 
 // MARK: - 播放器页面衔接上下文
 
-struct PlayerHandoffContext {
+struct PlayerHandoffContext: Hashable {
     let mediaID: String
     let dramaID: String?
     let episodeNumber: Int?

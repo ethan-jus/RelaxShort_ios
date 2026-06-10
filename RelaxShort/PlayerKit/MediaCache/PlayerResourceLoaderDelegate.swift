@@ -41,7 +41,8 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
 
         // 缓存命中
         if let result = cache.cachedData(for: originalURL, range: range) {
-            print("[PlayerKit] cache hit url=\(originalURL.lastPathComponent) range=\(lower)-\(upper) source=\(result.source.rawValue)")
+            let summary = cache.debugSummary(for: originalURL)
+            print("[PlayerKit] cache hit url=\(originalURL.lastPathComponent) range=\(lower)-\(upper) source=\(result.source.rawValue) \(summary)")
             fillContentInfo(
                 loadingRequest.contentInformationRequest,
                 response: nil,

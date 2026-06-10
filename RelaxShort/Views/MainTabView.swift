@@ -38,10 +38,10 @@ struct MainTabView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SeriesPlayerNav.self) { nav in
-                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, resumeTime: nav.resumeTime)
+                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, handoff: nav.handoff)
             }
             .navigationDestination(item: $appStore.navigationTarget) { nav in
-                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, resumeTime: nav.resumeTime)
+                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, handoff: nav.handoff)
             }
             .navigationDestination(isPresented: $appStore.isShowingSearch) {
                 SearchView()
