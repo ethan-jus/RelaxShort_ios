@@ -9,9 +9,13 @@ import Combine
 
 @MainActor final class RecommendSession: ObservableObject {
     /// 共享 engine — 由 PlayerCoordinator 提供，不再自己创建
+    private weak var coordinator: PlayerCoordinator?
     private var _engine: ShortVideoPlayerEngine?
     var engine: ShortVideoPlayerEngine {
-        get { _engine! }
+        get {
+            precondition(_engine != nil, "RecommendSession.engine 必须先绑定 PlayerCoordinator")
+            return _engine!
+        }
         set {
             _engine = newValue
             // 订阅共享 engine 的变化，转发到 session 的 objectWillChange
@@ -26,11 +30,21 @@ import Combine
     @Published var poolVersion = 0
     private var engineSink: AnyCancellable?
 
+    func bind(to coordinator: PlayerCoordinator) {
+        guard self.coordinator !== coordinator else { return }
+        self.coordinator = coordinator
+        engine = coordinator.engine
+    }
+
     func initializePool(dramas: [DramaItem]) {
         guard !dramas.isEmpty else { return }
         let items = dramas.map { $0.toPlayerMediaItem() }
-        engine.prepare(items: items, index: 0)
-        engine.play()
+        if let coordinator {
+            coordinator.claimForYou(items: items, index: 0)
+        } else {
+            engine.prepare(items: items, index: 0)
+            engine.play()
+        }
         hasInitializedPool = true; poolVersion &+= 1
     }
 

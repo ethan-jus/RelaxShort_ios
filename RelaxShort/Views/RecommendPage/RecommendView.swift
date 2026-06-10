@@ -45,7 +45,7 @@ struct RecommendView: View {
     // MARK: - 路由遮挡状态
 
     private var routeBlocksPlayback: Bool {
-        appStore.isShowingSearch || appStore.isShowingMembership || appStore.navigationTarget != nil
+        appStore.isShowingSearch || appStore.isShowingMembership
     }
 
     private var isPlaybackVisible: Bool {
@@ -333,7 +333,7 @@ struct RecommendView: View {
 
     private func loadAndInit() async {
         // 连线：session.engine 指向共享 coordinator.engine
-        session.engine = playerCoordinator.engine
+        session.bind(to: playerCoordinator)
         await viewModel.loadData()
         if isPlaybackVisible {
             initializePlaybackIfNeeded()
@@ -369,6 +369,7 @@ struct RecommendView: View {
     // MARK: - 自动播放配置
 
     private func setupAutoPlay() {
+        session.bind(to: playerCoordinator)
         session.engine.onPlaybackFinished = { [weak engine = session.engine] in
             engine?.pause(reason: .system)
             engine?.seek(to: 0)
@@ -633,10 +634,6 @@ private struct TabLifecycleModifier: ViewModifier {
             .onChange(of: appStore.isShowingMembership) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
                 if isShowing { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
-            }
-            .onChange(of: appStore.navigationTarget) { _, target in
-                guard appStore.selectedTab == .forYou else { return }
-                if target != nil { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
             }
     }
 }
