@@ -13,11 +13,17 @@ import SwiftUI
 /// 避免搜索和播放页导航状态变化导致标签内容失去视图身份。
 struct MainTabView: View {
     @EnvironmentObject var appStore: AppStore
-    @StateObject private var playerCoordinator = PlayerCoordinator()
+    @StateObject private var playerCoordinator: PlayerCoordinator
 
     @StateObject private var homeVM = HomeViewModel(repository: MockHomeRepository())
     @StateObject private var recommendVM = RecommendViewModel(repository: MockHomeRepository())
-    @StateObject private var recommendSession = RecommendSession()
+    @StateObject private var recommendSession: RecommendSession
+
+    init() {
+        let coordinator = PlayerCoordinator()
+        _playerCoordinator = StateObject(wrappedValue: coordinator)
+        _recommendSession = StateObject(wrappedValue: RecommendSession(engine: coordinator.engine))
+    }
 
     var body: some View {
         NavigationStack {

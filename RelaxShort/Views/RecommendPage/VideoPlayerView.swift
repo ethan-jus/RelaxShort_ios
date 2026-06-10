@@ -10,30 +10,30 @@ import Combine
 @MainActor final class RecommendSession: ObservableObject {
     /// 共享 engine — 由 PlayerCoordinator 提供，不再自己创建
     private weak var coordinator: PlayerCoordinator?
-    private var _engine: ShortVideoPlayerEngine?
-    var engine: ShortVideoPlayerEngine {
-        get {
-            precondition(_engine != nil, "RecommendSession.engine 必须先绑定 PlayerCoordinator")
-            return _engine!
-        }
-        set {
-            _engine = newValue
-            // 订阅共享 engine 的变化，转发到 session 的 objectWillChange
-            engineSink?.cancel()
-            engineSink = newValue.objectWillChange.sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-        }
-    }
+    private(set) var engine: ShortVideoPlayerEngine
     @Published var currentIndex = 0
     @Published var hasInitializedPool = false
     @Published var poolVersion = 0
     private var engineSink: AnyCancellable?
 
+    init(engine: ShortVideoPlayerEngine) {
+        self.engine = engine
+        subscribe(to: engine)
+    }
+
     func bind(to coordinator: PlayerCoordinator) {
         guard self.coordinator !== coordinator else { return }
         self.coordinator = coordinator
+        guard engine !== coordinator.engine else { return }
         engine = coordinator.engine
+        subscribe(to: coordinator.engine)
+    }
+
+    private func subscribe(to engine: ShortVideoPlayerEngine) {
+        engineSink?.cancel()
+        engineSink = engine.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     func initializePool(dramas: [DramaItem]) {

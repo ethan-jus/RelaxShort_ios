@@ -1042,7 +1042,10 @@ private struct NotificationPromptView: View {
 
 #if DEBUG
 #Preview("Recommend View") {
-    RecommendView(session: RecommendSession()).environmentObject(AppStore())
+    let coordinator = PlayerCoordinator()
+    RecommendView(session: RecommendSession(engine: coordinator.engine))
+        .environmentObject(AppStore())
+        .environmentObject(coordinator)
 }
 #endif
 }
