@@ -42,11 +42,13 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
         // 缓存命中
         if let result = cache.cachedData(for: originalURL, range: range) {
             let summary = cache.debugSummary(for: originalURL)
+            let metadata = cache.metadata(for: originalURL)
             print("[PlayerKit] cache hit url=\(originalURL.lastPathComponent) range=\(lower)-\(upper) source=\(result.source.rawValue) \(summary)")
             fillContentInfo(
                 loadingRequest.contentInformationRequest,
                 response: nil,
-                totalLength: nil
+                totalLength: metadata.len,
+                mimeType: metadata.mime
             )
             dataRequest.respond(with: result.data)
             loadingRequest.finishLoading()
@@ -91,7 +93,8 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
             self.fillContentInfo(
                 loadingRequest.contentInformationRequest,
                 response: httpResponse,
-                totalLength: totalLength
+                totalLength: totalLength,
+                mimeType: httpResponse?.mimeType
             )
 
             self.cache.write(
@@ -134,11 +137,13 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
     private func fillContentInfo(
         _ info: AVAssetResourceLoadingContentInformationRequest?,
         response: HTTPURLResponse?,
-        totalLength: Int64?
+        totalLength: Int64?,
+        mimeType: String? = nil
     ) {
         guard let info else { return }
         info.isByteRangeAccessSupported = true
-        info.contentType = UTType(filenameExtension: originalURL.pathExtension)?.identifier
+        info.contentType = mimeType.flatMap { UTType(mimeType: $0)?.identifier }
+            ?? UTType(filenameExtension: originalURL.pathExtension)?.identifier
             ?? UTType.mpeg4Movie.identifier
         if let totalLength, totalLength > 0 {
             info.contentLength = totalLength

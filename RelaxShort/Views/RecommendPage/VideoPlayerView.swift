@@ -79,9 +79,10 @@ extension PlayerMediaItem {
 extension DramaItem {
     func toPlayerMediaItem() -> PlayerMediaItem {
         let source: PlayerMediaSource = videoURL.flatMap(URL.init).map { .mp4($0) } ?? .mp4(URL(string: "about:blank")!)
+        let episodeNumber = max(1, currentEpisode)
         return PlayerMediaItem(
-            id: PlayerMediaItem.stableID(dramaID: id, episodeNumber: currentEpisode),
-            title: title, episodeNumber: currentEpisode,
+            id: PlayerMediaItem.stableID(dramaID: id, episodeNumber: episodeNumber),
+            title: title, episodeNumber: episodeNumber,
             coverURL: coverURL, source: source, resumeTime: nil
         )
     }

@@ -97,9 +97,10 @@ final class PlayerSlotPool {
                 print("[PlayerKit] preload hit idx=\(newIndex) slot=current reuse=true")
                 completion(.success(ctx.player))
             } else if ctx.mediaID == items[newIndex].id {
-                // 预加载缓存 item → 先复用，不重建；超时或 failed 由 engine KVO 处理
-                print("[PlayerKit] preload hit idx=\(newIndex) slot=current reuse=cache")
-                completion(.success(ctx.player))
+                // 缓存代理 item 目前只做后台预热，不能直接升主播放链路。
+                // AVPlayer 可能只请求 0-1 探测字节，直接复用会把 current 变成 failed item。
+                print("[PlayerKit] preload warm idx=\(newIndex) slot=current rebuild=direct")
+                prepare(item: items[newIndex], slot: .current, generation: generation, completion: completion)
             } else {
                 print("[PlayerKit] preload miss idx=\(newIndex) reason=id-mismatch")
                 prepare(item: items[newIndex], slot: .current, generation: generation, completion: completion)

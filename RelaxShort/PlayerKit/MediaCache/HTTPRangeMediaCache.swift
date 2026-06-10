@@ -11,6 +11,7 @@ final class HTTPRangeMediaCache {
     private let lock = NSLock()
     enum CacheHitSource: String { case exact, contained }
     struct CacheReadResult { let data: Data; let source: CacheHitSource }
+    struct CacheMetadata { let len: Int64?; let mime: String? }
     struct CM: Codable { var url: String = ""; var len: Int64?; var mime: String?; var ranges: [String] = []; var access: Date = Date() }
 
     init() {
@@ -51,6 +52,12 @@ final class HTTPRangeMediaCache {
         let result = meta[key(url)]?.ranges.isEmpty == false
         lock.unlock()
         return result
+    }
+    func metadata(for url: URL) -> CacheMetadata {
+        lock.lock()
+        let m = meta[key(url)]
+        lock.unlock()
+        return CacheMetadata(len: m?.len, mime: m?.mime)
     }
     func pruneIfNeeded() { q.async { [weak self] in self?.prune() } }
     /// 已缓存区间列表（debug 用）
