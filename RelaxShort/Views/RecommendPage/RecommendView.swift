@@ -524,6 +524,9 @@ struct RecommendView: View {
             }
 
             ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.001))
+                    .frame(height: isScrubbing ? 36 : 32)
                 Capsule().fill(Color.white.opacity(0.25)).frame(height: effectiveHeight)
                 Capsule().fill(Color.white.opacity(0.18))
                     .frame(width: max(0, barWidth * CGFloat(buffered)), height: effectiveHeight)
@@ -537,9 +540,9 @@ struct RecommendView: View {
                         .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - 7)
                 }
             }
-            .frame(height: isScrubbing ? 32 : 28, alignment: .center)
+            .frame(width: barWidth, height: isScrubbing ? 36 : 32, alignment: .center)
             .contentShape(Rectangle())
-            .simultaneousGesture(
+            .highPriorityGesture(
                 SpatialTapGesture()
                     .onEnded { value in
                         guard !isScrubbing, session.engine.progress.duration > 0 else { return }
@@ -547,7 +550,7 @@ struct RecommendView: View {
                         session.engine.seek(to: Double(clamped))
                     }
             )
-            .highPriorityGesture(
+            .simultaneousGesture(
                 LongPressGesture(minimumDuration: 0.28)
                     .sequenced(before: DragGesture(minimumDistance: 0))
                     .onChanged { value in
