@@ -82,6 +82,44 @@ enum PlayerItemFactory {
         }
     }
 
+    static func hlsURL(from source: PlayerMediaSource) -> URL? {
+        switch source {
+        case .hls(let masterURL), .hlsWithFallback(let masterURL, _):
+            return masterURL
+        case .mp4, .mp4WithExternalSubtitles, .mp4WithEmbeddedSubtitles:
+            return nil
+        }
+    }
+
+    static func sourceKind(_ source: PlayerMediaSource) -> String {
+        switch source {
+        case .mp4:
+            return "MP4"
+        case .mp4WithExternalSubtitles:
+            return "MP4+外挂字幕"
+        case .mp4WithEmbeddedSubtitles:
+            return "MP4+内封字幕"
+        case .hls:
+            return "HLS"
+        case .hlsWithFallback:
+            return "HLS+MP4 fallback"
+        }
+    }
+
+    static func playbackStrategyDescription(for source: PlayerMediaSource) -> String {
+        if let url = mp4URL(from: source) {
+            let leadingBytes = HTTPRangeMediaCache.shared.leadingCachedBytes(for: url)
+            let mode = HTTPRangeMediaCache.shared.hasPlayableLeadCache(for: url, minimumBytes: minimumPlayableLeadCacheBytes)
+                ? "cache-proxy"
+                : "direct+warmed-cache"
+            return "\(mode) lead=\(leadingBytes)"
+        }
+        if hlsURL(from: source) != nil {
+            return "native-hls"
+        }
+        return "direct"
+    }
+
     /// 读取内封字幕（异步）
     static func embeddedSubtitles(from asset: AVAsset) async -> [PlayerSubtitleOption] {
         guard let group = try? await asset.loadMediaSelectionGroup(for: .legible) else { return [] }

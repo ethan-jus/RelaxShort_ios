@@ -18,6 +18,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     @Published private(set) var availableSubtitles: [PlayerSubtitleOption] = []
     @Published var selectedSubtitleID: String?
     @Published var isReadyForDisplay: Bool = false
+    @Published private(set) var diagnostics = PlayerDiagnostics()
 
     var metrics = PlayerMetricsLogger()
     var onPlaybackFinished: (() -> Void)?
@@ -70,6 +71,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         currentItem = items[index]
 
         state = .preparing
+        updateDiagnostics(for: items[index], stateText: "prepare")
         resetProgress()
         resetReadyState()
         generation &+= 1
@@ -106,6 +108,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         currentItem = items[index]
 
         state = .preparing
+        updateDiagnostics(for: items[index], stateText: "move")
         resetProgress()
         resetReadyState()
         generation &+= 1
@@ -247,8 +250,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
     func markReadyForDisplay() {
         guard !isReadyForDisplay else { return }
         isReadyForDisplay = true
+        diagnostics.stateText = "first-frame"
         if moveTTFFStart > 0 {
             let ms = (CACurrentMediaTime() - moveTTFFStart) * 1000
+            diagnostics.moveTTFFMs = ms
             log("moveTTFF: \(String(format: "%.0f", ms))ms")
             moveTTFFStart = 0
         }
@@ -447,13 +452,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private func preloadAdjacent(gen: Int) {
         let nextIdx = currentIndex + 1
         if nextIdx < items.count {
-            log("preload: start next=\(nextIdx)")
+        log("preload: start next=\(nextIdx)")
             let task = Task { [weak self] in
                 guard let self else { return }
                 self.slotPool.prepare(item: self.items[nextIdx], slot: .next, generation: gen) { _ in }
             }
             preloadTasks.append(task)
+            diagnostics.preloadState = "next:\(items[nextIdx].id)"
             startWarmCache(for: items[nextIdx], byteCount: 1_048_576, reason: "next")
+            startHLSWarmIfNeeded(for: items[nextIdx], reason: "next")
         }
         let prevIdx = currentIndex - 1
         if prevIdx >= 0 {
@@ -502,6 +509,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         guard let url = PlayerItemFactory.mp4URL(from: item.source) else { return }
         if HTTPRangeMediaCache.shared.hasPlayableLeadCache(for: url, minimumBytes: byteCount) {
             log("warmCache skipped reason=\(reason) already-ready leading=\(HTTPRangeMediaCache.shared.leadingCachedBytes(for: url))")
+            diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url)
             return
         }
         warmCacheTask?.cancel()
@@ -532,16 +540,35 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 let actualRange = lo...hi
                 let totalLen = contentRange.components(separatedBy: "/").last.flatMap(Int64.init)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: actualRange, len: totalLen, mime: "video/mp4")
+                await MainActor.run { self?.diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url) }
                 self?.log("warmCache reason=\(reason) wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen?.description ?? "unknown")")
             } else if httpResp?.statusCode == 200 {
                 guard !data.isEmpty else { self?.log("warmCache skipped reason=\(reason) 200 empty data"); return }
                 let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: Int64(data.count), mime: "video/mp4")
+                await MainActor.run { self?.diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url) }
                 self?.log("warmCache reason=\(reason) wrote 0-\(data.count-1) status=200")
             } else {
                 self?.log("warmCache skipped reason=\(reason) status=\(httpResp?.statusCode ?? 0)")
             }
         }
+    }
+
+    /// HLS 不走自研 Range 缓存，先用 AVFoundation 异步预热 master/媒体选择信息
+    private func startHLSWarmIfNeeded(for item: PlayerMediaItem, reason: String) {
+        guard let url = PlayerItemFactory.hlsURL(from: item.source) else { return }
+        let task = Task(priority: .utility) { [weak self] in
+            let asset = AVURLAsset(url: url)
+            let playable = (try? await asset.load(.isPlayable)) == true
+            _ = try? await asset.load(.duration)
+            _ = try? await asset.loadMediaSelectionGroup(for: .legible)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                self?.diagnostics.preloadState = playable ? "hls \(reason):ready" : "hls \(reason):not-playable"
+                self?.log("hlsWarm reason=\(reason) playable=\(playable) url=\(url.lastPathComponent)")
+            }
+        }
+        preloadTasks.append(task)
     }
 
     private func cancelAllPreloadTasks() {
@@ -553,7 +580,20 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     private func logTTFF() {
         let ms = (CACurrentMediaTime() - ttffStart) * 1000
+        diagnostics.ttffMs = ms
         metrics.logTTFF(ms)
+    }
+
+    private func updateDiagnostics(for item: PlayerMediaItem, stateText: String) {
+        diagnostics.mediaID = item.id
+        diagnostics.sourceKind = PlayerItemFactory.sourceKind(item.source)
+        diagnostics.playbackStrategy = PlayerItemFactory.playbackStrategyDescription(for: item.source)
+        diagnostics.stateText = stateText
+        if let url = PlayerItemFactory.mp4URL(from: item.source) {
+            diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url)
+        } else {
+            diagnostics.cacheSummary = "HLS: system streaming cache"
+        }
     }
 
     // MARK: - 时间观察者

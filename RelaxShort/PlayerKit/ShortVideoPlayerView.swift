@@ -64,6 +64,15 @@ struct ShortVideoPlayerView: View {
                         .padding(.bottom, 60)
                 }
             }
+
+            #if DEBUG
+            if isActive, PlayerDiagnosticsOverlay.isEnabled {
+                PlayerDiagnosticsOverlay(diagnostics: engine.diagnostics)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.top, 70)
+                    .padding(.leading, 12)
+            }
+            #endif
         }
         .task { await imageLoader.load(coverURL) }
     }
@@ -164,3 +173,40 @@ private final class PlayerLayerUIView: UIView {
         (layer as? AVPlayerLayer)?.frame = bounds
     }
 }
+
+#if DEBUG
+private struct PlayerDiagnosticsOverlay: View {
+    let diagnostics: PlayerDiagnostics
+
+    static var isEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "PlayerKitDebugOverlay")
+            || ProcessInfo.processInfo.arguments.contains("-PlayerKitDebugOverlay")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("PlayerKit")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+            line("id", diagnostics.mediaID)
+            line("src", diagnostics.sourceKind)
+            line("mode", diagnostics.playbackStrategy)
+            line("pre", diagnostics.preloadState)
+            line("ttff", "\(Int(diagnostics.ttffMs)) / move \(Int(diagnostics.moveTTFFMs)) ms")
+            line("cache", diagnostics.cacheSummary)
+            line("state", diagnostics.stateText)
+        }
+        .font(.system(size: 9, weight: .medium, design: .monospaced))
+        .foregroundColor(.white)
+        .lineLimit(1)
+        .padding(8)
+        .frame(maxWidth: 260, alignment: .leading)
+        .background(Color.black.opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .allowsHitTesting(false)
+    }
+
+    private func line(_ key: String, _ value: String) -> some View {
+        Text("\(key): \(value)")
+    }
+}
+#endif

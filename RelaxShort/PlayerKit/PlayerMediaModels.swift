@@ -93,6 +93,19 @@ struct PlayerProgress {
     var bufferProgress: Double = 0
 }
 
+// MARK: - 播放诊断
+
+struct PlayerDiagnostics: Equatable {
+    var mediaID: String = "-"
+    var sourceKind: String = "-"
+    var playbackStrategy: String = "-"
+    var preloadState: String = "-"
+    var cacheSummary: String = "-"
+    var ttffMs: Double = 0
+    var moveTTFFMs: Double = 0
+    var stateText: String = "-"
+}
+
 // MARK: - 播放器页面衔接上下文
 
 struct PlayerHandoffContext: Hashable {
