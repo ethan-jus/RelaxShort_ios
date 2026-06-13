@@ -499,7 +499,11 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     /// 后台 warm cache：当前视频播放链路不走这里，只为下一条提前缓存首段
     private func startWarmCache(for item: PlayerMediaItem, byteCount: Int64, reason: String) {
-        guard case .mp4(let url) = item.source else { return }
+        guard let url = PlayerItemFactory.mp4URL(from: item.source) else { return }
+        if HTTPRangeMediaCache.shared.hasPlayableLeadCache(for: url, minimumBytes: byteCount) {
+            log("warmCache skipped reason=\(reason) already-ready leading=\(HTTPRangeMediaCache.shared.leadingCachedBytes(for: url))")
+            return
+        }
         warmCacheTask?.cancel()
         warmCacheTask = Task(priority: .background) { [weak self] in
             var req = URLRequest(url: url)

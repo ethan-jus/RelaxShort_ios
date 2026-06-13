@@ -6,6 +6,7 @@ import Foundation
 final class HTTPRangeMediaCache {
     static let shared = HTTPRangeMediaCache()
     private let root: URL; private let maxSize: Int64 = 500_000_000
+    private let maxMergedRangeBytes: Int64 = 16_000_000
     private var meta: [String: CM] = [:]; private let metaFile: URL
     private let q = DispatchQueue(label: "com.rs.cache", qos: .utility)
     private let lock = NSLock()
@@ -24,7 +25,10 @@ final class HTTPRangeMediaCache {
         lock.lock(); let cachedRanges = meta[k]?.ranges.compactMap { parseRange($0) } ?? []; lock.unlock()
         let f = file(k, range)
         // 精确匹配
-        if let d = try? Data(contentsOf: f) { return CacheReadResult(data: d, source: .exact) }
+        if let d = try? Data(contentsOf: f) {
+            touch(k)
+            return CacheReadResult(data: d, source: .exact)
+        }
         // 子区间
         for cached in cachedRanges where cached.lowerBound <= range.lowerBound && cached.upperBound >= range.upperBound {
             let f2 = file(k, cached)
@@ -32,6 +36,7 @@ final class HTTPRangeMediaCache {
                 let offset = Int(range.lowerBound - cached.lowerBound)
                 let length = Int(range.upperBound - range.lowerBound + 1)
                 guard offset + length <= full.count else { continue }
+                touch(k)
                 return CacheReadResult(data: full.subdata(in: offset..<(offset + length)), source: .contained)
             }
         }
@@ -40,12 +45,14 @@ final class HTTPRangeMediaCache {
 
     private func parseRange(_ s: String) -> ClosedRange<Int64>? {
         let parts = s.components(separatedBy: "-")
-        guard parts.count == 2, let lo = Int64(parts[0]), let hi = Int64(parts[1]) else { return nil }
+        guard parts.count == 2, let lo = Int64(parts[0]), let hi = Int64(parts[1]), hi >= lo else { return nil }
         return lo...hi
     }
     func write(data: Data, for url: URL, range: ClosedRange<Int64>, len: Int64?, mime: String?) {
-        let k = key(url); let f = file(k, range)
-        q.async { [weak self] in try? data.write(to: f); self?.update(k, url: url, range: range, len: len, mime: mime) }
+        let k = key(url)
+        q.async { [weak self] in
+            self?.writeMerged(data: data, for: url, key: k, range: range, len: len, mime: mime)
+        }
     }
     func hasCache(for url: URL) -> Bool {
         lock.lock()
@@ -90,15 +97,117 @@ final class HTTPRangeMediaCache {
     }
     private func key(_ u: URL) -> String { u.absoluteString.data(using: .utf8)?.base64EncodedString() ?? u.lastPathComponent }
     private func file(_ k: String, _ r: ClosedRange<Int64>) -> URL { root.appendingPathComponent("\(k)_\(r.lowerBound)_\(r.upperBound)") }
+    private func writeMerged(data: Data, for url: URL, key k: String, range: ClosedRange<Int64>, len: Int64?, mime: String?) {
+        guard !data.isEmpty, range.upperBound >= range.lowerBound else { return }
+        let incomingLength = range.upperBound - range.lowerBound + 1
+        guard incomingLength == Int64(data.count) else { return }
+
+        let existingRanges = cachedRanges(for: url)
+        var mergedRange = range
+        var mergeable: [ClosedRange<Int64>] = []
+        var changed = true
+
+        while changed {
+            changed = false
+            for existing in existingRanges where !mergeable.contains(existing) {
+                let candidate = min(mergedRange.lowerBound, existing.lowerBound)...max(mergedRange.upperBound, existing.upperBound)
+                let candidateLength = candidate.upperBound - candidate.lowerBound + 1
+                let existingLength = existing.upperBound - existing.lowerBound + 1
+                guard rangesTouchOrOverlap(mergedRange, existing),
+                      candidateLength <= maxMergedRangeBytes,
+                      existingLength <= Int64(Int.max),
+                      let existingData = try? Data(contentsOf: file(k, existing)),
+                      existingData.count == Int(existingLength) else {
+                    continue
+                }
+                mergedRange = candidate
+                mergeable.append(existing)
+                changed = true
+            }
+        }
+
+        let mergedLength = mergedRange.upperBound - mergedRange.lowerBound + 1
+        guard mergedLength <= maxMergedRangeBytes, mergedLength <= Int64(Int.max) else {
+            let f = file(k, range)
+            do {
+                try data.write(to: f)
+            } catch {
+                return
+            }
+            update(k, url: url, range: range, len: len, mime: mime)
+            return
+        }
+
+        var mergedData = Data(repeating: 0, count: Int(mergedLength))
+        for existing in mergeable {
+            guard let existingData = try? Data(contentsOf: file(k, existing)) else { continue }
+            let start = Int(existing.lowerBound - mergedRange.lowerBound)
+            mergedData.replaceSubrange(start..<(start + existingData.count), with: existingData)
+        }
+
+        let incomingStart = Int(range.lowerBound - mergedRange.lowerBound)
+        mergedData.replaceSubrange(incomingStart..<(incomingStart + data.count), with: data)
+
+        do {
+            try mergedData.write(to: file(k, mergedRange))
+        } catch {
+            return
+        }
+
+        lock.lock()
+        var m = meta[k] ?? CM(); m.url = url.absoluteString
+        let removed = Set(mergeable.map(rangeString))
+        m.ranges.removeAll { removed.contains($0) || $0 == rangeString(range) }
+        let mergedString = rangeString(mergedRange)
+        if !m.ranges.contains(mergedString) { m.ranges.append(mergedString) }
+        m.ranges = normalizedRanges(m.ranges)
+        m.access = Date(); if let len { m.len = len }; if let mime { m.mime = mime }; meta[k] = m
+        saveLocked()
+        lock.unlock()
+
+        for oldRange in mergeable where oldRange != mergedRange {
+            try? FileManager.default.removeItem(at: file(k, oldRange))
+        }
+        if range != mergedRange {
+            try? FileManager.default.removeItem(at: file(k, range))
+        }
+        prune()
+    }
     private func update(_ k: String, url: URL, range: ClosedRange<Int64>, len: Int64?, mime: String?) {
         lock.lock()
         var m = meta[k] ?? CM(); m.url = url.absoluteString
-        let rs = "\(range.lowerBound)-\(range.upperBound)"
+        let rs = rangeString(range)
         if !m.ranges.contains(rs) { m.ranges.append(rs) }
+        m.ranges = normalizedRanges(m.ranges)
         m.access = Date(); if let len { m.len = len }; if let mime { m.mime = mime }; meta[k] = m
         saveLocked()
         lock.unlock()
         prune()
+    }
+    private func touch(_ k: String) {
+        q.async { [weak self] in
+            guard let self else { return }
+            self.lock.lock()
+            if var m = self.meta[k] {
+                m.access = Date()
+                self.meta[k] = m
+                self.saveLocked()
+            }
+            self.lock.unlock()
+        }
+    }
+    private func rangeString(_ range: ClosedRange<Int64>) -> String {
+        "\(range.lowerBound)-\(range.upperBound)"
+    }
+    private func rangesTouchOrOverlap(_ a: ClosedRange<Int64>, _ b: ClosedRange<Int64>) -> Bool {
+        let aUpperTouches = a.upperBound == Int64.max ? Int64.max : a.upperBound + 1
+        let bUpperTouches = b.upperBound == Int64.max ? Int64.max : b.upperBound + 1
+        return a.lowerBound <= bUpperTouches && b.lowerBound <= aUpperTouches
+    }
+    private func normalizedRanges(_ ranges: [String]) -> [String] {
+        ranges.compactMap(parseRange)
+            .sorted { $0.lowerBound < $1.lowerBound }
+            .map(rangeString)
     }
     private func saveLocked() { if let d = try? JSONEncoder().encode(meta) { try? d.write(to: metaFile) } }
     private func save() {
