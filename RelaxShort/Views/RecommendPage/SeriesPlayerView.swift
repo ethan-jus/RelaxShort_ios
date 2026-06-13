@@ -20,6 +20,8 @@ struct SeriesPlayerView: View {
     @State private var episodes: [Episode] = []
     @State private var unlockedEpisodes: Set<Int> = []
     @State private var pendingLockedEpisode: Int?
+    @State private var isUIVisible = true
+    @State private var autoHideTask: Task<Void, Never>?
 
     @EnvironmentObject var playerCoordinator: PlayerCoordinator
 
@@ -40,33 +42,60 @@ struct SeriesPlayerView: View {
             ZStack {
                 episodePager(in: geo)
 
-                LinearGradient(
-                    colors: [.clear, .black.opacity(0.8)],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(height: 280)
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .allowsHitTesting(false)
+                // 全屏手势层（视频上面，UI 下面 — 点击切换 UI 显隐）
+                Color.clear
+                    .contentShape(Rectangle())
+                    .gesture(episodeDragGesture)
+                    .simultaneousGesture(longPressGesture)
+                    .simultaneousGesture(tapPauseGesture)
 
-                bottomBar
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .padding(.leading, DT.Space.pageH)
+                // UI 叠层（可隐藏）
+                if isUIVisible {
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.8)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    .frame(height: 280)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .allowsHitTesting(false)
+
+                    bottomBar
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                        .padding(.leading, DT.Space.pageH)
+                        .padding(.bottom, geo.safeAreaInsets.bottom + 10)
+
+                    seriesBottomOverlay(in: geo)
+
+                    RightActionBar(
+                        isBookmarked: $isBookmarked,
+                        viewCount: drama.formattedViewCount,
+                        onBookmark: { isBookmarked.toggle(); resetAutoHide() },
+                        onShare: { showShare = true },
+                        onEpisodes: { showEpisodeList = true }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(.trailing, DT.Space.pageH)
                     .padding(.bottom, geo.safeAreaInsets.bottom + 10)
+                }
 
-                RightActionBar(
-                    isBookmarked: $isBookmarked,
-                    viewCount: drama.formattedViewCount,
-                    onBookmark: { isBookmarked.toggle() },
-                    onShare: { showShare = true },
-                    onEpisodes: { showEpisodeList = true }
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(.trailing, DT.Space.pageH)
-                .padding(.bottom, geo.safeAreaInsets.bottom + 10)
+                // 中心暂停按钮：仅在播放中且 UI 可见时显示（暂停态由 ShortVideoPlayerView 自带按钮处理）
+                if isUIVisible, playerCoordinator.engine.state == .playing {
+                    Button {
+                        playerCoordinator.engine.pause(reason: .user)
+                    } label: {
+                        Image(systemName: "pause.fill")
+                            .font(.system(size: 36, weight: .medium))
+                            .foregroundColor(.white)
+                            .frame(width: 72, height: 72)
+                            .background(Circle().fill(Color.black.opacity(0.42)))
+                    }
+                    .zIndex(40)
+                }
 
                 if showSpeedHUD {
                     SpeedHUDView()
-                        .transition(.scale.combined(with: .opacity))
+                        .position(x: geo.size.width / 2, y: geo.size.height * 0.16)
+                        .transition(.opacity)
                 }
 
                 if showEpisodeList {
@@ -124,8 +153,26 @@ struct SeriesPlayerView: View {
             guard !isShowing, let pending = pendingLockedEpisode, isEpisodeLocked(pending) else { return }
             pendingLockedEpisode = nil
         }
+        .onChange(of: playerCoordinator.engine.state) { _, state in
+            if state == .playing { resetAutoHide() }
+            else if state == .pausedByUser { autoHideTask?.cancel() }
+        }
         .onDisappear {
+            autoHideTask?.cancel()
             playerCoordinator.release(.series(dramaID: drama.id))
+        }
+    }
+
+    // MARK: - 自动隐藏
+
+    private func resetAutoHide() {
+        autoHideTask?.cancel()
+        guard playerCoordinator.engine.state == .playing else { return }
+        isUIVisible = true
+        autoHideTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            guard !Task.isCancelled else { return }
+            withAnimation(.easeOut(duration: 0.3)) { isUIVisible = false }
         }
     }
 
@@ -163,6 +210,101 @@ struct SeriesPlayerView: View {
         }
         let startIndex = max(0, min(items.count - 1, currentEpisode - 1))
         playerCoordinator.claimSeries(drama: drama, items: items, startIndex: startIndex, handoff: handoff)
+    }
+
+    // MARK: - 底部信息叠层
+
+    private func seriesBottomOverlay(in geo: GeometryProxy) -> some View {
+        let horizontalPadding: CGFloat = 14
+        let actionRailWidth: CGFloat = 42
+        let actionRailGap: CGFloat = 10
+        let contentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
+        let engine = playerCoordinator.engine
+
+        return VStack(spacing: 0) {
+            Spacer()
+            VStack(alignment: .leading, spacing: 6) {
+                // 标题
+                Text(drama.title)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                // 标签（与 For You 一致：Members Only + Exclusive + 题材）
+                HStack(spacing: 6) {
+                    feedTag("Members Only", bg: DB.gold.opacity(0.25), fg: DB.gold)
+                    feedTag("Exclusive", bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                    feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                }
+                // 简介
+                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
+                + Text(drama.synopsis).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
+                .lineLimit(2)
+                // 进度条
+                seriesProgressBar(totalWidth: contentWidth, engine: engine)
+                    .frame(height: 32)
+            }
+            .frame(width: contentWidth, alignment: .leading)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, 66)
+        }
+    }
+
+    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
+        Text(text).font(.system(size: 12, weight: .medium)).foregroundColor(fg)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(bg).clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+
+    // MARK: - 进度条（带拖动和点击）
+    @State private var seriesScrubFraction: CGFloat = 0
+    @State private var seriesIsScrubbing = false
+    @State private var seriesWasPlayingBeforeScrub = false
+
+    private func seriesProgressBar(totalWidth: CGFloat, engine: ShortVideoPlayerEngine) -> some View {
+        let fraction = engine.progress.duration > 0
+            ? (seriesIsScrubbing ? Double(seriesScrubFraction) : engine.progress.currentTime / engine.progress.duration) : 0
+        let clampedProgress = max(0, min(1, CGFloat(fraction)))
+        let barWidth = totalWidth
+
+        return ZStack(alignment: .leading) {
+            // 触摸区域
+            Rectangle().fill(Color.white.opacity(0.001)).frame(height: 32)
+            // 轨道
+            Capsule().fill(Color.white.opacity(0.25)).frame(height: 2)
+            // 进度
+            Capsule().fill(DT.logoRed)
+                .frame(width: max(2.5, barWidth * clampedProgress), height: 2.5)
+            // 圆头
+            Circle().fill(.white)
+                .frame(width: seriesIsScrubbing ? 14 : 4, height: seriesIsScrubbing ? 14 : 4)
+                .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
+                .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - (seriesIsScrubbing ? 7 : 2))
+        }
+        .frame(width: barWidth, height: 32, alignment: .center)
+        .contentShape(Rectangle())
+        .highPriorityGesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { value in
+                    guard engine.progress.duration > 0 else { return }
+                    if !seriesIsScrubbing {
+                        seriesWasPlayingBeforeScrub = engine.state == .playing
+                    }
+                    seriesIsScrubbing = true
+                    seriesScrubFraction = max(0, min(1, value.location.x / barWidth))
+                }
+                .onEnded { _ in
+                    engine.seek(to: Double(max(0, min(1, seriesScrubFraction))))
+                    if seriesWasPlayingBeforeScrub { engine.play() }
+                    seriesIsScrubbing = false; seriesScrubFraction = 0
+                }
+        )
+        .simultaneousGesture(
+            SpatialTapGesture()
+                .onEnded { value in
+                    guard engine.progress.duration > 0 else { return }
+                    engine.seek(to: Double(max(0, min(1, value.location.x / barWidth))))
+                }
+        )
     }
 
     private func handleEpisodeTransition(from old: Int, to new: Int) {
@@ -220,9 +362,6 @@ struct SeriesPlayerView: View {
         }
         .frame(width: geo.size.width, height: pageHeight)
         .clipped()
-        .gesture(episodeDragGesture)
-        .simultaneousGesture(longPressGesture)
-        .simultaneousGesture(tapPauseGesture)
     }
 
     private func visibleEpisodeIndices() -> [Int] {
@@ -279,11 +418,17 @@ struct SeriesPlayerView: View {
     private var tapPauseGesture: some Gesture {
         TapGesture()
             .onEnded {
-                if playerCoordinator.engine.state == .playing {
-                    playerCoordinator.engine.pause(reason: .user)
-                } else if playerCoordinator.engine.state == .pausedByUser {
+                // 暂停态点击屏幕直接恢复播放，避免透明手势层挡住播放器内置播放按钮。
+                if playerCoordinator.engine.state == .pausedByUser {
                     playerCoordinator.engine.play()
+                    resetAutoHide()
+                    return
                 }
+                // 播放态点击屏幕 → 切换 UI 显隐。
+                withAnimation(.easeOut(duration: 0.25)) {
+                    isUIVisible.toggle()
+                }
+                if isUIVisible { resetAutoHide() }
             }
     }
 

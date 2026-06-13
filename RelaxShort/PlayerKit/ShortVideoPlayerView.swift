@@ -7,8 +7,16 @@ import AVFoundation
 struct ShortVideoPlayerView: View {
     let player: AVPlayer?
     let coverURL: String
+    let isActive: Bool
     @ObservedObject var engine: ShortVideoPlayerEngine
     @StateObject private var imageLoader = ImageLoader()
+
+    init(player: AVPlayer?, coverURL: String, engine: ShortVideoPlayerEngine, isActive: Bool = true) {
+        self.player = player
+        self.coverURL = coverURL
+        self.engine = engine
+        self.isActive = isActive
+    }
 
     var body: some View {
         ZStack {
@@ -34,7 +42,8 @@ struct ShortVideoPlayerView: View {
             }
 
             // 用户暂停：显示播放按钮，不显示封面
-            if engine.state == .pausedByUser {
+            // 只有当前 active player 且首帧就绪时才显示，避免非当前页残留按钮
+            if player != nil, isActive, engine.state == .pausedByUser, engine.isReadyForDisplay {
                 Image(systemName: "play.fill")
                     .font(.system(size: 36, weight: .medium))
                     .foregroundColor(.white)

@@ -109,24 +109,11 @@ struct RecommendView: View {
                 }
 
                 // 固定浮层
-                let searchTopPadding = geo.safeAreaInsets.top + 86
+                let searchTopPadding = geo.safeAreaInsets.top + 66
                 searchBarButton
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(.trailing, 14)
                     .padding(.top, searchTopPadding)
-
-                if session.engine.state == .pausedByUser, session.engine.isReadyForDisplay {
-                    Button { handleVideoTap() } label: {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 36, weight: .medium))
-                            .foregroundColor(.white)
-                            .frame(width: 72, height: 72)
-                            .background(Circle().fill(Color.black.opacity(0.42)))
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.scale.combined(with: .opacity))
-                    .zIndex(40)
-                }
 
                 if showSpeedHUD {
                     SpeedHUDView()
@@ -188,7 +175,8 @@ struct RecommendView: View {
                     ShortVideoPlayerView(
                         player: isCurrent ? session.engine.currentPlayer : nil,
                         coverURL: dramas[idx].coverURL,
-                        engine: session.engine
+                        engine: session.engine,
+                        isActive: isCurrent
                     )
                         .allowsHitTesting(false)
 
@@ -215,7 +203,8 @@ struct RecommendView: View {
         let horizontalPadding: CGFloat = 14
         let actionRailWidth: CGFloat = 42
         let actionRailGap: CGFloat = 10
-        let tabBarAvoidance: CGFloat = 86
+        // 导航栏实际渲染从 safeArea.bottom 开始，内容高 43pt
+        let tabBarAvoidance: CGFloat = 66 //进度条距离底部屏幕高度
         let contentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
 
         return VStack(spacing: 0) {
@@ -384,7 +373,7 @@ struct RecommendView: View {
             NotificationCenter.default.post(name: .showSearch, object: nil)
         } label: {
             Image(systemName: "magnifyingglass")
-                .font(.system(size: 26, weight: .light))
+                .font(.system(size: 24, weight: .regular))
                 .foregroundColor(.white)
                 .shadow(color: .black.opacity(0.28), radius: 3, x: 0, y: 1)
                 .frame(width: 42, height: 42)
@@ -494,7 +483,6 @@ struct RecommendView: View {
             ? (isScrubbing ? Double(scrubFraction) : session.engine.progress.currentTime / session.engine.progress.duration)
             : 0
         let buffered = session.engine.progress.bufferProgress
-        let effectiveHeight: CGFloat = isScrubbing ? 8 : 3
         let clampedProgress = max(0, min(1, CGFloat(fraction)))
         let scrubSeconds = Double(clampedProgress) * session.engine.progress.duration
         let showSeekPreview = isScrubbing
@@ -533,65 +521,52 @@ struct RecommendView: View {
                 Rectangle()
                     .fill(Color.white.opacity(0.001))
                     .frame(height: isScrubbing ? 36 : 32)
-                Capsule().fill(Color.white.opacity(0.25)).frame(height: effectiveHeight)
+                // 轨道 2pt / 缓冲 2.5pt / 进度 2.5pt
+                let trackH: CGFloat = isScrubbing ? 8 : 2
+                let activeH: CGFloat = isScrubbing ? 8 : 2.5
+                Capsule().fill(Color.white.opacity(0.25)).frame(height: trackH)
                 Capsule().fill(Color.white.opacity(0.18))
-                    .frame(width: max(0, barWidth * CGFloat(buffered)), height: effectiveHeight)
+                    .frame(width: max(0, barWidth * CGFloat(buffered)), height: activeH)
                 Capsule().fill(DT.logoRed)
-                    .frame(width: max(effectiveHeight, barWidth * clampedProgress), height: effectiveHeight)
-                if isScrubbing {
-                    Circle()
-                        .fill(.white)
-                        .frame(width: 14, height: 14)
-                        .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
-                        .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - 7)
-                }
+                    .frame(width: max(activeH, barWidth * clampedProgress), height: activeH)
+                Circle() //进度条圆头
+                    .fill(.white)
+                    .frame(width: isScrubbing ? 14 : 4, height: isScrubbing ? 14 : 4)
+                    .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
+                    // 白色圆头居中在进度条末端
+                    .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - (isScrubbing ? 7 : 2))
             }
             .frame(width: barWidth, height: isScrubbing ? 36 : 32, alignment: .center)
             .contentShape(Rectangle())
+            // 拖动 → scrub（minimumDistance: 10 区分点击和拖动）
             .highPriorityGesture(
-                SpatialTapGesture()
-                    .onEnded { value in
-                        guard !isScrubbing, session.engine.progress.duration > 0 else { return }
-                        let clamped = max(0, min(1, value.location.x / barWidth))
-                        session.engine.seek(to: Double(clamped))
-                    }
-            )
-            .simultaneousGesture(
-                LongPressGesture(minimumDuration: 0.28)
-                    .sequenced(before: DragGesture(minimumDistance: 0))
+                DragGesture(minimumDistance: 10)
                     .onChanged { value in
                         guard session.engine.progress.duration > 0 else { return }
-                        switch value {
-                        case .second(true, let drag?):
-                            if !isScrubbing {
-                                wasPlayingBeforeScrub = session.engine.state == .playing
-                                if isSpeeding {
-                                    isSpeeding = false
-                                    session.engine.setRate(1.0)
-                                    showSpeedHUD = false
-                                }
-                            }
-                            isScrubbing = true
-                            let x = drag.location.x
-                            scrubFraction = max(0, min(1, x / barWidth))
-                            session.engine.generateThumbnail(at: scrubFraction) { img in scrubThumbnail = img }
-                        default:
-                            break
+                        if !isScrubbing {
+                            wasPlayingBeforeScrub = session.engine.state == .playing
+                            if isSpeeding { isSpeeding = false; session.engine.setRate(1.0); showSpeedHUD = false }
                         }
+                        isScrubbing = true
+                        let x = value.location.x
+                        scrubFraction = max(0, min(1, x / barWidth))
+                        session.engine.generateThumbnail(at: scrubFraction) { img in scrubThumbnail = img }
                     }
+                    .onEnded { _ in
+                        let clamped = max(0, min(1, scrubFraction))
+                        session.engine.seek(to: Double(clamped))
+                        if wasPlayingBeforeScrub { session.engine.play() }
+                        isScrubbing = false; scrubFraction = 0
+                        scrubThumbnail = nil; wasPlayingBeforeScrub = false
+                    }
+            )
+            // 点击 → 直接 seek（带位置）
+            .simultaneousGesture(
+                SpatialTapGesture()
                     .onEnded { value in
-                        if case .second(true, let drag?) = value {
-                            let x = drag.location.x
-                            let clamped = max(0, min(1, x / barWidth))
-                            session.engine.seek(to: Double(clamped))
-                            if wasPlayingBeforeScrub { session.engine.playFromSystemResume() }
-                        }
-                        withAnimation(.easeOut(duration: 0.12)) {
-                            isScrubbing = false
-                        }
-                        scrubFraction = 0
-                        scrubThumbnail = nil
-                        wasPlayingBeforeScrub = false
+                        guard session.engine.progress.duration > 0 else { return }
+                        let clamped = max(0, min(1, value.location.x / barWidth))
+                        session.engine.seek(to: Double(clamped))
                     }
             )
         }
