@@ -25,7 +25,20 @@ struct FeedCardDTO: Decodable {
     let matchedLanguage: String?
     let countryCode: String?
     let fallbackReason: String?
+    /// Task14 后端已补齐的展示字段
+    let viewCount: Int64?
+    let category: String?
+    let regionTag: String?
+    let languageTag: String?
+    let episodeCount: Int?
+    let freeEpisodeRange: FreeEpisodeRangeDTO?
     let recommendationTraceId: String?
+}
+
+/// 对应后端 `free_episode_range` {start, end}
+struct FreeEpisodeRangeDTO: Decodable {
+    let start: Int
+    let end: Int
 }
 
 /// 对应后端 `monetization` Map

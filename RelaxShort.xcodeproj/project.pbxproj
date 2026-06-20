@@ -94,6 +94,7 @@
 		E7FFE811FDC95A4F80C7A654 /* ForYouFeedResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE297A7165A55E68BFCB9FA6 /* ForYouFeedResponseDTO.swift */; };
 		A9AA6BDCE7525C01ABC19F01 /* SeriesEpisodesResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A96C2B4E2AC50B8B17D50FC /* SeriesEpisodesResponseDTO.swift */; };
 		787FEE0511E957E8A50AE0CE /* PlayerMediaSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */; };
+		FB1270575E45544AA548243B /* RealSearchRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E07DF14795E56458A576B7D /* RealSearchRepository.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -193,6 +194,7 @@
 		CE297A7165A55E68BFCB9FA6 /* ForYouFeedResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ForYouFeedResponseDTO.swift"; sourceTree = "<group>"; };
 		5A96C2B4E2AC50B8B17D50FC /* SeriesEpisodesResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SeriesEpisodesResponseDTO.swift"; sourceTree = "<group>"; };
 		D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "PlayerMediaSource.swift"; sourceTree = "<group>"; };
+		3E07DF14795E56458A576B7D /* RealSearchRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealSearchRepository.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -329,6 +331,8 @@
 				7E6FBCCA53315987A7ADE8A3 /* APIResponseEnvelope.swift */,
 				173DC61A9CC85DAEB9CFD0ED /* RealHomeRepository.swift */,
 				065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */,
+			
+				3E07DF14795E56458A576B7D /* RealSearchRepository.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -647,6 +651,8 @@
 				E7FFE811FDC95A4F80C7A654 /* E7FFE811FDC95A4F80C7A654 in Sources */,
 				A9AA6BDCE7525C01ABC19F01 /* A9AA6BDCE7525C01ABC19F01 in Sources */,
 				787FEE0511E957E8A50AE0CE /* 787FEE0511E957E8A50AE0CE in Sources */,
+			
+				FB1270575E45544AA548243B /* FB1270575E45544AA548243B in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
