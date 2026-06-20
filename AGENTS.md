@@ -2,11 +2,18 @@
 
 本文件记录 iOS `ios/v1.0.0` 新会话必须知道、且不能靠代码一眼发现的事实。
 
+## 当前进度
+
+- Task13 已合并到 `main`，iOS 不再是纯 Mock 项目。
+- 已完成 Phase 1 真实 API 闭环：app init → For You 推荐流 → 剧集列表 → 播放地址。
+- Mock/Real 切换通过 `UserDefaults.standard.bool("use_real_api")` 控制，默认仍是 Mock。
+- 后端合同见 `app-server/v2/docs/IOS_API_CONTRACT_V1.md`。
+
 ## 当前目标
 
-- 将 iOS 从纯 Mock Repository 切换到真实后端 `/api/v2/**`。
-- Phase 1 闭环：app init → For You 推荐流 → 剧集列表 → 播放地址。
-- 后端合同见 `app-server/v2/docs/IOS_API_CONTRACT_V1.md`。
+- 补齐真实 API 模式下的 cursor 分页、错误态、播放页清晰度/字幕能力。
+- 等后端补齐 App 卡片字段后，移除 `RealHomeRepository` 中的展示默认值。
+- 在本机 Xcode 环境修复后补跑完整 `xcodebuild`。
 
 ## 架构边界
 
@@ -14,6 +21,7 @@
 - ViewModel 不直接解析后端 DTO。
 - 网络错误不要吞掉；ViewModel 可降级为空态或 Mock fallback，但必须记录日志。
 - Mock/Real 切换通过 `DependencyContainer` + `UserDefaults.standard.bool("use_real_api")` 控制。
+- 当前本机缺少 `CoreSimulator.framework`，`xcodebuild` 会在加载模拟器插件阶段失败；不要把这个环境问题写成代码通过编译。
 
 ## 禁止事项
 
