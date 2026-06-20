@@ -1,11 +1,11 @@
-# Task 13 交付报告：iOS Real API Phase 1
+# Task 13 R2 交付报告：iOS Real API Phase 1 返工
 
 **分支**: `task/task13-ios-real-api-phase1`
 **日期**: 2026-06-21
 
 ## 执行摘要
 
-实现 iOS 从 Mock 到真实 API 首个闭环：app init → For You 推荐流 → 剧集列表 → 播放地址。
+按 `docs/CODEX_REVIEW_TASK13_R1.md` 全部 P0/P1/P2 返工修复。R2 修复了新增文件未加入 Xcode target、UI 路径硬编码 Mock、SeriesPlayerView 未调用 episodePlay、文档缺失、网络错误映射退化等问题。
 
 ## 修改文件清单
 
@@ -79,7 +79,14 @@ defaults write com.relaxshort.ios use_real_api -bool false
 - `Episode.videoURL` 临时填 `preferredPlaybackURL` 兼容现有 `VideoPlayerView`/`PlayerPool`
 - 现有 `AVPlayer(url:)` 播放流程不受影响
 
-## 验证
+## R2 验证
+
+### git diff --check
+
+```bash
+$ git diff --check
+（通过，无 whitespace 错误）
+```
 
 ### xcodebuild
 
@@ -88,19 +95,13 @@ $ xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort \
     -destination 'generic/platform=iOS Simulator' build
 ```
 
-**失败**：本机缺少 `CoreSimulator.framework`（路径 `/Library/Developer/PrivateFrameworks/CoreSimulator.framework` 不存在）。Xcode 命令行工具插件加载失败。
+**失败**（环境限制，与 R1 相同）：本机缺少 `CoreSimulator.framework`。
 
-### 替代检查
+### pbxproj Sources 验证
 
 ```bash
-$ git diff --check
-（通过，无 whitespace 错误）
-
-$ git diff --stat
-（4 modified + 10 new files）
-
-$ git status --short --branch
-## task/task13-ios-real-api-phase1
+$ grep "APIConfig\|AppInitService\|RealHomeRepository\|RealDetailRepository\|AppInitResponseDTO\|ForYouFeedResponseDTO\|SeriesEpisodesResponseDTO\|PlayerMediaSource\|APIResponseEnvelope" project.pbxproj | grep "Sources"
+# 全部 9 个新文件均有 "in Sources" PBXBuildFile
 ```
 
 ## ECC 使用记录
@@ -111,6 +112,16 @@ $ git status --short --branch
 | `/ecc:plan` | ❌ | 同上 |
 | Explore agent（3 个并行） | ✅ | 读取全部 iOS 源码 + 后端合同 |
 | **手工审计替代** | ✅ | 按 CLAUDE.md/AGENTS.md 规则逐文件审查：MainActor、Codable snake_case、DTO/UI Model 分离、Repository 边界、安全默认值 |
+
+## R2 修复清单
+
+| 等级 | 问题 | 修复 |
+|------|------|------|
+| **P0** | 新增 9 个 Swift 文件未加入 Xcode target | Python 脚本写入 `project.pbxproj` PBXBuildFile + PBXFileReference + PBXGroup + PBXSourcesBuildPhase |
+| **P0** | MainTabView 硬编码 MockHomeRepository | 改为读取 `DependencyContainer.useRealAPI` 开关，通过 `init()` 注入 `RealHomeRepository` 或 `MockHomeRepository` |
+| **P0** | SeriesPlayerView 硬编码 MockDetailRepository | 添加 `@EnvironmentObject var dependencies`；`loadEpisodes()` 通过 `dependencies.detailRepository` 加载；真实模式下调用 `fetchPlaybackURL()` 获取当前集播放 URL |
+| **P1** | AGENTS.md/CLAUDE.md/CC_TASK13 缺失 | 恢复 3 个文档 |
+| **P2** | APIClient 网络错误映射退化 | `requestRaw()`/`requestArray()` 恢复 `do { try await session.data() } catch { throw NetworkError.from(error) }` |
 
 ## 未完成事项
 

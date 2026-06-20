@@ -50,7 +50,12 @@ final class APIClient {
     func requestRaw<T: Decodable>(_ endpoint: APIEndpoint) async throws -> T {
         let urlRequest = try buildRequest(for: endpoint)
         logRequest(urlRequest)
-        let (data, response) = try await session.data(for: urlRequest)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: urlRequest)
+        } catch {
+            throw NetworkError.from(error)
+        }
         try validateResponse(response, data: data)
         logResponse(response, data: data)
         do {
@@ -79,7 +84,12 @@ final class APIClient {
     func requestArray<T: Decodable>(_ endpoint: APIEndpoint) async throws -> [T] {
         let urlRequest = try buildRequest(for: endpoint)
         logRequest(urlRequest)
-        let (data, response) = try await session.data(for: urlRequest)
+        let (data, response): (Data, URLResponse)
+        do {
+            (data, response) = try await session.data(for: urlRequest)
+        } catch {
+            throw NetworkError.from(error)
+        }
         try validateResponse(response, data: data)
         logResponse(response, data: data)
         do {
