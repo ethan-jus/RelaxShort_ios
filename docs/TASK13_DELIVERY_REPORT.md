@@ -123,14 +123,22 @@ $ grep "APIConfig\|AppInitService\|RealHomeRepository\|RealDetailRepository\|App
 | **P1** | AGENTS.md/CLAUDE.md/CC_TASK13 缺失 | 恢复 3 个文档 |
 | **P2** | APIClient 网络错误映射退化 | `requestRaw()`/`requestArray()` 恢复 `do { try await session.data() } catch { throw NetworkError.from(error) }` |
 
-## 未完成事项
+## R3 修复清单
+
+| 等级 | 问题 | 修复 |
+|------|------|------|
+| **P0** | Episode.videoURL 是 `let`，SeriesPlayerView 赋值会编译错误 | 改为 `var videoURL: String`（不影响 Codable/Hashable） |
+| **P0** | 真实 For You `episodeCount=0` 进播放器后 `visibleEpisodeIndices()` 边界崩溃 | `totalEpisodes` 改为计算属性 `max(episodes.count, drama.episodeCount)`；`visibleEpisodeIndices()` 加 `guard totalEpisodes > 0` + `guard lo <= hi` |
+| **P1** | 交付报告保留已修复项为"未完成" | 清理过时项（SeriesPlayerView 注入、RecommendViewModel cursor 等已完成） |
+| **P2** | AGENTS/CLAUDE 放错目录 | 移到 iOS 仓库根目录 `ios/v1.0.0/` |
+
+## 当前未完成事项
 
 1. **xcodebuild 编译验证**：本机无 CoreSimulator.framework，需在配备完整 Xcode 环境的机器上验证
-2. **播放页 SeriesPlayerView 未改为调用 RealDetailRepository**：当前仍硬编码 `MockDetailRepository()`，Task13+ 应通过 DependencyContainer 注入
-3. **RecommendViewModel 仍走 `fetchDramas(category:)` 而非独立 `fetchForYou(cursor:)`**：cursor 分页状态需 Task13+ 补充
-4. **后端暂停字段**：`view_count`/`category`/`region_tag`/`language_tag`/`free_episode_range` 暂用默认值
+2. **cursor 分页**：`RecommendViewModel` 调用 `fetchDramas(category:)` 不支持 cursor 分页，需 Task13+ 改用独立 `fetchForYou(cursor:)` 方法
+3. **后端暂停字段**：`view_count`/`category`/`region_tag`/`language_tag`/`free_episode_range` 暂用默认值（Task12 Gap）
 
 ## 下一步建议
 
-- Task13+: 播放页对接 RealDetailRepository，加入 cursor 分页状态
-- Task14: 补后端暂停字段 + iOS RealAdService 接入 reward session
+- Task13+: cursor 分页状态续接 + 播放页高清切换
+- Task14: 补后端展示字段 + iOS RealAdService 接入 reward session

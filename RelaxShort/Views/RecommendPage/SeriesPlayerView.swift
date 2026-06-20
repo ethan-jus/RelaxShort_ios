@@ -34,11 +34,11 @@ struct SeriesPlayerView: View {
     @State private var playerPool = PlayerPool()
     @StateObject private var playerController = PlayerController()
 
-    private var totalEpisodes: Int
+    /// 总集数：从 episodes.count 派生，初始化时用 drama.episodeCount 兜底（可能为 0）
+    private var totalEpisodes: Int { max(episodes.count, drama.episodeCount) }
 
     init(drama: DramaItem, startEpisode: Int? = nil) {
         self.drama = drama
-        self.totalEpisodes = drama.episodeCount
         self.startEpisode = startEpisode ?? max(1, drama.currentEpisode)
         self._currentEpisode = State(initialValue: self.startEpisode)
     }
@@ -229,8 +229,10 @@ struct SeriesPlayerView: View {
     }
 
     private func visibleEpisodeIndices() -> [Int] {
+        guard totalEpisodes > 0 else { return [currentEpisode] }
         let lo = max(1, currentEpisode - 1)
         let hi = min(totalEpisodes, currentEpisode + 1)
+        guard lo <= hi else { return [currentEpisode] }
         return Array(lo...hi)
     }
 
