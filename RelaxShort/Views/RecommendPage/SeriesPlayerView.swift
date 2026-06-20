@@ -17,6 +17,7 @@ struct SeriesPlayerView: View {
 
     let drama: DramaItem
     let startEpisode: Int
+    @EnvironmentObject var dependencies: DependencyContainer
 
     @State private var currentEpisode: Int
     @State private var dragOffset: CGFloat = 0
@@ -33,11 +34,11 @@ struct SeriesPlayerView: View {
     @State private var playerPool = PlayerPool()
     @StateObject private var playerController = PlayerController()
 
-    private var totalEpisodes: Int
+    /// 总集数：从 episodes.count 派生，初始化时用 drama.episodeCount 兜底（可能为 0）
+    private var totalEpisodes: Int { max(episodes.count, drama.episodeCount) }
 
     init(drama: DramaItem, startEpisode: Int? = nil) {
         self.drama = drama
-        self.totalEpisodes = drama.episodeCount
         self.startEpisode = startEpisode ?? max(1, drama.currentEpisode)
         self._currentEpisode = State(initialValue: self.startEpisode)
     }
@@ -142,9 +143,31 @@ struct SeriesPlayerView: View {
     }
 
     private func loadEpisodes() async {
-        let repo = MockDetailRepository()
-        episodes = (try? await repo.fetchEpisodes(dramaId: drama.id)) ?? []
+        let repo = dependencies.detailRepository
+        do {
+            episodes = try await repo.fetchEpisodes(dramaId: drama.id)
+        } catch {
+            Logger.viewModel.error("SeriesPlayerView: fetchEpisodes failed: \(error)")
+            episodes = (try? await MockDetailRepository().fetchEpisodes(dramaId: drama.id)) ?? []
+        }
+        // Task13: 真实模式下为当前集调用 episodePlay 获取播放URL
+        await fetchCurrentEpisodePlaybackURL()
         initializeEpisodePool()
+    }
+
+    /// 通过 RealDetailRepository 获取当前集播放地址，更新 Episode.videoURL。
+    /// 失败时保留已有 URL（来自 episodes 响应或 Mock）。
+    private func fetchCurrentEpisodePlaybackURL() async {
+        guard let repo = dependencies.detailRepository as? RealDetailRepository else { return }
+        guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == currentEpisode }) else { return }
+        do {
+            if let url = try await repo.fetchPlaybackURL(episodeId: episodes[epIndex].id) {
+                episodes[epIndex].videoURL = url
+                Logger.viewModel.info("SeriesPlayerView: fetched playback URL for EP \(currentEpisode)")
+            }
+        } catch {
+            Logger.viewModel.warning("SeriesPlayerView: episodePlay failed, using fallback videoURL: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - PlayerPool 管理
@@ -206,8 +229,10 @@ struct SeriesPlayerView: View {
     }
 
     private func visibleEpisodeIndices() -> [Int] {
+        guard totalEpisodes > 0 else { return [currentEpisode] }
         let lo = max(1, currentEpisode - 1)
         let hi = min(totalEpisodes, currentEpisode + 1)
+        guard lo <= hi else { return [currentEpisode] }
         return Array(lo...hi)
     }
 

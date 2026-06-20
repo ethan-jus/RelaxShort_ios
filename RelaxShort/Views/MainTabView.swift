@@ -13,10 +13,19 @@ import SwiftUI
 /// 避免搜索和播放页导航状态变化导致标签内容失去视图身份。
 struct MainTabView: View {
     @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject var dependencies: DependencyContainer
 
-    @StateObject private var homeVM = HomeViewModel(repository: MockHomeRepository())
-    @StateObject private var recommendVM = RecommendViewModel(repository: MockHomeRepository())
+    @StateObject private var homeVM: HomeViewModel
+    @StateObject private var recommendVM: RecommendViewModel
     @StateObject private var recommendSession = RecommendSession()
+
+    init() {
+        let homeRepo = DependencyContainer.useRealAPI
+            ? RealHomeRepository() as HomeRepositoryProtocol
+            : MockHomeRepository() as HomeRepositoryProtocol
+        _homeVM = StateObject(wrappedValue: HomeViewModel(repository: homeRepo))
+        _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: homeRepo))
+    }
 
     var body: some View {
         NavigationStack {

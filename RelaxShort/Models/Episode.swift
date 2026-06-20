@@ -10,8 +10,8 @@ struct Episode: Codable, Identifiable {
     let episodeNumber: Int
     /// 剧集标题
     let title: String
-    /// 视频播放 URL
-    let videoURL: String
+    /// 视频播放 URL（Task13 R3: 改为 var，支持播放页通过 episodePlay 接口更新）
+    var videoURL: String
     /// 视频时长（秒）
     let duration: TimeInterval
     /// 是否锁定（需付费/VIP 解锁）
