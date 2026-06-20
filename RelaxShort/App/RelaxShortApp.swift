@@ -43,6 +43,10 @@ struct RelaxShortApp: App {
                         }
                     }
                     .transition(.opacity)
+                    // Task13: 启动页期间调用 app/init，不阻塞进入主界面
+                    .task {
+                        await AppInitService.shared.initialize()
+                    }
                 } else {
                     MainTabView()
                         .environmentObject(appStore)

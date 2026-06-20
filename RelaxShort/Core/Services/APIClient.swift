@@ -42,25 +42,17 @@ final class APIClient {
 
     // MARK: - Public API
 
-    /// 发起请求，解码为指定 `Decodable` 类型。
+    /// 发起请求，解码为指定 `Decodable` 类型（不解包 envelope）。
     ///
     /// - Parameter endpoint: 预定义的 API 端点
     /// - Returns: 解码后的模型对象
     /// - Throws: `NetworkError` 封装的请求/解码错误
-    func request<T: Decodable>(_ endpoint: APIEndpoint) async throws -> T {
+    func requestRaw<T: Decodable>(_ endpoint: APIEndpoint) async throws -> T {
         let urlRequest = try buildRequest(for: endpoint)
         logRequest(urlRequest)
-
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await session.data(for: urlRequest)
-        } catch {
-            throw NetworkError.from(error)
-        }
-
+        let (data, response) = try await session.data(for: urlRequest)
         try validateResponse(response, data: data)
         logResponse(response, data: data)
-
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
@@ -69,25 +61,27 @@ final class APIClient {
         }
     }
 
-    /// 发起请求，解码为 `Decodable` 数组。
-    ///
-    /// - Parameter endpoint: 预定义的 API 端点
-    /// - Returns: 解码后的模型数组
-    /// - Throws: `NetworkError`
-    func request<T: Decodable>(_ endpoint: APIEndpoint) async throws -> [T] {
+    /// 发起请求，自动解包后端 `ApiResponse<T>` envelope 的 `data` 字段。
+    /// - 2xx 但 `error != nil` 时转为 `APIError`。
+    /// - 返回 `data` 必须非 nil，否则抛 `NetworkError.invalidResponse`。
+    func requestData<T: Decodable>(_ endpoint: APIEndpoint) async throws -> T {
+        let envelope: APIResponseEnvelope<T> = try await requestRaw(endpoint)
+        if let apiError = envelope.error {
+            throw APIError(code: apiError.code, message: apiError.message ?? "未知错误")
+        }
+        guard let data = envelope.data else {
+            throw NetworkError.invalidResponse
+        }
+        return data
+    }
+
+    /// 发起请求，解码为 `Decodable` 数组（不解包 envelope）。
+    func requestArray<T: Decodable>(_ endpoint: APIEndpoint) async throws -> [T] {
         let urlRequest = try buildRequest(for: endpoint)
         logRequest(urlRequest)
-
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await session.data(for: urlRequest)
-        } catch {
-            throw NetworkError.from(error)
-        }
-
+        let (data, response) = try await session.data(for: urlRequest)
         try validateResponse(response, data: data)
         logResponse(response, data: data)
-
         do {
             return try decoder.decode([T].self, from: data)
         } catch {
