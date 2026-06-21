@@ -30,8 +30,23 @@ struct SearchView: View {
                     } else {
                         GeometryReader { geo in
                             ScrollView {
-                                MarketingGrid(dramas: viewModel.searchResults, playerDrama: $playerDrama, containerW: geo.size.width)
-                                    .padding(.top, DT.Space.lg)
+                                LazyVStack(spacing: 0) {
+                                    MarketingGrid(dramas: viewModel.searchResults, playerDrama: $playerDrama, containerW: geo.size.width)
+                                        .padding(.top, DT.Space.lg)
+                                    // Task16 R2: 底部 sentinel 触发加载更多
+                                    if viewModel.isLoadingMore {
+                                        ProgressView()
+                                            .tint(DT.Color.textSecondary)
+                                            .padding(.vertical, 20)
+                                    }
+                                    Color.clear
+                                        .frame(height: 1)
+                                        .onAppear {
+                                            if let last = viewModel.searchResults.last {
+                                                Task { await viewModel.loadMoreIfNeeded(currentItem: last) }
+                                            }
+                                        }
+                                }
                             }
                             .scrollDismissesKeyboard(.immediately)
                         }

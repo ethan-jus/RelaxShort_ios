@@ -21,9 +21,9 @@ extension HomeRepositoryProtocol {
     func fetchRankings(type: String) async throws -> [DramaItem] {
         let dramas = try await fetchDramas(category: .all)
         switch type {
-        case "hot":     return dramas.sorted { $0.viewCount > $1.viewCount }
-        case "trending": return dramas.filter { $0.isTrending }.sorted { $0.viewCount > $1.viewCount }
-        case "new":     return dramas.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
+        case "popular", "hot": return dramas.sorted { $0.viewCount > $1.viewCount }
+        case "trending":       return dramas.filter { $0.isTrending }.sorted { $0.viewCount > $1.viewCount }
+        case "new":            return dramas.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
         default:        return Array(dramas.prefix(20))
         }
     }

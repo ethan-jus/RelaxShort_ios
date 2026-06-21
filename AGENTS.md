@@ -12,8 +12,9 @@
 
 ## 当前进度（Task16 更新）
 
-- Task16 合并后：Search 真实搜索分页（nextCursor/hasMore/isLoadingMore）、Search Default 真实数据源、Ranking 通过协议 fetchRankings(type:) 调后端、Categories 后端 code 映射策略已建立。Mock 模式保留本地排序。
-- 当前本机 `xcodebuild` 因 iOS 26.5 platform 缺失无法编译，需在配备完整 Xcode 环境的机器上验证。
+- Task16 R2：Search 真实搜索分页已实现（nextCursor/hasMore/isLoadingMore）、Search Default 真实数据源、Ranking 通过协议 fetchRankings(type:) 调后端（popular/trending/new）。
+- Categories 真实模式实现：通过 `/api/v2/categories` 获取后端分类 code+localizedName，iOS DramaCategory 中文枚举名匹配后端 localizedName 后调 categorySeries；Mock 保留本地枚举。
+- 本机 xcodebuild 可用：`xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort -destination 'platform=iOS Simulator,name=iPhone 17' build` 已通过。
 - Mock/Real 切换通过 `UserDefaults.standard.bool("use_real_api")` 控制，默认仍是 Mock。
 
 ## 架构边界

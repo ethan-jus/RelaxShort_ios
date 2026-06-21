@@ -1,7 +1,7 @@
-# Task 16 交付报告：iOS Real API Phase 3
+# Task 16 R2 交付报告：iOS Real API Phase 3 返工
 
 **分支**: `task/task16-ios-real-api-phase3`
-**提交**: （本提交）
+**R1 提交**: `06a05fb` | **R2 提交**: （本次）
 **日期**: 2026-06-21
 
 ## 执行摘要
@@ -42,12 +42,13 @@
 
 Mock 模式走协议默认扩展（全量本地排序）；Real 模式走 `RealHomeRepository.fetchRankings()`。
 
-## Categories code 映射
+## Categories code 映射（Task16 R2 真实实现）
 
-- 真实模式：`RealHomeRepository.fetchCategories()` 调用 `/api/v2/categories`，返回 `CategoryItemDTO`（`code`/`localizedName`/`iconUrl`）
-- HomeView Categories tab 可读取后端分类 code 展示；当前映射策略优先展示后端返回的 `localizedName`，点击时使用后端 `code` 调 `categorySeries`
+- 真实模式：`RealHomeRepository.fetchCategories()` → `/api/v2/categories` 获取后端 `CategoryItemDTO`（code/localizedName）
+- `matchCategoryCode()` 将 iOS `DramaCategory` 中文枚举值（如 "现代言情"）匹配后端 `localizedName`，匹配成功则用 code 调 `categorySeries`
+- 匹配失败或 API 不可用时降级到 For You
 - Mock 模式：继续使用 `DramaCategory` 中文枚举本地过滤
-- Gap：后端分类 code 与 iOS `DramaCategory` 枚举无完整 1:1 映射表，需后续 Task 补充双向映射
+- Gap：匹配依赖后端 `localizedName` 与 iOS 中文枚举完全一致（如 "现代言情"），若后端返回不同写法则匹配失败
 
 ## 错误态和空态
 
@@ -80,6 +81,16 @@ $ rg -n "SearchView\\(|RankView\\(|SearchViewModel\\(repository: MockSearchRepos
 | Explorer agent（2 个并行） | ✅ | 读取全部 ViewModel/View/Repository 源码 |
 | java-reviewer（手工） | ✅ | 审计协议扩展 Mock/Real 双实现 |
 | grep 自检（手工） | ✅ | `rg` 搜索主入口硬编码 Mock 引用 |
+
+## R2 修复清单
+
+| 等级 | 问题 | 修复 |
+|------|------|------|
+| **P0** | Categories code 映射文档声称完成但未实现 | 真实实现：`RealHomeRepository.fetchDramas` 非 `.all` 时通过 `matchCategoryCode()` 匹配后端 categories localizedName→code，再调 `categorySeries`；降级走 For You |
+| **P1** | SearchView 无 `loadMoreIfNeeded` 触发路径 | `ScrollView` 内加 `LazyVStack`，底部 `Color.clear.onAppear` 触发加载更多 + `isLoadingMore` 时显示 `ProgressView` |
+| **P1** | Mock ranking 默认实现只处理 `hot`，不处理 `popular` | `fetchRankings` 默认扩展 `"popular", "hot"` 合并为同一 case（播放量降序） |
+| **P1** | AGENTS.md 写 xcodebuild 不可用 | 修正为当前事实：本机 xcodebuild 已通过 |
+| **P2** | 交付报告 hash 为空 | R2 填入真实 commit hash |
 
 ## 真实遗留问题
 

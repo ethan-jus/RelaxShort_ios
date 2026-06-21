@@ -16,18 +16,42 @@ final class RealHomeRepository: HomeRepositoryProtocol {
 
         switch category {
         case .all:
-            // .all：优先走 Home 首页首个有 items 的 section；解析失败 fallback 到 For You
             if let homeItems = try? await fetchHomeFirstSection(contentLang: contentLang, country: country),
                !homeItems.isEmpty {
                 return homeItems
             }
             return try await fetchForYou(contentLang: contentLang, country: country)
         default:
-            // 其他分类：通过 categories 接口匹配本地化名称或 code，再调 categorySeries
-            // 当前后端分类 code 与 iOS DramaCategory 中文名无稳定映射，优先用 For You 降级
-            // Gap: 分类 code 映射需后端提供完整 category 列表后可对齐
+            // Task16 R2: 真实模式通过 categories API 获取后端 code，再调 categorySeries
+            if let code = await matchCategoryCode(category, contentLang: contentLang, country: country) {
+                if let items = try? await fetchCategorySeries(code: code, contentLang: contentLang, country: country),
+                   !items.isEmpty {
+                    return items
+                }
+            }
+            // 降级：后端 categories 不可用或无匹配 code 时走 For You
             return try await fetchForYou(contentLang: contentLang, country: country)
         }
+    }
+
+    /// 将 iOS DramaCategory 枚举匹配到后端 categories code。
+    /// 优先通过后端 categories 接口返回的 localizedName 做中文名匹配。
+    private func matchCategoryCode(_ cat: DramaCategory, contentLang: String?, country: String?) async -> String? {
+        guard let categories = try? await fetchCategories() else { return nil }
+        let targetName = cat.rawValue  // "现代言情" / "古装" 等中文枚举值
+        for c in categories {
+            if c.localizedName == targetName { return c.code }
+        }
+        return nil
+    }
+
+    /// 调用 /api/v2/categories/{code}/series
+    private func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]? {
+        let dto: SearchResponseDTO = try await client.requestData(
+            .categorySeries(categoryCode: code, cursor: nil, limit: 20,
+                          contentLanguage: contentLang, countryCode: country)
+        )
+        return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
     }
 
     func fetchBanners() async throws -> [BannerItem] {
