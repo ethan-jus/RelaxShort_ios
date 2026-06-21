@@ -122,15 +122,13 @@ final class HomeViewModel: ObservableObject {
             if let localCat = category.localCategory {
                 let matches = filterFeatured(by: localCat)
                 categoryDramas = matches.isEmpty ? featuredDramas : matches
-            } else if DependencyContainer.useRealAPI, let realRepo = repository as? RealHomeRepository {
-                // 真实后端分类（localCategory == nil）：通过 code 调 categorySeries
+            } else {
+                // 真实后端分类（localCategory == nil）：通过协议方法调 categorySeries（Task17 收口）
                 let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
                 let country = UserDefaults.standard.string(forKey: "app_country_code")
-                categoryDramas = try await realRepo.fetchDramasByCategoryCode(
+                categoryDramas = try await repository.fetchCategorySeries(
                     code: category.code, contentLang: contentLang, country: country
                 )
-            } else {
-                categoryDramas = featuredDramas
             }
         } catch {
             categoryErrorMessage = "分类数据加载失败"

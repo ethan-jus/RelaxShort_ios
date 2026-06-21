@@ -59,8 +59,8 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         return []
     }
 
-    /// Task16 R3: 按后端 code 加载分类剧集（供 HomeViewModel 真实模式调用）
-    func fetchDramasByCategoryCode(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
+    /// Task17：按后端 code 加载分类剧集（协议方法，替代 Task16 的 fetchDramasByCategoryCode）
+    func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
         let dto: SearchResponseDTO = try await client.requestData(
             .categorySeries(categoryCode: code, cursor: nil, limit: 20,
                           contentLanguage: contentLang, countryCode: country)

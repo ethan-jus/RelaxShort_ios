@@ -16,12 +16,18 @@ protocol HomeRepositoryProtocol {
     func fetchRankings(type: String) async throws -> [DramaItem]
     /// 获取分类列表（Task16 R3：Home Categories tab 用）
     func fetchHomeCategories() async throws -> [HomeCategory]
+    /// 按后端分类 code 获取剧集列表（Task17：协议收口，移除 HomeViewModel 对 RealHomeRepository 的直接依赖）
+    func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]
 }
 
 extension HomeRepositoryProtocol {
     /// 默认实现：Mock 模式用本地 DramaCategory 列表
     func fetchHomeCategories() async throws -> [HomeCategory] {
         return DramaCategory.allCases.map { HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0) }
+    }
+    /// 默认实现：Mock 模式返回空或全量本地过滤
+    func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
+        return try await fetchDramas(category: .all)
     }
     /// 默认实现：本地排序降级（Mock 模式）
     func fetchRankings(type: String) async throws -> [DramaItem] {

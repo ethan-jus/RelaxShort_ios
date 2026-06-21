@@ -111,6 +111,8 @@
 		787FEE0511E957E8A50AE0CE /* PlayerMediaSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */; };
 		5C5D9C3E2148403992266DD2 /* PlayerCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */; };
 		DCD3189B09FF55E88489DE59 /* HomeCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */; };
+		47CAE4E9748555F58485DF77 /* RealAPISmokeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */; };
+		E0F0A47B6CF65DF99FE3A0D0 /* DebugSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFCC81788679592EBF64CF9F /* DebugSettingsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -227,6 +229,8 @@
 		D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API/PlayerMediaSource.swift"; sourceTree = "<group>"; };
 		89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCoordinator.swift; sourceTree = "<group>"; };
 		D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeCategory.swift"; sourceTree = "<group>"; };
+		CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealAPISmokeRunner.swift"; sourceTree = "<group>"; };
+		EFCC81788679592EBF64CF9F /* DebugSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/DebugSettingsView.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -381,6 +385,8 @@
 				173DC61A9CC85DAEB9CFD0ED /* RealHomeRepository.swift */,
 				3E07DF14795E56458A576B7D /* RealSearchRepository.swift */,
 				065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */,
+			
+				CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -516,6 +522,8 @@
 				89B63639161D513C9CC96252 /* Search */,
 				6BEC5544D6202D98963CED93 /* VIP */,
 				93EDA5267D9F7ECCBD82FC62 /* Welfare */,
+			
+				EFCC81788679592EBF64CF9F /* DebugSettingsView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -746,6 +754,10 @@
 				787FEE0511E957E8A50AE0CE /* 787FEE0511E957E8A50AE0CE in Sources */,
 			
 				DCD3189B09FF55E88489DE59 /* DCD3189B09FF55E88489DE59 in Sources */,
+			
+				47CAE4E9748555F58485DF77 /* 47CAE4E9748555F58485DF77 in Sources */,
+			
+				E0F0A47B6CF65DF99FE3A0D0 /* E0F0A47B6CF65DF99FE3A0D0 in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
