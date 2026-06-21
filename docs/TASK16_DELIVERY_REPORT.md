@@ -1,7 +1,7 @@
 # Task 16 R2 交付报告：iOS Real API Phase 3 返工
 
 **分支**: `task/task16-ios-real-api-phase3`
-**R1 提交**: `06a05fb` | **R2 提交**: （本次）
+**R1 提交**: `06a05fb` | **R2 提交**: `2f42c00`
 **日期**: 2026-06-21
 
 ## 执行摘要
@@ -70,7 +70,14 @@ $ xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort \
 ** BUILD SUCCEEDED **
 
 $ rg -n "SearchView\\(|RankView\\(|SearchViewModel\\(repository: MockSearchRepository|SearchDefaultViewModel\\(repository: MockHomeRepository|RankView\\(playerDrama:.*MockHomeRepository" RelaxShort
-（仅 Preview/测试样例出现 Mock 硬编码，主运行入口无）
+### rg grep 命中说明
+```
+RelaxShort/Views/Rank/RankView.swift:142:   — #Preview（构造示例，非主入口）
+RelaxShort/Views/Search/SearchView.swift:118 — #Preview("Search") { SearchView() }（默认Mock构造，非主入口）
+RelaxShort/Views/Home/HomeView.swift:164    — RankView(repository: rankingRepository)（通过DI参数传入，非硬编码Mock）
+RelaxShort/Views/MainTabView.swift:69       — SearchView(（通过DI容器注入repository，非硬编码Mock）
+```
+所有命中均为 Preview 或通过 DependencyContainer 注入的正常入口，无主线硬编码 Mock。
 ```
 
 ## ECC 使用记录
