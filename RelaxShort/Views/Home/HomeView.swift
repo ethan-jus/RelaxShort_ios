@@ -6,12 +6,14 @@ import SwiftUI
 struct HomeView: View {
     @EnvironmentObject private var appStore: AppStore
     @ObservedObject private var viewModel: HomeViewModel
+    private let rankingRepository: HomeRepositoryProtocol
     @State private var playerDrama: DramaItem?
     @State private var showVIP = false
     @State private var showReward = false
 
-    init(viewModel: HomeViewModel) {
+    init(viewModel: HomeViewModel, rankingRepository: HomeRepositoryProtocol = MockHomeRepository()) {
         self.viewModel = viewModel
+        self.rankingRepository = rankingRepository
     }
 
     var body: some View {
@@ -159,7 +161,7 @@ struct HomeView: View {
     // MARK: - Tab 2: Rankings
 
     private var rankingsTabContent: some View {
-        RankView(playerDrama: $playerDrama)
+        RankView(playerDrama: $playerDrama, repository: rankingRepository)
     }
 
     // MARK: - Tab 3: Categories (Filters + 3-col grid)

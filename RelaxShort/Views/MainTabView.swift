@@ -19,12 +19,14 @@ struct MainTabView: View {
     @StateObject private var homeVM: HomeViewModel
     @StateObject private var recommendVM: RecommendViewModel
     @StateObject private var recommendSession: RecommendSession
+    private let homeRepository: HomeRepositoryProtocol
 
     init() {
         let coordinator = PlayerCoordinator()
         let homeRepo = DependencyContainer.useRealAPI
             ? RealHomeRepository() as HomeRepositoryProtocol
             : MockHomeRepository() as HomeRepositoryProtocol
+        self.homeRepository = homeRepo
         _playerCoordinator = StateObject(wrappedValue: coordinator)
         _homeVM = StateObject(wrappedValue: HomeViewModel(repository: homeRepo))
         _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: homeRepo))
@@ -35,7 +37,12 @@ struct MainTabView: View {
         NavigationStack {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
-                    TabContentHost(homeVM: homeVM, recommendVM: recommendVM, recommendSession: recommendSession)
+                    TabContentHost(
+                        homeVM: homeVM,
+                        homeRepository: homeRepository,
+                        recommendVM: recommendVM,
+                        recommendSession: recommendSession
+                    )
                         .environmentObject(playerCoordinator)
                         .frame(width: geo.size.width, height: geo.size.height)
                     // 2. 底部标签栏
@@ -59,7 +66,10 @@ struct MainTabView: View {
                     .environmentObject(playerCoordinator)
             }
             .navigationDestination(isPresented: $appStore.isShowingSearch) {
-                SearchView()
+                SearchView(
+                    searchRepository: dependencies.searchRepository,
+                    discoveryRepository: dependencies.homeRepository
+                )
             }
             .navigationDestination(isPresented: $appStore.isShowingMembership) {
                 MembershipView()
@@ -87,12 +97,13 @@ struct MainTabView: View {
 private struct TabContentHost: View {
     @EnvironmentObject var appStore: AppStore
     let homeVM: HomeViewModel
+    let homeRepository: HomeRepositoryProtocol
     let recommendVM: RecommendViewModel
     let recommendSession: RecommendSession
 
     var body: some View {
         ZStack {
-            HomeView(viewModel: homeVM)
+            HomeView(viewModel: homeVM, rankingRepository: homeRepository)
                 .id(AppStore.Tab.home.rawValue)
                 .zIndex(appStore.selectedTab == .home ? 1 : 0)
                 .opacity(appStore.selectedTab == .home ? 1 : 0)

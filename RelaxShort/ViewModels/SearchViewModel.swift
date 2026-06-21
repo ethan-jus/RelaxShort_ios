@@ -26,7 +26,7 @@ final class SearchViewModel: ObservableObject {
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
             .removeDuplicates()
             .sink { [weak self] query in
-                self?.performSearch(query: query)
+                Task { await self?.performSearch(query: query) }
             }
             .store(in: &cancellables)
 
@@ -45,18 +45,27 @@ final class SearchViewModel: ObservableObject {
         }
     }
 
-    private func performSearch(query: String) {
+    private func performSearch(query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else {
             searchResults = []
             isSearching = false
+            errorMessage = nil
             return
         }
         isSearching = true
-        searchResults = allDramas.filter { drama in
-            drama.title.localizedCaseInsensitiveContains(trimmed) ||
-            drama.category.localizedCaseInsensitiveContains(trimmed) ||
-            drama.tags.contains { $0.localizedCaseInsensitiveContains(trimmed) }
+        errorMessage = nil
+        do {
+            let (items, _, _) = try await repository.search(query: trimmed, cursor: nil, limit: 20)
+            searchResults = items
+        } catch {
+            errorMessage = "搜索失败"
+            logError("SearchViewModel.performSearch failed: \(error)")
+            searchResults = allDramas.filter { drama in
+                drama.title.localizedCaseInsensitiveContains(trimmed) ||
+                drama.category.localizedCaseInsensitiveContains(trimmed) ||
+                drama.tags.contains { $0.localizedCaseInsensitiveContains(trimmed) }
+            }
         }
         isSearching = false
     }

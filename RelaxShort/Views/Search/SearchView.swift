@@ -6,15 +6,20 @@ import SwiftUI
 struct SearchView: View {
     @EnvironmentObject private var appStore: AppStore
     @StateObject private var viewModel: SearchViewModel
+    @StateObject private var defaultViewModel: SearchDefaultViewModel
 
-    init(viewModel: SearchViewModel? = nil) {
-        _viewModel = StateObject(wrappedValue: viewModel ?? SearchViewModel(repository: MockSearchRepository()))
+    init(
+        searchRepository: SearchRepositoryProtocol = MockSearchRepository(),
+        discoveryRepository: HomeRepositoryProtocol = MockHomeRepository()
+    ) {
+        _viewModel = StateObject(wrappedValue: SearchViewModel(repository: searchRepository))
+        _defaultViewModel = StateObject(wrappedValue: SearchDefaultViewModel(repository: discoveryRepository))
     }
     @State private var playerDrama: DramaItem?
     var body: some View {
         VStack(spacing: 0) {
             if viewModel.searchText.isEmpty {
-                SearchDefaultView(viewModel: SearchDefaultViewModel(repository: MockHomeRepository()))
+                SearchDefaultView(viewModel: defaultViewModel)
             } else {
                 VStack(spacing: 0) {
                     if viewModel.searchResults.isEmpty && !viewModel.isSearching {

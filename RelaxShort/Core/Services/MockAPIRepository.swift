@@ -295,6 +295,16 @@ struct MockSearchRepository: SearchRepositoryProtocol {
     func fetchDramas(category: DramaCategory) async throws -> [DramaItem] {
         try await Task.sleep(nanoseconds: MC.delay); return MockData.dramas
     }
+    func search(query: String, cursor: String?, limit: Int) async throws -> ([DramaItem], String?, Bool) {
+        try await Task.sleep(nanoseconds: MC.delay)
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let items = MockData.dramas.filter { drama in
+            drama.title.localizedCaseInsensitiveContains(trimmed) ||
+            drama.category.localizedCaseInsensitiveContains(trimmed) ||
+            drama.tags.contains { $0.localizedCaseInsensitiveContains(trimmed) }
+        }
+        return (Array(items.prefix(limit)), nil, false)
+    }
     func fetchBanners() async throws -> [BannerItem] {
         try await Task.sleep(nanoseconds: MC.delay); return MockData.banners
     }
