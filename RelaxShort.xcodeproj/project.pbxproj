@@ -103,6 +103,7 @@
 		4C2A4B746B4E5FA8AD0D26AF /* AppInitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC0029E1B4A5E50A277A299 /* AppInitService.swift */; };
 		E09FFD1FC4CA5F27B337582E /* APIResponseEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E6FBCCA53315987A7ADE8A3 /* APIResponseEnvelope.swift */; };
 		A0E1F901A6725799956393D0 /* RealHomeRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173DC61A9CC85DAEB9CFD0ED /* RealHomeRepository.swift */; };
+		FB1270575E45544AA548243B /* RealSearchRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E07DF14795E56458A576B7D /* RealSearchRepository.swift */; };
 		CEDC26B856AE55F0A2AD1160 /* RealDetailRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */; };
 		A2224A7AD8D851AC87787F17 /* AppInitResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = B63560DCD0A454C5BE878E22 /* AppInitResponseDTO.swift */; };
 		E7FFE811FDC95A4F80C7A654 /* ForYouFeedResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE297A7165A55E68BFCB9FA6 /* ForYouFeedResponseDTO.swift */; };
@@ -217,6 +218,7 @@
 		7BC0029E1B4A5E50A277A299 /* AppInitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppInitService.swift"; sourceTree = "<group>"; };
 		7E6FBCCA53315987A7ADE8A3 /* APIResponseEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DTO/APIResponseEnvelope.swift"; sourceTree = "<group>"; };
 		173DC61A9CC85DAEB9CFD0ED /* RealHomeRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealHomeRepository.swift"; sourceTree = "<group>"; };
+		3E07DF14795E56458A576B7D /* RealSearchRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealSearchRepository.swift; sourceTree = "<group>"; };
 		065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealDetailRepository.swift"; sourceTree = "<group>"; };
 		B63560DCD0A454C5BE878E22 /* AppInitResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API/AppInitResponseDTO.swift"; sourceTree = "<group>"; };
 		CE297A7165A55E68BFCB9FA6 /* ForYouFeedResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API/ForYouFeedResponseDTO.swift"; sourceTree = "<group>"; };
@@ -375,6 +377,7 @@
 				7BC0029E1B4A5E50A277A299 /* AppInitService.swift */,
 				7E6FBCCA53315987A7ADE8A3 /* APIResponseEnvelope.swift */,
 				173DC61A9CC85DAEB9CFD0ED /* RealHomeRepository.swift */,
+				3E07DF14795E56458A576B7D /* RealSearchRepository.swift */,
 				065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */,
 			);
 			path = Services;
@@ -696,6 +699,7 @@
 				ED523DCF8E19074DB9CE3EEF /* RankView.swift in Sources */,
 				E792C7488A231F2C32982561 /* RankViewModel.swift in Sources */,
 				515D6A18AF0E16B92039B736 /* RealAdService.swift in Sources */,
+				FB1270575E45544AA548243B /* RealSearchRepository.swift in Sources */,
 				E4C662B328DF8B393E7610D4 /* RecommendView.swift in Sources */,
 				6C6912FA41D55BA89E9652D3 /* RecommendViewModel.swift in Sources */,
 				63313C34915D61811BF274CD /* RelaxShortApp.swift in Sources */,

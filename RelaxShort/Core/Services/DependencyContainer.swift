@@ -35,7 +35,7 @@ final class DependencyContainer: ObservableObject {
 
     init(
         homeRepository: HomeRepositoryProtocol? = nil,
-        searchRepository: SearchRepositoryProtocol = MockSearchRepository(),
+        searchRepository: SearchRepositoryProtocol? = nil,
         detailRepository: DetailRepositoryProtocol? = nil,
         favoritesRepository: FavoritesRepositoryProtocol = MockFavoritesRepository(),
         profileRepository: ProfileRepositoryProtocol = MockProfileRepository(),
@@ -49,13 +49,18 @@ final class DependencyContainer: ObservableObject {
         } else {
             self.homeRepository = Self.useRealAPI ? RealHomeRepository() : MockHomeRepository()
         }
+        // Search：Task15：use_real_api=true 时注入 RealSearchRepository
+        if let sr = searchRepository {
+            self.searchRepository = sr
+        } else {
+            self.searchRepository = Self.useRealAPI ? RealSearchRepository() : MockSearchRepository()
+        }
         // Detail：根据开关选择 Real 或 Mock
         if let dr = detailRepository {
             self.detailRepository = dr
         } else {
             self.detailRepository = Self.useRealAPI ? RealDetailRepository() : MockDetailRepository()
         }
-        self.searchRepository = searchRepository
         self.favoritesRepository = favoritesRepository
         self.profileRepository = profileRepository
         self.authRepository = authRepository

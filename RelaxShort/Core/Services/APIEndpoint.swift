@@ -28,6 +28,15 @@ enum APIEndpoint {
     /// 剧集播放地址
     case episodePlay(episodeId: String)
 
+    // MARK: - Task15 第二批 v2 端点
+
+    case home(contentLanguage: String?, countryCode: String?)
+    case searchDefault(contentLanguage: String?, countryCode: String?)
+    case searchV2(query: String, cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?)
+    case rankings(type: String, contentLanguage: String?, countryCode: String?)
+    case categories(contentLanguage: String?, countryCode: String?)
+    case categorySeries(categoryCode: String, cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?)
+
     // MARK: - 旧 mock 端点（保留兼容）
 
     case homeFeed(category: DramaCategory)
@@ -57,7 +66,8 @@ extension APIEndpoint {
     /// 真实后端 baseURL
     var baseURL: String {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay:
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -72,6 +82,13 @@ extension APIEndpoint {
         case .forYou:                       return "/api/v2/feed/for-you"
         case .seriesEpisodes(let id):       return "/api/v2/series/\(id)/episodes"
         case .episodePlay(let id):          return "/api/v2/episodes/\(id)/play"
+        // ── Task15 v2 ──
+        case .home:                         return "/api/v2/home"
+        case .searchDefault:                return "/api/v2/search/default"
+        case .searchV2:                     return "/api/v2/search"
+        case .rankings:                     return "/api/v2/rankings"
+        case .categories:                   return "/api/v2/categories"
+        case .categorySeries(let code, _, _, _, _): return "/api/v2/categories/\(code)/series"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -98,7 +115,8 @@ extension APIEndpoint {
     var method: HTTPMethod {
         switch self {
         case .appInit:              return .post
-        case .forYou, .seriesEpisodes, .episodePlay: return .get
+        case .forYou, .seriesEpisodes, .episodePlay,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries: return .get
         case .homeFeed, .banners, .dramaDetail, .episodes,
              .watchHistory, .userProfile, .subscriptionStatus,
              .bookmarks, .coinTransactions, .search: return .get
@@ -188,10 +206,42 @@ extension APIEndpoint {
                 URLQueryItem(name: "page", value: "\(page)")
             ]
         case .seriesEpisodes:
-            // 可加 content_language query，暂时省略
             break
         case .episodePlay:
             break
+        // ── Task15 v2 query params ──
+        case .home(let cl, let cc):
+            var items = [URLQueryItem]()
+            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
+            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            if !items.isEmpty { components?.queryItems = items }
+        case .searchDefault(let cl, let cc):
+            var items = [URLQueryItem]()
+            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
+            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            if !items.isEmpty { components?.queryItems = items }
+        case .searchV2(let q, let cursor, let limit, let cl, let cc):
+            var items = [URLQueryItem(name: "q", value: q), URLQueryItem(name: "limit", value: "\(limit)")]
+            if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
+            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
+            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            components?.queryItems = items
+        case .rankings(let type, let cl, let cc):
+            var items = [URLQueryItem(name: "type", value: type)]
+            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
+            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            components?.queryItems = items
+        case .categories(let cl, let cc):
+            var items = [URLQueryItem]()
+            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
+            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            if !items.isEmpty { components?.queryItems = items }
+        case .categorySeries(_, let cursor, let limit, let cl, let cc):
+            var items = [URLQueryItem(name: "limit", value: "\(limit)")]
+            if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
+            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
+            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            components?.queryItems = items
         default:
             break
         }
