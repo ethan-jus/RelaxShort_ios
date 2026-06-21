@@ -1,7 +1,7 @@
 # Task 16 交付报告：iOS Real API Phase 3
 
 **分支**: `task/task16-ios-real-api-phase3`
-**R1**: `06a05fb` | **R2**: `2f42c00` | **R3**: `baec6cf` | **R4**: （本次）
+**R1**: `06a05fb` | **R2**: `2f42c00` | **R3**: `baec6cf` | **R4**: `65473d2`
 **日期**: 2026-06-21
 
 ## 执行摘要
