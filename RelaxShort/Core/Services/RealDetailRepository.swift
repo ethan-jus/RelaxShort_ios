@@ -61,12 +61,12 @@ final class RealDetailRepository: DetailRepositoryProtocol {
 
     // MARK: - Play Asset
 
-    /// 获取播放地址并映射到 PlayerMediaSource，同时更新 Episode.videoURL 为兼容 URL。
-    func fetchPlayAsset(episodeId: String) async throws -> PlayerMediaSource {
+    /// 获取播放地址并映射到播放接口 DTO，同时更新 Episode.videoURL 为兼容 URL。
+    func fetchPlayAsset(episodeId: String) async throws -> PlaybackMediaSourceDTO {
         let dto: EpisodePlayResponseDTO = try await client.requestData(
             .episodePlay(episodeId: episodeId)
         )
-        return PlayerMediaSource(from: dto)
+        return PlaybackMediaSourceDTO(from: dto)
     }
 
     /// 获取播放地址并按兼容方式更新 episode.videoURL

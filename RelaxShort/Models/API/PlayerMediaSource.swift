@@ -9,7 +9,7 @@ import Foundation
 /// - 多清晰度 rendition
 /// - 字幕轨
 /// - 进度缩略图
-struct PlayerMediaSource {
+struct PlaybackMediaSourceDTO {
     let sourceType: String            // hls / mp4 / hls_with_fallback
     let masterUrl: String?            // HLS master playlist
     let fallbackMp4Url: String?        // MP4 fallback URL

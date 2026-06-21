@@ -15,24 +15,28 @@ struct MainTabView: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var dependencies: DependencyContainer
 
+    @StateObject private var playerCoordinator: PlayerCoordinator
     @StateObject private var homeVM: HomeViewModel
     @StateObject private var recommendVM: RecommendViewModel
-    @StateObject private var recommendSession = RecommendSession()
+    @StateObject private var recommendSession: RecommendSession
 
     init() {
+        let coordinator = PlayerCoordinator()
         let homeRepo = DependencyContainer.useRealAPI
             ? RealHomeRepository() as HomeRepositoryProtocol
             : MockHomeRepository() as HomeRepositoryProtocol
+        _playerCoordinator = StateObject(wrappedValue: coordinator)
         _homeVM = StateObject(wrappedValue: HomeViewModel(repository: homeRepo))
         _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: homeRepo))
+        _recommendSession = StateObject(wrappedValue: RecommendSession(engine: coordinator.engine))
     }
 
     var body: some View {
         NavigationStack {
             GeometryReader { geo in
                 ZStack(alignment: .bottom) {
-                    // 1. 内容层 — 独立视图隔离导航状态变化
                     TabContentHost(homeVM: homeVM, recommendVM: recommendVM, recommendSession: recommendSession)
+                        .environmentObject(playerCoordinator)
                         .frame(width: geo.size.width, height: geo.size.height)
                     // 2. 底部标签栏
                     if !appStore.isBottomTabBarHidden {
@@ -47,10 +51,12 @@ struct MainTabView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: SeriesPlayerNav.self) { nav in
-                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode)
+                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, handoff: nav.handoff)
+                    .environmentObject(playerCoordinator)
             }
             .navigationDestination(item: $appStore.navigationTarget) { nav in
-                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode)
+                SeriesPlayerView(drama: nav.drama, startEpisode: nav.startEpisode, handoff: nav.handoff)
+                    .environmentObject(playerCoordinator)
             }
             .navigationDestination(isPresented: $appStore.isShowingSearch) {
                 SearchView()
