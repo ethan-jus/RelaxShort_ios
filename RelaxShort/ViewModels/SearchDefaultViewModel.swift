@@ -3,7 +3,8 @@ import Combine
 
 // MARK: - Search Default ViewModel
 /// 搜索默认页 ViewModel
-/// 管理三榜（热搜榜/热播榜/新剧榜）数据加载与 Tab 切换
+/// Task16：真实模式优先用 RealSearchRepository.fetchDramas（走 search/default hot_series），
+/// Mock 模式保留 Home 全量本地排序。
 @MainActor
 final class SearchDefaultViewModel: ObservableObject {
 
@@ -18,7 +19,8 @@ final class SearchDefaultViewModel: ObservableObject {
 
     // MARK: - Dependencies
 
-    private let repository: HomeRepositoryProtocol
+    private let homeRepository: HomeRepositoryProtocol
+    private let searchRepository: SearchRepositoryProtocol
 
     // MARK: - Tab Titles
 
@@ -44,8 +46,9 @@ final class SearchDefaultViewModel: ObservableObject {
 
     // MARK: - Init
 
-    init(repository: HomeRepositoryProtocol) {
-        self.repository = repository
+    init(homeRepository: HomeRepositoryProtocol, searchRepository: SearchRepositoryProtocol) {
+        self.homeRepository = homeRepository
+        self.searchRepository = searchRepository
     }
 
     // MARK: - Load Data
@@ -53,14 +56,35 @@ final class SearchDefaultViewModel: ObservableObject {
     func loadData() async {
         isLoading = true
         errorMessage = nil
+        defer { isLoading = false }
+
+        if DependencyContainer.useRealAPI {
+            await loadFromSearchDefault()
+        } else {
+            await loadFromHome()
+        }
+    }
+
+    /// 真实模式：从 search/default 取 hot_series 作为发现数据
+    private func loadFromSearchDefault() async {
         do {
-            let allDramas = try await repository.fetchDramas(category: .all)
+            let items = try await searchRepository.fetchDramas(category: .all)
+            populateRanks(from: items)
+        } catch {
+            errorMessage = "搜索发现数据加载失败"
+            logError("SearchDefaultViewModel.loadFromSearchDefault failed: \(error)")
+        }
+    }
+
+    /// Mock 模式：全量 Home 数据本地排序
+    private func loadFromHome() async {
+        do {
+            let allDramas = try await homeRepository.fetchDramas(category: .all)
             populateRanks(from: allDramas)
         } catch {
             errorMessage = error.localizedDescription
-            logError("SearchDefaultViewModel.loadData failed: \(error)")
+            logError("SearchDefaultViewModel.loadFromHome failed: \(error)")
         }
-        isLoading = false
     }
 
     // MARK: - Tab Switching
@@ -88,7 +112,7 @@ final class SearchDefaultViewModel: ObservableObject {
             .enumerated()
             .map { RankDrama(from: $1, rank: $0 + 1) }
 
-        // 新剧榜：按 ID 降序（模拟新剧排序）
+        // 新剧榜：按 ID 降序
         newDrama = dramas
             .sorted { $0.id > $1.id }
             .prefix(20)

@@ -13,7 +13,10 @@ struct SearchView: View {
         discoveryRepository: HomeRepositoryProtocol = MockHomeRepository()
     ) {
         _viewModel = StateObject(wrappedValue: SearchViewModel(repository: searchRepository))
-        _defaultViewModel = StateObject(wrappedValue: SearchDefaultViewModel(repository: discoveryRepository))
+        _defaultViewModel = StateObject(wrappedValue: SearchDefaultViewModel(
+            homeRepository: discoveryRepository,
+            searchRepository: searchRepository
+        ))
     }
     @State private var playerDrama: DramaItem?
     var body: some View {

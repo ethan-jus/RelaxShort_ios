@@ -2,7 +2,8 @@ import SwiftUI
 import Combine
 
 // MARK: - Search ViewModel
-/// 搜索页 ViewModel，管理搜索文本、历史记录和结果过滤
+/// 搜索页 ViewModel，管理搜索文本、历史记录、分页和结果展示。
+/// Task16：新增真实搜索分页（nextCursor/hasMore/isLoadingMore/loadMoreIfNeeded）。
 @MainActor
 final class SearchViewModel: ObservableObject {
     private let repository: SearchRepositoryProtocol
@@ -13,6 +14,10 @@ final class SearchViewModel: ObservableObject {
     @Published var searchHistory: [String] = []
     @Published var isSearching: Bool = false
     @Published var errorMessage: String?
+    /// Task16: 分页状态
+    @Published var isLoadingMore: Bool = false
+    private var nextCursor: String?
+    private var hasMore: Bool = false
 
     private let historyKey = "com.relaxshort.searchHistory"
     private var cancellables = Set<AnyCancellable>()
@@ -45,29 +50,50 @@ final class SearchViewModel: ObservableObject {
         }
     }
 
+    /// 执行搜索（关键词变化时重置分页状态）
     private func performSearch(query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else {
             searchResults = []
             isSearching = false
             errorMessage = nil
+            resetPagination()
             return
         }
         isSearching = true
         errorMessage = nil
+        resetPagination()
         do {
-            let (items, _, _) = try await repository.search(query: trimmed, cursor: nil, limit: 20)
+            let (items, cursor, more) = try await repository.search(query: trimmed, cursor: nil, limit: 20)
             searchResults = items
+            nextCursor = cursor
+            hasMore = more
         } catch {
             errorMessage = "搜索失败"
             logError("SearchViewModel.performSearch failed: \(error)")
-            searchResults = allDramas.filter { drama in
-                drama.title.localizedCaseInsensitiveContains(trimmed) ||
-                drama.category.localizedCaseInsensitiveContains(trimmed) ||
-                drama.tags.contains { $0.localizedCaseInsensitiveContains(trimmed) }
-            }
+            // 失败不清空已有结果
         }
         isSearching = false
+    }
+
+    /// Task16: 加载更多（无限滚动）
+    func loadMoreIfNeeded(currentItem: DramaItem) async {
+        guard let last = searchResults.last, last.id == currentItem.id else { return }
+        guard hasMore, !isLoadingMore else { return }
+        isLoadingMore = true
+        do {
+            let (items, cursor, more) = try await repository.search(
+                query: searchText.trimmingCharacters(in: .whitespaces),
+                cursor: nextCursor, limit: 20
+            )
+            searchResults.append(contentsOf: items)
+            nextCursor = cursor
+            hasMore = more
+        } catch {
+            logError("SearchViewModel.loadMore failed: \(error)")
+            // 加载更多失败不清空已有结果，保留重试机会
+        }
+        isLoadingMore = false
     }
 
     func submitSearch() {
@@ -79,6 +105,13 @@ final class SearchViewModel: ObservableObject {
     func searchFromHistory(_ query: String) {
         searchText = query
         submitSearch()
+    }
+
+    // MARK: - Pagination
+
+    private func resetPagination() {
+        nextCursor = nil
+        hasMore = false
     }
 
     // MARK: - History Management

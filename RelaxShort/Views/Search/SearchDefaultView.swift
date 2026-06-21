@@ -169,7 +169,10 @@ struct SearchDefaultView: View {
 
 #if DEBUG
 #Preview("SearchDefault - Dark") {
-    SearchDefaultView(viewModel: SearchDefaultViewModel(repository: MockHomeRepository()))
+    SearchDefaultView(viewModel: SearchDefaultViewModel(
+        homeRepository: MockHomeRepository(),
+        searchRepository: MockSearchRepository()
+    ))
         .preferredColorScheme(.dark)
 }
 #endif

@@ -298,12 +298,17 @@ struct MockSearchRepository: SearchRepositoryProtocol {
     func search(query: String, cursor: String?, limit: Int) async throws -> ([DramaItem], String?, Bool) {
         try await Task.sleep(nanoseconds: MC.delay)
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let items = MockData.dramas.filter { drama in
+        let all = MockData.dramas.filter { drama in
             drama.title.localizedCaseInsensitiveContains(trimmed) ||
             drama.category.localizedCaseInsensitiveContains(trimmed) ||
             drama.tags.contains { $0.localizedCaseInsensitiveContains(trimmed) }
         }
-        return (Array(items.prefix(limit)), nil, false)
+        let page = cursor.flatMap(Int.init) ?? 0
+        let start = page * limit
+        let slice = Array(all.dropFirst(start).prefix(limit))
+        let hasMore = start + limit < all.count
+        let nextCursor = hasMore ? "\(page + 1)" : nil
+        return (slice, nextCursor, hasMore)
     }
     func fetchBanners() async throws -> [BannerItem] {
         try await Task.sleep(nanoseconds: MC.delay); return MockData.banners

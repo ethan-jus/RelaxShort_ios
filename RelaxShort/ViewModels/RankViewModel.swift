@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Rank ViewModel
 
 /// 排行榜页面 ViewModel
-/// 管理榜单分类切换、排行数据加载
+/// Task16：通过协议 `fetchRankings(type:)` 调用后端 rankings，不再本地排序。
 @MainActor
 final class RankViewModel: ObservableObject {
 
@@ -32,26 +32,15 @@ final class RankViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let allDramas = try await repository.fetchDramas(category: .all)
-            let sorted: [DramaItem]
-            switch selectedCategory {
-            case .hot:
-                sorted = allDramas.sorted { $0.viewCount > $1.viewCount }
-            case .trending:
-                sorted = allDramas.filter { $0.isTrending }
-                    .sorted { $0.viewCount > $1.viewCount }
-            case .new:
-                sorted = allDramas.sorted {
-                    (Int($0.id) ?? 0) > (Int($1.id) ?? 0)
-                }
-            }
-            self.dramas = sorted.enumerated().map { index, drama in
+            let type = mapToRankingType(selectedCategory)
+            let items = try await repository.fetchRankings(type: type)
+            self.dramas = items.enumerated().map { index, drama in
                 RankDrama(from: drama, rank: index + 1)
             }
         } catch {
             errorMessage = "排行榜数据加载失败"
             logError("RankViewModel.loadData failed: \(error)")
-            dramas = []
+            // 保持现有数据显示，不清空
         }
     }
 
@@ -60,6 +49,18 @@ final class RankViewModel: ObservableObject {
         selectedCategory = category
         Task {
             await loadData()
+        }
+    }
+
+    // MARK: - Type Mapping
+
+    /// RankCategory → 后端 rankings type 参数。
+    /// 后端 rankings 接口支持的 type: popular / new / trending（以 IOS_API_CONTRACT_V1.md 为准）
+    private func mapToRankingType(_ category: RankCategory) -> String {
+        switch category {
+        case .hot:      return "popular"
+        case .trending: return "trending"
+        case .new:      return "new"
         }
     }
 

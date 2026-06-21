@@ -10,11 +10,11 @@
 - Mock/Real 切换通过 `UserDefaults.standard.bool("use_real_api")` 控制，默认仍是 Mock。
 - 后端合同见 `app-server/v2/docs/IOS_API_CONTRACT_V1.md`。
 
-## 当前目标
+## 当前进度（Task16 更新）
 
-- 补齐真实 API 模式下的 cursor 分页、错误态、播放页清晰度/字幕能力。
-- 补齐 iOS 分类中文名与后端分类 code 的稳定映射。
-- VIP、My List、Profile、金币福利、广告奖励仍主要为 Mock/本地实现，后续任务再接真实 API。
+- Task16 合并后：Search 真实搜索分页（nextCursor/hasMore/isLoadingMore）、Search Default 真实数据源、Ranking 通过协议 fetchRankings(type:) 调后端、Categories 后端 code 映射策略已建立。Mock 模式保留本地排序。
+- 当前本机 `xcodebuild` 因 iOS 26.5 platform 缺失无法编译，需在配备完整 Xcode 环境的机器上验证。
+- Mock/Real 切换通过 `UserDefaults.standard.bool("use_real_api")` 控制，默认仍是 Mock。
 
 ## 架构边界
 
