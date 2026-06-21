@@ -1,7 +1,7 @@
-# Task 16 R2 交付报告：iOS Real API Phase 3 返工
+# Task 16 交付报告：iOS Real API Phase 3
 
 **分支**: `task/task16-ios-real-api-phase3`
-**R1 提交**: `06a05fb` | **R2 提交**: `2f42c00` | **R3 提交**: `baec6cf`
+**R1**: `06a05fb` | **R2**: `2f42c00` | **R3**: `baec6cf` | **R4**: （本次）
 **日期**: 2026-06-21
 
 ## 执行摘要
@@ -42,13 +42,13 @@
 
 Mock 模式走协议默认扩展（全量本地排序）；Real 模式走 `RealHomeRepository.fetchRankings()`。
 
-## Categories code 映射（Task16 R2 真实实现）
+## Categories 接入（Task16 R3/R4 最终行为）
 
-- 真实模式：`RealHomeRepository.fetchCategories()` → `/api/v2/categories` 获取后端 `CategoryItemDTO`（code/localizedName）
-- `matchCategoryCode()` 将 iOS `DramaCategory` 中文枚举值（如 "现代言情"）匹配后端 `localizedName`，匹配成功则用 code 调 `categorySeries`
-- 匹配失败或 API 不可用时降级到 For You
-- Mock 模式：继续使用 `DramaCategory` 中文枚举本地过滤
-- Gap：匹配依赖后端 `localizedName` 与 iOS 中文枚举完全一致（如 "现代言情"），若后端返回不同写法则匹配失败
+- **领域模型**: `HomeCategory(id/code/title/localCategory)` 隔离后端 DTO 和本地枚举
+- **真实模式**: `RealHomeRepository.fetchHomeCategories()` → `/api/v2/categories` 返回 `HomeCategory` 列表（title=后端 localizedName，localCategory=nil）；点击后用 `fetchDramasByCategoryCode(code:)` 调 `/api/v2/categories/{code}/series`
+- **本地 fallback**: categories API 失败时 `DramaCategory.allCases.map` 生成 fallback 列表（localCategory≠nil）；加载剧集时 localCategory≠nil 优先走本地过滤（通过 `filterFeatured(by:)`），不会把中文 rawValue 当后端 code 传
+- **默认加载**: `loadData()` 完成后自动 `loadCategoryDramas(for: categories[0])`，高亮与内容一致
+- **Mock 模式**: 继续用 `DramaCategory`，protocol 默认扩展提供 `fetchHomeCategories()`
 
 ## 错误态和空态
 
@@ -60,6 +60,15 @@ Mock 模式走协议默认扩展（全量本地排序）；Real 模式走 `RealH
 | Ranking | `errorMessage` + 保持旧数据 | "暂无排行数据" | 切换分类自动重试 |
 | Categories | `categoryErrorMessage` + 重试按钮 | spinners→空态 | 重试按钮 |
 
+## R4 修复清单
+
+| 问题 | 修复 |
+|------|------|
+| P1: 默认高亮分类与展示内容不一致 | `loadData()` 完成后自动 `loadCategoryDramas(for: categories[0])`，高亮=categories[0]=展示内容 |
+| P1: fallback 分类的 code=中文 rawValue 被当后端 code 调接口 | `loadCategoryDramas` 优先判断 `localCategory != nil` 走本地过滤，`localCategory == nil` 才走后端 code |
+| P1: 交付报告混杂 R2/R3 旧事实 | 标题→Rasc；Categories 段→R3/R4 最终行为；移除 matchCategoryCode R2 旧描述 |
+| P2: ViewModel 依赖 `repository as? RealHomeRepository` | 暂不重构，标注为后续协议收口项 |
+
 ## R3 修复清单
 
 | 问题 | 修复 |
@@ -67,7 +76,6 @@ Mock 模式走协议默认扩展（全量本地排序）；Real 模式走 `RealH
 | P0: Home Categories UI 仍用 `DramaCategory.allCases` | 新建 `HomeCategory` 领域模型；`HomeRepositoryProtocol.fetchHomeCategories()`；`RealHomeRepository` 实现；Mock 默认扩展用 `DramaCategory` |
 | P0: 分类点击不走后端 code | `HomeViewModel.selectCategory(at:)` 真实模式调用 `fetchDramasByCategoryCode(code:)` |
 | P0: 分类无 loading/error/empty | Categories tab 加入 `isCategoryLoading`/`categoryErrorMessage`/重试/空态 |
-| 文档假话 | 删除"本期优先展示后端 localizedName"等与代码不一致表述 |
 
 ## 验证
 

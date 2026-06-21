@@ -86,7 +86,7 @@ final class HomeViewModel: ObservableObject {
             logError("HomeViewModel.loadData failed: \(error)")
         }
 
-        // 分类列表：独立加载，失败时 fallback 到本地枚举
+        // 分类列表：独立加载，失败时 fallback 到本地枚举。加载完成后自动拉取默认分类剧集。
         do {
             let cats = try await categoriesTask
             self.categories = cats
@@ -95,6 +95,10 @@ final class HomeViewModel: ObservableObject {
             self.categories = DramaCategory.allCases.map {
                 HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0)
             }
+        }
+        if !categories.isEmpty {
+            selectedCategoryIndex = 0
+            await loadCategoryDramas(for: categories[0])
         }
     }
 
@@ -114,17 +118,17 @@ final class HomeViewModel: ObservableObject {
         defer { isCategoryLoading = false }
 
         do {
-            // 真实模式：通过后端 code 调 categorySeries
-            if DependencyContainer.useRealAPI, let realRepo = repository as? RealHomeRepository {
+            // R4: localCategory != nil 优先走本地过滤（Mock 或 categories API 失败 fallback）
+            if let localCat = category.localCategory {
+                let matches = filterFeatured(by: localCat)
+                categoryDramas = matches.isEmpty ? featuredDramas : matches
+            } else if DependencyContainer.useRealAPI, let realRepo = repository as? RealHomeRepository {
+                // 真实后端分类（localCategory == nil）：通过 code 调 categorySeries
                 let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
                 let country = UserDefaults.standard.string(forKey: "app_country_code")
                 categoryDramas = try await realRepo.fetchDramasByCategoryCode(
                     code: category.code, contentLang: contentLang, country: country
                 )
-            } else if let localCat = category.localCategory {
-                // Mock 模式：本地过滤
-                let matches = filterFeatured(by: localCat)
-                categoryDramas = matches.isEmpty ? featuredDramas : matches
             } else {
                 categoryDramas = featuredDramas
             }
