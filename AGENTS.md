@@ -12,10 +12,11 @@
 
 ## 当前进度（Task16 更新）
 
-- Task16 R2：Search 真实搜索分页已实现（nextCursor/hasMore/isLoadingMore）、Search Default 真实数据源、Ranking 通过协议 fetchRankings(type:) 调后端（popular/trending/new）。
-- Categories 真实模式实现：通过 `/api/v2/categories` 获取后端分类 code+localizedName，iOS DramaCategory 中文枚举名匹配后端 localizedName 后调 categorySeries；Mock 保留本地枚举。
+- Task16 R4：Search 真实搜索分页已实现（nextCursor/hasMore/isLoadingMore/loadMoreIfNeeded），Search Default 支持真实数据源，Ranking 通过协议 `fetchRankings(type:)` 调后端（popular/trending/new）。
+- Categories 最终实现：Home Categories UI 使用 `HomeCategory(id/code/title/localCategory)`。真实模式通过 `/api/v2/categories` 获取后端 `code` 和 `localizedName`，点击后用后端 `code` 调 `/api/v2/categories/{code}/series`；Mock 或 categories API 失败时使用本地 `DramaCategory` fallback，只走本地过滤，不把中文 rawValue 当后端 code。
 - 本机 xcodebuild 可用：`xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort -destination 'platform=iOS Simulator,name=iPhone 17' build` 已通过。
 - Mock/Real 切换通过 `UserDefaults.standard.bool("use_real_api")` 控制，默认仍是 Mock。
+- 当前 P2 follow-up：`HomeViewModel` 仍通过 `repository as? RealHomeRepository` 调真实分类剧集接口，后续应把 `fetchDramasByCategoryCode(code:)` 收进 `HomeRepositoryProtocol`。
 
 ## 架构边界
 
