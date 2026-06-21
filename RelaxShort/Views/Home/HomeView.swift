@@ -164,25 +164,25 @@ struct HomeView: View {
         RankView(playerDrama: $playerDrama, repository: rankingRepository)
     }
 
-    // MARK: - Tab 3: Categories (Filters + 3-col grid)
-
-    @State private var selectedCategory: DramaCategory = .all
+    // MARK: - Tab 3: Categories (Task16 R3: 真实模式用后端分类)
 
     private var categoriesTabContent: some View {
         VStack(spacing: 0) {
-            // Filter pills
+            // Filter pills — 使用 viewModel.categories（真实模式来自后端 /api/v2/categories）
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: DT.Space.sm) {
-                    ForEach(DramaCategory.allCases, id: \.rawValue) { category in
+                    ForEach(Array(viewModel.categories.enumerated()), id: \.element.id) { idx, cat in
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) { selectedCategory = category }
+                            Task {
+                                await viewModel.selectCategory(at: idx)
+                            }
                         } label: {
-                            Text(category.rawValue)
-                                .font(.system(size: 13, weight: selectedCategory == category ? .bold : .regular))
-                                .foregroundColor(selectedCategory == category ? .white : DB.mutedText)
+                            Text(cat.title)
+                                .font(.system(size: 13, weight: viewModel.selectedCategoryIndex == idx ? .bold : .regular))
+                                .foregroundColor(viewModel.selectedCategoryIndex == idx ? .white : DB.mutedText)
                                 .padding(.horizontal, 14).padding(.vertical, 7)
                                 .background(
-                                    Capsule().fill(selectedCategory == category ? DB.pink : DB.panel)
+                                    Capsule().fill(viewModel.selectedCategoryIndex == idx ? DB.pink : DB.panel)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -192,16 +192,24 @@ struct HomeView: View {
             }
             .padding(.top, DT.Space.sm).padding(.bottom, DT.Space.md)
 
-            // Drama grid
-            let dramas: [DramaItem] = {
-                if selectedCategory == .all {
-                    return featuredOrEmpty
+            // Category loading / error / empty
+            if viewModel.isCategoryLoading {
+                Spacer()
+                ProgressView().tint(DT.Color.textSecondary)
+                Spacer()
+            } else if let err = viewModel.categoryErrorMessage, viewModel.categoryDramas.isEmpty {
+                VStack(spacing: DT.Space.md) {
+                    Spacer()
+                    Text(err).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
+                    Button(L10n.retry) {
+                        Task { await viewModel.selectCategory(at: viewModel.selectedCategoryIndex) }
+                    }
+                    .font(DT.Font.button).foregroundColor(DT.brandPink)
+                    Spacer()
                 }
-                let matches = viewModel.dramas(for: selectedCategory)
-                return matches.isEmpty ? featuredOrEmpty : matches
-            }()
-
-            ScrollView(showsIndicators: false) {
+            } else {
+                let dramas = viewModel.categoryDramas.isEmpty ? featuredOrEmpty : viewModel.categoryDramas
+                ScrollView(showsIndicators: false) {
                 LazyVGrid(
                     columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3),
                     spacing: DT.Space.md
@@ -222,6 +230,7 @@ struct HomeView: View {
                 Color.clear.frame(height: 72)
             }
         }
+    }
     }
 
     // MARK: - Tab 4: Anime

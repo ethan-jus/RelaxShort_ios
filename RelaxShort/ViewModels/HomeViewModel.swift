@@ -15,34 +15,35 @@ final class HomeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var selectedTab: Int = 0
 
+    // MARK: - Categories (Task16 R3)
+
+    /// 分类列表：真实模式来自后端 categories API，Mock 来自 DramaCategory 枚举
+    @Published var categories: [HomeCategory] = []
+    /// 当前选中的分类索引（对应 categories 数组）
+    @Published var selectedCategoryIndex: Int = 0
+    /// 当前分类的剧集列表
+    @Published var categoryDramas: [DramaItem] = []
+    /// 分类加载状态
+    @Published var isCategoryLoading: Bool = false
+    /// 分类错误信息
+    @Published var categoryErrorMessage: String?
+
     let tabs: [String] = [
         "Popular", "New", "Rankings", "Categories", "Anime", "VIP", "Original+"
     ]
 
-    /// 是否有内容可展示
     var hasContent: Bool { !fixedDramas.isEmpty }
 
     // MARK: - Per-Tab Drama Lists
 
-    /// Tab 1 "New" — 最新剧集（按 id 降序，模拟最新）
     var dramasForNewTab: [DramaItem] {
-        featuredDramas.sorted { lhs, rhs in
-            (Int(lhs.id) ?? 0) > (Int(rhs.id) ?? 0)
-        }
+        featuredDramas.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
     }
 
-    /// Tab 2 "Rankings" — 按 viewCount 降序
     var dramasForRankingsTab: [DramaItem] {
         rankingDramas
     }
 
-    /// 所有分类（排除 .all）
-    var browseCategories: [DramaCategory] {
-        DramaCategory.allCases.filter { $0 != .all }
-    }
-
-    /// Tab 4 "Anime" — tags 含 anime / animation / comics 的剧集
-    /// 不允许空白：无 tag 数据时 fallback 到 fantasy → featuredDramas.prefix(12)
     var dramasForAnimeTab: [DramaItem] {
         let anime = featuredDramas.filter { drama in
             drama.tags.contains { tag in
@@ -56,26 +57,8 @@ final class HomeViewModel: ObservableObject {
         return Array(featuredDramas.prefix(12))
     }
 
-    /// Tab 6 "Original+" — badge == .vip 或 isHot 为 true 的精选
     var dramasForOriginalPlusTab: [DramaItem] {
         featuredDramas.filter { $0.badge == .vip || $0.isHot }
-    }
-
-    /// 按 DramCategory 过滤剧集（用于 Categories tab）
-    func dramas(for category: DramaCategory) -> [DramaItem] {
-        let matches: [String] = {
-            switch category {
-            case .modernRomance: return ["现代言情"]
-            case .ancientCostume: return ["古代言情"]
-            case .sweetPet:      return ["甜宠"]
-            case .revenge:       return ["逆袭"]
-            case .billionaire:   return ["总裁"]
-            case .urban:         return ["都市"]
-            case .fantasy:       return ["玄幻"]
-            default:             return [category.rawValue]
-            }
-        }()
-        return featuredDramas.filter { matches.contains($0.category) }
     }
 
     init(repository: HomeRepositoryProtocol) {
@@ -89,6 +72,7 @@ final class HomeViewModel: ObservableObject {
 
         async let dramasTask = repository.fetchDramas(category: DramaCategory.all)
         async let bannersTask = repository.fetchBanners()
+        async let categoriesTask = repository.fetchHomeCategories()
 
         do {
             let (dramas, banners) = try await (dramasTask, bannersTask)
@@ -100,8 +84,72 @@ final class HomeViewModel: ObservableObject {
         } catch {
             errorMessage = "加载失败，请检查网络后重试"
             logError("HomeViewModel.loadData failed: \(error)")
-            // 降级：保持空数组，由 View 展示 Error/Empty 状态
         }
+
+        // 分类列表：独立加载，失败时 fallback 到本地枚举
+        do {
+            let cats = try await categoriesTask
+            self.categories = cats
+        } catch {
+            logError("HomeViewModel.loadCategories failed: \(error)")
+            self.categories = DramaCategory.allCases.map {
+                HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0)
+            }
+        }
+    }
+
+    // MARK: - Category Drama Loading (Task16 R3)
+
+    /// 切换分类并加载对应剧集
+    func selectCategory(at index: Int) async {
+        guard index >= 0, index < categories.count else { return }
+        selectedCategoryIndex = index
+        let cat = categories[index]
+        await loadCategoryDramas(for: cat)
+    }
+
+    private func loadCategoryDramas(for category: HomeCategory) async {
+        isCategoryLoading = true
+        categoryErrorMessage = nil
+        defer { isCategoryLoading = false }
+
+        do {
+            // 真实模式：通过后端 code 调 categorySeries
+            if DependencyContainer.useRealAPI, let realRepo = repository as? RealHomeRepository {
+                let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
+                let country = UserDefaults.standard.string(forKey: "app_country_code")
+                categoryDramas = try await realRepo.fetchDramasByCategoryCode(
+                    code: category.code, contentLang: contentLang, country: country
+                )
+            } else if let localCat = category.localCategory {
+                // Mock 模式：本地过滤
+                let matches = filterFeatured(by: localCat)
+                categoryDramas = matches.isEmpty ? featuredDramas : matches
+            } else {
+                categoryDramas = featuredDramas
+            }
+        } catch {
+            categoryErrorMessage = "分类数据加载失败"
+            logError("HomeViewModel.loadCategoryDramas failed: \(error)")
+            // 失败时不覆盖已有数据
+        }
+    }
+
+    /// 本地 DramaCategory 过滤（Mock 降级用）
+    private func filterFeatured(by category: DramaCategory) -> [DramaItem] {
+        let matches: [String] = {
+            switch category {
+            case .modernRomance: return ["现代言情"]
+            case .ancientCostume: return ["古代言情"]
+            case .sweetPet:      return ["甜宠"]
+            case .revenge:       return ["逆袭"]
+            case .billionaire:   return ["总裁"]
+            case .urban:         return ["都市"]
+            case .fantasy:       return ["玄幻"]
+            default:             return [category.rawValue]
+            }
+        }()
+        return featuredDramas.filter { matches.contains($0.category) }
     }
 
     private func logError(_ message: String) {

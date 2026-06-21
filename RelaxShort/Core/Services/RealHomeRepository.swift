@@ -59,6 +59,15 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         return []
     }
 
+    /// Task16 R3: 按后端 code 加载分类剧集（供 HomeViewModel 真实模式调用）
+    func fetchDramasByCategoryCode(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
+        let dto: SearchResponseDTO = try await client.requestData(
+            .categorySeries(categoryCode: code, cursor: nil, limit: 20,
+                          contentLanguage: contentLang, countryCode: country)
+        )
+        return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
+    }
+
     // MARK: - For You
 
     func fetchForYou(contentLang: String? = nil, country: String? = nil,
@@ -87,6 +96,24 @@ final class RealHomeRepository: HomeRepositoryProtocol {
             }
         }
         return nil
+    }
+
+    // MARK: - Categories (Task16 R3)
+
+    func fetchHomeCategories() async throws -> [HomeCategory] {
+        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
+        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let dto: CategoriesResponseDTO = try await client.requestData(
+            .categories(contentLanguage: contentLang, countryCode: country)
+        )
+        return (dto.items ?? []).map { item in
+            HomeCategory(
+                id: item.code ?? "",
+                code: item.code ?? "",
+                title: item.localizedName ?? item.code ?? "",
+                localCategory: nil
+            )
+        }
     }
 
     // MARK: - Rankings

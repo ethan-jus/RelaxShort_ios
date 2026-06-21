@@ -14,9 +14,15 @@ protocol HomeRepositoryProtocol {
     func fetchBanners() async throws -> [BannerItem]
     /// 按榜单类型获取排行（Task16：RankViewModel 通过协议调用后端 rankings）
     func fetchRankings(type: String) async throws -> [DramaItem]
+    /// 获取分类列表（Task16 R3：Home Categories tab 用）
+    func fetchHomeCategories() async throws -> [HomeCategory]
 }
 
 extension HomeRepositoryProtocol {
+    /// 默认实现：Mock 模式用本地 DramaCategory 列表
+    func fetchHomeCategories() async throws -> [HomeCategory] {
+        return DramaCategory.allCases.map { HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0) }
+    }
     /// 默认实现：本地排序降级（Mock 模式）
     func fetchRankings(type: String) async throws -> [DramaItem] {
         let dramas = try await fetchDramas(category: .all)

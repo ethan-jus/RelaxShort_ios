@@ -110,6 +110,7 @@
 		A9AA6BDCE7525C01ABC19F01 /* SeriesEpisodesResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A96C2B4E2AC50B8B17D50FC /* SeriesEpisodesResponseDTO.swift */; };
 		787FEE0511E957E8A50AE0CE /* PlayerMediaSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */; };
 		5C5D9C3E2148403992266DD2 /* PlayerCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */; };
+		DCD3189B09FF55E88489DE59 /* HomeCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -225,6 +226,7 @@
 		5A96C2B4E2AC50B8B17D50FC /* SeriesEpisodesResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API/SeriesEpisodesResponseDTO.swift"; sourceTree = "<group>"; };
 		D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API/PlayerMediaSource.swift"; sourceTree = "<group>"; };
 		89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCoordinator.swift; sourceTree = "<group>"; };
+		D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeCategory.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -544,6 +546,8 @@
 					CE297A7165A55E68BFCB9FA6 /* ForYouFeedResponseDTO.swift */,
 					5A96C2B4E2AC50B8B17D50FC /* SeriesEpisodesResponseDTO.swift */,
 					D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */,
+			
+				D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -740,6 +744,8 @@
 				E7FFE811FDC95A4F80C7A654 /* E7FFE811FDC95A4F80C7A654 in Sources */,
 				A9AA6BDCE7525C01ABC19F01 /* A9AA6BDCE7525C01ABC19F01 in Sources */,
 				787FEE0511E957E8A50AE0CE /* 787FEE0511E957E8A50AE0CE in Sources */,
+			
+				DCD3189B09FF55E88489DE59 /* DCD3189B09FF55E88489DE59 in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
