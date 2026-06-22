@@ -87,6 +87,12 @@ $ xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort \
 ** BUILD SUCCEEDED **
 ```
 
+Simulator UI check:
+
+- Installed and launched the Debug build on iPhone 17 simulator.
+- Verified Profile → Settings shows `Developer: API Smoke`.
+- Verified tapping the row presents `DebugSettingsView`.
+
 ### R1
 
 ```bash
@@ -113,4 +119,4 @@ Note: CC 的 `claude plugin list` 在其执行环境中被权限拦截；Codex �
 ## Remaining
 
 - Smoke test requires manual execution in simulator (CC environment cannot launch simulator)
-- Simulator UI verification (Profile → Settings → Developer entry) requires manual testing
+- Live smoke still requires a reachable backend server and configured `api_base_url`.
