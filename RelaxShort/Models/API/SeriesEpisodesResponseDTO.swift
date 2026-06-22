@@ -19,6 +19,31 @@ struct EpisodeItemDTO: Decodable {
     let vipRequired: Bool?
     let unlockCoinCost: Decimal?
     let status: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case episodeId
+        case episodeNumber
+        case localizedTitle
+        case localizedSynopsis
+        case durationSeconds
+        case isFree
+        case vipRequired
+        case unlockCoinCost
+        case status
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        episodeId = try container.decode(Int64.self, forKey: .episodeId)
+        episodeNumber = try container.decode(Int.self, forKey: .episodeNumber)
+        localizedTitle = try container.decodeIfPresent(String.self, forKey: .localizedTitle)
+        localizedSynopsis = try container.decodeIfPresent(String.self, forKey: .localizedSynopsis)
+        durationSeconds = try container.decodeIfPresent(Int.self, forKey: .durationSeconds)
+        isFree = FlexibleBoolDecoder.decode(container, forKey: .isFree)
+        vipRequired = FlexibleBoolDecoder.decode(container, forKey: .vipRequired)
+        unlockCoinCost = try container.decodeIfPresent(Decimal.self, forKey: .unlockCoinCost)
+        status = try container.decodeIfPresent(Int.self, forKey: .status)
+    }
 }
 
 // MARK: - Episode Play Response DTO

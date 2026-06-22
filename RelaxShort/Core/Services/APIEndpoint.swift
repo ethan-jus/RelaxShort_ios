@@ -158,6 +158,13 @@ extension APIEndpoint {
 
     /// 请求体
     var body: Data? {
+        switch method {
+        case .get, .delete:
+            return nil
+        case .post, .put, .patch:
+            break
+        }
+
         let params: [String: Any]
         switch self {
         case .appInit:
@@ -185,6 +192,9 @@ extension APIEndpoint {
             params = ["phone": phone, "code": code]
         default:
             params = [:]
+        }
+        guard !params.isEmpty || method == .post || method == .put || method == .patch else {
+            return nil
         }
         return try? JSONSerialization.data(withJSONObject: params, options: [])
     }
