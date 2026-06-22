@@ -13,7 +13,7 @@
 ## 当前进度（Task16 更新）
 
 - Task16 R4：Search 真实搜索分页已实现，Search Default 支持真实数据源，Ranking 通过协议调后端，Categories 完整接入。
-- Task17：DEBUG-only 真实 API 调试面板 + 冒烟测试已完成待合并。`DebugSettingsView` 可查看/切换 API 模式、baseURL、app init 上下文、一键运行 10 步冒烟测试。仅 DEBUG 可用，Release 不包含。
+- Task17：DEBUG-only 真实 API 调试面板 + 冒烟测试已完成并通过 Codex review。`DebugSettingsView` 可查看/切换 API 模式、baseURL、app init 上下文、一键运行 10 步冒烟测试。仅 DEBUG 可用，Release 不包含。
 - `fetchCategorySeries(code:)` 已收入 `HomeRepositoryProtocol`，`HomeViewModel` 不再直接依赖 `RealHomeRepository`。
 - 本机 xcodebuild 可用：`xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort -destination 'platform=iOS Simulator,name=iPhone 17' build` 已通过。
 - Mock/Real 切换通过 `UserDefaults.standard.bool("use_real_api")` 控制，默认仍是 Mock。
