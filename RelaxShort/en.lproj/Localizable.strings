@@ -90,6 +90,8 @@
 "profile.points" = "Points";
 "profile.quality" = "Quality";
 "profile.followed_count" = "Following %d";
+"profile.login_to_view" = "Login to View Profile";
+"profile.login_to_sync" = "Sign in to access your profile, wallet, and more";
 
 /* ---- Favorites ---- */
 "favorites.my_favorites" = "My Favorites";

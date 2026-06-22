@@ -96,6 +96,8 @@
 "profile.points" = "نقاط";
 "profile.quality" = "الجودة";
 "profile.followed_count" = "متابَع %d";
+"profile.login_to_view" = "سجّل الدخول لعرض الملف الشخصي";
+"profile.login_to_sync" = "سجّل الدخول للوصول إلى ملفك الشخصي ومحفظتك والمزيد";
 
 /* ---- Theme ---- */
 "theme.system" = "النظام";

@@ -96,6 +96,8 @@
 "profile.points" = "포인트";
 "profile.quality" = "화질";
 "profile.followed_count" = "팔로우 %d";
+"profile.login_to_view" = "로그인하여 프로필 보기";
+"profile.login_to_sync" = "로그인하면 프로필, 지갑 등을 이용할 수 있습니다";
 
 /* ---- Theme ---- */
 "theme.system" = "시스템 설정";

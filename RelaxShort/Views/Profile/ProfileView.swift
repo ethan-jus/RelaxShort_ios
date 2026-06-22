@@ -61,8 +61,26 @@ struct ProfileView: View {
     }
 
     @State private var showLogoutAlert = false
+    @State private var showLoginSheet = false
 
     var body: some View {
+        Group {
+            if authStore.isLoggedIn {
+                loggedInContent
+            } else {
+                guestProfileContent
+            }
+        }
+        .navigationDestination(for: ProfileSheet.self) { sheet in
+            profileDestination(for: sheet)
+        }
+        .navigationBarHidden(true)
+        .ignoresSafeArea()
+    }
+
+    // MARK: - Logged In Content
+
+    private var loggedInContent: some View {
         ScrollView {
             VStack(spacing: DT.Space.md) {
                 // ① Header
@@ -112,11 +130,6 @@ struct ProfileView: View {
             .padding(.horizontal, DT.Space.pageH)
         }
         .background(DT.Color.bgPrimary)
-        .navigationDestination(for: ProfileSheet.self) { sheet in
-            profileDestination(for: sheet)
-        }
-        .navigationBarHidden(true)
-        .ignoresSafeArea()
         .onAppear {
             viewModel.loadProfile()
         }
@@ -127,6 +140,58 @@ struct ProfileView: View {
             }
         } message: {
             Text(L10n.logoutConfirmMessage)
+        }
+    }
+
+    // MARK: - Guest Profile Content
+
+    /// 未登录状态的 Profile 页，与 My List 的 guest 状态保持一致
+    private var guestProfileContent: some View {
+        VStack(spacing: DT.Space.xl) {
+            Spacer()
+
+            // Avatar placeholder
+            ZStack {
+                Circle()
+                    .fill(DT.brandPink.opacity(0.12))
+                    .frame(width: 100, height: 100)
+                Image(systemName: "person.fill")
+                    .font(DT.Font.body(44))
+                    .foregroundColor(DT.brandPink)
+            }
+
+            Text(L10n.profileLoginToView)
+                .font(DT.Font.body(17, weight: .semibold))
+                .foregroundColor(DT.Color.textPrimary)
+
+            Text(L10n.profileLoginToSync)
+                .font(DT.Font.caption)
+                .foregroundColor(DT.Color.textTertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, DT.Space.xxl)
+
+            Button {
+                showLoginSheet = true
+            } label: {
+                Text(L10n.loginNow)
+                    .font(DT.Font.body(15, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 200, height: 44)
+                    .background(DT.brandPink)
+                    .clipShape(Capsule())
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(DT.Color.bgPrimary)
+        .sheet(isPresented: $showLoginSheet) {
+            LoginView()
+        }
+        .onChange(of: authStore.isLoggedIn) { _, newValue in
+            if newValue {
+                showLoginSheet = false
+            }
         }
     }
 

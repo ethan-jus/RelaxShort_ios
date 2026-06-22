@@ -143,6 +143,8 @@ enum L10n {
         "profile.points": "积分",
         "profile.quality": "画质",
         "profile.followed_count": "已关注 %d",
+        "profile.login_to_view": "登录后查看个人中心",
+        "profile.login_to_sync": "登录后即可访问个人资料、钱包等功能",
         "profile.logout": "退出登录",
         "profile.confirm_logout": "确认退出",
         "profile.logout_confirm_message": "确定要退出登录吗？",
@@ -506,6 +508,8 @@ enum L10n {
     static func followedCount(_ count: Int) -> String {
         loc("profile.followed_count", formatArgs: [count])
     }
+    static var profileLoginToView: String { loc("profile.login_to_view") }
+    static var profileLoginToSync: String { loc("profile.login_to_sync") }
     static var logout: String { loc("profile.logout") }
     static var confirmLogout: String { loc("profile.confirm_logout") }
     static var logoutConfirmMessage: String { loc("profile.logout_confirm_message") }

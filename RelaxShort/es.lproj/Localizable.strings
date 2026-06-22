@@ -96,6 +96,8 @@
 "profile.points" = "Puntos";
 "profile.quality" = "Calidad";
 "profile.followed_count" = "Siguiendo %d";
+"profile.login_to_view" = "Inicia sesión para ver tu perfil";
+"profile.login_to_sync" = "Inicia sesión para acceder a tu perfil, billetera y más";
 
 /* ---- Theme ---- */
 "theme.system" = "Sistema";

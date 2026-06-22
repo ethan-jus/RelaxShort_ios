@@ -90,6 +90,8 @@
 "profile.points" = "积分";
 "profile.quality" = "画质";
 "profile.followed_count" = "已关注 %d";
+"profile.login_to_view" = "登录后查看个人中心";
+"profile.login_to_sync" = "登录后即可访问个人资料、钱包等功能";
 
 /* ---- Favorites ---- */
 "favorites.my_favorites" = "我的收藏";
