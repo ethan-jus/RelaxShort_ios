@@ -231,6 +231,22 @@ enum L10n {
         "category.甜宠": "甜宠",
         "category.都市": "都市",
         "category.古装": "古装",
+        // English backend category names (Task20: prevent "category.Romance"-style display)
+        "category.Romance": "Romance",
+        "category.romance": "Romance",
+        "category.Fantasy": "Fantasy",
+        "category.fantasy": "Fantasy",
+        "category.Thriller": "Thriller",
+        "category.thriller": "Thriller",
+        "category.Drama": "Drama",
+        "category.drama": "Drama",
+        "category.Action": "Action",
+        "category.action": "Action",
+        // Badge tag labels
+        "badge.vip": "VIP",
+        "badge.hot": "Hot",
+        "badge.new": "New",
+        "badge.trending": "Trending",
         // Theme
         "theme.system": "跟随系统",
         "theme.light": "浅色模式",
@@ -533,7 +549,70 @@ enum L10n {
     static var synopsis: String { loc("recommend.synopsis") }
     static var expand: String { loc("player.expand") }
     static func tagDisplayName(_ tag: String) -> String { loc("tag.\(tag)") }
-    static func categoryDisplayName(_ category: String) -> String { loc("category.\(category)") }
+
+    /// Returns a user-facing category name.
+    /// Known backend names/codes (Romance, Fantasy, Thriller, Drama, Action, and their lowercase
+    /// variants) map through the fallback dictionary. Unknown non-empty categories return the raw
+    /// category text after stripping any accidental `category.` prefix. Empty string means
+    /// "no category tag should be rendered".
+    static func categoryDisplayName(_ category: String) -> String {
+        guard !category.isEmpty else { return "" }
+        let result = loc("category.\(category)")
+        // If the result still looks like a localization key (e.g. "category.SciFi"),
+        // strip the prefix and return the raw name.
+        if result.hasPrefix("category.") {
+            return String(result.dropFirst("category.".count))
+        }
+        return result
+    }
+
+    // MARK: - Badge Tags (Task20: semantic badge display)
+
+    /// Describes a single badge tag for player / recommend card overlays.
+    enum BadgeTag: String, CaseIterable {
+        case vip, hot, trending, new, category
+    }
+
+    /// Ordered badge tag keys for `drama`, respecting compact display rules.
+    /// - VIP / Members tag: shown when `isMemberOnly || isVIPOnly || badge == .vip`
+    /// - Hot: shown when `isHot || badge == .hot`
+    /// - Trending: shown when `isTrending`
+    /// - New: shown when `badge == .new`
+    /// - Category: shown when `category` is non-empty
+    static func dramaBadgeTags(for drama: DramaItem) -> [BadgeTag] {
+        var tags: [BadgeTag] = []
+        if drama.isMemberOnly || drama.isVIPOnly || drama.badge == .vip {
+            tags.append(.vip)
+        }
+        if drama.isHot || drama.badge == .hot {
+            tags.append(.hot)
+        }
+        if drama.isTrending {
+            tags.append(.trending)
+        }
+        if drama.badge == .new {
+            tags.append(.new)
+        }
+        if !drama.category.isEmpty {
+            tags.append(.category)
+        }
+        // Keep tag count compact — max 4
+        if tags.count > 4 {
+            tags = Array(tags.prefix(4))
+        }
+        return tags
+    }
+
+    /// Human-readable label for a `BadgeTag`.
+    static func badgeTagLabel(_ tag: BadgeTag) -> String {
+        switch tag {
+        case .vip:       return loc("badge.vip")
+        case .hot:       return loc("badge.hot")
+        case .trending:  return loc("badge.trending")
+        case .new:       return loc("badge.new")
+        case .category:  return "" // filled by caller from categoryDisplayName
+        }
+    }
 
     // MARK: - Exit Guide
 

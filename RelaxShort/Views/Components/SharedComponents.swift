@@ -282,3 +282,44 @@ struct RankingRow: View {
         .contentShape(Rectangle())
     }
 }
+
+// MARK: - Badge Tag View (Task20: shared badge rendering)
+
+/// Renders a single badge tag for player / recommend card overlays.
+/// Uses feed-style styling with configurable foreground/background colors.
+struct DramaBadgeTagView: View {
+    let tag: L10n.BadgeTag
+    let drama: DramaItem
+
+    var body: some View {
+        switch tag {
+        case .vip:
+            feedTag(L10n.badgeTagLabel(.vip), bg: .goldVipBadgeBg, fg: .goldVipBadgeFg)
+        case .hot:
+            feedTag(L10n.badgeTagLabel(.hot), bg: .white.opacity(0.12), fg: .white.opacity(0.85))
+        case .trending:
+            feedTag(L10n.badgeTagLabel(.trending), bg: .white.opacity(0.12), fg: .white.opacity(0.85))
+        case .new:
+            feedTag(L10n.badgeTagLabel(.new), bg: .white.opacity(0.12), fg: .white.opacity(0.85))
+        case .category:
+            let cat = L10n.categoryDisplayName(drama.category)
+            if !cat.isEmpty {
+                feedTag(cat, bg: .white.opacity(0.12), fg: .white.opacity(0.85))
+            }
+        }
+    }
+
+    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(fg)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(bg)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+private extension Color {
+    static let goldVipBadgeBg = Color(red: 0.85, green: 0.72, blue: 0.38).opacity(0.25)
+    static let goldVipBadgeFg = Color(red: 0.85, green: 0.72, blue: 0.38)
+}

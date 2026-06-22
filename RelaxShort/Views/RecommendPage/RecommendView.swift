@@ -227,11 +227,14 @@ struct RecommendView: View {
                             }
                             .buttonStyle(.plain)
 
-                            // 标签
-                            HStack(spacing: 6) {
-                                feedTag("Members Only", bg: DB.gold.opacity(0.25), fg: DB.gold)
-                                feedTag("Exclusive", bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
-                                feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                            // 标签（根据 DramaItem 状态动态展示）
+                            let badgeTags = L10n.dramaBadgeTags(for: drama)
+                            if !badgeTags.isEmpty {
+                                HStack(spacing: 6) {
+                                    ForEach(Array(badgeTags.enumerated()), id: \.offset) { _, tag in
+                                        DramaBadgeTagView(tag: tag, drama: drama)
+                                    }
+                                }
                             }
 
                             // 简介展开和收起
@@ -312,12 +315,6 @@ struct RecommendView: View {
     private func truncatedSynopsis(_ text: String) -> String {
         if text.count > 80 { String(text.prefix(80)) }
         else { text }
-    }
-
-    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
-        Text(text).font(.system(size: 12, weight: .medium)).foregroundColor(fg)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(bg).clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     private func loadAndInit() async {

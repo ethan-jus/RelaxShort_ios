@@ -140,7 +140,7 @@ struct SeriesPlayerView: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
-        .navigationTitle("\(drama.title) \(L10n.episodeNumber(currentEpisode))")
+        .navigationTitle("\(drama.title) \(L10n.playerEpisodeNumber(currentEpisode))")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showShare) {
             ShareSheet(dramaTitle: drama.title)
@@ -252,11 +252,14 @@ struct SeriesPlayerView: View {
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
-                // 标签（与 For You 一致：Members Only + Exclusive + 题材）
-                HStack(spacing: 6) {
-                    feedTag("Members Only", bg: DB.gold.opacity(0.25), fg: DB.gold)
-                    feedTag("Exclusive", bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
-                    feedTag(L10n.categoryDisplayName(drama.category), bg: Color.white.opacity(0.12), fg: .white.opacity(0.85))
+                // 标签（根据 DramaItem 状态动态展示）
+                let badgeTags = L10n.dramaBadgeTags(for: drama)
+                if !badgeTags.isEmpty {
+                    HStack(spacing: 6) {
+                        ForEach(Array(badgeTags.enumerated()), id: \.offset) { _, tag in
+                            DramaBadgeTagView(tag: tag, drama: drama)
+                        }
+                    }
                 }
                 // 简介
                 (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
@@ -270,12 +273,6 @@ struct SeriesPlayerView: View {
             .padding(.horizontal, horizontalPadding)
             .padding(.bottom, 66)
         }
-    }
-
-    private func feedTag(_ text: String, bg: Color, fg: Color) -> some View {
-        Text(text).font(.system(size: 12, weight: .medium)).foregroundColor(fg)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(bg).clipShape(RoundedRectangle(cornerRadius: 4))
     }
 
     // MARK: - 进度条（带拖动和点击）
