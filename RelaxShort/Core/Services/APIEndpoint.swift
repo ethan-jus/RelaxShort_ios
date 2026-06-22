@@ -37,6 +37,12 @@ enum APIEndpoint {
     case categories(contentLanguage: String?, countryCode: String?)
     case categorySeries(categoryCode: String, cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?)
 
+    // MARK: - Task23 用户/钱包/偏好端点
+
+    case userMe
+    case userWallet
+    case updateUserPreferences(uiLanguage: String?, contentLanguage: String?, subtitleLanguage: String?, defaultQuality: String?)
+
     // MARK: - 旧 mock 端点（保留兼容）
 
     case homeFeed(category: DramaCategory)
@@ -67,7 +73,8 @@ extension APIEndpoint {
     var baseURL: String {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries:
+             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
+             .userMe, .userWallet, .updateUserPreferences:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -89,6 +96,10 @@ extension APIEndpoint {
         case .rankings:                     return "/api/v2/rankings"
         case .categories:                   return "/api/v2/categories"
         case .categorySeries(let code, _, _, _, _): return "/api/v2/categories/\(code)/series"
+        // ── Task23 v2 ──
+        case .userMe:                           return "/api/v2/users/me"
+        case .userWallet:                       return "/api/v2/users/me/wallet"
+        case .updateUserPreferences:            return "/api/v2/users/me/preferences"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -116,7 +127,9 @@ extension APIEndpoint {
         switch self {
         case .appInit:              return .post
         case .forYou, .seriesEpisodes, .episodePlay,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries: return .get
+             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
+             .userMe, .userWallet: return .get
+        case .updateUserPreferences: return .patch
         case .homeFeed, .banners, .dramaDetail, .episodes,
              .watchHistory, .userProfile, .subscriptionStatus,
              .bookmarks, .coinTransactions, .search: return .get
@@ -124,6 +137,16 @@ extension APIEndpoint {
              .purchaseCoins, .login: return .post
         case .updateProfile: return .patch
         case .removeBookmark, .logout: return .delete
+        }
+    }
+
+    /// 是否需要 X-User-Id 请求头（仅 user/profile/wallet 端点）
+    private var requiresUserIdHeader: Bool {
+        switch self {
+        case .userMe, .userWallet, .updateUserPreferences:
+            return true
+        default:
+            return false
         }
     }
 
@@ -153,6 +176,16 @@ extension APIEndpoint {
         if let token = StorageService.shared.accessToken {
             base["Authorization"] = "Bearer \(token)"
         }
+
+        // 本地 dev 桥：用户端点需要 X-User-Id（仅 real API 模式生效）
+        if requiresUserIdHeader {
+            let userId = StorageService.shared.userId
+                ?? (UserDefaults.standard.bool(forKey: "use_real_api") ? "1" : nil)
+            if let uid = userId {
+                base["X-User-Id"] = uid
+            }
+        }
+
         return base
     }
 
@@ -190,6 +223,13 @@ extension APIEndpoint {
             params = ["keyword": keyword, "page": page, "pageSize": 20]
         case .login(let phone, let code):
             params = ["phone": phone, "code": code]
+        case .updateUserPreferences(let uiLang, let contentLang, let subLang, let quality):
+            var dict: [String: String] = [:]
+            if let v = uiLang { dict["ui_language"] = v }
+            if let v = contentLang { dict["content_language"] = v }
+            if let v = subLang { dict["subtitle_language"] = v }
+            if let v = quality { dict["default_quality"] = v }
+            params = dict
         default:
             params = [:]
         }

@@ -38,7 +38,11 @@ import Combine
 
     func initializePool(dramas: [DramaItem]) {
         guard !dramas.isEmpty else { return }
-        let items = dramas.map { $0.toPlayerMediaItem() }
+        let items = dramas.compactMap { $0.toPlayerMediaItem() }
+        guard !items.isEmpty else {
+            print("[PlayerKit] initializePool skipped reason=no-playable-items dramas=\(dramas.count)")
+            return
+        }
         if let coordinator {
             coordinator.claimForYou(items: items, index: 0)
         } else {
@@ -77,13 +81,21 @@ extension PlayerMediaItem {
 }
 
 extension DramaItem {
-    func toPlayerMediaItem() -> PlayerMediaItem {
-        let source: PlayerMediaSource = videoURL.flatMap(URL.init).map { .mp4($0) } ?? .mp4(URL(string: "about:blank")!)
+    /// Task24 R2: 可失败构造，禁止 about:blank 进入 PlayerKit。
+    /// 仅当 videoURL 为 http/https scheme 时才创建 PlayerMediaItem，
+    /// 否则打印诊断日志返回 nil，由调用方 compactMap 过滤。
+    func toPlayerMediaItem() -> PlayerMediaItem? {
+        guard let raw = videoURL,
+              let url = URL(string: raw),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+            print("[PlayerKit] skip playable item id=\(id) reason=missing-video-url title=\(title) videoURL=\(videoURL ?? "nil")")
+            return nil
+        }
         let episodeNumber = max(1, currentEpisode)
         return PlayerMediaItem(
             id: PlayerMediaItem.stableID(dramaID: id, episodeNumber: episodeNumber),
             title: title, episodeNumber: episodeNumber,
-            coverURL: coverURL, source: source, resumeTime: nil
+            coverURL: coverURL, source: .mp4(url), resumeTime: nil
         )
     }
 }

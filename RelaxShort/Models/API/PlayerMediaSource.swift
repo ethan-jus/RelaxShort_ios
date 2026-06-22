@@ -34,4 +34,26 @@ struct PlaybackMediaSourceDTO {
         self.defaultSubtitleLanguage = playResponse.defaultSubtitleLanguage
         self.thumbnailTrack = playResponse.thumbnailTrack
     }
+
+    /// 将播放接口 DTO 转换为 PlayerKit 的 `PlayerMediaSource` 枚举。
+    /// Task24：根据 sourceType 选择 hls / mp4 / hls_with_fallback，为播放器提供正确的媒体源类型。
+    func toPlayerMediaSource() -> PlayerMediaSource? {
+        switch sourceType {
+        case "hls_with_fallback":
+            guard let hls = masterUrl, let hlsURL = URL(string: hls),
+                  let mp4 = fallbackMp4Url, let mp4URL = URL(string: mp4) else { return nil }
+            return .hlsWithFallback(masterURL: hlsURL, fallbackMP4URL: mp4URL)
+        case "hls":
+            guard let hls = masterUrl, let hlsURL = URL(string: hls) else { return nil }
+            return .hls(masterURL: hlsURL)
+        case "mp4":
+            guard let mp4 = fallbackMp4Url ?? preferredPlaybackURL,
+                  let mp4URL = URL(string: mp4) else { return nil }
+            return .mp4(mp4URL)
+        default:
+            guard let preferred = preferredPlaybackURL,
+                  let url = URL(string: preferred) else { return nil }
+            return .mp4(url)
+        }
+    }
 }

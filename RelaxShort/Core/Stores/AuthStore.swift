@@ -91,6 +91,17 @@ final class AuthStore: ObservableObject {
         persistUser()
     }
 
+    /// 从后端加载的 Profile 数据同步到 AuthStore（不改变登录状态）。
+    /// 调用方必须已确认 `isLoggedIn == true` 后再使用此方法。
+    func applyLoadedProfile(_ user: User) {
+        currentUser = user
+        isVip = user.isVipValid
+        vipExpireDate = user.vipExpireDate
+        coinBalance = user.coinBalance
+        storage.userId = user.id
+        persistUser()
+    }
+
     // MARK: - Private Helpers
 
     private func signIn(

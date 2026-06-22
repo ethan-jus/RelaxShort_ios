@@ -96,6 +96,7 @@ struct MainTabView: View {
 /// 导航状态变化只触发主标签视图重建，不影响标签内容容器的视图身份。
 private struct TabContentHost: View {
     @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject var dependencies: DependencyContainer
     let homeVM: HomeViewModel
     let homeRepository: HomeRepositoryProtocol
     let recommendVM: RecommendViewModel
@@ -127,7 +128,7 @@ private struct TabContentHost: View {
                 .opacity(appStore.selectedTab == .myList ? 1 : 0)
                 .disabled(appStore.selectedTab != .myList)
 
-            ProfileView()
+            ProfileView(viewModel: ProfileViewModel(repository: dependencies.profileRepository))
                 .id(AppStore.Tab.profile.rawValue)
                 .zIndex(appStore.selectedTab == .profile ? 1 : 0)
                 .opacity(appStore.selectedTab == .profile ? 1 : 0)

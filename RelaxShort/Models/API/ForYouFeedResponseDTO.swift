@@ -79,11 +79,33 @@ struct MonetizationDTO: Decodable {
 }
 
 /// 对应后端 `play_asset` Map（简版：仅含 master URL / fallback / qualities 摘要）
+/// Task24 R2: 后端 feed 快照 play_asset_json 的 key 是 `hls` / `mp4_fallback`，
+/// 但 convertFromSnakeCase 只把 mp4_fallback→mp4Fallback，不把 hls→hlsMasterUrl。
+/// 这里显式兼容两类 key：后端 feed 快照的短 key（hls/mp4Fallback）与播放接口的标准 key（hlsMasterUrl/mp4FallbackUrl）。
 struct PlayAssetDTO: Decodable {
     let hlsMasterUrl: String?
     let mp4FallbackUrl: String?
     let qualities: [QualityDTO]?
     let subtitles: [SubtitleDTO]?
+
+    private enum CodingKeys: String, CodingKey {
+        case hls
+        case hlsMasterUrl
+        case mp4Fallback
+        case mp4FallbackUrl
+        case qualities
+        case subtitles
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hlsMasterUrl = try container.decodeIfPresent(String.self, forKey: .hlsMasterUrl)
+            ?? container.decodeIfPresent(String.self, forKey: .hls)
+        mp4FallbackUrl = try container.decodeIfPresent(String.self, forKey: .mp4FallbackUrl)
+            ?? container.decodeIfPresent(String.self, forKey: .mp4Fallback)
+        qualities = try container.decodeIfPresent([QualityDTO].self, forKey: .qualities)
+        subtitles = try container.decodeIfPresent([SubtitleDTO].self, forKey: .subtitles)
+    }
 }
 
 struct QualityDTO: Decodable {

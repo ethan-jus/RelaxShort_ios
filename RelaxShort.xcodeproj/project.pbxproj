@@ -113,6 +113,8 @@
 		DCD3189B09FF55E88489DE59 /* HomeCategory.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */; };
 		47CAE4E9748555F58485DF77 /* RealAPISmokeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */; };
 		E0F0A47B6CF65DF99FE3A0D0 /* DebugSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFCC81788679592EBF64CF9F /* DebugSettingsView.swift */; };
+		F1A23B000000000000000001 /* UserProfileResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A23B000000000000000002 /* UserProfileResponseDTO.swift */; };
+		F1A23B000000000000000003 /* RealProfileRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A23B000000000000000004 /* RealProfileRepository.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -231,6 +233,8 @@
 		D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "HomeCategory.swift"; sourceTree = "<group>"; };
 		CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealAPISmokeRunner.swift"; sourceTree = "<group>"; };
 		EFCC81788679592EBF64CF9F /* DebugSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Debug/DebugSettingsView.swift"; sourceTree = "<group>"; };
+		F1A23B000000000000000002 /* UserProfileResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "API/UserProfileResponseDTO.swift"; sourceTree = "<group>"; };
+		F1A23B000000000000000004 /* RealProfileRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RealProfileRepository.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -385,6 +389,7 @@
 				173DC61A9CC85DAEB9CFD0ED /* RealHomeRepository.swift */,
 				3E07DF14795E56458A576B7D /* RealSearchRepository.swift */,
 				065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */,
+				F1A23B000000000000000004 /* RealProfileRepository.swift */,
 
 				CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */,
 			);
@@ -553,6 +558,7 @@
 					B63560DCD0A454C5BE878E22 /* AppInitResponseDTO.swift */,
 					CE297A7165A55E68BFCB9FA6 /* ForYouFeedResponseDTO.swift */,
 					5A96C2B4E2AC50B8B17D50FC /* SeriesEpisodesResponseDTO.swift */,
+					F1A23B000000000000000002 /* UserProfileResponseDTO.swift */,
 					D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */,
 
 				D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */,
@@ -748,7 +754,9 @@
 				E09FFD1FC4CA5F27B337582E /* E09FFD1FC4CA5F27B337582E in Sources */,
 				A0E1F901A6725799956393D0 /* A0E1F901A6725799956393D0 in Sources */,
 				CEDC26B856AE55F0A2AD1160 /* CEDC26B856AE55F0A2AD1160 in Sources */,
+				F1A23B000000000000000003 /* F1A23B000000000000000003 in Sources */,
 				A2224A7AD8D851AC87787F17 /* A2224A7AD8D851AC87787F17 in Sources */,
+				F1A23B000000000000000001 /* F1A23B000000000000000001 in Sources */,
 				E7FFE811FDC95A4F80C7A654 /* E7FFE811FDC95A4F80C7A654 in Sources */,
 				A9AA6BDCE7525C01ABC19F01 /* A9AA6BDCE7525C01ABC19F01 in Sources */,
 				787FEE0511E957E8A50AE0CE /* 787FEE0511E957E8A50AE0CE in Sources */,

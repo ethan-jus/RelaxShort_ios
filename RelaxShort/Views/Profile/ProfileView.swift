@@ -133,6 +133,10 @@ struct ProfileView: View {
         .onAppear {
             viewModel.loadProfile()
         }
+        .onChange(of: viewModel.profile) { _, newProfile in
+            guard let user = newProfile, authStore.isLoggedIn else { return }
+            authStore.applyLoadedProfile(user)
+        }
         .alert(L10n.confirmLogout, isPresented: $showLogoutAlert) {
             Button(L10n.cancel, role: .cancel) {}
             Button(L10n.logout, role: .destructive) {
@@ -256,7 +260,7 @@ struct ProfileView: View {
                 )
                 .frame(width: 60, height: 60)
 
-            Text(viewModel.displayName)
+            Text(viewModel.avatarInitials)
                 .font(DT.Font.body(22, weight: .bold))
                 .foregroundColor(.white)
         }

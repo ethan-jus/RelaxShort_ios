@@ -38,7 +38,7 @@ final class DependencyContainer: ObservableObject {
         searchRepository: SearchRepositoryProtocol? = nil,
         detailRepository: DetailRepositoryProtocol? = nil,
         favoritesRepository: FavoritesRepositoryProtocol = MockFavoritesRepository(),
-        profileRepository: ProfileRepositoryProtocol = MockProfileRepository(),
+        profileRepository: ProfileRepositoryProtocol? = nil,
         authRepository: AuthRepositoryProtocol = MockAuthRepository(),
         vipRepository: VIPRepositoryProtocol = MockVIPRepository(),
         coinRewardRepository: CoinRewardRepositoryProtocol = MockCoinRewardRepository()
@@ -62,7 +62,12 @@ final class DependencyContainer: ObservableObject {
             self.detailRepository = Self.useRealAPI ? RealDetailRepository() : MockDetailRepository()
         }
         self.favoritesRepository = favoritesRepository
-        self.profileRepository = profileRepository
+        // Profile：根据开关选择 Real 或 Mock（Task23）
+        if let pr = profileRepository {
+            self.profileRepository = pr
+        } else {
+            self.profileRepository = Self.useRealAPI ? RealProfileRepository() : MockProfileRepository()
+        }
         self.authRepository = authRepository
         self.vipRepository = vipRepository
         self.coinRewardRepository = coinRewardRepository

@@ -43,6 +43,12 @@ final class ProfileViewModel: ObservableObject {
 
     var displayName: String {
         guard let profile = profile else { return "" }
+        return profile.nickname
+    }
+
+    /// Avatar 内显示的首字母缩写（2 字符上限）
+    var avatarInitials: String {
+        guard let profile = profile else { return "" }
         return String(profile.nickname.prefix(2)).uppercased()
     }
 

@@ -1,7 +1,7 @@
 import Foundation
 
 /// 用户模型 — 包含个人信息、会员状态、金币余额等核心字段
-struct User: Codable, Identifiable {
+struct User: Codable, Identifiable, Equatable {
     /// 用户唯一标识
     let id: String
     /// 用户昵称

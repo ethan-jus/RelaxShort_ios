@@ -42,15 +42,13 @@ enum PlayerItemFactory {
         }
     }
 
-    /// 创建主播放条目：首段缓存足够时走缓存代理，否则直连优先出画
+    /// 创建主播放条目：MP4 一律直连，避免 relaxshort-cache:// 自定义 scheme 触发 CustomURLFlume 失败。
+    /// Task24：旧 HTTP MP4 CDN 不支持通过 cache scheme 代理，强制直连保证首帧出画。
+    /// 预加载仍通过 startWarmCache 提前下载首段到 HTTPRangeMediaCache，但不通过 scheme 代理播放。
     static func makePlaybackItem(from source: PlayerMediaSource) -> PlayerManagedItem {
         if let url = mp4URL(from: source) {
             let leadingBytes = HTTPRangeMediaCache.shared.leadingCachedBytes(for: url)
-            if HTTPRangeMediaCache.shared.hasPlayableLeadCache(for: url, minimumBytes: minimumPlayableLeadCacheBytes) {
-                print("[PlayerKit] playback item cache-ready url=\(url.lastPathComponent) leading=\(leadingBytes)")
-                return makeManagedItem(from: source)
-            }
-            print("[PlayerKit] playback item direct url=\(url.lastPathComponent) leading=\(leadingBytes)")
+            print("[PlayerKit] makePlaybackItem source=\(sourceKind(source)) url=\(url.absoluteString) strategy=direct leading=\(leadingBytes)")
         }
         return makeDirectItem(from: source)
     }

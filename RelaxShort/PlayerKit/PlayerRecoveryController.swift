@@ -21,6 +21,10 @@ final class PlayerRecoveryController {
     private let monitor = NWPathMonitor()
     private var isOnline = true
 
+    /// Task24: 每个 media item 连续恢复失败计数，防止无限 recovery
+    private var failureCounts: [String: Int] = [:]
+    private let maxRecoveryAttempts = 3
+
     // observer tokens — 可 detach
     private var failObserver: Any?
     private var stallObserver: Any?
@@ -80,6 +84,10 @@ final class PlayerRecoveryController {
                             e.updateState(.playing)
                         default: break
                         }
+                    }
+                    // Task24: 播放恢复正常，清除当前 item 的失败计数
+                    if let id = self.engine?.currentItem?.id {
+                        self.failureCounts.removeValue(forKey: id)
                     }
                 default: break
                 }
@@ -166,12 +174,21 @@ final class PlayerRecoveryController {
 
     /// 公开 — engine item status failed 时调用
     func attemptRecovery(reason: RecoveryReason = .networkRestored) {
-        guard let engine, let _ = lastItem, wasPlaying else { return }
+        guard let engine, let item = lastItem, wasPlaying else { return }
+
+        // Task24: 同一 media item 连续失败上限检查
+        let count = (failureCounts[item.id] ?? 0) + 1
+        failureCounts[item.id] = count
+        if count > maxRecoveryAttempts {
+            print("[PlayerKit] recovery capped id=\(item.id) failures=\(count) max=\(maxRecoveryAttempts)")
+            engine.updateState(.failed(message: "连续恢复失败(\(count)次)"))
+            return
+        }
 
         recoveryTask?.cancel()
         let startTime = CACurrentMediaTime()
         let recoverTime = lastTime
-        print("[PlayerKit] recovery start id=\(lastItem?.id ?? "?") time=\(recoverTime) reason=\(reason.rawValue)")
+        print("[PlayerKit] recovery start id=\(item.id) time=\(recoverTime) reason=\(reason.rawValue) attempt=\(count)/\(maxRecoveryAttempts)")
 
         engine.updateState(.recovering)
         engine.rebuildCurrentItem(autoplay: false)

@@ -23,6 +23,8 @@ struct SeriesPlayerView: View {
     @State private var pendingLockedEpisode: Int?
     @State private var isUIVisible = true
     @State private var autoHideTask: Task<Void, Never>?
+    /// Task24: 缓存当前集播放接口返回的 PlayerMediaSource（key = episodeId）
+    @State private var episodeMediaSources: [String: PlayerMediaSource] = [:]
 
     @EnvironmentObject var playerCoordinator: PlayerCoordinator
 
@@ -192,15 +194,21 @@ struct SeriesPlayerView: View {
         initializeEpisodePlayer()
     }
 
-    /// 通过 RealDetailRepository 获取当前集播放地址，更新 Episode.videoURL。
+    /// 通过 RealDetailRepository 获取当前集播放地址和 PlayerMediaSource。
+    /// 更新 Episode.videoURL 兼容字段，同时缓存 source 供 playerItems 使用。
     /// 失败时保留已有 URL（来自 episodes 响应或 Mock）。
     private func fetchCurrentEpisodePlaybackURL() async {
         guard let repo = dependencies.detailRepository as? RealDetailRepository else { return }
         guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == currentEpisode }) else { return }
+        let episodeId = episodes[epIndex].id
         do {
-            if let url = try await repo.fetchPlaybackURL(episodeId: episodes[epIndex].id) {
+            let dto = try await repo.fetchPlayAsset(episodeId: episodeId)
+            if let url = dto.preferredPlaybackURL {
                 episodes[epIndex].videoURL = url
-                Logger.viewModel.info("SeriesPlayerView: fetched playback URL for EP \(currentEpisode)")
+            }
+            if let source = dto.toPlayerMediaSource() {
+                episodeMediaSources[episodeId] = source
+                Logger.viewModel.info("SeriesPlayerView: fetched source type=\(dto.sourceType) for EP \(currentEpisode)")
             }
         } catch {
             Logger.viewModel.warning("SeriesPlayerView: episodePlay failed, using fallback videoURL: \(error.localizedDescription)")
@@ -209,13 +217,21 @@ struct SeriesPlayerView: View {
 
     private func playerItems(from eps: [Episode]) -> [PlayerMediaItem] {
         eps.compactMap { ep -> PlayerMediaItem? in
-            guard let url = URL(string: ep.videoURL) else { return nil }
+            // Task24: 优先使用播放接口返回的 PlayerMediaSource（含正确 source type）
+            let source: PlayerMediaSource
+            if let cached = episodeMediaSources[ep.id] {
+                source = cached
+            } else if let url = URL(string: ep.videoURL) {
+                source = .mp4(url)
+            } else {
+                return nil
+            }
             return PlayerMediaItem(
                 id: PlayerMediaItem.stableID(dramaID: drama.id, episodeNumber: ep.episodeNumber),
                 title: drama.title,
                 episodeNumber: ep.episodeNumber,
                 coverURL: drama.coverURL,
-                source: .mp4(url),
+                source: source,
                 resumeTime: nil
             )
         }
