@@ -1,12 +1,16 @@
 # Task 17 Delivery Report: iOS Real API Smoke & Debug Readiness
 
 **Branch**: `task/task17-ios-real-api-smoke`
-**Commit**: `d8a69ba`
-**Date**: 2026-06-21
+**Commits**:
+- R1: `d8a69ba` — initial implementation (smoke runner, debug panel, protocol cleanup)
+- R1 docs: `a540054`, `ec726d9`
+- R2: `5ce2e05` — Codex R1 review fixes (wire DebugSettingsView, whitespace, docs)
+
+**Date**: 2026-06-21 (R1), 2026-06-22 (R2)
 
 ## Summary
 
-Added DEBUG-only real API smoke runner, debug settings panel, and protocol cleanup per `docs/CC_TASK17_IOS_REAL_API_SMOKE.md`.
+Added DEBUG-only real API smoke runner, debug settings panel, and protocol cleanup per `docs/CC_TASK17_IOS_REAL_API_SMOKE.md`. R2 fixes per `docs/CODEX_REVIEW_TASK17_R1.md` and `docs/CC_TASK17_R2_FIXES.md`.
 
 ## Files Changed
 
@@ -19,6 +23,16 @@ Added DEBUG-only real API smoke runner, debug settings panel, and protocol clean
 | `RelaxShort/ViewModels/HomeViewModel.swift` | Remove `repository as? RealHomeRepository` cast; use protocol method |
 | `RelaxShort.xcodeproj/project.pbxproj` | Add new files to Sources |
 | `AGENTS.md` | Update Task17 status |
+| `docs/TASK17_DELIVERY_REPORT.md` | This report (updated R2) |
+
+### R2 Fixes (per `docs/CC_TASK17_R2_FIXES.md`)
+
+| File | Change |
+|------|--------|
+| `RelaxShort/Views/Profile/ProfileView.swift` | SettingsView: add DEBUG-only "Developer: API Smoke" row + sheet presentation |
+| `RelaxShort.xcodeproj/project.pbxproj` | Clean trailing whitespace (4 lines) |
+| `AGENTS.md` | Remove stale `HomeViewModel as? RealHomeRepository` mention |
+| `docs/TASK17_DELIVERY_REPORT.md` | Add R2 commits, live smoke status, ECC usage record |
 
 ## Debug Panel
 
@@ -29,7 +43,7 @@ Added DEBUG-only real API smoke runner, debug settings panel, and protocol clean
 - **Actions**: Save Settings, Reset to Mock, Run App Init, Run API Smoke Test
 - **Smoke Results**: per-step status (green/red/yellow), endpoint path, summary, error, duration
 
-Accessible by adding `DebugSettingsView()` as a sheet or navigation destination in a DEBUG-only build. Not wired to main UI to avoid production exposure.
+Accessible via Profile → Settings → "Developer: API Smoke" (DEBUG-only, `#if DEBUG` guarded). Sheet-presented `DebugSettingsView`.
 
 ## Smoke Runner
 
@@ -57,6 +71,24 @@ Each step captures: name, endpoint, status (success/failure/skipped), summary, e
 
 ## Verification
 
+### R2
+
+```bash
+$ git diff --check               # working tree vs HEAD
+PASS (no whitespace issues)
+
+$ git diff --check main...HEAD
+PASS
+```
+
+```bash
+$ xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort \
+    -destination 'platform=iOS Simulator,name=iPhone 17' build
+** BUILD SUCCEEDED **
+```
+
+### R1
+
 ```bash
 $ git diff --check
 PASS
@@ -68,7 +100,17 @@ $ xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort \
 
 Smoke test not run against live backend — requires reachable backend server with `use_real_api=true` and configured `api_base_url`.
 
+## ECC Usage
+
+| ECC 命令/agent/skill | 用途 | 影响的实现/测试 |
+|----------------------|------|-----------------|
+| Explore agent | 分析 ProfileView、SettingsView、DebugSettingsView 导航结构 | 选择 Profile → Settings 的 DEBUG-only 入口 |
+| swiftui-patterns | 任务要求的 SwiftUI 调试入口设计参考 | 将入口限定在 SettingsView 的 `#if DEBUG` 区块 |
+| security-reviewer / security-review | 敏感信息自检要求 | 未写入 token、密码、生产 URL 或服务器凭据 |
+
+Note: CC 的 `claude plugin list` 在其执行环境中被权限拦截；Codex 已在工作空间确认 `ecc@ecc` 安装并启用。
+
 ## Remaining
 
 - Smoke test requires manual execution in simulator (CC environment cannot launch simulator)
-- Debug panel not yet wired to main UI navigation — developer must manually present `DebugSettingsView()`
+- Simulator UI verification (Profile → Settings → Developer entry) requires manual testing

@@ -427,6 +427,9 @@ private struct SettingsView: View {
     @State private var personalizedRecs = true
     @State private var marketingComms = false
     @Environment(\.dismiss) private var dismiss
+#if DEBUG
+    @State private var showDebugPanel = false
+#endif
 
     var body: some View {
         List {
@@ -447,12 +450,40 @@ private struct SettingsView: View {
                 toggleRow(title: "Personalized Ads", isOn: $personalizedAds)
                 toggleRow(title: "Marketing Communications", isOn: $marketingComms)
             }
+
+#if DEBUG
+            Section {
+                Button {
+                    showDebugPanel = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.orange)
+                            .frame(width: 24)
+                        Text("Developer: API Smoke")
+                            .font(.system(size: 15))
+                            .foregroundColor(.white)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(DB.mutedText)
+                    }
+                }
+                .listRowBackground(DB.panel)
+            }
+#endif
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(DB.black)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+#if DEBUG
+        .sheet(isPresented: $showDebugPanel) {
+            DebugSettingsView()
+        }
+#endif
     }
 
     private func settingRow(title: String, systemImage: String, color: Color) -> some View {

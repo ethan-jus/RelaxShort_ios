@@ -378,14 +378,14 @@
 				816C2A833938C5A1359FED73 /* RepositoryProtocols.swift */,
 				142D16FA5DD46D6AC295A967 /* StorageService.swift */,
 				DF4A121A77EFE00386139727 /* StoreKitManager.swift */,
-			
+
 				EAB9B1695F125A9D9EB7B5A1 /* APIConfig.swift */,
 				7BC0029E1B4A5E50A277A299 /* AppInitService.swift */,
 				7E6FBCCA53315987A7ADE8A3 /* APIResponseEnvelope.swift */,
 				173DC61A9CC85DAEB9CFD0ED /* RealHomeRepository.swift */,
 				3E07DF14795E56458A576B7D /* RealSearchRepository.swift */,
 				065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */,
-			
+
 				CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */,
 			);
 			path = Services;
@@ -522,7 +522,7 @@
 				89B63639161D513C9CC96252 /* Search */,
 				6BEC5544D6202D98963CED93 /* VIP */,
 				93EDA5267D9F7ECCBD82FC62 /* Welfare */,
-			
+
 				EFCC81788679592EBF64CF9F /* DebugSettingsView.swift */,
 			);
 			path = Views;
@@ -554,7 +554,7 @@
 					CE297A7165A55E68BFCB9FA6 /* ForYouFeedResponseDTO.swift */,
 					5A96C2B4E2AC50B8B17D50FC /* SeriesEpisodesResponseDTO.swift */,
 					D20FD7A3399158EFA990DE36 /* PlayerMediaSource.swift */,
-			
+
 				D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */,
 			);
 			path = Models;
@@ -742,7 +742,7 @@
 				6AB55348636F727A0915171A /* VIPViewModel.swift in Sources */,
 				780220A30CA17D36AC00BCA2 /* VideoPlayerView.swift in Sources */,
 				6477CAE549CC459E6CF4B297 /* WatchHistory.swift in Sources */,
-			
+
 				157EA7612F5F55209BB9DF3A /* 157EA7612F5F55209BB9DF3A in Sources */,
 				4C2A4B746B4E5FA8AD0D26AF /* 4C2A4B746B4E5FA8AD0D26AF in Sources */,
 				E09FFD1FC4CA5F27B337582E /* E09FFD1FC4CA5F27B337582E in Sources */,
@@ -752,11 +752,11 @@
 				E7FFE811FDC95A4F80C7A654 /* E7FFE811FDC95A4F80C7A654 in Sources */,
 				A9AA6BDCE7525C01ABC19F01 /* A9AA6BDCE7525C01ABC19F01 in Sources */,
 				787FEE0511E957E8A50AE0CE /* 787FEE0511E957E8A50AE0CE in Sources */,
-			
+
 				DCD3189B09FF55E88489DE59 /* DCD3189B09FF55E88489DE59 in Sources */,
-			
+
 				47CAE4E9748555F58485DF77 /* 47CAE4E9748555F58485DF77 in Sources */,
-			
+
 				E0F0A47B6CF65DF99FE3A0D0 /* E0F0A47B6CF65DF99FE3A0D0 in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
