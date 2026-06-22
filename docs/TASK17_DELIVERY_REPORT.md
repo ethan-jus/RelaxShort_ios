@@ -4,7 +4,7 @@
 **Commits**:
 - R1: `d8a69ba` — initial implementation (smoke runner, debug panel, protocol cleanup)
 - R1 docs: `a540054`, `ec726d9`
-- R2: `5ce2e05` — Codex R1 review fixes (wire DebugSettingsView, whitespace, docs)
+- R2: `b605efa` — Codex R1 review fixes (wire DebugSettingsView, whitespace, docs)
 
 **Date**: 2026-06-21 (R1), 2026-06-22 (R2)
 
