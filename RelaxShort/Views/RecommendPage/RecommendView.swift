@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - 沉浸式短剧流
 
@@ -30,8 +31,6 @@ struct RecommendView: View {
     @State private var isScrubbing = false
     @State private var scrubFraction: CGFloat = 0
     @State private var showAbout = false
-    @State private var showNotificationPrompt = false
-    @State private var hasShownNotification = false
     @State private var wasPlayingBeforeScrub = false
     @State private var isDraggingPage = false
     @State private var scrubThumbnail: UIImage?
@@ -148,9 +147,6 @@ struct RecommendView: View {
                     )
                     .zIndex(200)
                 }
-                if showNotificationPrompt {
-                    NotificationPromptView(isPresented: $showNotificationPrompt).zIndex(300)
-                }
             }
         }
     }
@@ -187,7 +183,7 @@ struct RecommendView: View {
                     .allowsHitTesting(false)
 
                     // 每页独立底部浮层
-                    if !isSpeeding, !showAbout, !showNotificationPrompt {
+                    if !isSpeeding, !showAbout {
                         pageBottomOverlay(drama: dramas[idx], isCurrent: isCurrent, geo: geo)
                     }
                 }
@@ -200,12 +196,14 @@ struct RecommendView: View {
     }
 
     private func pageBottomOverlay(drama: DramaItem, isCurrent: Bool, geo: GeometryProxy) -> some View {
-        let horizontalPadding: CGFloat = 14
-        let actionRailWidth: CGFloat = 42
-        let actionRailGap: CGFloat = 10
-        // 导航栏实际渲染从 safeArea.bottom 开始，内容高 43pt
-        let tabBarAvoidance: CGFloat = 66 //进度条距离底部屏幕高度
-        let contentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
+        // Task26 R3: 响应式宽度，兼容 iPhone mini → Pro Max
+        let horizontalPadding: CGFloat = 16
+        let actionRailWidth: CGFloat = 50
+        let actionRailGap = max(18, geo.size.width * 0.055)
+        let maxContentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
+        let contentWidth = min(maxContentWidth, geo.size.width * 0.74)
+        let bottomSafeArea = UIApplication.safeAreaInsets.bottom
+        let tabBarAvoidance = bottomSafeArea + DramaBoxBottomTabBar.totalHeight
 
         return VStack(spacing: 0) {
             Spacer()
@@ -238,7 +236,7 @@ struct RecommendView: View {
                             }
 
                             // 简介展开和收起
-                            synopsisView(drama.synopsis)
+                            synopsisView(drama.synopsis, contentWidth: contentWidth)
                                 .lineSpacing(3)
                                 .contentShape(Rectangle())
                                 .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() } }
@@ -275,11 +273,11 @@ struct RecommendView: View {
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: contentWidth, height: 38)
-                            .background(RoundedRectangle(cornerRadius: 5, style: .continuous).fill(Color.white.opacity(0.22)))
-                            .overlay(RoundedRectangle(cornerRadius: 5, style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                            .background(RoundedRectangle(cornerRadius: 3, style: .continuous).fill(Color.white.opacity(0.22)))
+                            .overlay(RoundedRectangle(cornerRadius: 3, style: .continuous).stroke(Color.white.opacity(0.12), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
-                    .padding(.top, 10)
+                    .padding(.top, 8)
                 }
 
                 if isCurrent {
@@ -290,6 +288,7 @@ struct RecommendView: View {
                     Capsule()
                         .fill(Color.white.opacity(0.22))
                         .frame(width: geo.size.width - horizontalPadding * 2, height: 3)
+                        .frame(height: 14, alignment: .bottom)
                 }
             }
             .padding(.horizontal, horizontalPadding)
@@ -298,23 +297,77 @@ struct RecommendView: View {
         .zIndex(10)
     }
 
-    private func synopsisView(_ text: String) -> some View {
+    private func synopsisView(_ text: String, contentWidth: CGFloat) -> some View {
         Group {
             if isExpanded {
                 (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
                 + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.82)))
+            } else if shouldShowMore(for: text, contentWidth: contentWidth) {
+                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
+                + Text(truncatedSynopsis(text, contentWidth: contentWidth)).font(.system(size: 13)).foregroundColor(.white.opacity(0.82))
+                + Text("... more").font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.96)))
             } else {
                 (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
-                + Text(truncatedSynopsis(text)).font(.system(size: 13)).foregroundColor(.white.opacity(0.82))
-                + Text("... more").font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.96)))
+                + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.82)))
             }
         }
         .lineLimit(isExpanded ? nil : 2)
     }
 
-    private func truncatedSynopsis(_ text: String) -> String {
-        if text.count > 80 { String(text.prefix(80)) }
-        else { text }
+    private func shouldShowMore(for text: String, contentWidth: CGFloat) -> Bool {
+        synopsisTextHeight("Trailer | \(text.trimmedForSynopsis)", width: contentWidth) > twoLineSynopsisHeight
+    }
+
+    private func truncatedSynopsis(_ text: String, contentWidth: CGFloat) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard shouldShowMore(for: trimmed, contentWidth: contentWidth) else { return trimmed }
+
+        var low = 0
+        var high = trimmed.count
+        var best = ""
+        let characters = Array(trimmed)
+
+        while low <= high {
+            let mid = (low + high) / 2
+            let candidate = String(characters.prefix(mid)).trimmedForSynopsis
+            let displayText = "Trailer | \(candidate)... more"
+
+            if synopsisTextHeight(displayText, width: contentWidth) <= twoLineSynopsisHeight {
+                best = candidate
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+
+        return best.isEmpty ? trimmed : best
+    }
+
+    private var twoLineSynopsisHeight: CGFloat {
+        let font = UIFont.systemFont(ofSize: 13)
+        return font.lineHeight * 2 + 3 + 1
+    }
+
+    private func synopsisTextHeight(_ text: String, width: CGFloat) -> CGFloat {
+        guard width > 0 else { return 0 }
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineSpacing = 3
+
+        let attributed = NSAttributedString(
+            string: text,
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 13),
+                .paragraphStyle: paragraph
+            ]
+        )
+
+        let rect = attributed.boundingRect(
+            with: CGSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            context: nil
+        )
+        return ceil(rect.height)
     }
 
     private func loadAndInit() async {
@@ -323,12 +376,6 @@ struct RecommendView: View {
         await viewModel.loadData()
         if isPlaybackVisible {
             initializePlaybackIfNeeded()
-            if !hasShownNotification {
-                hasShownNotification = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation(.easeOut(duration: 0.3)) { showNotificationPrompt = true }
-                }
-            }
         }
     }
 
@@ -514,13 +561,14 @@ struct RecommendView: View {
                 .transition(.opacity)
             }
 
-            ZStack(alignment: .leading) {
+            ZStack(alignment: .bottomLeading) {
                 Rectangle()
                     .fill(Color.white.opacity(0.001))
-                    .frame(height: isScrubbing ? 36 : 32)
+                    .frame(height: isScrubbing ? 36 : 14)
                 // 轨道 2pt / 缓冲 2.5pt / 进度 2.5pt
                 let trackH: CGFloat = isScrubbing ? 8 : 2
                 let activeH: CGFloat = isScrubbing ? 8 : 2.5
+                let knobDiameter: CGFloat = isScrubbing ? 14 : 4
                 Capsule().fill(Color.white.opacity(0.25)).frame(height: trackH)
                 Capsule().fill(Color.white.opacity(0.18))
                     .frame(width: max(0, barWidth * CGFloat(buffered)), height: activeH)
@@ -528,12 +576,15 @@ struct RecommendView: View {
                     .frame(width: max(activeH, barWidth * clampedProgress), height: activeH)
                 Circle() //进度条圆头
                     .fill(.white)
-                    .frame(width: isScrubbing ? 14 : 4, height: isScrubbing ? 14 : 4)
+                    .frame(width: knobDiameter, height: knobDiameter)
                     .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
-                    // 白色圆头居中在进度条末端
-                    .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - (isScrubbing ? 7 : 2))
+                    // 白色圆头的圆心对齐在进度线中心，非拖动和拖动状态一致。
+                    .offset(
+                        x: max(0, min(barWidth, barWidth * clampedProgress)) - knobDiameter / 2,
+                        y: (knobDiameter - activeH) / 2
+                    )
             }
-            .frame(width: barWidth, height: isScrubbing ? 36 : 32, alignment: .center)
+            .frame(width: barWidth, height: isScrubbing ? 36 : 14, alignment: .bottom)
             .contentShape(Rectangle())
             // 拖动 → scrub（minimumDistance: 10 区分点击和拖动）
             .highPriorityGesture(
@@ -945,73 +996,6 @@ private struct DramaAboutSheet: View {
     }
 }
 
-// MARK: - 通知引导弹窗
-
-/// 短剧应用风格通知弹窗，仅用于模拟
-private struct NotificationPromptView: View {
-    @Binding var isPresented: Bool
-
-    var body: some View {
-        ZStack {
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-                .onTapGesture { dismiss() }
-
-            VStack(spacing: 0) {
-                ZStack {
-                    Circle()
-                        .fill(DB.pink.opacity(0.15))
-                        .frame(width: 72, height: 72)
-                    Image(systemName: "bell.badge.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(DB.pink)
-                }
-                .padding(.top, 28)
-                .padding(.bottom, 20)
-
-                Text("Turn on Notifications")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.bottom, 8)
-
-                Text("Get notified about new episodes, exclusive releases, and special rewards.")
-                    .font(.system(size: 14))
-                    .foregroundColor(DB.mutedText)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 28)
-                    .padding(.bottom, 24)
-
-                Button { dismiss() } label: {
-                    Text("Allow Notifications")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .background(DB.pink)
-                        .cornerRadius(DB.ctaRadius)
-                }
-                .padding(.horizontal, 28)
-                .padding(.bottom, 12)
-
-                Button { dismiss() } label: {
-                    Text("Not Now")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(DB.mutedText)
-                }
-                .padding(.bottom, 24)
-            }
-            .frame(width: 300)
-            .background(DB.panelElevated)
-            .clipShape(RoundedRectangle(cornerRadius: DB.sheetCornerRadius))
-            .shadow(color: .black.opacity(0.5), radius: 20, y: 4)
-        }
-    }
-
-    private func dismiss() {
-        withAnimation(.easeOut(duration: 0.25)) { isPresented = false }
-    }
-}
-
 #if DEBUG
 #Preview("Recommend View") {
     let coordinator = PlayerCoordinator()
@@ -1020,4 +1004,10 @@ private struct NotificationPromptView: View {
         .environmentObject(coordinator)
 }
 #endif
+}
+
+private extension String {
+    var trimmedForSynopsis: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }

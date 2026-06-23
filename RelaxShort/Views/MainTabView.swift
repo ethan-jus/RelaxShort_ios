@@ -35,25 +35,22 @@ struct MainTabView: View {
 
     var body: some View {
         NavigationStack {
-            GeometryReader { geo in
-                ZStack(alignment: .bottom) {
-                    TabContentHost(
-                        homeVM: homeVM,
-                        homeRepository: homeRepository,
-                        recommendVM: recommendVM,
-                        recommendSession: recommendSession
+            ZStack(alignment: .bottom) {
+                TabContentHost(
+                    homeVM: homeVM,
+                    homeRepository: homeRepository,
+                    recommendVM: recommendVM,
+                    recommendSession: recommendSession
+                )
+                .environmentObject(playerCoordinator)
+                .ignoresSafeArea(edges: .bottom)
+
+                if !appStore.isBottomTabBarHidden {
+                    DramaBoxBottomTabBar(
+                        selectedTab: $appStore.selectedTab,
+                        transparent: appStore.selectedTab == .forYou
                     )
-                        .environmentObject(playerCoordinator)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                    // 2. 底部标签栏
-                    if !appStore.isBottomTabBarHidden {
-                        DramaBoxBottomTabBar(
-                            selectedTab: $appStore.selectedTab,
-                            transparent: appStore.selectedTab == .forYou,
-                            bottomInset: geo.safeAreaInsets.bottom
-                        )
-                        .transition(.opacity)
-                    }
+                    .transition(.opacity)
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -74,7 +71,6 @@ struct MainTabView: View {
             .navigationDestination(isPresented: $appStore.isShowingMembership) {
                 MembershipView()
             }
-            // 金币福利页已调整为底部标签，不再作为入栈页面
         }
         .persistentSystemOverlays(appStore.selectedTab == .forYou ? .hidden : .visible)
         .onReceive(NotificationCenter.default.publisher(for: .showSearch)) { _ in
@@ -84,7 +80,6 @@ struct MainTabView: View {
             appStore.isShowingMembership = true
         }
     }
-
 }
 
 // MARK: - 标签内容容器

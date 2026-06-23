@@ -16,6 +16,11 @@ import Combine
     @Published var poolVersion = 0
     private var engineSink: AnyCancellable?
 
+    /// Task26: 可播放条目列表，保存 dramaIndex → playableIndex 映射
+    private(set) var playableItems: [RecommendPlayableItem] = []
+    /// dramaIndex → playableIndex 快速查找
+    private var dramaToPlayable: [Int: Int] = [:]
+
     init(engine: ShortVideoPlayerEngine) {
         self.engine = engine
         subscribe(to: engine)
@@ -38,24 +43,54 @@ import Combine
 
     func initializePool(dramas: [DramaItem]) {
         guard !dramas.isEmpty else { return }
-        let items = dramas.compactMap { $0.toPlayerMediaItem() }
+        var items: [RecommendPlayableItem] = []
+        var d2p: [Int: Int] = [:]
+        for (dIdx, drama) in dramas.enumerated() {
+            guard let mediaItem = drama.toPlayerMediaItem() else { continue }
+            let pIdx = items.count
+            items.append(RecommendPlayableItem(id: mediaItem.id, dramaIndex: dIdx, item: mediaItem))
+            d2p[dIdx] = pIdx
+        }
         guard !items.isEmpty else {
             print("[PlayerKit] initializePool skipped reason=no-playable-items dramas=\(dramas.count)")
             return
         }
+        playableItems = items
+        dramaToPlayable = d2p
+        let playerItems = items.map(\.item)
         if let coordinator {
-            coordinator.claimForYou(items: items, index: 0)
+            coordinator.claimForYou(items: playerItems, index: 0)
         } else {
-            engine.prepare(items: items, index: 0)
+            engine.prepare(items: playerItems, index: 0)
             engine.play()
         }
         hasInitializedPool = true; poolVersion &+= 1
     }
 
+    /// 将 drama index 映射为 playable index，供 engine.move 使用。
+    /// 如果目标 drama 不可播放，返回最近的合法 playable index 或 nil。
+    func playableIndex(for dramaIndex: Int) -> Int? {
+        if let direct = dramaToPlayable[dramaIndex] { return direct }
+        // 不可播放时找最近的合法索引
+        let sorted = dramaToPlayable.keys.sorted()
+        guard let first = sorted.first, let last = sorted.last else { return nil }
+        if dramaIndex < first { return 0 }
+        if dramaIndex > last { return playableItems.count - 1 }
+        // 二分查找最近
+        var best = first
+        for k in sorted { if k <= dramaIndex { best = k } else { break } }
+        return dramaToPlayable[best]
+    }
+
     func handleTransition(from old: Int, to new: Int, dramas: [DramaItem]) {
         guard old != new else { return }
         currentIndex = new
-        engine.move(to: new)
+        // Task26: 使用 playable index 安全移动
+        if let pIdx = playableIndex(for: new) {
+            engine.move(to: pIdx)
+        } else {
+            print("[PlayerKit] handleTransition skipped dramaIndex=\(new) reason=no-playable-index")
+        }
         poolVersion &+= 1
     }
 
@@ -72,6 +107,13 @@ struct VideoPlayerView: View {
 }
 
 // MARK: - DramaItem → PlayerMediaItem 映射
+
+/// Task26: 可播放条目与原始 drama index 的映射，避免 compactMap 跳过无 URL 卡片后索引错位。
+struct RecommendPlayableItem: Identifiable, Hashable {
+    let id: String
+    let dramaIndex: Int
+    let item: PlayerMediaItem
+}
 
 extension PlayerMediaItem {
     /// 统一稳定 ID：For You 和 Series 使用同一规则

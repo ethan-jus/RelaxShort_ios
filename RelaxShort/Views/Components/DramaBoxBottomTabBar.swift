@@ -7,16 +7,17 @@ import SwiftUI
 struct DramaBoxBottomTabBar: View {
     @Binding var selectedTab: AppStore.Tab
     let transparent: Bool
-    let bottomInset: CGFloat
+    static let topPadding: CGFloat = 8
+    static let bottomPadding: CGFloat = 8
+    static let itemHitHeight: CGFloat = 44
+    static let totalHeight: CGFloat = topPadding + itemHitHeight + bottomPadding
 
     init(
         selectedTab: Binding<AppStore.Tab>,
-        transparent: Bool,
-        bottomInset: CGFloat = 0
+        transparent: Bool
     ) {
         self._selectedTab = selectedTab
         self.transparent = transparent
-        self.bottomInset = bottomInset
     }
 
     var body: some View {
@@ -25,7 +26,8 @@ struct DramaBoxBottomTabBar: View {
                 tabButton(for: tab)
             }
         }
-        .padding(.top, 8)
+        .padding(.top, Self.topPadding)
+        .padding(.bottom, Self.bottomPadding)
         .background(
             Group {
                 if transparent {
@@ -40,22 +42,22 @@ struct DramaBoxBottomTabBar: View {
     private func tabButton(for tab: AppStore.Tab) -> some View {
         let isSelected = selectedTab == tab
         return Button {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
-            selectedTab = tab
+            withAnimation(.easeInOut(duration: 0.15)) {
+                selectedTab = tab
+            }
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: 4) {
                 Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
 
                 Text(tab.title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 35)
+            .frame(height: Self.itemHitHeight)
             .foregroundColor(
                 isSelected ? DB.logoRed : .white.opacity(0.9)
             )
@@ -74,8 +76,7 @@ struct DramaBoxBottomTabBar_Previews: PreviewProvider {
             Spacer()
             DramaBoxBottomTabBar(
                 selectedTab: .constant(.forYou),
-                transparent: true,
-                bottomInset: 34
+                transparent: true
             )
         }
         .background(Color.black)
