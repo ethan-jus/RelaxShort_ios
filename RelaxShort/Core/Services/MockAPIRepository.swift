@@ -322,6 +322,18 @@ struct MockDetailRepository: DetailRepositoryProtocol {
     func fetchEpisodes(dramaId: String) async throws -> [Episode] {
         try await Task.sleep(nanoseconds: MC.delay); return MockData.episodes(for: dramaId)
     }
+    func fetchPlayAsset(episodeId: String) async throws -> PlaybackMediaSourceDTO {
+        try await Task.sleep(nanoseconds: MC.delay)
+        let parts = episodeId.split(separator: "_")
+        guard parts.count >= 3,
+              let dramaId = parts.dropFirst().dropLast().first.map(String.init),
+              let episode = MockData.episodes(for: dramaId).first(where: { $0.id == episodeId }),
+              let url = URL(string: episode.videoURL),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
+            throw NSError(domain: "MockDetailRepository", code: 404, userInfo: [NSLocalizedDescriptionKey: "Mock play asset not found"])
+        }
+        return PlaybackMediaSourceDTO(sourceType: "mp4", masterUrl: nil, fallbackMp4Url: url.absoluteString)
+    }
     func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem] {
         try await Task.sleep(nanoseconds: MC.delay); return Array(MockData.dramas.shuffled().prefix(6))
     }

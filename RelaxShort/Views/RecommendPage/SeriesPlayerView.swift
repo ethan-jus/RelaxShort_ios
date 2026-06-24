@@ -22,23 +22,35 @@ struct SeriesPlayerView: View {
     @State private var pendingLockedEpisode: Int?
     @State private var isUIVisible = true
     @State private var autoHideTask: Task<Void, Never>?
-    /// Task24: 缓存当前集播放接口返回的 PlayerMediaSource（key = episodeId）
+    /// 缓存播放接口返回的媒体源（key = episodeId），避免切回已访问剧集时重复请求。
     @State private var episodeMediaSources: [String: PlayerMediaSource] = [:]
-    /// Task26 R2: 单一 sheet router，避免多 .sheet 互抢
+    /// 单一 sheet router，避免多 .sheet 互抢。
     @State private var activeSheet: PlayerSheet?
     @State private var isSpeeding = false
-    /// Task26 R2: 切集 loading 状态
     @State private var isSwitchingEpisode = false
+    @State private var playbackState: PlayerPlaybackState = .idle
+    @State private var playbackProgress = PlayerProgress()
+    @State private var selectedPlaybackRate: Float = 1.0
+    @State private var selectedQualityID = "auto"
 
-    /// Task26 R2: 单一 sheet router 枚举
+    private enum ChromeMetrics {
+        static let horizontalPadding: CGFloat = 16
+        static let actionRailWidth: CGFloat = 50
+        static let bottomGap: CGFloat = 10
+        static let progressIdleHeight: CGFloat = 14
+        static let progressScrubbingHeight: CGFloat = 36
+        static let topGapBelowSafeArea: CGFloat = 8
+        static let topBarHeight: CGFloat = 44
+        static let membershipRowHeight: CGFloat = 30
+    }
+
     private enum PlayerSheet: Identifiable {
-        case share, speed, quality, more
+        case share, speed, quality
         var id: String {
             switch self {
             case .share: "share"
             case .speed: "speed"
             case .quality: "quality"
-            case .more: "more"
             }
         }
     }
@@ -46,8 +58,8 @@ struct SeriesPlayerView: View {
     @EnvironmentObject var playerCoordinator: PlayerCoordinator
     @Environment(\.dismiss) private var dismiss
 
-    /// 总集数：从 episodes.count 派生，初始化时用 drama.episodeCount 兜底（可能为 0）
-    private var totalEpisodes: Int { max(episodes.count, drama.episodeCount) }
+    /// 剧集列表加载后以接口返回为准；加载前用卡片字段兜底，避免展示不存在的集数。
+    private var totalEpisodes: Int { episodes.isEmpty ? max(1, drama.episodeCount) : episodes.count }
 
     init(drama: DramaItem, startEpisode: Int? = nil, handoff: PlayerHandoffContext? = nil) {
         self.drama = drama
@@ -68,14 +80,13 @@ struct SeriesPlayerView: View {
                     .contentShape(Rectangle())
                     .gesture(episodeDragGesture)
                     .simultaneousGesture(longPressGesture)
-                    .simultaneousGesture(tapPauseGesture)
+                    .simultaneousGesture(tapPauseGesture(in: geo))
 
                 // UI 叠层（可隐藏）
-                if isUIVisible {
-                    // Task26: 顶部控制栏
-                    topControlBar(in: geo)
+                if isUIVisible, !showSpeedHUD {
+                    topControlBar
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding(.top, geo.safeAreaInsets.top + 8)
+                        .padding(.top, topChromeTopInset(in: geo))
                         .zIndex(60)
 
                     LinearGradient(
@@ -86,40 +97,17 @@ struct SeriesPlayerView: View {
                     .frame(maxHeight: .infinity, alignment: .bottom)
                     .allowsHitTesting(false)
 
-                    bottomBar
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .padding(.leading, DT.Space.pageH)
-                        .padding(.bottom, geo.safeAreaInsets.bottom + 10)
-
-                    seriesBottomOverlay(in: geo)
-
-                    // Task26: 底部会员/下载条
-                    membershipDownloadStrip(in: geo)
-
-                    RightActionBar(
-                        isBookmarked: $isBookmarked,
-                        viewCount: drama.formattedViewCount,
-                        onBookmark: { isBookmarked.toggle(); resetAutoHide() },
-                        onShare: { activeSheet = .share },
-                        onEpisodes: { showEpisodeList = true }
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(.trailing, DT.Space.pageH)
-                    .padding(.bottom, geo.safeAreaInsets.bottom + 10)
+                    seriesChromeOverlay(in: geo)
                 }
 
-                // 中心暂停按钮：仅在播放中且 UI 可见时显示（暂停态由 ShortVideoPlayerView 自带按钮处理）
-                if isUIVisible, playerCoordinator.engine.state == .playing {
-                    Button {
-                        playerCoordinator.engine.pause(reason: .user)
-                    } label: {
-                        Image(systemName: "pause.fill")
-                            .font(.system(size: 36, weight: .medium))
-                            .foregroundColor(.white)
-                            .frame(width: 72, height: 72)
-                            .background(Circle().fill(Color.black.opacity(0.42)))
-                    }
-                    .zIndex(40)
+                if showSpeedHUD {
+                    speedProgressOverlay(in: geo)
+                        .zIndex(45)
+                }
+
+                if isUIVisible, !showSpeedHUD {
+                    centerPlaybackButton
+                        .zIndex(40)
                 }
 
                 if showSpeedHUD {
@@ -175,36 +163,30 @@ struct SeriesPlayerView: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
-        .navigationTitle("\(drama.title) \(L10n.playerEpisodeNumber(currentEpisode))")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .share:
                 ShareSheet(dramaTitle: drama.title)
                     .presentationDetents([.medium])
             case .speed:
-                PlayerSpeedSheet(engine: playerCoordinator.engine)
-                    .presentationDetents([.fraction(0.45)])
+                PlayerSpeedSheet(
+                    selectedRate: selectedPlaybackRate,
+                    onSelect: applyPlaybackRate
+                )
+                    .presentationDetents([.fraction(0.34)])
                     .presentationDragIndicator(.hidden)
             case .quality:
                 PlayerQualitySheet(
                     qualities: qualityOptions(),
-                    currentQuality: "720p"
+                    currentQuality: selectedQualityID,
+                    onSelect: { qualityID in
+                        selectedQualityID = qualityID
+                        resetAutoHide()
+                    }
                 )
                 .presentationDetents([.fraction(0.4)])
-                .presentationDragIndicator(.hidden)
-            case .more:
-                PlayerMoreSheet(
-                    onQuality: {
-                        activeSheet = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                            activeSheet = .quality
-                        }
-                    },
-                    onSubtitles: { },
-                    onReport: { }
-                )
-                .presentationDetents([.fraction(0.3)])
                 .presentationDragIndicator(.hidden)
             }
         }
@@ -217,9 +199,19 @@ struct SeriesPlayerView: View {
             guard !isShowing, let pending = pendingLockedEpisode, isEpisodeLocked(pending) else { return }
             pendingLockedEpisode = nil
         }
-        .onChange(of: playerCoordinator.engine.state) { _, state in
+        .onReceive(playerCoordinator.engine.$state) { state in
+            playbackState = state
             if state == .playing { resetAutoHide() }
             else if state == .pausedByUser { autoHideTask?.cancel() }
+        }
+        .onReceive(playerCoordinator.engine.$progress) { progress in
+            playbackProgress = progress
+            if let preview = seriesSeekPreviewFraction, progress.duration > 0 {
+                let actual = CGFloat(progress.currentTime / progress.duration)
+                if abs(actual - preview) < 0.02 {
+                    seriesSeekPreviewFraction = nil
+                }
+            }
         }
         .onDisappear {
             autoHideTask?.cancel()
@@ -250,33 +242,10 @@ struct SeriesPlayerView: View {
             Logger.viewModel.error("SeriesPlayerView: fetchEpisodes failed: \(error)")
             episodes = (try? await MockDetailRepository().fetchEpisodes(dramaId: drama.id)) ?? []
         }
-        // Task13: 真实模式下为当前集调用 episodePlay 获取播放URL
-        await fetchCurrentEpisodePlaybackURL()
+        await ensurePlayAsset(for: currentEpisode)
         initializeEpisodePlayer()
     }
 
-    /// 通过 RealDetailRepository 获取当前集播放地址和 PlayerMediaSource。
-    /// 更新 Episode.videoURL 兼容字段，同时缓存 source 供 playerItems 使用。
-    /// 失败时保留已有 URL（来自 episodes 响应或 Mock）。
-    private func fetchCurrentEpisodePlaybackURL() async {
-        guard let repo = dependencies.detailRepository as? RealDetailRepository else { return }
-        guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == currentEpisode }) else { return }
-        let episodeId = episodes[epIndex].id
-        do {
-            let dto = try await repo.fetchPlayAsset(episodeId: episodeId)
-            if let url = dto.preferredPlaybackURL {
-                episodes[epIndex].videoURL = url
-            }
-            if let source = dto.toPlayerMediaSource() {
-                episodeMediaSources[episodeId] = source
-                Logger.viewModel.info("SeriesPlayerView: fetched source type=\(dto.sourceType) for EP \(currentEpisode)")
-            }
-        } catch {
-            Logger.viewModel.warning("SeriesPlayerView: episodePlay failed, using fallback videoURL: \(error.localizedDescription)")
-        }
-    }
-
-    /// Task26 R2: 初始化时使用 switchToEpisode 安全切换（确保已拉 play asset）
     private func initializeEpisodePlayer() {
         guard !isEpisodeLocked(currentEpisode) else {
             pendingLockedEpisode = currentEpisode
@@ -289,74 +258,193 @@ struct SeriesPlayerView: View {
         guard !playable.isEmpty else { return }
         let startIndex = playable.firstIndex(where: { $0.episodeNumber == currentEpisode }) ?? 0
         playerCoordinator.claimSeries(drama: drama, items: playable.map(\.item), startIndex: startIndex, handoff: handoff)
+        resetAutoHide()
     }
 
-    // MARK: - 底部信息叠层
+    // MARK: - Bottom Chrome
 
-    private func seriesBottomOverlay(in geo: GeometryProxy) -> some View {
-        let horizontalPadding: CGFloat = 14
-        let actionRailWidth: CGFloat = 42
-        let actionRailGap: CGFloat = 10
-        let contentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
-        let engine = playerCoordinator.engine
+    private func seriesChromeOverlay(in geo: GeometryProxy) -> some View {
+        let horizontalPadding = ChromeMetrics.horizontalPadding
+        let actionRailWidth = ChromeMetrics.actionRailWidth
+        let actionRailGap = max(18, geo.size.width * 0.055)
+        let contentMaxWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
+        let contentWidth = min(contentMaxWidth, geo.size.width * 0.74)
+        let progressWidth = geo.size.width - horizontalPadding * 2
+        let bottomInset = UIApplication.safeAreaInsets.bottom + ChromeMetrics.bottomGap
 
         return VStack(spacing: 0) {
             Spacer()
-            VStack(alignment: .leading, spacing: 6) {
-                // 标题
-                Text(drama.title)
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                // 标签（根据 DramaItem 状态动态展示）
-                let badgeTags = L10n.dramaBadgeTags(for: drama)
-                if !badgeTags.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(Array(badgeTags.enumerated()), id: \.offset) { _, tag in
-                            DramaBadgeTagView(tag: tag, drama: drama)
-                        }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .bottom, spacing: actionRailGap) {
+                    seriesInfoBlock(width: contentWidth)
+
+                    RightActionBar(
+                        isBookmarked: $isBookmarked,
+                        viewCount: drama.formattedViewCount,
+                        onBookmark: {
+                            isBookmarked.toggle()
+                            resetAutoHide()
+                        },
+                        onShare: { activeSheet = .share },
+                        onEpisodes: { showEpisodeList = true }
+                    )
+                    .frame(width: actionRailWidth)
+                }
+
+                if isEpisodeLocked(currentEpisode) {
+                    unlockCurrentEpisodeButton(width: contentWidth)
+                        .padding(.top, 2)
+                }
+
+                seriesProgressBar(totalWidth: progressWidth, engine: playerCoordinator.engine)
+                    .frame(width: progressWidth, height: seriesIsScrubbing ? ChromeMetrics.progressScrubbingHeight : ChromeMetrics.progressIdleHeight)
+                    .padding(.top, 2)
+
+                membershipDownloadRow
+                    .frame(width: progressWidth)
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, bottomInset)
+        }
+        .zIndex(50)
+    }
+
+    private func seriesInfoBlock(width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                showEpisodeList = true
+                resetAutoHide()
+            } label: {
+                HStack(spacing: 4) {
+                    Text(drama.title)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+            .buttonStyle(.plain)
+
+            let badgeTags = L10n.dramaBadgeTags(for: drama)
+            if !badgeTags.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(Array(badgeTags.enumerated()), id: \.offset) { _, tag in
+                        DramaBadgeTagView(tag: tag, drama: drama)
                     }
                 }
-                // 简介
-                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
-                + Text(drama.synopsis).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
-                .lineLimit(2)
-                // 进度条
-                seriesProgressBar(totalWidth: contentWidth, engine: engine)
-                    .frame(height: 32)
             }
-            .frame(width: contentWidth, alignment: .leading)
-            .padding(.horizontal, horizontalPadding)
-            .padding(.bottom, 66)
+
+            (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
+            + Text(drama.synopsis).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
+            .lineLimit(2)
+            .lineSpacing(3)
         }
+        .frame(width: width, alignment: .leading)
+    }
+
+    private func unlockCurrentEpisodeButton(width: CGFloat) -> some View {
+        Button {
+            unlockTargetEpisode = currentEpisode
+            showUnlockSheet = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Unlock EP \(currentEpisode)")
+                    .font(.system(size: 15, weight: .semibold))
+            }
+            .foregroundColor(.white)
+            .frame(width: width, height: 40)
+            .background(DB.pink)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var membershipDownloadRow: some View {
+        HStack {
+            Button {} label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "crown.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Join membership")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundColor(DB.gold)
+                .padding(.horizontal, 14)
+                .frame(height: ChromeMetrics.membershipRowHeight)
+                .background(Capsule().fill(DB.gold.opacity(0.14)))
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Button {} label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Download")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(.white.opacity(0.72))
+                .frame(height: ChromeMetrics.membershipRowHeight)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func speedProgressOverlay(in geo: GeometryProxy) -> some View {
+        let horizontalPadding = ChromeMetrics.horizontalPadding
+        let progressWidth = geo.size.width - horizontalPadding * 2
+        let bottomInset = UIApplication.safeAreaInsets.bottom + ChromeMetrics.bottomGap
+        let progressBottomGap = bottomInset + ChromeMetrics.membershipRowHeight + 4
+
+        return VStack(spacing: 0) {
+            Spacer()
+            seriesProgressBar(totalWidth: progressWidth, engine: playerCoordinator.engine)
+                .frame(width: progressWidth, height: seriesIsScrubbing ? ChromeMetrics.progressScrubbingHeight : ChromeMetrics.progressIdleHeight)
+                .padding(.horizontal, horizontalPadding)
+                .padding(.bottom, progressBottomGap)
+        }
+        .allowsHitTesting(false)
     }
 
     // MARK: - 进度条（带拖动和点击）
     @State private var seriesScrubFraction: CGFloat = 0
     @State private var seriesIsScrubbing = false
     @State private var seriesWasPlayingBeforeScrub = false
+    @State private var seriesSeekPreviewFraction: CGFloat?
 
     private func seriesProgressBar(totalWidth: CGFloat, engine: ShortVideoPlayerEngine) -> some View {
-        let fraction = engine.progress.duration > 0
-            ? (seriesIsScrubbing ? Double(seriesScrubFraction) : engine.progress.currentTime / engine.progress.duration) : 0
+        let progress = playbackProgress
+        let fraction = progress.duration > 0
+            ? Double(seriesSeekPreviewFraction ?? (seriesIsScrubbing ? seriesScrubFraction : CGFloat(progress.currentTime / progress.duration))) : 0
         let clampedProgress = max(0, min(1, CGFloat(fraction)))
         let barWidth = totalWidth
 
-        return ZStack(alignment: .leading) {
-            // 触摸区域
-            Rectangle().fill(Color.white.opacity(0.001)).frame(height: 32)
-            // 轨道
-            Capsule().fill(Color.white.opacity(0.25)).frame(height: 2)
-            // 进度
+        return ZStack(alignment: .bottomLeading) {
+            Rectangle()
+                .fill(Color.white.opacity(0.001))
+                .frame(height: seriesIsScrubbing ? ChromeMetrics.progressScrubbingHeight : ChromeMetrics.progressIdleHeight)
+            let trackH: CGFloat = seriesIsScrubbing ? 8 : 2
+            let activeH: CGFloat = seriesIsScrubbing ? 8 : 2.5
+            let knobDiameter: CGFloat = seriesIsScrubbing ? 14 : 4
+            Capsule().fill(Color.white.opacity(0.25)).frame(height: trackH)
             Capsule().fill(DT.logoRed)
-                .frame(width: max(2.5, barWidth * clampedProgress), height: 2.5)
-            // 圆头
+                .frame(width: max(activeH, barWidth * clampedProgress), height: activeH)
             Circle().fill(.white)
-                .frame(width: seriesIsScrubbing ? 14 : 4, height: seriesIsScrubbing ? 14 : 4)
+                .frame(width: knobDiameter, height: knobDiameter)
                 .shadow(color: .black.opacity(0.3), radius: 3, x: 0, y: 1)
-                .offset(x: max(0, min(barWidth, barWidth * clampedProgress)) - (seriesIsScrubbing ? 7 : 2))
+                .offset(
+                    x: max(0, min(barWidth, barWidth * clampedProgress)) - knobDiameter / 2,
+                    y: (knobDiameter - activeH) / 2
+                )
         }
-        .frame(width: barWidth, height: 32, alignment: .center)
+        .frame(width: barWidth, height: seriesIsScrubbing ? ChromeMetrics.progressScrubbingHeight : ChromeMetrics.progressIdleHeight, alignment: .bottom)
         .contentShape(Rectangle())
         .highPriorityGesture(
             DragGesture(minimumDistance: 10)
@@ -369,46 +457,66 @@ struct SeriesPlayerView: View {
                     seriesScrubFraction = max(0, min(1, value.location.x / barWidth))
                 }
                 .onEnded { _ in
-                    engine.seek(to: Double(max(0, min(1, seriesScrubFraction))))
+                    let clamped = max(0, min(1, seriesScrubFraction))
+                    seriesSeekPreviewFraction = clamped
+                    engine.seek(to: Double(clamped))
                     if seriesWasPlayingBeforeScrub { engine.play() }
-                    seriesIsScrubbing = false; seriesScrubFraction = 0
+                    seriesIsScrubbing = false
+                    seriesScrubFraction = 0
+                    seriesWasPlayingBeforeScrub = false
+                    clearSeekPreviewAfterProgressCatchUp()
                 }
         )
         .simultaneousGesture(
             SpatialTapGesture()
                 .onEnded { value in
-                    guard engine.progress.duration > 0 else { return }
-                    engine.seek(to: Double(max(0, min(1, value.location.x / barWidth))))
+                    guard playbackProgress.duration > 0 else { return }
+                    let clamped = max(0, min(1, value.location.x / barWidth))
+                    seriesSeekPreviewFraction = clamped
+                    engine.seek(to: Double(clamped))
+                    resetAutoHide()
+                    clearSeekPreviewAfterProgressCatchUp()
                 }
         )
     }
 
-    // MARK: - Task26 Quality Helpers（fallback UI，无多码率数据）
+    private func clearSeekPreviewAfterProgressCatchUp() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            seriesSeekPreviewFraction = nil
+        }
+    }
+
+    // MARK: - Quality Helpers
 
     private func qualityOptions() -> [PlayerQualitySheet.QualityOption] {
         [
-            .init(id: "auto", label: "Auto", isVIP: false, isSelected: true),
-            .init(id: "720p", label: "720p", isVIP: false, isSelected: false),
-            .init(id: "1080p", label: "1080p", isVIP: true, isSelected: false),
-            .init(id: "540p", label: "540p", isVIP: false, isSelected: false)
+            .init(id: "auto", label: "Auto", isVIP: false, isSelected: selectedQualityID == "auto"),
+            .init(id: "1080p", label: "1080P", isVIP: true, isSelected: selectedQualityID == "1080p"),
+            .init(id: "720p", label: "720P", isVIP: false, isSelected: selectedQualityID == "720p"),
+            .init(id: "540p", label: "540P", isVIP: false, isSelected: selectedQualityID == "540p")
         ]
+    }
+
+    private func applyPlaybackRate(_ rate: Float) {
+        selectedPlaybackRate = rate
+        playerCoordinator.engine.setRate(rate)
+        resetAutoHide()
     }
 
     // MARK: - Episode Switching
 
-    /// Task26 R3: 安全切集请求入口。由 drag/onChange/EpisodePickerSheet 调用。
     /// 避免拖动直接改 currentEpisode 造成状态错位。
     private func requestEpisodeSwitch(_ target: Int) {
         guard target != currentEpisode, target >= 1, target <= totalEpisodes else { return }
         switchToEpisode(target)
     }
 
-    /// Task26 R2 P0: 切集入口 — 先拉真实播放源，再重建 playable items，最后 prepare/play。
+    /// 切集入口：先拉播放源，再重建 playable items，最后 prepare/play。
     /// 禁止在无 source 时用 episodeNumber - 1 做 engine.move。
-    /// Task26 R3: 添加 currentEpisode 未变化 guard，避免 onChange 循环触发。
     private func switchToEpisode(_ episodeNumber: Int) {
         guard !isSwitchingEpisode else { return }
-        guard episodeNumber != currentEpisode else { return } // R3: 已在此集则不重复切
+        guard episodeNumber != currentEpisode else { return }
         // 锁定集不能播放
         guard !isEpisodeLocked(episodeNumber) else {
             pendingLockedEpisode = episodeNumber
@@ -436,33 +544,24 @@ struct SeriesPlayerView: View {
         }
     }
 
-    /// Task26 R4: 三层回退支持 Real / Mock 两种模式。
-    /// ① 已有 cached source → true
-    /// ② episode.videoURL 有效（Mock 模式首次加载已写入）→ 缓存为 .mp4 source → true
-    /// ③ RealDetailRepository.fetchPlayAsset（Real 模式）→ true/false
+    /// 三层回退支持 Real / Mock 两种模式：
+    /// 已有缓存、Episode.videoURL、本地/后端 repository 播放接口。
     @MainActor
     private func ensurePlayAsset(for episodeNumber: Int) async -> Bool {
         guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == episodeNumber }) else { return false }
         let ep = episodes[epIndex]
         let episodeId = ep.id
 
-        // ① 已有缓存直接返回
         if episodeMediaSources[episodeId] != nil { return true }
 
-        // ② Mock 模式：已有有效 videoURL 即可
         if let url = URL(string: ep.videoURL),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             episodeMediaSources[episodeId] = .mp4(url)
             return true
         }
 
-        // ③ Real 模式：通过后端接口拉取
-        guard let repo = dependencies.detailRepository as? RealDetailRepository else {
-            Logger.viewModel.warning("SeriesPlayerView: no source for EP\(episodeNumber) (no RealDetailRepository, no videoURL)")
-            return false
-        }
         do {
-            let dto = try await repo.fetchPlayAsset(episodeId: episodeId)
+            let dto = try await dependencies.detailRepository.fetchPlayAsset(episodeId: episodeId)
             if let url = dto.preferredPlaybackURL {
                 episodes[epIndex].videoURL = url
             }
@@ -478,7 +577,7 @@ struct SeriesPlayerView: View {
         }
     }
 
-    /// 从 sourceForEpisode 构建 EpisodePlayableItem 列表（保证索引安全）
+    /// 从可用播放源构建播放器列表，保证 episodeNumber 与 player index 不错位。
     private struct EpisodePlayableItem: Identifiable {
         let id: String
         let episodeNumber: Int
@@ -496,7 +595,6 @@ struct SeriesPlayerView: View {
     private func buildPlayableItems(from eps: [Episode]) -> [EpisodePlayableItem] {
         eps.compactMap { ep in
             guard let source = sourceForEpisode(ep) else {
-                print("[SeriesPlayer] skip EP\(ep.episodeNumber) reason=no-source")
                 return nil
             }
             return EpisodePlayableItem(
@@ -519,84 +617,100 @@ struct SeriesPlayerView: View {
         switchToEpisode(pending)
     }
 
-    // MARK: - Task26 顶部控制栏
+    // MARK: - Top Chrome
 
-    private func topControlBar(in geo: GeometryProxy) -> some View {
-        HStack {
+    private func topChromeTopInset(in geo: GeometryProxy) -> CGFloat {
+        let windowTopInset = UIApplication.safeAreaInsets.top
+        let topInset = max(geo.safeAreaInsets.top, windowTopInset)
+        return topInset + ChromeMetrics.topGapBelowSafeArea
+    }
+
+    private var topControlBar: some View {
+        HStack(spacing: 10) {
             Button {
                 dismiss()
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
-                    Text("EP.\(currentEpisode)")
-                        .font(.system(size: 17, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 34, height: 36)
+                    .contentShape(Rectangle())
+                    .shadow(color: .black.opacity(0.45), radius: 2, x: 0, y: 1)
             }
             .buttonStyle(.plain)
+
+            Text("EP.\(currentEpisode)")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
 
             Spacer()
 
             Button {
                 activeSheet = .speed
             } label: {
-                Label("Speed", systemImage: "speedometer")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(Color.white.opacity(0.15)))
+                Label {
+                    Text(speedControlTitle)
+                        .font(.system(size: 14, weight: .bold))
+                } icon: {
+                    Image(systemName: "timer")
+                        .font(.system(size: 15, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .frame(height: ChromeMetrics.topBarHeight)
             }
             .buttonStyle(.plain)
 
-            Button {
-                activeSheet = .more
+            Menu {
+                Button {
+                    activeSheet = .speed
+                } label: {
+                    Label("Speed", systemImage: "timer")
+                }
+
+                Button {
+                    activeSheet = .quality
+                } label: {
+                    Label("Quality", systemImage: "4k.tv")
+                }
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.white)
                     .frame(width: 36, height: 36)
+                    .rotationEffect(.degrees(90))
             }
             .buttonStyle(.plain)
         }
-        .padding(.horizontal, 14)
+        .frame(height: ChromeMetrics.topBarHeight)
+        .padding(.horizontal, ChromeMetrics.horizontalPadding)
     }
 
-    // MARK: - Task26 底部会员/下载条
+    private var speedControlTitle: String {
+        abs(selectedPlaybackRate - 1.0) < 0.01 ? "Speed" : String(format: "%.1fx", selectedPlaybackRate)
+    }
 
-    private func membershipDownloadStrip(in geo: GeometryProxy) -> some View {
-        HStack {
-            Button {
-                print("[SeriesPlayer] Join membership tapped (UI-only)")
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "crown.fill").font(.system(size: 12))
-                    Text("Join membership").font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundColor(DB.gold)
-                .padding(.horizontal, 14).padding(.vertical, 7)
-                .background(Capsule().fill(DB.gold.opacity(0.12)))
+    private var centerPlaybackButton: some View {
+        Button {
+            if playbackState == .playing {
+                playerCoordinator.engine.pause(reason: .user)
+                autoHideTask?.cancel()
+            } else {
+                playerCoordinator.engine.play()
+                resetAutoHide()
             }
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            Button {
-                print("[SeriesPlayer] Download tapped (UI-only)")
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.down.circle").font(.system(size: 14))
-                    Text("Download").font(.system(size: 13, weight: .medium))
-                }
-                .foregroundColor(.white.opacity(0.7))
-            }
-            .buttonStyle(.plain)
+        } label: {
+            let isPlaying = playbackState == .playing
+            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: 34, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 74, height: 74)
+                .background(Circle().fill(Color.black.opacity(0.42)))
+                .shadow(color: .black.opacity(0.25), radius: 8, x: 0, y: 4)
         }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.bottom, geo.safeAreaInsets.bottom + 54)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .id(String(describing: playbackState))
+        .buttonStyle(.plain)
+        .accessibilityLabel(playbackState == .playing ? "Pause" : "Play")
     }
 
     // MARK: - Episode Pager
@@ -611,7 +725,8 @@ struct SeriesPlayerView: View {
                 ShortVideoPlayerView(
                     player: isCurrent ? playerCoordinator.engine.currentPlayer : nil,
                     coverURL: drama.coverURL,
-                    engine: playerCoordinator.engine
+                    engine: playerCoordinator.engine,
+                    showsSystemPlaybackButton: false
                 )
                 .allowsHitTesting(false)
                 .frame(width: geo.size.width, height: pageHeight)
@@ -663,6 +778,7 @@ struct SeriesPlayerView: View {
                 switch value {
                 case .second(true, _):
                     if !showSpeedHUD, playerCoordinator.engine.progress.duration > 0 {
+                        autoHideTask?.cancel()
                         if playerCoordinator.engine.state == .pausedByUser {
                             playerCoordinator.engine.play()
                         }
@@ -673,26 +789,43 @@ struct SeriesPlayerView: View {
                 }
             }
             .onEnded { _ in
-                playerCoordinator.engine.setRate(1.0)
+                playerCoordinator.engine.setRate(selectedPlaybackRate)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
+                if isUIVisible, playerCoordinator.engine.state == .playing {
+                    resetAutoHide()
+                }
             }
     }
 
-    private var tapPauseGesture: some Gesture {
-        TapGesture()
-            .onEnded {
-                // 暂停态点击屏幕直接恢复播放，避免透明手势层挡住播放器内置播放按钮。
-                if playerCoordinator.engine.state == .pausedByUser {
-                    playerCoordinator.engine.play()
-                    resetAutoHide()
-                    return
-                }
-                // 播放态点击屏幕 → 切换 UI 显隐。
+    private func tapPauseGesture(in geo: GeometryProxy) -> some Gesture {
+        SpatialTapGesture()
+            .onEnded { value in
+                guard !isTapInsideVisibleChrome(value.location, in: geo) else { return }
                 withAnimation(.easeOut(duration: 0.25)) {
                     isUIVisible.toggle()
                 }
-                if isUIVisible { resetAutoHide() }
+                if isUIVisible, playerCoordinator.engine.state == .playing {
+                    resetAutoHide()
+                } else {
+                    autoHideTask?.cancel()
+                }
             }
+    }
+
+    private func isTapInsideVisibleChrome(_ location: CGPoint, in geo: GeometryProxy) -> Bool {
+        guard isUIVisible, !showSpeedHUD else { return false }
+
+        let topStart = topChromeTopInset(in: geo)
+        let topEnd = topStart + ChromeMetrics.topBarHeight + 12
+        if location.y <= topEnd { return true }
+
+        let bottomSafeArea = UIApplication.safeAreaInsets.bottom
+        let bottomChromeHeight = bottomSafeArea
+            + ChromeMetrics.bottomGap
+            + ChromeMetrics.membershipRowHeight
+            + ChromeMetrics.progressScrubbingHeight
+            + 180
+        return location.y >= geo.size.height - bottomChromeHeight
     }
 
     // MARK: - Episode Lock Check
@@ -703,31 +836,9 @@ struct SeriesPlayerView: View {
         return !freeRange.contains(ep)
     }
 
-    // MARK: - Bottom Bar
-
-    private var bottomBar: some View {
-        VStack(spacing: 8) {
-            if isEpisodeLocked(currentEpisode) {
-                Button {
-                    unlockTargetEpisode = currentEpisode
-                    showUnlockSheet = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.fill").font(.system(size: 12))
-                        Text("Unlock EP \(currentEpisode)")
-                            .font(DT.Font.body(15, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20).frame(height: 40)
-                    .background(DB.pink)
-                    .clipShape(RoundedRectangle(cornerRadius: DT.Radius.xl))
-                }
-            }
-        }
-    }
 }
 
-// MARK: - Task26 R2 Episode Picker Sheet（6 列 + range tabs）
+// MARK: - Episode Picker Sheet
 
 private struct EpisodePickerSheet: View {
     let drama: DramaItem
@@ -743,7 +854,7 @@ private struct EpisodePickerSheet: View {
     @State private var selectedRange = 0
 
     private var ranges: [ClosedRange<Int>] {
-        let total = max(episodes.count, drama.episodeCount)
+        let total = episodes.isEmpty ? max(1, drama.episodeCount) : episodes.count
         guard total > 0 else { return [1...1] }
         var result: [ClosedRange<Int>] = []
         var start = 1

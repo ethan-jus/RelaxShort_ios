@@ -18,6 +18,24 @@ struct PlaybackMediaSourceDTO {
     let defaultSubtitleLanguage: String?
     let thumbnailTrack: ThumbnailDTO?
 
+    init(
+        sourceType: String,
+        masterUrl: String?,
+        fallbackMp4Url: String?,
+        qualities: [QualityDTO] = [],
+        subtitleTracks: [SubtitleDTO] = [],
+        defaultSubtitleLanguage: String? = nil,
+        thumbnailTrack: ThumbnailDTO? = nil
+    ) {
+        self.sourceType = sourceType
+        self.masterUrl = masterUrl
+        self.fallbackMp4Url = fallbackMp4Url
+        self.qualities = qualities
+        self.subtitleTracks = subtitleTracks
+        self.defaultSubtitleLanguage = defaultSubtitleLanguage
+        self.thumbnailTrack = thumbnailTrack
+    }
+
     /// 兼容现有 `VideoPlayerView` 的推荐播放地址：HLS > MP4 fallback > 首个清晰度
     var preferredPlaybackURL: String? {
         if let hls = masterUrl, !hls.isEmpty { return hls }
@@ -36,24 +54,33 @@ struct PlaybackMediaSourceDTO {
     }
 
     /// 将播放接口 DTO 转换为 PlayerKit 的 `PlayerMediaSource` 枚举。
-    /// Task24：根据 sourceType 选择 hls / mp4 / hls_with_fallback，为播放器提供正确的媒体源类型。
     func toPlayerMediaSource() -> PlayerMediaSource? {
         switch sourceType {
         case "hls_with_fallback":
-            guard let hls = masterUrl, let hlsURL = URL(string: hls),
-                  let mp4 = fallbackMp4Url, let mp4URL = URL(string: mp4) else { return nil }
+            guard let hls = masterUrl,
+                  let hlsURL = URL(string: hls),
+                  let mp4 = fallbackMp4Url,
+                  let mp4URL = URL(string: mp4) else {
+                return fallbackMP4Source()
+            }
             return .hlsWithFallback(masterURL: hlsURL, fallbackMP4URL: mp4URL)
         case "hls":
-            guard let hls = masterUrl, let hlsURL = URL(string: hls) else { return nil }
+            guard let hls = masterUrl, let hlsURL = URL(string: hls) else {
+                return fallbackMP4Source()
+            }
             return .hls(masterURL: hlsURL)
         case "mp4":
-            guard let mp4 = fallbackMp4Url ?? preferredPlaybackURL,
-                  let mp4URL = URL(string: mp4) else { return nil }
-            return .mp4(mp4URL)
+            return fallbackMP4Source()
         default:
             guard let preferred = preferredPlaybackURL,
                   let url = URL(string: preferred) else { return nil }
             return .mp4(url)
         }
+    }
+
+    private func fallbackMP4Source() -> PlayerMediaSource? {
+        guard let mp4 = fallbackMp4Url ?? qualities.first?.url,
+              let mp4URL = URL(string: mp4) else { return nil }
+        return .mp4(mp4URL)
     }
 }

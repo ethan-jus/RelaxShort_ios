@@ -61,6 +61,8 @@ protocol DetailRepositoryProtocol {
     func fetchDramaDetail(id: String) async throws -> DramaItem
     /// 获取剧集列表
     func fetchEpisodes(dramaId: String) async throws -> [Episode]
+    /// 获取单集播放源
+    func fetchPlayAsset(episodeId: String) async throws -> PlaybackMediaSourceDTO
     /// 获取相关推荐短剧
     func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem]
 }

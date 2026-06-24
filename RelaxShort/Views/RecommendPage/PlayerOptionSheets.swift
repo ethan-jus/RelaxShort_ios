@@ -2,17 +2,16 @@ import SwiftUI
 
 // MARK: - Player Speed Sheet
 
-/// Task26: 倍速选择底部面板
+/// 倍速选择底部面板
 struct PlayerSpeedSheet: View {
     @Environment(\.dismiss) private var dismiss
-    let engine: ShortVideoPlayerEngine
+    let selectedRate: Float
+    let onSelect: (Float) -> Void
 
     private let speeds: [(label: String, value: Float)] = [
         ("3.0x", 3.0), ("2.0x", 2.0), ("1.5x", 1.5),
         ("1.25x", 1.25), ("1.0x", 1.0), ("0.75x", 0.75)
     ]
-
-    @State private var selected: Float = 1.0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,47 +25,39 @@ struct PlayerSpeedSheet: View {
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.78))
                         .frame(width: 36, height: 36)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
 
-            VStack(spacing: 2) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                 ForEach(speeds, id: \.label) { speed in
+                    let isSelected = abs(selectedRate - speed.value) < 0.01
                     Button {
-                        selected = speed.value
-                        engine.setRate(speed.value)
+                        onSelect(speed.value)
                         dismiss()
                     } label: {
-                        HStack {
-                            Text(speed.label)
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.white)
-                            Spacer()
-                            if abs(selected - speed.value) < 0.01 {
-                                Circle()
-                                    .fill(DB.pink)
-                                    .frame(width: 20, height: 20)
-                                    .overlay(
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(.white)
-                                    )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .frame(height: 48)
+                        Text(speed.label)
+                            .font(.system(size: 16, weight: isSelected ? .bold : .semibold))
+                            .foregroundColor(isSelected ? .white : .white.opacity(0.78))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 46)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(abs(selected - speed.value) < 0.01 ? Color.white.opacity(0.12) : Color.clear)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(isSelected ? DB.pink.opacity(0.95) : Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(isSelected ? Color.white.opacity(0.22) : Color.white.opacity(0.06), lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, 20)
             .padding(.bottom, 34)
         }
         .background(DB.panelElevated)
@@ -75,11 +66,12 @@ struct PlayerSpeedSheet: View {
 
 // MARK: - Player Quality Sheet
 
-/// Task26: 清晰度选择底部面板
+/// 清晰度选择底部面板
 struct PlayerQualitySheet: View {
     @Environment(\.dismiss) private var dismiss
     let qualities: [QualityOption]
     let currentQuality: String
+    let onSelect: (String) -> Void
 
     struct QualityOption: Identifiable {
         let id: String
@@ -110,37 +102,44 @@ struct PlayerQualitySheet: View {
 
             VStack(spacing: 2) {
                 ForEach(qualities) { option in
-                    HStack {
-                        Text(option.label)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(option.isVIP ? .white.opacity(0.35) : .white)
-                        if option.isVIP {
-                            Text("VIP")
-                                .font(.system(size: 10, weight: .bold))
+                    Button {
+                        onSelect(option.id)
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(option.label)
+                                .font(.system(size: 16, weight: option.isVIP ? .bold : .medium))
+                                .foregroundColor(option.isVIP ? DB.gold : .white)
+                            if option.isVIP {
+                                ZStack {
+                                    Image(systemName: "hexagon.fill")
+                                        .font(.system(size: 21, weight: .bold))
+                                    Text("V")
+                                        .font(.system(size: 9, weight: .black))
+                                        .foregroundColor(.black.opacity(0.86))
+                                }
                                 .foregroundColor(DB.gold)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Capsule().fill(DB.gold.opacity(0.15)))
+                            }
+                            Spacer()
+                            if option.isSelected {
+                                Circle()
+                                    .fill(option.isVIP ? DB.gold : DB.pink)
+                                    .frame(width: 20, height: 20)
+                                    .overlay(
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                            .foregroundColor(option.isVIP ? .black : .white)
+                                    )
+                            }
                         }
-                        Spacer()
-                        if option.isSelected {
-                            Circle()
-                                .fill(DB.pink)
-                                .frame(width: 20, height: 20)
-                                .overlay(
-                                    Image(systemName: "checkmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.white)
-                                )
-                        }
+                        .padding(.horizontal, 20)
+                        .frame(height: 50)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(option.isSelected ? Color.white.opacity(0.12) : Color.clear)
+                        )
                     }
-                    .padding(.horizontal, 20)
-                    .frame(height: 48)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(option.isSelected ? Color.white.opacity(0.12) : Color.clear)
-                    )
-                    .disabled(option.isVIP)
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.bottom, 34)
@@ -151,9 +150,10 @@ struct PlayerQualitySheet: View {
 
 // MARK: - Player More Sheet
 
-/// Task26: 更多选项底部面板（清晰度/字幕/反馈）
+/// 更多选项底部面板（清晰度/字幕/反馈）
 struct PlayerMoreSheet: View {
     @Environment(\.dismiss) private var dismiss
+    var onSpeed: () -> Void
     var onQuality: () -> Void
     var onSubtitles: () -> Void
     var onReport: () -> Void
@@ -167,6 +167,11 @@ struct PlayerMoreSheet: View {
                 .padding(.bottom, 16)
 
             VStack(spacing: 0) {
+                moreRow(icon: "timer", title: "Speed", disabled: false) {
+                    dismiss(); onSpeed()
+                }
+                Divider().background(Color.white.opacity(0.08)).padding(.leading, 56)
+
                 moreRow(icon: "4k.tv", title: "Quality", disabled: false) {
                     dismiss(); onQuality()
                 }
@@ -213,7 +218,7 @@ struct PlayerMoreSheet: View {
 #if DEBUG
 struct PlayerSpeedSheet_Previews: PreviewProvider {
     static var previews: some View {
-        PlayerSpeedSheet(engine: PlayerCoordinator().engine)
+        PlayerSpeedSheet(selectedRate: 1.0, onSelect: { _ in })
             .preferredColorScheme(.dark)
     }
 }
