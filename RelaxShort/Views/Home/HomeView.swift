@@ -204,46 +204,33 @@ struct HomeView: View {
         .refreshable { await viewModel.loadData() }
     }
 
-    // MARK: - Tab 1: New (Compact List)
+    // MARK: - Tab 1: New
 
     private func newTabContent(containerW: CGFloat) -> some View {
         let dramas = viewModel.dramasForNewTab
         return ScrollView(showsIndicators: false) {
             if !dramas.isEmpty {
-                LazyVStack(spacing: DT.Space.sm) {
-                    ForEach(dramas) { drama in
-                        Button { playerDrama = drama } label: {
-                            HStack(spacing: DT.Space.md) {
-                                CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
-                                    cornerRadius: DB.posterRadius, width: 72, height: 96)
-
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(drama.title)
-                                        .font(.system(size: 15, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                                    HStack(spacing: 8) {
-                                        Text(drama.category).font(.system(size: 12)).foregroundColor(DB.mutedText)
-                                        Text("\(drama.episodeCount) EP").font(.system(size: 12)).foregroundColor(DB.mutedText)
-                                        Text(drama.formattedViewCount).font(.system(size: 12)).foregroundColor(DB.mutedText)
-                                    }
-                                    Text(drama.synopsis)
-                                        .font(.system(size: 12)).foregroundColor(DB.mutedText).lineLimit(2)
-                                }
-                                Spacer()
-                                Image(systemName: "play.circle.fill")
-                                    .font(.system(size: 28)).foregroundColor(DB.pink.opacity(0.8))
-                            }
-                            .padding(DT.Space.md)
-                            .background(DB.panel).cornerRadius(DB.cardRadius)
-                        }
-                        .buttonStyle(.plain)
+                LazyVStack(spacing: 22) {
+                    ForEach(Array(dramas.enumerated()), id: \.element.id) { index, drama in
+                        NewDramaRow(
+                            drama: drama,
+                            dateBadge: newDateBadge(for: index),
+                            containerWidth: containerW,
+                            onTap: { playerDrama = drama }
+                        )
                     }
                 }
                 .padding(.horizontal, DT.Space.pageH)
-                .padding(.top, 12)
+                .padding(.top, 6)
             }
             Color.clear.frame(height: 72)
         }
         .refreshable { await viewModel.loadData() }
+    }
+
+    private func newDateBadge(for index: Int) -> String {
+        if index < 2 { return "Today" }
+        return index < 5 ? "06/21" : "06/20"
     }
 
     // MARK: - Tab 2: Rankings
@@ -704,6 +691,86 @@ struct HomeView: View {
             Text(L10n.noContent).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
             Text(L10n.pullToRefresh).font(DT.Font.caption).foregroundColor(DT.Color.textTertiary)
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - New Tab Row
+
+private struct NewDramaRow: View {
+    let drama: DramaItem
+    let dateBadge: String
+    let containerWidth: CGFloat
+    let onTap: () -> Void
+
+    private var coverWidth: CGFloat {
+        let available = containerWidth - DT.Space.pageH * 2
+        return min(max(available * 0.36, 118), 148)
+    }
+
+    private var coverHeight: CGFloat {
+        coverWidth * 3 / 2
+    }
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(alignment: .top, spacing: 16) {
+                poster
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(drama.title)
+                        .font(.system(size: 21, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(drama.synopsis.isEmpty ? "A short drama imported from legacy playable media." : drama.synopsis)
+                        .font(.system(size: 17, weight: .regular))
+                        .foregroundColor(DB.mutedText)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Spacer(minLength: 0)
+
+                    HStack(spacing: 10) {
+                        Text(drama.category.isEmpty ? "Drama" : drama.category)
+                            .lineLimit(1)
+                        if let tag = drama.tags.first, !tag.isEmpty {
+                            Text(tag)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 8)
+                        Text("\(drama.episodeCount) Episodes")
+                            .lineLimit(1)
+                    }
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(DB.mutedText)
+                }
+                .frame(height: coverHeight, alignment: .top)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var poster: some View {
+        ZStack(alignment: .topTrailing) {
+            CoverImageView(
+                url: drama.coverURL,
+                aspectRatio: 2.0 / 3.0,
+                cornerRadius: DB.posterRadius,
+                width: coverWidth,
+                height: coverHeight
+            )
+
+            Text(dateBadge)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 8)
+                .frame(height: 28)
+                .background(Color.black.opacity(0.45))
+                .clipShape(RoundedCorner(radius: DB.posterRadius, corners: [.topRight, .bottomLeft]))
+        }
+        .frame(width: coverWidth, height: coverHeight)
     }
 }
 

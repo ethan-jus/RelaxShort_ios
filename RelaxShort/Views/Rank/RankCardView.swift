@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Rank Card View (DramaBox Style)
 
 /// DramaBox 风格排行榜卡片
-/// 布局：左侧大号排名数字 | 60×80 封面 | 标题+标签+播放量 | 右箭头
+/// 布局：左侧大号排名数字 | 封面 | 标题+标签 | 右侧热度
 /// 前三名排名数字使用金色
 struct RankCardView: View {
     let drama: RankDrama
@@ -24,21 +24,16 @@ struct RankCardView: View {
     var body: some View {
         Button(action: { onTap?() }) {
             HStack(spacing: 0) {
-                // ① 排名数字
                 rankNumber
-
-                // ② 封面 60×80
                 coverImage
-
-                // ③ 剧集信息
                 infoSection
-
                 Spacer(minLength: DT.Space.sm)
+                heatSection
             }
-            .padding(.vertical, DT.Space.sm)
-            .padding(.horizontal, DT.Space.sm)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 14)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: DB.cardRadius)
                     .fill(DB.panel)
             )
         }
@@ -49,10 +44,10 @@ struct RankCardView: View {
 
     private var rankNumber: some View {
         Text("\(drama.rank)")
-            .font(.system(size: 28, weight: rankWeight, design: .rounded))
+            .font(.system(size: 30, weight: rankWeight, design: .rounded))
             .foregroundColor(rankColor)
-            .frame(width: 36, alignment: .center)
-            .padding(.trailing, DT.Space.sm)
+            .frame(width: 42, alignment: .center)
+            .padding(.trailing, 14)
     }
 
     // MARK: - Cover Image
@@ -62,8 +57,8 @@ struct RankCardView: View {
             url: drama.coverURL,
             aspectRatio: 3.0 / 4.0,
             cornerRadius: DB.posterRadius,
-            width: 60,
-            height: 80
+            width: 64,
+            height: 84
         )
     }
 
@@ -71,48 +66,47 @@ struct RankCardView: View {
 
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // 标题 (最多2行)
             Text(drama.title)
-                .font(DT.Font.body(15, weight: .medium))
+                .font(.system(size: 19, weight: .semibold))
                 .foregroundColor(DT.Color.textPrimary)
                 .lineLimit(2)
+                .minimumScaleFactor(0.9)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // 标签行
-            HStack(spacing: 6) {
-                // 分类标签
+            HStack(spacing: 4) {
                 Text(drama.category)
-                    .font(DT.Font.caption)
+                    .font(.system(size: 15))
                     .foregroundColor(DT.Color.textSecondary)
                     .lineLimit(1)
 
-                // tags
                 if !drama.tags.isEmpty {
-                    ForEach(drama.tags.prefix(2), id: \.self) { tag in
+                    ForEach(drama.tags.prefix(1), id: \.self) { tag in
+                        Text(",")
+                            .font(.system(size: 15))
+                            .foregroundColor(DT.Color.textSecondary)
                         Text(tag)
-                            .font(DT.Font.body(11))
-                            .foregroundColor(DT.Color.textTertiary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(DT.Color.textPrimary.opacity(0.08))
-                            .cornerRadius(4)
+                            .font(.system(size: 15))
+                            .foregroundColor(DT.Color.textSecondary)
+                            .lineLimit(1)
                     }
                 }
             }
-
-            Spacer().frame(height: 2)
-
-            // 热度
-            HStack(spacing: 4) {
-                Image(systemName: "flame.fill")
-                    .font(DT.Font.body(11))
-                    .foregroundColor(DT.brandGold)
-                Text(drama.hot)
-                    .font(DT.Font.body(12))
-                    .foregroundColor(DT.Color.textTertiary)
-            }
+            .lineLimit(1)
         }
-        .padding(.leading, DT.Space.md)
+        .padding(.leading, 18)
+    }
+
+    private var heatSection: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
+            Text(drama.hot)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+        }
+        .frame(minWidth: 72, alignment: .trailing)
     }
 }
 

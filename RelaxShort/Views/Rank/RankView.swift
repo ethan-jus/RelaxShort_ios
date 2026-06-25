@@ -2,12 +2,8 @@ import SwiftUI
 
 // MARK: - Rank View (Embedded, DramaBox Style)
 
-/// DramaBox 风格排行榜页面 — 嵌入首页 Rankings Tab
-///
-/// - 深色背景 + 顶部橙红渐变装饰
-/// - 三个榜单切换: 热播榜/热搜榜/新剧榜
-/// - 排名列表：大号排名数字(前三金色) + 60×80封面 + 标题+标签+播放量 + 右箭头
-/// - 每个排名项可点击，通过 playerDrama 绑定触发上级页面的 SeriesPlayerView 导航
+/// DramaBox 风格排行榜页面 — 嵌入首页 Rankings Tab。
+/// 顶部使用克制的棕黑氛围渐变，列表仍由真实 rankings API 驱动。
 struct RankView: View {
     @Binding var playerDrama: DramaItem?
     @StateObject private var viewModel: RankViewModel
@@ -20,9 +16,12 @@ struct RankView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(spacing: 0) {
-            categoryTabs
-            rankList
+        ZStack(alignment: .top) {
+            rankingBackdrop
+            VStack(spacing: 0) {
+                categoryTabs
+                rankList
+            }
         }
         .background(DT.Color.bgPrimary)
         .task {
@@ -30,9 +29,18 @@ struct RankView: View {
         }
     }
 
+    private var rankingBackdrop: some View {
+        LinearGradient(
+            colors: viewModel.selectedCategory.backdropColors,
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .frame(height: 260)
+        .ignoresSafeArea(edges: .horizontal)
+    }
+
     // MARK: - Category Tabs
 
-    // Task27 R3: 三 pill 均匀分布，单行不换行
     private var categoryTabs: some View {
         HStack(spacing: 0) {
             ForEach(RankCategory.allCases) { category in
@@ -51,13 +59,15 @@ struct RankView: View {
             withAnimation(.easeInOut(duration: 0.2)) { viewModel.switchCategory(category) }
         } label: {
             Text(category.title)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 16, weight: .semibold))
                 .lineLimit(1)
                 .foregroundColor(isSelected ? .white : DB.mutedText)
-                .padding(.horizontal, 10).padding(.vertical, 8)
+                .minimumScaleFactor(0.86)
+                .padding(.horizontal, 8)
+                .frame(height: 40)
                 .frame(maxWidth: .infinity)
-                .background(Capsule().fill(isSelected ? DB.pink : Color.clear))
-                .overlay(Capsule().stroke(isSelected ? Color.clear : Color.white.opacity(0.15), lineWidth: 1))
+                .background(Capsule().fill(isSelected ? category.pillColor : Color.clear))
+                .overlay(Capsule().stroke(isSelected ? Color.clear : Color.white.opacity(0.18), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -80,7 +90,7 @@ struct RankView: View {
                             onTap: { playerDrama = drama.drama }
                         )
                         .padding(.horizontal, DT.Space.pageH)
-                        .padding(.bottom, 10)
+                        .padding(.bottom, 16)
                     }
                 }
             }
@@ -112,3 +122,39 @@ struct RankView: View {
         .background(DT.Color.bgPrimary)
 }
 #endif
+
+private extension RankCategory {
+    var pillColor: Color {
+        switch self {
+        case .hot:
+            Color(hex: "#7A5A4A")
+        case .trending:
+            Color(hex: "#635A62")
+        case .new:
+            Color(hex: "#5E6049")
+        }
+    }
+
+    var backdropColors: [Color] {
+        switch self {
+        case .hot:
+            [
+                Color(hex: "#4A3028").opacity(0.95),
+                Color(hex: "#261A18").opacity(0.72),
+                DB.black
+            ]
+        case .trending:
+            [
+                Color(hex: "#35313C").opacity(0.9),
+                Color(hex: "#1F1C22").opacity(0.7),
+                DB.black
+            ]
+        case .new:
+            [
+                Color(hex: "#3A3B2A").opacity(0.88),
+                Color(hex: "#202016").opacity(0.7),
+                DB.black
+            ]
+        }
+    }
+}
