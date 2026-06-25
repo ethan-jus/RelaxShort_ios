@@ -21,7 +21,6 @@ struct RankView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            gradientBar
             categoryTabs
             rankList
         }
@@ -31,29 +30,15 @@ struct RankView: View {
         }
     }
 
-    // MARK: - Gradient Bar
-
-    private var gradientBar: some View {
-        LinearGradient(
-            colors: [
-                DT.rankGradientStart.opacity(0.35),
-                DT.rankGradientMid.opacity(0.12),
-                Color.clear
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 32)
-    }
-
     // MARK: - Category Tabs
 
+    // Task27 R3: 三 pill 均匀分布，单行不换行
     private var categoryTabs: some View {
-        HStack(spacing: DT.Space.md) {
+        HStack(spacing: 0) {
             ForEach(RankCategory.allCases) { category in
                 rankCategoryPill(category)
+                    .frame(maxWidth: .infinity)
             }
-            Spacer()
         }
         .padding(.horizontal, DT.Space.pageH)
         .padding(.top, DT.Space.sm)
@@ -62,30 +47,17 @@ struct RankView: View {
 
     private func rankCategoryPill(_ category: RankCategory) -> some View {
         let isSelected = category == viewModel.selectedCategory
-
         return Button {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                viewModel.switchCategory(category)
-            }
+            withAnimation(.easeInOut(duration: 0.2)) { viewModel.switchCategory(category) }
         } label: {
-            Text(category.rawValue)
-                .font(DT.Font.body(14, weight: .medium))
-                .foregroundColor(isSelected ? DT.Color.textPrimary : DT.Color.textSecondary)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 8)
-                .background(
-                    isSelected
-                        ? DT.brandPink
-                        : Color.clear
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(
-                            isSelected ? Color.clear : DT.Color.textPrimary.opacity(0.15),
-                            lineWidth: 1
-                        )
-                )
-                .clipShape(Capsule())
+            Text(category.title)
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .foregroundColor(isSelected ? .white : DB.mutedText)
+                .padding(.horizontal, 10).padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
+                .background(Capsule().fill(isSelected ? DB.pink : Color.clear))
+                .overlay(Capsule().stroke(isSelected ? Color.clear : Color.white.opacity(0.15), lineWidth: 1))
         }
         .buttonStyle(.plain)
     }
@@ -107,11 +79,8 @@ struct RankView: View {
                             drama: drama,
                             onTap: { playerDrama = drama.drama }
                         )
-                        if index < viewModel.dramas.count - 1 {
-                            Divider()
-                                .background(DT.Color.textPrimary.opacity(0.06))
-                                .padding(.leading, 36 + DT.Space.sm + 60 + DT.Space.md + DT.Space.pageH)
-                        }
+                        .padding(.horizontal, DT.Space.pageH)
+                        .padding(.bottom, 10)
                     }
                 }
             }

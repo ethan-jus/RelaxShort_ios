@@ -15,7 +15,7 @@ import SwiftUI
 struct CoverImageView: View {
     let url: String
     var aspectRatio: CGFloat = DT.Layout.cardAspectRatio // 默认 2:3 竖版
-    var cornerRadius: CGFloat = DT.Radius.md
+    var cornerRadius: CGFloat = DB.posterRadius
     var width: CGFloat? = nil
     var height: CGFloat? = nil
 
@@ -53,7 +53,7 @@ struct CoverImageView: View {
             }
         }
         .applySize(width: width, height: height)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
     
     /// 渐变占位背景
@@ -127,7 +127,7 @@ struct ContinueWatchingSection: View {
                                 CoverImageView(
                                     url: drama.coverURL,
                                     aspectRatio: DT.Layout.cardAspectRatio,
-                                    cornerRadius: DT.Radius.md,
+                                    cornerRadius: DB.posterRadius,
                                     width: 100,
                                     height: 140
                                 )
@@ -231,7 +231,7 @@ struct RankingRow: View {
             CoverImageView(
                 url: drama.coverURL,
                 aspectRatio: DT.Layout.cardAspectRatio,
-                cornerRadius: DT.Radius.md,
+                cornerRadius: DB.posterRadius,
                 width: 60,
                 height: 80
             )

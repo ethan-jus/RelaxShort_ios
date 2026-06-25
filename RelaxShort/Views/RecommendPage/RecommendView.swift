@@ -59,7 +59,7 @@ struct RecommendView: View {
             .task { await loadAndInit() }
             .sheet(isPresented: $showShare) {
                 ShareSheet(dramaTitle: currentDrama?.title ?? "")
-                    .presentationDetents([.medium])
+                    .shareSheetPresentationStyle()
             }
             .onChange(of: session.currentIndex) { oldValue, newValue in
                 // 单视频切换状态重置
@@ -767,7 +767,7 @@ private struct DramaAboutSheet: View {
             CoverImageView(
                 url: drama.coverURL,
                 aspectRatio: 2.0 / 3.0,
-                cornerRadius: 6,
+                cornerRadius: DB.posterRadius,
                 width: 92,
                 height: 124
             )
@@ -965,7 +965,7 @@ private struct DramaAboutSheet: View {
                     CoverImageView(
                         url: item.coverURL,
                         aspectRatio: 2.0 / 3.0,
-                        cornerRadius: 3
+                        cornerRadius: DB.posterRadius
                     )
                     .frame(height: 150)
                     .clipped()

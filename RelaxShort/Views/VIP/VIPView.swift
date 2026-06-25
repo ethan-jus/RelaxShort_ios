@@ -391,7 +391,6 @@ extension VIPView {
                                 url: drama.coverURL, aspectRatio: 2.0/3.0,
                                 cornerRadius: DB.posterRadius, width: 100, height: 150
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
                             Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1).frame(width: 100)
                             Text("\(drama.episodeCount) EP").font(.system(size: 10)).foregroundColor(DB.mutedText)
                         }

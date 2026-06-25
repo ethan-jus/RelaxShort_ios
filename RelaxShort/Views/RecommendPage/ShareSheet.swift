@@ -1,102 +1,95 @@
 import SwiftUI
 
-// MARK: - DramaBox Share Sheet
+// MARK: - Share Metrics (Task27 R3)
 
-/// DramaBox 风格底部分享面板
-/// 奖励提示 + 5 个平台图标 + Copy Link
+private enum ShareMetrics {
+    static let detentHeight: CGFloat = 420
+    static let cornerRadius: CGFloat = 26
+    static let iconSize: CGFloat = 68
+    static let rewardPillHeight: CGFloat = 52
+}
+
+extension View {
+    func shareSheetPresentationStyle() -> some View {
+        self
+            .presentationDetents([.height(ShareMetrics.detentHeight)])
+            .presentationDragIndicator(.hidden)
+            .presentationCornerRadius(ShareMetrics.cornerRadius)
+    }
+}
+
+// MARK: - DramaBox Share Sheet (Task27 R3)
+
 struct ShareSheet: View {
     @Environment(\.dismiss) private var dismiss
-
     let dramaTitle: String
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 标题栏 + 关闭
-            HStack {
-                Spacer().frame(width: 36)
-                Spacer()
-                Text("Share")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 36, height: 36)
+        GeometryReader { geo in
+            let iconW = min(ShareMetrics.iconSize, (geo.size.width - 90) / 5)
+            VStack(spacing: 0) {
+                HStack {
+                    Spacer().frame(width: 40)
+                    Spacer()
+                    Text("Share").font(.system(size: 22, weight: .bold)).foregroundColor(.white)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark").font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.55)).frame(width: 40, height: 40)
+                    }
                 }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+                .padding(.horizontal, 20).padding(.top, 22).padding(.bottom, 14)
 
-            // 奖励提示
-            HStack(spacing: 8) {
-                Image(systemName: "bitcoinsign.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(DB.gold)
-                Text("first share gets 10 coins")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.85))
-                Spacer()
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(Capsule().fill(Color.white.opacity(0.08)))
-            .padding(.horizontal, 20)
-            .padding(.bottom, 24)
-
-            // 平台列表（横向滚动 5 个平台）
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 24) {
-                    sharePlatform(icon: "camera.circle.fill", name: "Instagram", color: Color(hex: "#E4405F"))
-                    sharePlatform(icon: "bolt.circle.fill", name: "Snapchat", color: Color(hex: "#FFFC00"), iconColor: .black)
-                    sharePlatform(icon: "message.circle.fill", name: "Facebook Messenger", color: Color(hex: "#0084FF"))
-                    sharePlatform(icon: "phone.circle.fill", name: "WhatsApp", color: Color(hex: "#25D366"))
-                    sharePlatform(icon: "link.circle.fill", name: "Copy Link", color: Color.white.opacity(0.28))
+                HStack(spacing: 10) {
+                    Image(systemName: "bitcoinsign.circle.fill").font(.system(size: 22)).foregroundColor(DB.gold)
+                    Text("first share gets 10 coins").font(.system(size: 17, weight: .medium)).foregroundColor(.white.opacity(0.88))
+                    Spacer()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 20).frame(height: ShareMetrics.rewardPillHeight)
+                .background(Capsule().fill(Color.white.opacity(0.09)))
+                .padding(.horizontal, 24).padding(.bottom, 28)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 18) {
+                        shareBtn(icon: "camera.fill", label: "Instagram",
+                            bg: [Color(hex: "#F58529"), Color(hex: "#DD2A7B"), Color(hex: "#8134AF")], w: iconW)
+                        shareBtn(icon: "bolt.fill", label: "Snapchat",
+                            bg: [Color(hex: "#FFFC00")], iconC: .black, w: iconW)
+                        shareBtn(icon: "message.fill", label: "Facebook Messenger",
+                            bg: [Color(hex: "#00B2FF"), Color(hex: "#006AFF")], w: iconW)
+                        shareBtn(icon: "phone.fill", label: "WhatsApp",
+                            bg: [Color(hex: "#25D366")], w: iconW)
+                        shareBtn(icon: "link", label: "Copy Link",
+                            bg: [Color.white.opacity(0.18)], iconC: .white, w: iconW)
+                    }
+                    .padding(.horizontal, 16)
+                }
+                Spacer().frame(height: 40)
             }
-            .padding(.bottom, 34)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .background(Color(hex: "#1C1C1E"))
         }
-        .background(DB.panelElevated)
     }
 
-    private func sharePlatform(
-        icon: String,
-        name: String,
-        color: Color,
-        iconColor: Color = .white
-    ) -> some View {
+    private func shareBtn(icon: String, label: String, bg: [Color], iconC: Color = .white, w: CGFloat) -> some View {
         Button {
-            if name == "Copy Link" {
-                UIPasteboard.general.string = "https://relaxshort.app/drama/\(dramaTitle)"
-            }
+            if label == "Copy Link" { UIPasteboard.general.string = "https://relaxshort.app/drama/\(dramaTitle)" }
             dismiss()
         } label: {
             VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 36))
-                    .foregroundColor(iconColor)
-                    .frame(width: 56, height: 56)
-                    .background(Circle().fill(color.opacity(0.18)))
-
-                Text(name)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.7))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 74)
+                ZStack {
+                    if bg.count > 1 { LinearGradient(colors: bg, startPoint: .topLeading, endPoint: .bottomTrailing).clipShape(Circle()) }
+                    else { Circle().fill(bg[0]) }
+                    Image(systemName: icon).font(.system(size: max(20, w * 0.4), weight: .medium)).foregroundColor(iconC)
+                }
+                .frame(width: w, height: w)
+                Text(label).font(.system(size: 11, weight: .medium)).foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2).multilineTextAlignment(.center).frame(width: w)
             }
-        }
+        }.buttonStyle(.plain)
     }
 }
 
 #if DEBUG
-#Preview("Share Sheet") {
-    ShareSheet(dramaTitle: "Mafia's Good Girl")
-        .preferredColorScheme(.dark)
-}
+#Preview("Share Sheet") { ShareSheet(dramaTitle: "Mafia's Good Girl").preferredColorScheme(.dark) }
 #endif

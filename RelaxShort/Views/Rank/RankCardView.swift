@@ -34,15 +34,13 @@ struct RankCardView: View {
                 infoSection
 
                 Spacer(minLength: DT.Space.sm)
-
-                // ④ 右箭头
-                Image(systemName: "chevron.right")
-                    .font(DT.Font.body(14))
-                    .foregroundColor(DT.Color.textTertiary)
             }
-            .padding(.vertical, DT.Space.md)
-            .padding(.horizontal, DT.Space.pageH)
-            .background(DT.Color.bgPrimary)
+            .padding(.vertical, DT.Space.sm)
+            .padding(.horizontal, DT.Space.sm)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(DB.panel)
+            )
         }
         .buttonStyle(.plain)
     }
@@ -63,7 +61,7 @@ struct RankCardView: View {
         CoverImageView(
             url: drama.coverURL,
             aspectRatio: 3.0 / 4.0,
-            cornerRadius: 6,
+            cornerRadius: DB.posterRadius,
             width: 60,
             height: 80
         )
@@ -106,9 +104,9 @@ struct RankCardView: View {
 
             // 热度
             HStack(spacing: 4) {
-                Image(systemName: "play.rectangle.fill")
+                Image(systemName: "flame.fill")
                     .font(DT.Font.body(11))
-                    .foregroundColor(DT.Color.textTertiary)
+                    .foregroundColor(DT.brandGold)
                 Text(drama.hot)
                     .font(DT.Font.body(12))
                     .foregroundColor(DT.Color.textTertiary)

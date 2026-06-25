@@ -220,8 +220,8 @@ enum DT {
 /// DramaBox 第一版复刻令牌 — 不替换 DT，只在复刻页面使用
 enum DB {
     // MARK: 品牌色
-    /// 高饱和粉红强调色 #FF2E6D
-    static let pink: SwiftUI.Color = SwiftUI.Color(hex: "#FF2E6D")
+    /// DramaBox 风格强调色统一使用 App Logo 红，避免界面混入额外高饱和粉色
+    static let pink: SwiftUI.Color = DT.logoRed
     /// App Logo 主红色，用于选中态品牌色
     static let logoRed: SwiftUI.Color = DT.logoRed
     /// 金色/会员色 #C29852
@@ -244,8 +244,8 @@ enum DB {
     static let bottomBarHeight: CGFloat = 64
     /// 弹层圆角 16pt
     static let sheetCornerRadius: CGFloat = 16
-    /// 海报圆角 6pt
-    static let posterRadius: CGFloat = 6
+    /// 视频海报圆角 2pt，所有剧集封面统一使用这个值
+    static let posterRadius: CGFloat = 2
     /// 卡片圆角 8pt
     static let cardRadius: CGFloat = 8
     /// CTA 按钮圆角 4pt

@@ -1,4 +1,83 @@
 import SwiftUI
+import UIKit
+
+private struct CategoryScrollOffsetReader: UIViewRepresentable {
+    @Binding var offsetY: CGFloat
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(offsetY: $offsetY)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = ObserverView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateUIView(_ view: UIView, context: Context) {
+        (view as? ObserverView)?.coordinator = context.coordinator
+        context.coordinator.attach(to: view.nearestVerticalScrollView)
+    }
+
+    final class ObserverView: UIView {
+        weak var coordinator: Coordinator?
+
+        override func didMoveToSuperview() {
+            super.didMoveToSuperview()
+            attach()
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            attach()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            attach()
+        }
+
+        private func attach() {
+            coordinator?.attach(to: nearestVerticalScrollView)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        private var offsetY: Binding<CGFloat>
+        private weak var scrollView: UIScrollView?
+        private var observation: NSKeyValueObservation?
+
+        init(offsetY: Binding<CGFloat>) {
+            self.offsetY = offsetY
+        }
+
+        func attach(to scrollView: UIScrollView?) {
+            guard let scrollView, self.scrollView !== scrollView else { return }
+            self.scrollView = scrollView
+            offsetY.wrappedValue = scrollView.contentOffset.y
+            observation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
+                self?.offsetY.wrappedValue = scrollView.contentOffset.y
+            }
+        }
+    }
+}
+
+private extension UIView {
+    var nearestVerticalScrollView: UIScrollView? {
+        var view = superview
+        while let current = view {
+            if let scrollView = current as? UIScrollView {
+                let isVertical = scrollView.alwaysBounceVertical || scrollView.contentSize.height > scrollView.bounds.height
+                if isVertical {
+                    return scrollView
+                }
+            }
+            view = current.superview
+        }
+        return nil
+    }
+}
 
 // MARK: - Home View (v9 — GeometryReader)
 
@@ -10,6 +89,20 @@ struct HomeView: View {
     @State private var playerDrama: DramaItem?
     @State private var showVIP = false
     @State private var showReward = false
+    /// R6: Categories 三行筛选状态
+    @State private var selectedLanguage: String = "All"
+    @State private var selectedGenre: String = "All"
+    @State private var selectedPayment: String = "All"
+    @State private var categoryScrollOffsetY: CGFloat = 0
+    @State private var isCategoryFilterOverlayPresented = false
+
+    private enum HomeMetrics {
+        static let chromeTopGap: CGFloat = 8
+        static let tabVerticalPadding: CGFloat = 14
+        static let searchBarHeight: CGFloat = 36
+        static let categorySummaryHeight: CGFloat = 44
+        static let categoryFilterHideThreshold: CGFloat = 155
+    }
 
     init(viewModel: HomeViewModel, rankingRepository: HomeRepositoryProtocol = MockHomeRepository()) {
         self.viewModel = viewModel
@@ -18,18 +111,16 @@ struct HomeView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let topLift = min(max(geo.safeAreaInsets.top - 34, 0), 18)
             ZStack {
                 DT.Color.bgPrimary.ignoresSafeArea()
-
                 VStack(spacing: 0) {
                     DramaBoxSearchHeaderView(
                         onSearchTap: { NotificationCenter.default.post(name: .showSearch, object: nil) },
                         onVIPTap: { showVIP = true },
                         onRewardTap: { showReward = true }
                     )
-                        .padding(.bottom, 0)
-                    tabBar.padding(.bottom, 4)
+                        .padding(.top, HomeMetrics.chromeTopGap)
+                    tabBar.padding(.vertical, HomeMetrics.tabVerticalPadding)
                     TabView(selection: $viewModel.selectedTab) {
                         popularContent(containerW: geo.size.width).tag(0)
                         newTabContent(containerW: geo.size.width).tag(1)
@@ -43,8 +134,6 @@ struct HomeView: View {
                     .frame(width: geo.size.width)
                     .ignoresSafeArea(.container, edges: .bottom)
                 }
-                .padding(.top, -topLift)
-
                 if viewModel.isLoading, !viewModel.hasContent { loadingView }
                 else if let msg = viewModel.errorMessage, !viewModel.hasContent { errorView(message: msg) }
                 else if !viewModel.hasContent, !viewModel.isLoading { emptyView }
@@ -79,7 +168,7 @@ struct HomeView: View {
                         } label: {
                             VStack(spacing: 4) {
                                 Text(tab)
-                                    .font(DT.Font.body(15, weight: .bold))
+                                    .font(DT.Font.body(17, weight: .bold))
                                     .foregroundColor(viewModel.selectedTab == idx ? DT.Color.textPrimary : DT.Color.textSecondary)
 
                                 Capsule()
@@ -126,8 +215,7 @@ struct HomeView: View {
                         Button { playerDrama = drama } label: {
                             HStack(spacing: DT.Space.md) {
                                 CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
-                                    cornerRadius: 6, width: 72, height: 96)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    cornerRadius: DB.posterRadius, width: 72, height: 96)
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(drama.title)
@@ -164,73 +252,238 @@ struct HomeView: View {
         RankView(playerDrama: $playerDrama, repository: rankingRepository)
     }
 
-    // MARK: - Tab 3: Categories (Task16 R3: 真实模式用后端分类)
+    // MARK: - R6 Categories Filter Model
+
+    private struct CategoryFilterOption: Identifiable, Equatable {
+        let id: String
+        let title: String
+    }
+
+    // MARK: - Tab 3: Categories (R6 三行筛选)
+
+    /// 语言行：All + 常用语言码映射
+    private var languageOptions: [CategoryFilterOption] {
+        [
+            CategoryFilterOption(id: "All", title: "All"),
+            CategoryFilterOption(id: "local", title: "Local"),
+            CategoryFilterOption(id: "zh-Hans", title: "Chinese"),
+            CategoryFilterOption(id: "ko", title: "Korean"),
+            CategoryFilterOption(id: "ja", title: "Japanese"),
+            CategoryFilterOption(id: "es", title: "Spanish"),
+            CategoryFilterOption(id: "others", title: "Others"),
+            CategoryFilterOption(id: "en", title: "English")
+        ]
+    }
+
+    private var genreOptions: [CategoryFilterOption] {
+        var opts = [CategoryFilterOption(id: "All", title: "All")]
+        for cat in viewModel.categories {
+            opts.append(CategoryFilterOption(id: cat.code, title: cat.title))
+        }
+        return opts
+    }
+
+    /// 付费行：All / Paid / Members Only / Free（前端过滤）
+    private var paymentOptions: [CategoryFilterOption] {
+        [
+            CategoryFilterOption(id: "All", title: "All"),
+            CategoryFilterOption(id: "paid", title: "Paid"),
+            CategoryFilterOption(id: "member", title: "Members Only"),
+            CategoryFilterOption(id: "free", title: "Free")
+        ]
+    }
+
+    private var languageRow: some View {
+        catFilterRow(options: languageOptions, selected: $selectedLanguage)
+    }
+
+    private var genreRow: some View {
+        catFilterRow(options: genreOptions, selected: .init(
+            get: { selectedGenre },
+            set: { newVal in
+                selectedGenre = newVal
+                if newVal == "All" {
+                    viewModel.categoryDramas = []
+                } else if let idx = viewModel.categories.firstIndex(where: { $0.code == newVal }) {
+                    Task { await viewModel.selectCategory(at: idx) }
+                }
+            }
+        ))
+    }
+
+    private var paymentRow: some View {
+        catFilterRow(options: paymentOptions, selected: $selectedPayment)
+    }
+
+    private var categorySelectedSummary: String {
+        let selectedTitles = [
+            selectedLanguage == "All" ? nil : title(for: selectedLanguage, in: languageOptions),
+            selectedGenre == "All" ? nil : title(for: selectedGenre, in: genreOptions),
+            selectedPayment == "All" ? nil : title(for: selectedPayment, in: paymentOptions)
+        ].compactMap { $0 }
+
+        return selectedTitles.isEmpty ? "Categories" : selectedTitles.joined(separator: " · ")
+    }
+
+    private func title(for id: String, in options: [CategoryFilterOption]) -> String {
+        options.first(where: { $0.id == id })?.title ?? "All"
+    }
 
     private var categoriesTabContent: some View {
-        VStack(spacing: 0) {
-            // Filter pills — 使用 viewModel.categories（真实模式来自后端 /api/v2/categories）
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: DT.Space.sm) {
-                    ForEach(Array(viewModel.categories.enumerated()), id: \.element.id) { idx, cat in
-                        Button {
-                            Task {
-                                await viewModel.selectCategory(at: idx)
-                            }
-                        } label: {
-                            Text(cat.title)
-                                .font(.system(size: 13, weight: viewModel.selectedCategoryIndex == idx ? .bold : .regular))
-                                .foregroundColor(viewModel.selectedCategoryIndex == idx ? .white : DB.mutedText)
-                                .padding(.horizontal, 14).padding(.vertical, 7)
-                                .background(
-                                    Capsule().fill(viewModel.selectedCategoryIndex == idx ? DB.pink : DB.panel)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, DT.Space.pageH)
-            }
-            .padding(.top, DT.Space.sm).padding(.bottom, DT.Space.md)
+        GeometryReader { _ in
+            let filterHideThreshold = HomeMetrics.categoryFilterHideThreshold
+            let filterIsFullyHidden = categoryScrollOffsetY >= filterHideThreshold
 
-            // Category loading / error / empty
-            if viewModel.isCategoryLoading {
-                Spacer()
-                ProgressView().tint(DT.Color.textSecondary)
-                Spacer()
-            } else if let err = viewModel.categoryErrorMessage, viewModel.categoryDramas.isEmpty {
-                VStack(spacing: DT.Space.md) {
-                    Spacer()
-                    Text(err).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
-                    Button(L10n.retry) {
-                        Task { await viewModel.selectCategory(at: viewModel.selectedCategoryIndex) }
-                    }
-                    .font(DT.Font.button).foregroundColor(DT.brandPink)
-                    Spacer()
-                }
-            } else {
-                let dramas = viewModel.categoryDramas.isEmpty ? featuredOrEmpty : viewModel.categoryDramas
+            ZStack(alignment: .top) {
                 ScrollView(showsIndicators: false) {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3),
-                    spacing: DT.Space.md
-                ) {
-                    ForEach(dramas) { drama in
-                        Button { playerDrama = drama } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
-                                    cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                                    .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
-                                Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                                Text("\(drama.episodeCount) EP").font(.system(size: 10)).foregroundColor(DB.mutedText)
-                            }
-                        }.buttonStyle(.plain)
+                    CategoryScrollOffsetReader(offsetY: $categoryScrollOffsetY)
+                        .frame(width: 1, height: 1)
+
+                    categoryFilterContent
+
+                    categoryGridStateContent
+                }
+                .onChange(of: categoryScrollOffsetY) { _, offset in
+                    if offset < filterHideThreshold {
+                        isCategoryFilterOverlayPresented = false
                     }
                 }
-                .padding(.horizontal, DT.Space.pageH)
-                Color.clear.frame(height: 72)
+                .refreshable { await viewModel.loadData() }
+
+                if filterIsFullyHidden, !isCategoryFilterOverlayPresented {
+                    categorySummaryHeader
+                }
+
+                if isCategoryFilterOverlayPresented {
+                    categoryFilterOverlay
+                }
             }
         }
     }
+
+    private var categoryFilterContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            languageRow
+            genreRow
+            paymentRow
+        }
+        .padding(.horizontal, DT.Space.pageH)
+        .padding(.top, DT.Space.sm)
+        .padding(.bottom, 18)
+    }
+
+    private var categorySummaryHeader: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isCategoryFilterOverlayPresented = true
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Spacer(minLength: 0)
+                Text(categorySelectedSummary)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(DB.logoRed)
+                    .lineLimit(1)
+                Text("▼")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(DB.logoRed)
+                Spacer(minLength: 0)
+            }
+            .frame(height: HomeMetrics.categorySummaryHeight)
+            .contentShape(Rectangle())
+            .background(DB.black)
+        }
+        .buttonStyle(.plain)
+        .transition(.opacity)
+        .zIndex(10)
+    }
+
+    private var categoryFilterOverlay: some View {
+        VStack(spacing: 0) {
+            categoryFilterContent
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isCategoryFilterOverlayPresented = false
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Text("Collapse")
+                    Image(systemName: "chevron.up")
+                }
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(DB.logoRed)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+            }
+            .buttonStyle(.plain)
+        }
+        .background(DB.black)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .zIndex(2)
+    }
+
+    @ViewBuilder
+    private var categoryGridStateContent: some View {
+        if viewModel.isCategoryLoading {
+            VStack {
+                Spacer(minLength: 120)
+                ProgressView().tint(DT.Color.textSecondary)
+                Spacer(minLength: 120)
+            }
+            .frame(maxWidth: .infinity)
+        } else if let err = viewModel.categoryErrorMessage, viewModel.categoryDramas.isEmpty {
+            VStack(spacing: DT.Space.md) {
+                Spacer(minLength: 120)
+                Text(err).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
+                Button(L10n.retry) { Task { await viewModel.selectCategory(at: viewModel.selectedCategoryIndex) } }
+                    .font(DT.Font.button).foregroundColor(DT.brandPink)
+                Spacer(minLength: 120)
+            }
+            .frame(maxWidth: .infinity)
+        } else {
+            let dramas = selectedGenre == "All" ? featuredOrEmpty : viewModel.categoryDramas
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3), spacing: DT.Space.md) {
+                ForEach(dramas) { drama in
+                    Button { playerDrama = drama } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
+                            Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
+                            Text("\(drama.episodeCount) EP").font(.system(size: 10)).foregroundColor(DB.mutedText)
+                        }
+                    }.buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, DT.Space.pageH)
+            Color.clear.frame(height: 72)
+        }
+    }
+
+    /// R6: DramaBox-style filter row. Selected items use logo red text with a subtle red pill.
+    private func catFilterRow(options: [CategoryFilterOption], selected: Binding<String>) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(options) { opt in
+                    let isSelected = selected.wrappedValue == opt.id
+                    Button {
+                        selected.wrappedValue = opt.id
+                    } label: {
+                        Text(opt.title)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundColor(isSelected ? DB.logoRed : DB.mutedText)
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule().fill(isSelected ? DB.logoRed.opacity(0.22) : Color.clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .frame(height: 36)
     }
 
     // MARK: - Tab 4: Anime
@@ -301,7 +554,6 @@ struct HomeView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
                                     cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                                    .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
                                 Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
                             }
                         }.buttonStyle(.plain)
@@ -320,7 +572,6 @@ struct HomeView: View {
                                     VStack(alignment: .leading, spacing: 4) {
                                         CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
                                             cornerRadius: DB.posterRadius, width: 100, height: 150)
-                                            .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
                                         Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1).frame(width: 100)
                                     }
                                 }.buttonStyle(.plain)
@@ -347,9 +598,8 @@ struct HomeView: View {
         .refreshable { await viewModel.loadData() }
     }
 
-    private var featuredOrEmpty: [DramaItem] {
-        viewModel.featuredDramas.isEmpty ? MockData.homePopular : viewModel.featuredDramas
-    }
+    /// R5: 真实路径不使用 MockData 兜底
+    private var featuredOrEmpty: [DramaItem] { viewModel.featuredDramas }
 
     // MARK: - Tab 6: Original+
 
@@ -394,7 +644,6 @@ struct HomeView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
                                         cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                                        .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
                                     Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
                                 }
                             }.buttonStyle(.plain)
@@ -416,7 +665,6 @@ struct HomeView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
                                         cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                                        .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
                                     Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
                                 }
                             }.buttonStyle(.plain)
@@ -463,7 +711,7 @@ struct HomeView: View {
 
 /// 首页顶部搜索栏 — 接受闭包替代 NotificationCenter
 private struct DramaBoxSearchHeaderView: View {
-    private let btnH: CGFloat = 34
+    private let btnH: CGFloat = 36
     var onSearchTap: () -> Void = {}
     var onVIPTap: () -> Void = {}
     var onRewardTap: () -> Void = {}

@@ -56,8 +56,8 @@ struct MarketingCard: View {
     var body: some View {
         Button{playerDrama=drama}label:{
             VStack(alignment:.leading,spacing:0){
-                ZStack(alignment:.topTrailing){CoverImageView(url:drama.coverURL,cornerRadius:2).frame(width:colW,height:coverH).clipped();if let b=drama.badge{BadgeTagView(type:b)}}
-                    .frame(width:colW,height:coverH).clipped()
+                ZStack(alignment:.topTrailing){CoverImageView(url:drama.coverURL,cornerRadius:DB.posterRadius,width:colW,height:coverH);if let b=drama.badge{BadgeTagView(type:b)}}
+                    .frame(width:colW,height:coverH)
                 Text(drama.title).font(.system(size:14,weight:.medium)).foregroundColor(DT.Color.textPrimary).lineLimit(2)
                     .padding(.horizontal,4).padding(.top,6).padding(.bottom,6).frame(maxWidth:colW,alignment:.leading)
             }.frame(width:colW,height:cardH,alignment:.top)
@@ -116,7 +116,7 @@ struct CategoryCard: View {
             ForEach(Array(dramas.prefix(4).enumerated()),id:\.element.id){idx,drama in
                 Button{playerDrama=drama}label:{
                     HStack(spacing:0){
-                        CoverImageView(url:drama.coverURL,cornerRadius:2,width:44,height:56).padding(.trailing,8)
+                        CoverImageView(url:drama.coverURL,cornerRadius:DB.posterRadius,width:44,height:56).padding(.trailing,8)
                         Text(drama.title).font(.system(size:13,weight:.medium)).foregroundColor(.white).lineLimit(2).fixedSize(horizontal:false,vertical:true).frame(maxWidth:.infinity,alignment:.leading)
                     }.padding(4).background(theme.subBg).cornerRadius(2)
                 }.buttonStyle(.plain)
@@ -132,7 +132,7 @@ struct WaterfallCard: View {
     var body: some View {
         Button{playerDrama=drama}label:{
             VStack(alignment:.leading,spacing:0){
-                ZStack(alignment:.topTrailing){CoverImageView(url:drama.coverURL,cornerRadius:2).frame(width:colW,height:coverH).clipped();if let b=drama.badge{BadgeTagView(type:b)}}
+                ZStack(alignment:.topTrailing){CoverImageView(url:drama.coverURL,cornerRadius:DB.posterRadius,width:colW,height:coverH);if let b=drama.badge{BadgeTagView(type:b)}}
                 Text(drama.title).font(.system(size:14,weight:.semibold)).foregroundColor(DT.Color.textPrimary).lineLimit(2).padding(.horizontal,6).padding(.top,10).padding(.bottom,6)
                 footerRow.padding(.horizontal,6).padding(.bottom,8)
             }.frame(width:colW).background(DT.Color.bgCard).cornerRadius(2)
@@ -155,9 +155,7 @@ struct CategoryDramaCard: View {
         Button { playerDrama = drama } label: {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topTrailing) {
-                    CoverImageView(url: drama.coverURL, cornerRadius: DT.Radius.sm)
-                        .frame(width: cardW, height: coverH)
-                        .clipped()
+                    CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: cardW, height: coverH)
                     if let badge = drama.badge {
                         BadgeTagView(type: badge)
                     }

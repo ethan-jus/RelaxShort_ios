@@ -31,11 +31,18 @@ struct RankDrama: Identifiable {
 
 // MARK: - Rank Category
 
-/// 排行榜子榜单类型
-enum RankCategory: String, CaseIterable, Identifiable {
-    case hot     = "热播榜"
-    case trending = "热搜榜"
-    case new     = "新剧榜"
-
-    var id: String { rawValue }
+/// R3: API type 与 display title 分离
+enum RankCategory: CaseIterable, Identifiable {
+    case hot, trending, new
+    var id: String { apiType }
+    var apiType: String {
+        switch self {
+        case .hot: "popular"; case .trending: "trending"; case .new: "new"
+        }
+    }
+    var title: String {
+        switch self {
+        case .hot: "Most Trending"; case .trending: "Top Searched"; case .new: "New Releases"
+        }
+    }
 }

@@ -169,7 +169,7 @@ struct SeriesPlayerView: View {
             switch sheet {
             case .share:
                 ShareSheet(dramaTitle: drama.title)
-                    .presentationDetents([.medium])
+                    .shareSheetPresentationStyle()
             case .speed:
                 PlayerSpeedSheet(
                     selectedRate: selectedPlaybackRate,
@@ -887,7 +887,7 @@ private struct EpisodePickerSheet: View {
 
                 // Header: poster + title
                 HStack(alignment: .top, spacing: 14) {
-                    CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: 6, width: 72, height: 96)
+                    CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: 72, height: 96)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(drama.title).font(.system(size: 20, weight: .bold)).foregroundColor(.white).lineLimit(1)
                         Text("\(drama.formattedViewCount) Views").font(.system(size: 16)).foregroundColor(.white.opacity(0.5))

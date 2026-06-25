@@ -54,14 +54,8 @@ final class RankViewModel: ObservableObject {
 
     // MARK: - Type Mapping
 
-    /// RankCategory → 后端 rankings type 参数。
-    /// 后端 rankings 接口支持的 type: popular / new / trending（以 IOS_API_CONTRACT_V1.md 为准）
     private func mapToRankingType(_ category: RankCategory) -> String {
-        switch category {
-        case .hot:      return "popular"
-        case .trending: return "trending"
-        case .new:      return "new"
-        }
+        category.apiType
     }
 
     private func logError(_ message: String) {

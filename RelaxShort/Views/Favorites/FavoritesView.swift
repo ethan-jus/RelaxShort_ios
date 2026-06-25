@@ -124,9 +124,8 @@ struct FavoritesView: View {
                     HStack(spacing: DT.Space.md) {
                         CoverImageView(
                             url: drama.coverURL, aspectRatio: 2.0/3.0,
-                            cornerRadius: 6, width: 72, height: 96
+                            cornerRadius: DB.posterRadius, width: 72, height: 96
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
 
                         VStack(alignment: .leading, spacing: 4) {
                             Text(drama.title)
@@ -188,7 +187,6 @@ struct FavoritesView: View {
                             url: drama.coverURL, aspectRatio: 2.0/3.0,
                             cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
                         Text(drama.title)
                             .font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
                     }
@@ -272,11 +270,10 @@ struct WatchHistoryCard: View {
             CoverImageView(
                 url: record.drama.coverURL,
                 aspectRatio: DT.Layout.cardAspectRatio,
-                cornerRadius: 6,
+                cornerRadius: DB.posterRadius,
                 width: 80,
                 height: 106
             )
-            .clipShape(RoundedRectangle(cornerRadius: 6))
             .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
 
             // Info

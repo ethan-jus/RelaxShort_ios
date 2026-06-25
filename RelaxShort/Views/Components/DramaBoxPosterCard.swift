@@ -26,7 +26,6 @@ struct DramaBoxPosterCard: View {
                         width: width,
                         height: height
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
 
                     // Badge overlay
                     if let badge = drama.badge {
