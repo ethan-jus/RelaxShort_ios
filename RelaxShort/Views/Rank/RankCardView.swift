@@ -30,8 +30,8 @@ struct RankCardView: View {
                 Spacer(minLength: DT.Space.sm)
                 heatSection
             }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 12)
             .background(
                 RoundedRectangle(cornerRadius: DB.cardRadius)
                     .fill(DB.panel)
@@ -44,10 +44,10 @@ struct RankCardView: View {
 
     private var rankNumber: some View {
         Text("\(drama.rank)")
-            .font(.system(size: 30, weight: rankWeight, design: .rounded))
+            .font(.system(size: 26, weight: rankWeight, design: .rounded))
             .foregroundColor(rankColor)
-            .frame(width: 42, alignment: .center)
-            .padding(.trailing, 14)
+            .frame(width: 30, alignment: .center)
+            .padding(.trailing, 10)
     }
 
     // MARK: - Cover Image
@@ -57,8 +57,8 @@ struct RankCardView: View {
             url: drama.coverURL,
             aspectRatio: 3.0 / 4.0,
             cornerRadius: DB.posterRadius,
-            width: 64,
-            height: 84
+            width: 58,
+            height: 78
         )
     }
 
@@ -67,25 +67,25 @@ struct RankCardView: View {
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(drama.title)
-                .font(.system(size: 19, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(DT.Color.textPrimary)
                 .lineLimit(2)
-                .minimumScaleFactor(0.9)
+                .minimumScaleFactor(0.86)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 4) {
                 Text(drama.category)
-                    .font(.system(size: 15))
+                    .font(.system(size: 14))
                     .foregroundColor(DT.Color.textSecondary)
                     .lineLimit(1)
 
                 if !drama.tags.isEmpty {
                     ForEach(drama.tags.prefix(1), id: \.self) { tag in
                         Text(",")
-                            .font(.system(size: 15))
+                            .font(.system(size: 14))
                             .foregroundColor(DT.Color.textSecondary)
                         Text(tag)
-                            .font(.system(size: 15))
+                            .font(.system(size: 14))
                             .foregroundColor(DT.Color.textSecondary)
                             .lineLimit(1)
                     }
@@ -93,20 +93,21 @@ struct RankCardView: View {
             }
             .lineLimit(1)
         }
-        .padding(.leading, 18)
+        .padding(.leading, 12)
     }
 
     private var heatSection: some View {
         HStack(spacing: 5) {
             Image(systemName: "flame.fill")
-                .font(.system(size: 17, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
             Text(drama.hot)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
+                .minimumScaleFactor(0.82)
         }
-        .frame(minWidth: 72, alignment: .trailing)
+        .frame(width: 54, alignment: .trailing)
     }
 }
 

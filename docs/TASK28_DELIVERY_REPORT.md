@@ -35,6 +35,7 @@ Anime / VIP / Original+ 未进入本轮。
   - 右侧标题、简介、分类/标签/集数。
   - 封面角标保留 `Today / 06/21 / 06/20` 轻量 UI 文案，集中在 `newDateBadge(for:)`。
 - 按用户要求，没有新增 `Live Now / Coming Soon` 子 tab。
+- R8 修正：压缩单行卡片高度，封面宽度调整为 34% 区间但高度改为紧凑比例，简介从 3 行降到 2 行，行距从 22 降到 16，避免 New tab 显得笨重。
 
 ### Rankings
 
@@ -49,6 +50,9 @@ Anime / VIP / Original+ 未进入本轮。
   - 中间封面和标题/标签。
   - 右侧火焰 icon + 热度。
   - 每行独立深色卡片。
+- R8 修正：把棕黑渐变背景上移到 `HomeView`，当选中 Rankings tab 时从状态栏/搜索栏区域开始覆盖全屏背景，而不是只覆盖 tab 内容区。
+- R8 修正：压缩排名数字、封面和右侧热度区域宽度，增加标题可用空间，减少标题过早显示省略号。
+- R8 修正：Rankings 子 tab 切换时同步切换全屏背景色和选中胶囊色：`Most Trending` 棕黑、`Top Searched` 紫色、`New Releases` 青绿色。
 
 ### Categories
 

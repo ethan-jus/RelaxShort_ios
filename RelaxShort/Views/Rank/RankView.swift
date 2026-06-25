@@ -7,36 +7,29 @@ import SwiftUI
 struct RankView: View {
     @Binding var playerDrama: DramaItem?
     @StateObject private var viewModel: RankViewModel
+    private let onCategoryChange: (RankCategory) -> Void
 
-    init(playerDrama: Binding<DramaItem?>, repository: HomeRepositoryProtocol = MockHomeRepository()) {
+    init(
+        playerDrama: Binding<DramaItem?>,
+        repository: HomeRepositoryProtocol = MockHomeRepository(),
+        onCategoryChange: @escaping (RankCategory) -> Void = { _ in }
+    ) {
         self._playerDrama = playerDrama
         self._viewModel = StateObject(wrappedValue: RankViewModel(repository: repository))
+        self.onCategoryChange = onCategoryChange
     }
 
     // MARK: - Body
 
     var body: some View {
-        ZStack(alignment: .top) {
-            rankingBackdrop
-            VStack(spacing: 0) {
-                categoryTabs
-                rankList
-            }
+        VStack(spacing: 0) {
+            categoryTabs
+            rankList
         }
-        .background(DT.Color.bgPrimary)
         .task {
+            onCategoryChange(viewModel.selectedCategory)
             await viewModel.loadData()
         }
-    }
-
-    private var rankingBackdrop: some View {
-        LinearGradient(
-            colors: viewModel.selectedCategory.backdropColors,
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .frame(height: 260)
-        .ignoresSafeArea(edges: .horizontal)
     }
 
     // MARK: - Category Tabs
@@ -56,7 +49,10 @@ struct RankView: View {
     private func rankCategoryPill(_ category: RankCategory) -> some View {
         let isSelected = category == viewModel.selectedCategory
         return Button {
-            withAnimation(.easeInOut(duration: 0.2)) { viewModel.switchCategory(category) }
+            withAnimation(.easeInOut(duration: 0.2)) {
+                viewModel.switchCategory(category)
+                onCategoryChange(category)
+            }
         } label: {
             Text(category.title)
                 .font(.system(size: 16, weight: .semibold))
@@ -129,32 +125,9 @@ private extension RankCategory {
         case .hot:
             Color(hex: "#7A5A4A")
         case .trending:
-            Color(hex: "#635A62")
+            Color(red: 0.35, green: 0.15, blue: 0.55)
         case .new:
-            Color(hex: "#5E6049")
-        }
-    }
-
-    var backdropColors: [Color] {
-        switch self {
-        case .hot:
-            [
-                Color(hex: "#4A3028").opacity(0.95),
-                Color(hex: "#261A18").opacity(0.72),
-                DB.black
-            ]
-        case .trending:
-            [
-                Color(hex: "#35313C").opacity(0.9),
-                Color(hex: "#1F1C22").opacity(0.7),
-                DB.black
-            ]
-        case .new:
-            [
-                Color(hex: "#3A3B2A").opacity(0.88),
-                Color(hex: "#202016").opacity(0.7),
-                DB.black
-            ]
+            Color(red: 0.08, green: 0.35, blue: 0.38)
         }
     }
 }

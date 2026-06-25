@@ -95,6 +95,7 @@ struct HomeView: View {
     @State private var selectedPayment: String = "All"
     @State private var categoryScrollOffsetY: CGFloat = 0
     @State private var isCategoryFilterOverlayPresented = false
+    @State private var selectedRankCategory: RankCategory = .hot
 
     private enum HomeMetrics {
         static let chromeTopGap: CGFloat = 8
@@ -112,7 +113,7 @@ struct HomeView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                DT.Color.bgPrimary.ignoresSafeArea()
+                homeBackdrop.ignoresSafeArea()
                 VStack(spacing: 0) {
                     DramaBoxSearchHeaderView(
                         onSearchTap: { NotificationCenter.default.post(name: .showSearch, object: nil) },
@@ -151,6 +152,24 @@ struct HomeView: View {
             CoinRewardView(mode: .pushed)
         }
         .task { await viewModel.loadData() }
+    }
+
+    @ViewBuilder
+    private var homeBackdrop: some View {
+        if viewModel.selectedTab == 2 {
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: selectedRankCategory.homeBackdropColors,
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 270)
+
+                DB.black
+            }
+        } else {
+            DT.Color.bgPrimary
+        }
     }
 
     // MARK: - Tab Bar
@@ -210,7 +229,7 @@ struct HomeView: View {
         let dramas = viewModel.dramasForNewTab
         return ScrollView(showsIndicators: false) {
             if !dramas.isEmpty {
-                LazyVStack(spacing: 22) {
+                LazyVStack(spacing: 16) {
                     ForEach(Array(dramas.enumerated()), id: \.element.id) { index, drama in
                         NewDramaRow(
                             drama: drama,
@@ -236,7 +255,11 @@ struct HomeView: View {
     // MARK: - Tab 2: Rankings
 
     private var rankingsTabContent: some View {
-        RankView(playerDrama: $playerDrama, repository: rankingRepository)
+        RankView(
+            playerDrama: $playerDrama,
+            repository: rankingRepository,
+            onCategoryChange: { selectedRankCategory = $0 }
+        )
     }
 
     // MARK: - R6 Categories Filter Model
@@ -704,11 +727,11 @@ private struct NewDramaRow: View {
 
     private var coverWidth: CGFloat {
         let available = containerWidth - DT.Space.pageH * 2
-        return min(max(available * 0.36, 118), 148)
+        return min(max(available * 0.34, 110), 132)
     }
 
     private var coverHeight: CGFloat {
-        coverWidth * 3 / 2
+        coverWidth * 1.28
     }
 
     var body: some View {
@@ -716,17 +739,17 @@ private struct NewDramaRow: View {
             HStack(alignment: .top, spacing: 16) {
                 poster
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(drama.title)
-                        .font(.system(size: 21, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(drama.synopsis.isEmpty ? "A short drama imported from legacy playable media." : drama.synopsis)
-                        .font(.system(size: 17, weight: .regular))
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundColor(DB.mutedText)
-                        .lineLimit(3)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Spacer(minLength: 0)
@@ -771,6 +794,31 @@ private struct NewDramaRow: View {
                 .clipShape(RoundedCorner(radius: DB.posterRadius, corners: [.topRight, .bottomLeft]))
         }
         .frame(width: coverWidth, height: coverHeight)
+    }
+}
+
+private extension RankCategory {
+    var homeBackdropColors: [Color] {
+        switch self {
+        case .hot:
+            [
+                Color(hex: "#54392F").opacity(0.95),
+                Color(hex: "#251A17").opacity(0.78),
+                DB.black
+            ]
+        case .trending:
+            [
+                Color(red: 0.22, green: 0.17, blue: 0.32).opacity(0.86),
+                Color(red: 0.14, green: 0.12, blue: 0.22).opacity(0.72),
+                DB.black
+            ]
+        case .new:
+            [
+                Color(red: 0.07, green: 0.26, blue: 0.28).opacity(0.82),
+                Color(red: 0.05, green: 0.16, blue: 0.18).opacity(0.68),
+                DB.black
+            ]
+        }
     }
 }
 
