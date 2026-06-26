@@ -30,9 +30,11 @@ final class PlayerRecoveryController {
     private var stallObserver: Any?
     private var timeControlObs: NSKeyValueObservation?
     private var recoveryTask: Task<Void, Never>?
+    private var stablePlaybackTask: Task<Void, Never>?
 
     deinit {
         recoveryTask?.cancel()
+        stablePlaybackTask?.cancel()
         monitor.cancel()
     }
 
@@ -85,9 +87,10 @@ final class PlayerRecoveryController {
                         default: break
                         }
                     }
-                    // Task24: 播放恢复正常，清除当前 item 的失败计数
+                    // 只有稳定播放一段时间后才清除失败计数。
+                    // AVPlayer 可能短暂进入 playing 后立即 failed，过早清零会让 attempt 永远停在 1/3。
                     if let id = self.engine?.currentItem?.id {
-                        self.failureCounts.removeValue(forKey: id)
+                        self.scheduleStablePlaybackReset(for: id)
                     }
                 default: break
                 }
@@ -100,6 +103,8 @@ final class PlayerRecoveryController {
         if let o = stallObserver { NotificationCenter.default.removeObserver(o); stallObserver = nil }
         timeControlObs?.invalidate()
         timeControlObs = nil
+        stablePlaybackTask?.cancel()
+        stablePlaybackTask = nil
     }
 
     // MARK: - 状态快照
@@ -239,6 +244,18 @@ final class PlayerRecoveryController {
             let durationMs = (CACurrentMediaTime() - startTime) * 1000
             engine.metrics.logRecovery(ms: durationMs)
             self.recoveryTask = nil
+        }
+    }
+
+    private func scheduleStablePlaybackReset(for itemID: String) {
+        stablePlaybackTask?.cancel()
+        stablePlaybackTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            guard let self, !Task.isCancelled else { return }
+            guard self.engine?.currentItem?.id == itemID,
+                  self.engine?.state == .playing else { return }
+            self.failureCounts.removeValue(forKey: itemID)
+            print("[PlayerKit] recovery counter reset id=\(itemID) reason=stablePlayback")
         }
     }
 }

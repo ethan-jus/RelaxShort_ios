@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 import GoogleMobileAds
 
 @main
@@ -20,6 +21,8 @@ struct RelaxShortApp: App {
     // MARK: - Init
 
     init() {
+        configureAudioSession()
+
         // 注册测试设备，确保真机+模拟器调试时都能加载测试广告
         GADMobileAds.sharedInstance().requestConfiguration.testDeviceIdentifiers = [
             "00008130-001128D23A2A001C"   // iPhone 15 Pro Max
@@ -30,6 +33,16 @@ struct RelaxShortApp: App {
             DispatchQueue.main.async {
                 RealAdService.shared.isSDKReady = true
             }
+        }
+    }
+
+    private func configureAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay])
+            try session.setActive(true)
+        } catch {
+            print("[PlayerKit] audioSession configure failed: \(error.localizedDescription)")
         }
     }
 
