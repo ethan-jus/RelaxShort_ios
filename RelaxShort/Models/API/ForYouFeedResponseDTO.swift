@@ -35,6 +35,8 @@ struct FeedCardDTO: Decodable {
     let localizedTitle: String?
     let localizedSynopsis: String?
     let coverUrl: String?
+    let horizontalCoverUrl: String?
+    let displayFlags: [String]?
     let tags: [String]?
     let playAsset: PlayAssetDTO?
     let monetization: MonetizationDTO?

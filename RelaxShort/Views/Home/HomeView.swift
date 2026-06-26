@@ -499,26 +499,94 @@ struct HomeView: View {
     // MARK: - Tab 4: Anime
 
     private func animeTabContent(containerW: CGFloat) -> some View {
-        ScrollView(showsIndicators: false) {
-            if !viewModel.dramasForAnimeTab.isEmpty {
-                MasonryWaterfall(dramas: viewModel.dramasForAnimeTab, playerDrama: $playerDrama, containerW: containerW)
-                    .padding(.top, 12)
-            } else {
-                VStack(spacing: DT.Space.md) {
-                    Image(systemName: "tv")
-                        .font(DT.Font.emptyIcon)
-                        .foregroundColor(DT.Color.textTertiary)
-                    Text(L10n.noAnime)
-                        .font(DT.Font.bodyDefault)
-                        .foregroundColor(DT.Color.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.top, 60)
+        let dramas = viewModel.dramasForAnimeTab
+        if dramas.isEmpty { return AnyView(animeEmptyState) }
+        return AnyView(ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
+                AnimeHeroCarousel(dramas: dramas, containerW: containerW, playerDrama: $playerDrama)
+                animeWeeklyFeatured(Array(dramas.prefix(8)), containerW: containerW)
+                animeMoreRecommended(Array(dramas.dropFirst(1)), containerW: containerW)
             }
             Color.clear.frame(height: 64)
-        }
-        .refreshable { await viewModel.loadData() }
+        }.refreshable { await viewModel.loadData() })
     }
+
+    private var animeEmptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "tv").font(.system(size: 40)).foregroundColor(.white.opacity(0.2))
+            Text(L10n.noAnime).font(.system(size: 14)).foregroundColor(.white.opacity(0.5))
+        }.frame(maxWidth: .infinity).padding(.top, 80)
+    }
+
+    private func animeWeeklyFeatured(_ dramas: [DramaItem], containerW: CGFloat) -> some View {
+        let cardW = min(max(containerW * 0.29, 112), 132)
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.featured).font(.system(size: 18, weight: .semibold)).foregroundColor(.white).padding(.horizontal, 16)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(dramas) { drama in
+                        Button { playerDrama = drama } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: cardW, height: cardW * 1.5)
+                                Text(drama.title).font(.system(size: 13, weight: .medium)).foregroundColor(.white).lineLimit(1).frame(width: cardW)
+                                Text(drama.category).font(.system(size: 12)).foregroundColor(DB.mutedText).lineLimit(1).frame(width: cardW)
+                            }
+                        }.buttonStyle(.plain)
+                    }
+                }.padding(.horizontal, 16)
+            }
+        }.padding(.bottom, 24)
+    }
+
+    private func animeMoreRecommended(_ dramas: [DramaItem], containerW: CGFloat) -> some View {
+        let coverW = min(max(containerW * 0.28, 104), 122)
+        let coverH = coverW * 1.42
+        return VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.recommended).font(.system(size: 18, weight: .semibold)).foregroundColor(.white).padding(.horizontal, 16)
+            LazyVStack(spacing: 18) {
+                ForEach(dramas) { drama in
+                    Button { playerDrama = drama } label: {
+                        HStack(alignment: .top, spacing: 14) {
+                            ZStack(alignment: .topTrailing) {
+                                CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: coverW, height: coverH)
+                                if let flag = displayFlag(for: drama) {
+                                    Text(flag).font(.system(size: 10, weight: .bold)).foregroundColor(.white)
+                                        .padding(.horizontal, 6).padding(.vertical, 3)
+                                        .background(RoundedRectangle(cornerRadius: 2).fill(Color(red: 0.52, green: 0.38, blue: 0.82))).padding(4)
+                                }
+                                VStack {
+                                    Spacer()
+                                    HStack {
+                                        Spacer()
+                                        HStack(spacing: 3) {
+                                            Image(systemName: "play.fill").font(.system(size: 8))
+                                            Text(drama.formattedViewCount).font(.system(size: 10, weight: .medium))
+                                        }.foregroundColor(.white).padding(.horizontal, 5).padding(.vertical, 3)
+                                            .background(Color.black.opacity(0.55)).cornerRadius(3).padding(4)
+                                    }
+                                }
+                            }.frame(width: coverW, height: coverH)
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(drama.title).font(.system(size: 16, weight: .semibold)).foregroundColor(.white).lineLimit(2)
+                                if !drama.synopsis.isEmpty { Text(drama.synopsis).font(.system(size: 13)).foregroundColor(DB.mutedText).lineLimit(3) }
+                                HStack(spacing: 8) {
+                                    Text(drama.category).font(.system(size: 12)).foregroundColor(DB.mutedText)
+                                    if let languageTag = drama.languageTag, !languageTag.isEmpty {
+                                        Text(languageTag).font(.system(size: 12)).foregroundColor(DB.mutedText)
+                                    }
+                                    Text("\(drama.episodeCount) EP").font(.system(size: 12)).foregroundColor(DB.mutedText)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }.buttonStyle(.plain)
+                }
+            }.padding(.horizontal, 16)
+        }
+    }
+
+    /// 从后端 display_flags 读取运营角标，不下发时返回 nil
+    private func displayFlag(for drama: DramaItem) -> String? { drama.displayFlags.first }
 
     // MARK: - Tab 5: VIP Content Channel
 
@@ -819,6 +887,65 @@ private extension RankCategory {
                 DB.black
             ]
         }
+    }
+}
+
+// MARK: - Anime Hero Carousel
+
+private struct AnimeHeroCarousel: View {
+    let dramas: [DramaItem]; let containerW: CGFloat
+    @Binding var playerDrama: DramaItem?
+    @State private var idx: Int = 0
+
+    private var items: [DramaItem] {
+        let src = Array(dramas.prefix(3)); guard !src.isEmpty else { return [] }
+        var r = src; while r.count < 3 { r.append(contentsOf: src.prefix(3 - r.count)) }
+        return Array(r.prefix(3))
+    }
+
+    var body: some View {
+        let w = max(1, containerW - 32)
+        let h = min(max(w * 0.54, 168), 214)
+        TabView(selection: $idx) {
+            ForEach(Array(items.enumerated()), id: \.offset) { i, drama in
+                Button { playerDrama = drama } label: {
+                    ZStack(alignment: .bottom) {
+                        CoverImageView(url: drama.bannerCoverURL ?? drama.coverURL, aspectRatio: w/h, cornerRadius: DB.posterRadius, width: w, height: h)
+                        LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .center, endPoint: .bottom)
+                            .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
+                        HStack {
+                            Text(drama.title).font(.system(size: 18, weight: .semibold)).foregroundColor(.white).lineLimit(1)
+                            Spacer()
+                            AnimeHeroIndicator(currentIndex: idx, count: 3)
+                        }.padding(.horizontal, 12).padding(.bottom, 10)
+                    }
+                }.buttonStyle(.plain).tag(i)
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(width: w, height: h)
+        .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
+        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
+            withAnimation(.easeInOut(duration: 0.4)) { idx = (idx + 1) % max(items.count, 1) }
+        }
+        .padding(.horizontal, 16).padding(.bottom, 24)
+    }
+}
+
+private struct AnimeHeroIndicator: View {
+    let currentIndex: Int
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(index == currentIndex ? Color.white.opacity(0.58) : Color.white.opacity(0.16))
+                    .frame(width: index == currentIndex ? 16 : 6, height: 2)
+            }
+        }
+        .padding(.horizontal, 5)
+        .frame(height: 10)
     }
 }
 

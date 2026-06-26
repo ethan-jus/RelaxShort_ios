@@ -5,6 +5,10 @@ struct DramaItem: Identifiable, Codable, Hashable {
     let title: String
     let coverURL: String
     var videoURL: String? = nil
+    /// 横版 Banner（后端 horizontal_cover_url），nil 时 fallback coverURL
+    var bannerCoverURL: String? = nil
+    /// 运营角标（后端 display_flags）
+    var displayFlags: [String] = []
     let category: String
     let tags: [String]
     let viewCount: Int

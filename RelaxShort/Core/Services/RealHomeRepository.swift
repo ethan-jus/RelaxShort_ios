@@ -176,11 +176,8 @@ enum FeedCardDTOMapper {
         }()
 
         let resolvedVideoURL = card.playAsset?.hlsMasterUrl ?? card.playAsset?.mp4FallbackUrl
-        if resolvedVideoURL == nil {
-            print("[RealHomeRepository] missing playAsset url seriesId=\(card.seriesId) title=\(card.localizedTitle ?? "-") playAsset=\(String(describing: card.playAsset))")
-        }
 
-        return DramaItem(
+        var item = DramaItem(
             id: String(card.seriesId),
             title: card.localizedTitle ?? "",
             coverURL: card.coverUrl ?? "",
@@ -208,5 +205,8 @@ enum FeedCardDTOMapper {
             freeEpisodeRange: freeRange,
             isMemberOnly: false
         )
+        item.bannerCoverURL = card.horizontalCoverUrl
+        item.displayFlags = card.displayFlags ?? []
+        return item
     }
 }
