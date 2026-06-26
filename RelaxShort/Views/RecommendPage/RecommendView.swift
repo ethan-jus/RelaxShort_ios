@@ -382,7 +382,6 @@ struct RecommendView: View {
     private func initializePlaybackIfNeeded() {
         guard !session.hasInitializedPool, !viewModel.dramas.isEmpty else { return }
         session.initializePool(dramas: viewModel.dramas)
-        session.engine.play()
     }
 
     // MARK: - 计算属性
