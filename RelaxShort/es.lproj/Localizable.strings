@@ -204,3 +204,12 @@
 
 /* ---- VIP ---- */
 "vip.title" = "RelaxShort VIP";
+"search.failed" = "Error de búsqueda. Inténtalo de nuevo.";
+"search.recent_searches" = "Búsquedas recientes";
+"search.trending_searches" = "Búsquedas populares";
+"search.clear_history" = "Borrar historial de búsqueda";
+"search.clear_text" = "Borrar texto de búsqueda";
+"search.tab.top_searched" = "Más buscados";
+"search.tab.most_trending" = "Tendencias";
+"search.tab.new_releases" = "Nuevos estrenos";
+"search.rank_accessibility_format" = "Puesto %d: %@";

@@ -292,8 +292,9 @@ struct MockHomeRepository: HomeRepositoryProtocol {
 }
 
 struct MockSearchRepository: SearchRepositoryProtocol {
-    func fetchDramas(category: DramaCategory) async throws -> [DramaItem] {
-        try await Task.sleep(nanoseconds: MC.delay); return MockData.dramas
+    func fetchSuggestions() async throws -> [String] {
+        try await Task.sleep(nanoseconds: MC.delay)
+        return Array(MockData.dramas.prefix(6).map(\.title))
     }
     func search(query: String, cursor: String?, limit: Int) async throws -> ([DramaItem], String?, Bool) {
         try await Task.sleep(nanoseconds: MC.delay)
@@ -309,9 +310,6 @@ struct MockSearchRepository: SearchRepositoryProtocol {
         let hasMore = start + limit < all.count
         let nextCursor = hasMore ? "\(page + 1)" : nil
         return (slice, nextCursor, hasMore)
-    }
-    func fetchBanners() async throws -> [BannerItem] {
-        try await Task.sleep(nanoseconds: MC.delay); return MockData.banners
     }
 }
 

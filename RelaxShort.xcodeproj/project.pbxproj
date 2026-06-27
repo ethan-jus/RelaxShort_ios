@@ -65,6 +65,9 @@
 		9F2B5CBD100A06A160CF773C /* DramaBoxBottomTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9F6A1269CCC563189D7AE7E /* DramaBoxBottomTabBar.swift */; };
 		9F9F993193E6AF344C7E2F94 /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 142D16FA5DD46D6AC295A967 /* StorageService.swift */; };
 		A41016AFF966DD48067E8DC1 /* SearchDefaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EC9E6C0320ECBC023B4E17 /* SearchDefaultView.swift */; };
+		A30B00000000000000000001 /* SearchRankTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30F00000000000000000001 /* SearchRankTheme.swift */; };
+		A30B00000000000000000002 /* SearchRankCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30F00000000000000000002 /* SearchRankCardView.swift */; };
+		A30B00000000000000000003 /* SearchRankingPager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30F00000000000000000003 /* SearchRankingPager.swift */; };
 		A904D3F3D117CE6F5C9FE9C4 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF861F910EFAE987BF1A60D /* ProfileView.swift */; };
 		A925386114185EA02BD70324 /* NavigationRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5AB7221591FB4CB7E7C3A6 /* NavigationRoutes.swift */; };
 		A97478AD4830248EE21D0AF4 /* SubtitleParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352DAC99DF7A5862ABF44ADA /* SubtitleParser.swift */; };
@@ -195,6 +198,9 @@
 		C0FBCC165022E5CCB45EA6E8 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		C15E0ECC75DBFD47BDC8BF48 /* CoinRewardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinRewardView.swift; sourceTree = "<group>"; };
 		C2ECC6D89B539AE9E9C77C64 /* SearchDefaultViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchDefaultViewModel.swift; sourceTree = "<group>"; };
+		A30F00000000000000000001 /* SearchRankTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRankTheme.swift; sourceTree = "<group>"; };
+		A30F00000000000000000002 /* SearchRankCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRankCardView.swift; sourceTree = "<group>"; };
+		A30F00000000000000000003 /* SearchRankingPager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRankingPager.swift; sourceTree = "<group>"; };
 		C9E72EDFAD26B4E491CBF588 /* Bookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bookmark.swift; sourceTree = "<group>"; };
 		CE171218A2C10E4C0D56A9F5 /* PlayerResourceLoaderDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerResourceLoaderDelegate.swift; sourceTree = "<group>"; };
 		D253297B8A9E0DBCD3F63137 /* RelaxShortApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelaxShortApp.swift; sourceTree = "<group>"; };
@@ -439,6 +445,9 @@
 			isa = PBXGroup;
 			children = (
 				D8EC9E6C0320ECBC023B4E17 /* SearchDefaultView.swift */,
+				A30F00000000000000000002 /* SearchRankCardView.swift */,
+				A30F00000000000000000001 /* SearchRankTheme.swift */,
+				A30F00000000000000000003 /* SearchRankingPager.swift */,
 				28899AC8C3E62CAF6EF737A4 /* SearchView.swift */,
 			);
 			path = Search;
@@ -733,6 +742,9 @@
 				05E7C5CD90C150C482CA8DF1 /* RightActionBar.swift in Sources */,
 				BB620C8D87AB1D3DCD9E9469 /* RulePopupView.swift in Sources */,
 				A41016AFF966DD48067E8DC1 /* SearchDefaultView.swift in Sources */,
+				A30B00000000000000000002 /* SearchRankCardView.swift in Sources */,
+				A30B00000000000000000001 /* SearchRankTheme.swift in Sources */,
+				A30B00000000000000000003 /* SearchRankingPager.swift in Sources */,
 				950D311C2699FB3FDD0DFEF6 /* SearchDefaultViewModel.swift in Sources */,
 				612F40122E21C22C29A7235A /* SearchView.swift in Sources */,
 				EC43C2384ABDEDCE727009FF /* SearchViewModel.swift in Sources */,

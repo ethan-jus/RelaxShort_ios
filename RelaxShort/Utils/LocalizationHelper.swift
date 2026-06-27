@@ -43,6 +43,15 @@ enum L10n {
         "search.no_results": "未找到相关剧集",
         "search.try_different_keyword": "换个关键词试试吧",
         "search.hint": "搜索剧名、分类或标签",
+        "search.failed": "搜索失败，请重试。",
+        "search.recent_searches": "最近搜索",
+        "search.trending_searches": "热门搜索",
+        "search.clear_history": "清除搜索记录",
+        "search.clear_text": "清除搜索内容",
+        "search.tab.top_searched": "热门搜索",
+        "search.tab.most_trending": "热门趋势",
+        "search.tab.new_releases": "最新上线",
+        "search.rank_accessibility_format": "第%d名：%@",
         // Home
         "home.featured": "精选",
         "home.rankings": "排行榜",
@@ -377,6 +386,20 @@ enum L10n {
     static var searchPlaceholder: String { loc("search.placeholder") }
     static var noSearchResults: String { loc("search.no_results") }
     static var tryDifferentKeyword: String { loc("search.try_different_keyword") }
+    static var searchFailed: String { loc("search.failed") }
+    static var recentSearches: String { loc("search.recent_searches") }
+    static var trendingSearches: String { loc("search.trending_searches") }
+    static var clearSearchHistory: String { loc("search.clear_history") }
+    static var clearSearchText: String { loc("search.clear_text") }
+    static var topSearchedTab: String { loc("search.tab.top_searched") }
+    static var mostTrendingTab: String { loc("search.tab.most_trending") }
+    static var newReleasesTab: String { loc("search.tab.new_releases") }
+    static func searchRankAccessibility(rank: Int, title: String) -> String {
+        loc(
+            "search.rank_accessibility_format",
+            formatArgs: [rank, title]
+        )
+    }
     static var searchHint: String { loc("search.hint") }
 
     // MARK: - Home

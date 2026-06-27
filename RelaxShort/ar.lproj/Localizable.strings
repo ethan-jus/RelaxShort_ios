@@ -204,3 +204,12 @@
 
 /* ---- VIP ---- */
 "vip.title" = "RelaxShort VIP";
+"search.failed" = "فشل البحث. حاول مرة أخرى.";
+"search.recent_searches" = "عمليات البحث الأخيرة";
+"search.trending_searches" = "عمليات البحث الرائجة";
+"search.clear_history" = "مسح سجل البحث";
+"search.clear_text" = "مسح نص البحث";
+"search.tab.top_searched" = "الأكثر بحثًا";
+"search.tab.most_trending" = "الأكثر رواجًا";
+"search.tab.new_releases" = "الإصدارات الجديدة";
+"search.rank_accessibility_format" = "المرتبة %d: %@";

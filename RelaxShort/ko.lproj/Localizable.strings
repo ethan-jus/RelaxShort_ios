@@ -204,3 +204,12 @@
 
 /* ---- VIP ---- */
 "vip.title" = "RelaxShort VIP";
+"search.failed" = "검색에 실패했습니다. 다시 시도해 주세요.";
+"search.recent_searches" = "최근 검색";
+"search.trending_searches" = "인기 검색어";
+"search.clear_history" = "검색 기록 지우기";
+"search.clear_text" = "검색어 지우기";
+"search.tab.top_searched" = "인기 검색";
+"search.tab.most_trending" = "급상승";
+"search.tab.new_releases" = "신규 공개";
+"search.rank_accessibility_format" = "%d위: %@";

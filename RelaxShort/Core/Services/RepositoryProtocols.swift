@@ -51,12 +51,10 @@ extension HomeRepositoryProtocol {
 
 /// 搜索数据仓库协议
 protocol SearchRepositoryProtocol {
-    /// 获取全部短剧（用于搜索过滤）
-    func fetchDramas(category: DramaCategory) async throws -> [DramaItem]
+    /// 获取搜索默认页的热门搜索词
+    func fetchSuggestions() async throws -> [String]
     /// 按关键词搜索短剧
     func search(query: String, cursor: String?, limit: Int) async throws -> ([DramaItem], String?, Bool)
-    /// 获取 Banner 轮播数据
-    func fetchBanners() async throws -> [BannerItem]
 }
 
 // MARK: - Detail

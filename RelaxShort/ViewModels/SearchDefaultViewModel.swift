@@ -1,123 +1,78 @@
 import SwiftUI
-import Combine
 
-// MARK: - Search Default ViewModel
-/// 搜索默认页 ViewModel
-/// Task16：真实模式优先用 RealSearchRepository.fetchDramas（走 search/default hot_series），
-/// Mock 模式保留 Home 全量本地排序。
+/// 加载并维护 Search 默认页的三个真实榜单。
 @MainActor
 final class SearchDefaultViewModel: ObservableObject {
-
-    // MARK: - Published State
-
-    @Published var selectedTab: Int = 0
-    @Published var hotSearch: [RankDrama] = []
-    @Published var hotPlay: [RankDrama] = []
-    @Published var newDrama: [RankDrama] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
-
-    // MARK: - Dependencies
+    @Published var selectedTheme: SearchRankTheme = .topSearched
+    @Published private(set) var rankings: [SearchRankTheme: [RankDrama]] = [:]
+    @Published private(set) var trendingSearches: [String] = []
+    @Published private(set) var isLoading = false
+    @Published private(set) var errorMessage: String?
 
     private let homeRepository: HomeRepositoryProtocol
     private let searchRepository: SearchRepositoryProtocol
 
-    // MARK: - Tab Titles
-
-    let tabs = ["热搜榜", "热播榜", "新剧榜"]
-
-    var emptyMessage: String {
-        switch selectedTab {
-        case 0: return "暂无热搜"
-        case 1: return "暂无热播"
-        case 2: return "暂无新剧"
-        default: return "暂无数据"
-        }
-    }
-
-    var currentDramas: [RankDrama] {
-        switch selectedTab {
-        case 0: return hotSearch
-        case 1: return hotPlay
-        case 2: return newDrama
-        default: return []
-        }
-    }
-
-    // MARK: - Init
-
-    init(homeRepository: HomeRepositoryProtocol, searchRepository: SearchRepositoryProtocol) {
+    init(
+        homeRepository: HomeRepositoryProtocol,
+        searchRepository: SearchRepositoryProtocol
+    ) {
         self.homeRepository = homeRepository
         self.searchRepository = searchRepository
     }
 
-    // MARK: - Load Data
+    func items(for theme: SearchRankTheme) -> [RankDrama] {
+        rankings[theme] ?? []
+    }
+
+    func selectTheme(_ theme: SearchRankTheme) {
+        selectedTheme = theme
+    }
 
     func loadData() async {
+        guard rankings.isEmpty || trendingSearches.isEmpty else {
+            return
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        if DependencyContainer.useRealAPI {
-            await loadFromSearchDefault()
-        } else {
-            await loadFromHome()
-        }
-    }
+        async let suggestions = fetchSuggestions()
 
-    /// 真实模式：从 search/default 取 hot_series 作为发现数据
-    private func loadFromSearchDefault() async {
         do {
-            let items = try await searchRepository.fetchDramas(category: .all)
-            populateRanks(from: items)
+            async let topItems = fetchRanked(.topSearched)
+            async let trendingItems = fetchRanked(.mostTrending)
+            async let releaseItems = fetchRanked(.newReleases)
+
+            let loaded = try await (topItems, trendingItems, releaseItems)
+            rankings = [
+                .topSearched: loaded.0,
+                .mostTrending: loaded.1,
+                .newReleases: loaded.2
+            ]
         } catch {
-            errorMessage = "搜索发现数据加载失败"
-            logError("SearchDefaultViewModel.loadFromSearchDefault failed: \(error)")
+            errorMessage = L10n.searchFailed
+            logError("SearchDefaultViewModel.loadData failed: \(error)")
         }
+
+        trendingSearches = await suggestions
     }
 
-    /// Mock 模式：全量 Home 数据本地排序
-    private func loadFromHome() async {
+    private func fetchRanked(_ theme: SearchRankTheme) async throws -> [RankDrama] {
+        try await homeRepository.fetchRankings(type: theme.apiType)
+            .enumerated()
+            .map { index, drama in
+                RankDrama(from: drama, rank: index + 1)
+            }
+    }
+
+    private func fetchSuggestions() async -> [String] {
         do {
-            let allDramas = try await homeRepository.fetchDramas(category: .all)
-            populateRanks(from: allDramas)
+            return try await searchRepository.fetchSuggestions()
         } catch {
-            errorMessage = error.localizedDescription
-            logError("SearchDefaultViewModel.loadFromHome failed: \(error)")
+            logError("SearchDefaultViewModel.fetchSuggestions failed: \(error)")
+            return []
         }
-    }
-
-    // MARK: - Tab Switching
-
-    func switchTab(to index: Int) {
-        withAnimation(.easeInOut(duration: 0.25)) {
-            selectedTab = index
-        }
-    }
-
-    // MARK: - Private Helpers
-
-    private func populateRanks(from dramas: [DramaItem]) {
-        // 热搜榜：按评分降序
-        hotSearch = dramas
-            .sorted { $0.rating > $1.rating }
-            .prefix(20)
-            .enumerated()
-            .map { RankDrama(from: $1, rank: $0 + 1) }
-
-        // 热播榜：按播放量降序
-        hotPlay = dramas
-            .sorted { $0.viewCount > $1.viewCount }
-            .prefix(20)
-            .enumerated()
-            .map { RankDrama(from: $1, rank: $0 + 1) }
-
-        // 新剧榜：按 ID 降序
-        newDrama = dramas
-            .sorted { $0.id > $1.id }
-            .prefix(20)
-            .enumerated()
-            .map { RankDrama(from: $1, rank: $0 + 1) }
     }
 
     private func logError(_ message: String) {

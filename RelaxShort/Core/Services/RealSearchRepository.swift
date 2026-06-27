@@ -2,27 +2,19 @@ import Foundation
 
 // MARK: - Real Search Repository
 
-/// 真实后端 SearchRepositoryProtocol 实现。
-/// - `fetchDramas(category:)` 首版读取 `search/default` 的 `hot_series`。
-/// - `fetchBanners()` 返回空（后端无独立 search banner）。
+/// 真实后端搜索仓库。
 @MainActor
 final class RealSearchRepository: SearchRepositoryProtocol {
 
     private let client = APIClient.shared
 
-    func fetchDramas(category: DramaCategory) async throws -> [DramaItem] {
+    func fetchSuggestions() async throws -> [String] {
         let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
-        // 首版：用 search/default 的 hot_series 作为搜索发现候选数据
         let dto: SearchDefaultResponseDTO = try await client.requestData(
             .searchDefault(contentLanguage: contentLang, countryCode: country)
         )
-        return (dto.hotSeries ?? []).map(FeedCardDTOMapper.toDramaItem)
-    }
-
-    func fetchBanners() async throws -> [BannerItem] {
-        // 后端无独立 search banner，返回空
-        return []
+        return dto.suggestions ?? []
     }
 
     /// 执行真实搜索

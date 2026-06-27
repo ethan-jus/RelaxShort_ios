@@ -209,3 +209,12 @@
 
 /* ---- VIP ---- */
 "vip.title" = "RelaxShort VIP";
+"search.failed" = "Search failed. Please try again.";
+"search.recent_searches" = "Recent Searches";
+"search.trending_searches" = "Trending Searches";
+"search.clear_history" = "Clear search history";
+"search.clear_text" = "Clear search text";
+"search.tab.top_searched" = "Top Searched";
+"search.tab.most_trending" = "Most Trending";
+"search.tab.new_releases" = "New Releases";
+"search.rank_accessibility_format" = "Rank %d: %@";

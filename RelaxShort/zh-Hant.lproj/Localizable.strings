@@ -204,3 +204,12 @@
 
 /* ---- VIP ---- */
 "vip.title" = "RelaxShort VIP";
+"search.failed" = "搜尋失敗，請重試。";
+"search.recent_searches" = "最近搜尋";
+"search.trending_searches" = "熱門搜尋";
+"search.clear_history" = "清除搜尋記錄";
+"search.clear_text" = "清除搜尋內容";
+"search.tab.top_searched" = "熱門搜尋";
+"search.tab.most_trending" = "熱門趨勢";
+"search.tab.new_releases" = "最新上架";
+"search.rank_accessibility_format" = "第%d名：%@";

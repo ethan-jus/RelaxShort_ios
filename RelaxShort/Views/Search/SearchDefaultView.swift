@@ -1,178 +1,166 @@
 import SwiftUI
 
-// MARK: - Search Default View
-/// 搜索默认页 — 用户点击搜索框但未输入时的状态
-/// 展示三个榜单（热搜榜/热播榜/新剧榜），横向滑动切换
-/// 搜索栏由父视图 SearchView 的 toolbar 管理
+/// Search 输入为空时展示最近搜索和三个真实榜单。
 struct SearchDefaultView: View {
-    @StateObject private var viewModel: SearchDefaultViewModel
-
-    init(viewModel: SearchDefaultViewModel) {
-        self._viewModel = StateObject(wrappedValue: viewModel)
-    }
-
-    // MARK: - Body
+    @ObservedObject var viewModel: SearchDefaultViewModel
+    let searchHistory: [String]
+    let onHistorySelected: (String) -> Void
+    let onClearHistory: () -> Void
+    let onDramaSelected: (DramaItem) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            rankTabs
-
-            if viewModel.isLoading {
-                Spacer()
-                ProgressView()
-                    .tint(DT.brandPink)
-                Spacer()
-            } else if let error = viewModel.errorMessage {
-                errorStateView(error)
-            } else {
-                TabView(selection: $viewModel.selectedTab) {
-                    rankList(dramas: viewModel.hotSearch, emptyMessage: L10n.noHotSearch)
-                        .tag(0)
-                    rankList(dramas: viewModel.hotPlay, emptyMessage: L10n.noHotPlay)
-                        .tag(1)
-                    rankList(dramas: viewModel.newDrama, emptyMessage: L10n.noNewDrama)
-                        .tag(2)
-                }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            if !visibleSearchTerms.isEmpty {
+                searchTermsSection
             }
 
-            Spacer(minLength: 0)
+            rankTabs
+
+            Group {
+                if viewModel.isLoading {
+                    loadingState
+                } else if let errorMessage = viewModel.errorMessage {
+                    errorState(errorMessage)
+                } else {
+                    SearchRankingPager(
+                        viewModel: viewModel,
+                        onDramaSelected: onDramaSelected
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(DT.Color.bgPrimary.ignoresSafeArea())
+        .background(DT.Color.bgPrimary)
         .task {
             await viewModel.loadData()
         }
     }
 
-    // MARK: - Error State
+    private var visibleSearchTerms: [String] {
+        searchHistory.isEmpty ? viewModel.trendingSearches : searchHistory
+    }
 
-    private func errorStateView(_ message: String) -> some View {
-        VStack(spacing: DT.Space.md) {
-            Spacer()
-            Image(systemName: "exclamationmark.triangle")
-                .font(DT.Font.emptyIcon)
-                .foregroundColor(DT.Color.textTertiary)
-            Text(message)
-                .font(DT.Font.bodyDefault)
-                .foregroundColor(DT.Color.textSecondary)
-                .multilineTextAlignment(.center)
-            Button(L10n.retry) {
-                Task { await viewModel.loadData() }
+    private var searchTermsTitle: String {
+        searchHistory.isEmpty ? L10n.trendingSearches : L10n.recentSearches
+    }
+
+    private var searchTermsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(searchTermsTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                if !searchHistory.isEmpty {
+                    Button(action: onClearHistory) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14))
+                            .foregroundColor(DB.mutedText)
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(L10n.clearSearchHistory)
+                }
             }
-            .font(DT.Font.button)
-            .foregroundColor(DT.brandPink)
-            Spacer()
-        }
-        .padding(.horizontal, DT.Space.pageH)
-    }
 
-    // MARK: - 榜单 Tab 标签
-
-    private var rankTabs: some View {
-        HStack(spacing: 20) {
-            rankTabButton(title: L10n.hotSearchTab, index: 0)
-            rankTabButton(title: L10n.hotPlayTab, index: 1)
-            rankTabButton(title: L10n.newDramaTab, index: 2)
-            Spacer()
-        }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.vertical, 6)
-    }
-
-    private func rankTabButton(title: String, index: Int) -> some View {
-        Button {
-            viewModel.switchTab(to: index)
-        } label: {
-            Text(title)
-                .foregroundColor(viewModel.selectedTab == index ? DT.brandPink : DT.Color.textSecondary)
-                .font(DT.Font.button)
-        }
-        .buttonStyle(.plain)
-    }
-
-    // MARK: - 榜单列表
-
-    @ViewBuilder
-    private func rankList(dramas: [RankDrama], emptyMessage: String) -> some View {
-        if dramas.isEmpty {
-            VStack(spacing: DT.Space.md) {
-                Image(systemName: "tray")
-                    .font(DT.Font.emptyIcon)
-                    .foregroundColor(DT.Color.textTertiary)
-                Text(emptyMessage)
-                    .font(DT.Font.bodyDefault)
-                    .foregroundColor(DT.Color.textSecondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: DT.Space.md) {
-                    ForEach(dramas) { drama in
-                        rankDramaRow(drama)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(visibleSearchTerms, id: \.self) { term in
+                        Button {
+                            onHistorySelected(term)
+                        } label: {
+                            Text(term)
+                                .font(.system(size: 13))
+                                .foregroundColor(DB.mutedText)
+                                .padding(.horizontal, 12)
+                                .frame(height: 36)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(
+                                    RoundedRectangle(cornerRadius: DB.posterRadius)
+                                )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .padding(.horizontal, DT.Space.pageH)
-                .padding(.top, DT.Space.sm)
-                .padding(.bottom, 40)
             }
-            .scrollDismissesKeyboard(.immediately)
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 20)
     }
 
-    // MARK: - 榜单行
-
-    private func rankDramaRow(_ drama: RankDrama) -> some View {
-        HStack(spacing: DT.Space.md) {
-            // 排名数字
-            Text("\(drama.rank)")
-                .font(DT.Font.largeTitle(22))
-                .foregroundColor(drama.rank <= 3 ? DT.brandGold : DT.Color.textSecondary)
-                .frame(width: 28)
-
-            // 封面图
-            CoverImageView(
-                url: drama.coverURL,
-                width: 80,
-                height: 80
-            )
-
-            // 标题 & 分类
-            VStack(alignment: .leading, spacing: DT.Space.xs) {
-                Text(drama.title)
-                    .foregroundColor(DT.Color.textPrimary)
-                    .font(DT.Font.button)
-                    .lineLimit(2)
-
-                Text(drama.category + " " + drama.tags.joined(separator: " "))
-                    .foregroundColor(DT.Color.textSecondary)
-                    .font(DT.Font.caption)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            // 热度
-            HStack(spacing: 2) {
-                Image(systemName: "flame.fill")
-                    .font(DT.Font.body(14))
-                    .foregroundColor(DT.hotTag)
-                Text(drama.hot)
-                    .foregroundColor(DT.Color.textPrimary)
-                    .font(DT.Font.body(14, weight: .bold))
+    private var rankTabs: some View {
+        HStack(spacing: 0) {
+            ForEach(SearchRankTheme.allCases) { theme in
+                Button {
+                    viewModel.selectTheme(theme)
+                } label: {
+                    Text(theme.title)
+                        .font(
+                            .system(
+                                size: 16,
+                                weight: viewModel.selectedTheme == theme
+                                    ? .semibold
+                                    : .regular
+                            )
+                        )
+                        .foregroundColor(
+                            viewModel.selectedTheme == theme
+                                ? DB.logoRed
+                                : DB.mutedText
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.plain)
             }
         }
-        .padding(DT.Space.md)
-        .background(DT.Color.textPrimary.opacity(0.05))
-        .cornerRadius(DT.Radius.md)
+        .padding(.horizontal, 16)
+    }
+
+    private var loadingState: some View {
+        ProgressView()
+            .tint(DB.logoRed)
+    }
+
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40))
+                .foregroundColor(DB.mutedText)
+
+            Text(message)
+                .font(.system(size: 14))
+                .foregroundColor(DB.mutedText)
+                .multilineTextAlignment(.center)
+
+            Button(L10n.retry) {
+                Task {
+                    await viewModel.loadData()
+                }
+            }
+            .foregroundColor(DB.logoRed)
+        }
+        .padding(.horizontal, 24)
     }
 }
 
 #if DEBUG
-#Preview("SearchDefault - Dark") {
-    SearchDefaultView(viewModel: SearchDefaultViewModel(
-        homeRepository: MockHomeRepository(),
-        searchRepository: MockSearchRepository()
-    ))
-        .preferredColorScheme(.dark)
+#Preview("Search Default") {
+    let repository = MockSearchRepository()
+    SearchDefaultView(
+        viewModel: SearchDefaultViewModel(
+            homeRepository: MockHomeRepository(),
+            searchRepository: repository
+        ),
+        searchHistory: ["Jiang", "CEO"],
+        onHistorySelected: { _ in },
+        onClearHistory: {},
+        onDramaSelected: { _ in }
+    )
+    .preferredColorScheme(.dark)
 }
 #endif
