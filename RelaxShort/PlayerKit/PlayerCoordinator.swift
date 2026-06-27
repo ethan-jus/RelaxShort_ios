@@ -39,6 +39,7 @@ final class PlayerCoordinator: ObservableObject {
 
         if currentMatches {
             print("[PlayerKit] handoff reuse current player id=\(targetItemID)")
+            engine.play()
             return
         }
 
@@ -46,7 +47,6 @@ final class PlayerCoordinator: ObservableObject {
         engine.prepare(items: items, index: startIndex)
 
         if let handoff, handoff.resumeTime > 0 {
-            let wasPlaying = handoff.wasPlaying
             let resumeTime = handoff.resumeTime
             let eng = engine
             Task { @MainActor in
@@ -57,19 +57,19 @@ final class PlayerCoordinator: ObservableObject {
                     obs?.invalidate()
                     Task { @MainActor in
                         guard !didStart else { return }; didStart = true
-                        eng.seekTime(resumeTime) { _ in if wasPlaying { eng.play() } }
+                        eng.seekTime(resumeTime) { _ in eng.play() }
                     }
                 }
                 // 如果已经 ready
                 if !didStart, eng.currentPlayer?.currentItem?.status == .readyToPlay {
                     didStart = true
-                    eng.seekTime(resumeTime) { _ in if wasPlaying { eng.play() } }
+                    eng.seekTime(resumeTime) { _ in eng.play() }
                 }
                 // 超时兜底
                 try? await Task.sleep(nanoseconds: 3_000_000_000)
                 if !didStart {
                     didStart = true
-                    eng.seekTime(resumeTime) { _ in if wasPlaying { eng.play() } }
+                    eng.seekTime(resumeTime) { _ in eng.play() }
                 }
             }
         } else {
@@ -77,14 +77,12 @@ final class PlayerCoordinator: ObservableObject {
         }
     }
 
-    /// 释放播放权 — 返回 For You 时不清理，只改变 owner
+    /// 释放播放权。
+    /// 当前 owner 退出时必须暂停共享 engine，避免全屏播放器 dismiss 后继续漏音。
     func release(_ owner: Owner) {
-        if case .series = owner {
-            // 从 Series 返回 → 恢复 For You 所有权，不清理 engine
-            self.owner = .forYou
-        } else if self.owner == owner {
-            self.owner = nil
-        }
+        guard self.owner == owner else { return }
+        engine.pause(reason: .system)
+        self.owner = nil
     }
 }
 
