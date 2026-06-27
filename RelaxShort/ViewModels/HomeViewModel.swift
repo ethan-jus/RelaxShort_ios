@@ -7,6 +7,8 @@ final class HomeViewModel: ObservableObject {
     private let repository: HomeRepositoryProtocol
 
     @Published var featuredDramas: [DramaItem] = []
+    /// Home API section data keyed by tab code.
+    @Published var homeTabsByCode: [String: HomeTabContent] = [:]
     @Published var fixedDramas: [DramaItem] = []
     @Published var masonryDramas: [DramaItem] = []
     @Published var rankingDramas: [DramaItem] = []
@@ -15,7 +17,7 @@ final class HomeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var selectedTab: Int = 0
 
-    // MARK: - Categories (Task16 R3)
+    // MARK: - Categories
 
     /// 分类列表：真实模式来自后端 categories API，Mock 来自 DramaCategory 枚举
     @Published var categories: [HomeCategory] = []
@@ -57,12 +59,12 @@ final class HomeViewModel: ObservableObject {
         return Array(featuredDramas.prefix(12))
     }
 
-    var dramasForOriginalPlusTab: [DramaItem] {
-        featuredDramas.filter { $0.badge == .vip || $0.isHot }
-    }
-
     init(repository: HomeRepositoryProtocol) {
         self.repository = repository
+    }
+
+    func section(_ sectionCode: String, in tabCode: String) -> HomeSectionContent? {
+        homeTabsByCode[tabCode]?.sections.first { $0.code == sectionCode }
     }
 
     func loadData() async {
@@ -70,12 +72,25 @@ final class HomeViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
 
-        async let dramasTask = repository.fetchDramas(category: DramaCategory.all)
         async let bannersTask = repository.fetchBanners()
         async let categoriesTask = repository.fetchHomeCategories()
+        async let homeTabsTask = repository.fetchHomeTabs(contentLang: nil, country: nil)
 
         do {
-            let (dramas, banners) = try await (dramasTask, bannersTask)
+            let tabs = try await homeTabsTask
+            homeTabsByCode = Dictionary(tabs.map { ($0.code, $0) }, uniquingKeysWith: { _, latest in latest })
+        } catch {
+            homeTabsByCode = [:]
+            logError("HomeViewModel.loadHomeTabs failed: \(error)")
+        }
+
+        do {
+            let configuredDramas = homeTabsByCode["popular"]?.sections
+                .first(where: { !$0.items.isEmpty })?.items ?? []
+            let dramas = configuredDramas.isEmpty
+                ? try await repository.fetchDramas(category: DramaCategory.all)
+                : configuredDramas
+            let banners = try await bannersTask
             self.featuredDramas = dramas
             self.fixedDramas = Array(dramas.prefix(9))
             self.masonryDramas = Array(dramas.dropFirst(9))
@@ -86,7 +101,7 @@ final class HomeViewModel: ObservableObject {
             logError("HomeViewModel.loadData failed: \(error)")
         }
 
-        // 分类列表：独立加载，失败时 fallback 到本地枚举。加载完成后自动拉取默认分类剧集。
+        // 分类独立加载；失败时回退本地枚举，再加载默认分类内容。
         do {
             let cats = try await categoriesTask
             self.categories = cats
@@ -102,7 +117,7 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Category Drama Loading (Task16 R3)
+    // MARK: - Category Drama Loading
 
     /// 切换分类并加载对应剧集
     func selectCategory(at index: Int) async {
@@ -118,7 +133,7 @@ final class HomeViewModel: ObservableObject {
         defer { isCategoryLoading = false }
 
         do {
-            // R4: localCategory != nil 优先走本地过滤（Mock 或 categories API 失败 fallback）
+            // Mock 或接口降级得到本地分类时，使用本地过滤。
             if let localCat = category.localCategory {
                 let matches = filterFeatured(by: localCat)
                 categoryDramas = matches.isEmpty ? featuredDramas : matches

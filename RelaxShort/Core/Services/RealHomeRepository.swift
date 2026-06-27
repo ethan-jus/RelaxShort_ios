@@ -22,7 +22,7 @@ final class RealHomeRepository: HomeRepositoryProtocol {
             }
             return try await fetchForYou(contentLang: contentLang, country: country)
         default:
-            // Task16 R2: 真实模式通过 categories API 获取后端 code，再调 categorySeries
+            // 真实模式先匹配后端分类 code，再请求分类内容。
             if let code = await matchCategoryCode(category, contentLang: contentLang, country: country) {
                 if let items = try? await fetchCategorySeries(code: code, contentLang: contentLang, country: country),
                    !items.isEmpty {
@@ -98,7 +98,7 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         return nil
     }
 
-    // MARK: - Categories (Task16 R3)
+    // MARK: - Categories
 
     func fetchHomeCategories() async throws -> [HomeCategory] {
         let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
@@ -136,6 +136,47 @@ final class RealHomeRepository: HomeRepositoryProtocol {
             .categories(contentLanguage: contentLang, countryCode: country)
         )
         return dto.items ?? []
+    }
+}
+
+// MARK: - Home Section Models
+
+struct HomeSectionContent: Identifiable {
+    let id: String
+    let code: String
+    let sectionType: String?
+    let titleKey: String?
+    let items: [DramaItem]
+}
+
+struct HomeTabContent {
+    let code: String
+    let sections: [HomeSectionContent]
+}
+
+extension RealHomeRepository {
+    func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent] {
+        let lang = contentLang ?? UserDefaults.standard.string(forKey: "app_content_language")
+        let cty = country ?? UserDefaults.standard.string(forKey: "app_country_code")
+        let dto: HomeResponseDTO = try await client.requestData(
+            .home(contentLanguage: lang, countryCode: cty)
+        )
+        guard let tabs = dto.tabs else { return [] }
+        return tabs.compactMap { tab in
+            guard let code = tab.code else { return nil }
+            let sections: [HomeSectionContent] = (tab.sections ?? []).compactMap { sec in
+                guard let secCode = sec.code else { return nil }
+                let items = (sec.items ?? []).map(FeedCardDTOMapper.toDramaItem)
+                return HomeSectionContent(
+                    id: secCode,
+                    code: secCode,
+                    sectionType: sec.sectionType,
+                    titleKey: sec.titleKey,
+                    items: items
+                )
+            }
+            return HomeTabContent(code: code, sections: sections)
+        }
     }
 }
 
@@ -207,6 +248,13 @@ enum FeedCardDTOMapper {
         )
         item.bannerCoverURL = card.horizontalCoverUrl
         item.displayFlags = card.displayFlags ?? []
+        item.placementBadge = card.placementBadge.map {
+            PlacementBadge(
+                code: $0.code,
+                label: $0.label ?? $0.code,
+                tone: PlacementBadgeTone(rawValue: $0.tone ?? "") ?? .neutral
+            )
+        }
         return item
     }
 }

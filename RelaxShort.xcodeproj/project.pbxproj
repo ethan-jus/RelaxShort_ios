@@ -22,6 +22,7 @@
 		39D8E9DA7400BCF179CA4ACC /* BannerCarouselView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F568292E03F1FD0A10249AEA /* BannerCarouselView.swift */; };
 		3A5C94BBB1652FCA4C8FD2E4 /* Bookmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = C9E72EDFAD26B4E491CBF588 /* Bookmark.swift */; };
 		3C166BF01EA519B171BB29BF /* ContentGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6239C7548EBE5D9DC91B774 /* ContentGridView.swift */; };
+		3C29B2916A8A40C19941B29F /* HomeSectionComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C29B2906A8A40C19941B29F /* HomeSectionComponents.swift */; };
 		3DA9ADA76FBF34BE2D573190 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE6686338A9B5C9165091C3 /* MainTabView.swift */; };
 		437DB3F81EB2313F084B19F4 /* AdConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B283C7770DFE5035A2A801EA /* AdConfig.swift */; };
 		479CE0557FE0EB68C8164DA2 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FBCC165022E5CCB45EA6E8 /* APIClient.swift */; };
@@ -198,6 +199,7 @@
 		CE171218A2C10E4C0D56A9F5 /* PlayerResourceLoaderDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerResourceLoaderDelegate.swift; sourceTree = "<group>"; };
 		D253297B8A9E0DBCD3F63137 /* RelaxShortApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelaxShortApp.swift; sourceTree = "<group>"; };
 		D6239C7548EBE5D9DC91B774 /* ContentGridView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentGridView.swift; sourceTree = "<group>"; };
+		3C29B2906A8A40C19941B29F /* HomeSectionComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSectionComponents.swift; sourceTree = "<group>"; };
 		D7B5D6833951FB561F5C8BC0 /* FavoritesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesView.swift; sourceTree = "<group>"; };
 		D7EBAB6170EDA73DEF1AB939 /* AdCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdCardView.swift; sourceTree = "<group>"; };
 		D8EC9E6C0320ECBC023B4E17 /* SearchDefaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchDefaultView.swift; sourceTree = "<group>"; };
@@ -490,6 +492,7 @@
 				F568292E03F1FD0A10249AEA /* BannerCarouselView.swift */,
 				57B73D1F27373372450CDDB7 /* BannerCarouselViewModel.swift */,
 				D6239C7548EBE5D9DC91B774 /* ContentGridView.swift */,
+				3C29B2906A8A40C19941B29F /* HomeSectionComponents.swift */,
 				E421576C8190BCF4CC8EFABD /* HomeView.swift */,
 				0F907B906FB605748F73151A /* TopToolbarView.swift */,
 			);
@@ -693,6 +696,7 @@
 				ADA87D600B71591BC2FD8B39 /* FavoritesViewModel.swift in Sources */,
 				22DD7B8ED502B83B8DA519EC /* HTTPRangeMediaCache.swift in Sources */,
 				018255F83848D18F615B66FC /* HomeView.swift in Sources */,
+				3C29B2916A8A40C19941B29F /* HomeSectionComponents.swift in Sources */,
 				C1D76D631694C10F3B7D91D8 /* HomeViewModel.swift in Sources */,
 				1FF3E1A102BEF7AA8D4F9D2A /* ImageLoader.swift in Sources */,
 				EBC20B06EACB0E62DACEDCA3 /* LocalizationHelper.swift in Sources */,

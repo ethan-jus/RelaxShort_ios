@@ -1,5 +1,18 @@
 import Foundation
 
+enum PlacementBadgeTone: String, Codable, Hashable {
+    case brand
+    case violet
+    case gold
+    case neutral
+}
+
+struct PlacementBadge: Codable, Hashable {
+    let code: String
+    let label: String
+    let tone: PlacementBadgeTone
+}
+
 struct DramaItem: Identifiable, Codable, Hashable {
     let id: String
     let title: String
@@ -9,6 +22,8 @@ struct DramaItem: Identifiable, Codable, Hashable {
     var bannerCoverURL: String? = nil
     /// 运营角标（后端 display_flags）
     var displayFlags: [String] = []
+    /// Home 栏目条目级角标，同一剧在不同栏目可不同。
+    var placementBadge: PlacementBadge? = nil
     let category: String
     let tags: [String]
     let viewCount: Int

@@ -89,7 +89,7 @@ struct HomeView: View {
     @State private var playerDrama: DramaItem?
     @State private var showVIP = false
     @State private var showReward = false
-    /// R6: Categories 三行筛选状态
+    /// Categories 三行筛选状态。
     @State private var selectedLanguage: String = "All"
     @State private var selectedGenre: String = "All"
     @State private var selectedPayment: String = "All"
@@ -262,14 +262,14 @@ struct HomeView: View {
         )
     }
 
-    // MARK: - R6 Categories Filter Model
+    // MARK: - Categories Filter Model
 
     private struct CategoryFilterOption: Identifiable, Equatable {
         let id: String
         let title: String
     }
 
-    // MARK: - Tab 3: Categories (R6 三行筛选)
+    // MARK: - Tab 3: Categories
 
     /// 语言行：All + 常用语言码映射
     private var languageOptions: [CategoryFilterOption] {
@@ -452,7 +452,7 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
         } else {
-            let dramas = selectedGenre == "All" ? featuredOrEmpty : viewModel.categoryDramas
+            let dramas = selectedGenre == "All" ? viewModel.featuredDramas : viewModel.categoryDramas
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3), spacing: DT.Space.md) {
                 ForEach(dramas) { drama in
                     Button { playerDrama = drama } label: {
@@ -469,7 +469,7 @@ struct HomeView: View {
         }
     }
 
-    /// R6: DramaBox-style filter row. Selected items use logo red text with a subtle red pill.
+    /// 选中项使用品牌红文字和低对比度背景，位置保持稳定。
     private func catFilterRow(options: [CategoryFilterOption], selected: Binding<String>) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
@@ -500,10 +500,12 @@ struct HomeView: View {
 
     private func animeTabContent(containerW: CGFloat) -> some View {
         let dramas = viewModel.dramasForAnimeTab
+        let heroItems = Array(dramas.prefix(3))
         if dramas.isEmpty { return AnyView(animeEmptyState) }
         return AnyView(ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                AnimeHeroCarousel(dramas: dramas, containerW: containerW, playerDrama: $playerDrama)
+                HomeHeroCarouselSection(dramas: heroItems, playerDrama: $playerDrama, containerW: containerW)
+                    .padding(.bottom, 24)
                 animeWeeklyFeatured(Array(dramas.prefix(8)), containerW: containerW)
                 animeMoreRecommended(Array(dramas.dropFirst(1)), containerW: containerW)
             }
@@ -591,167 +593,88 @@ struct HomeView: View {
     // MARK: - Tab 5: VIP Content Channel
 
     private func homeVIPTabContent(containerW: CGFloat) -> some View {
-        let vipDramas = MockData.homeVipRecommendations.isEmpty
-            ? featuredOrEmpty.filter { $0.badge == .vip || $0.isHot }
-            : MockData.homeVipRecommendations
-
+        let weeklySection = viewModel.section("vip_weekly_featured", in: "vip")
+        let classicsSection = viewModel.section("vip_classics", in: "vip")
+        let weeklyItems = weeklySection?.items ?? []
+        let classicsItems = classicsSection?.items ?? []
+        let hasContent = !weeklyItems.isEmpty || !classicsItems.isEmpty
         return ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: DT.Space.xl) {
-                // Golden VIP theme banner
-                ZStack {
-                    LinearGradient(
-                        colors: [Color(hex: "#1A1410"), Color(hex: "#3D2B15"), Color(hex: "#5C3D1A")],
-                        startPoint: .leading, endPoint: .trailing
-                    )
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "crown.fill").foregroundColor(DB.gold)
-                                Text("VIP Picks").font(.system(size: 20, weight: .bold)).foregroundColor(DB.gold)
-                            }
-                            Text("Exclusive content for members").font(.system(size: 13)).foregroundColor(DB.mutedText)
-                        }
-                        Spacer()
+            if hasContent {
+                VStack(alignment: .leading, spacing: 28) {
+                    if !weeklyItems.isEmpty {
+                        HomePosterRailSection(
+                            title: weeklySection?.titleKey ?? "Weekly Featured",
+                            dramas: weeklyItems,
+                            playerDrama: $playerDrama,
+                            containerW: containerW
+                        )
                     }
-                    .padding(.horizontal, DT.Space.pageH)
-                }
-                .frame(height: 100)
-                .cornerRadius(DB.cardRadius)
-                .padding(.horizontal, DT.Space.pageH)
-                .padding(.top, DT.Space.sm)
-
-                // VIP Picks grid
-                Text("VIP Picks").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
-                    .padding(.horizontal, DT.Space.pageH)
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3),
-                    spacing: DT.Space.md
-                ) {
-                    ForEach(Array(vipDramas.prefix(6))) { drama in
-                        Button { playerDrama = drama } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
-                                    cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                                Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                            }
-                        }.buttonStyle(.plain)
+                    if !classicsItems.isEmpty {
+                        HomeDramaListSection(
+                            title: classicsSection?.titleKey ?? "VIP Classics",
+                            dramas: classicsItems,
+                            playerDrama: $playerDrama,
+                            containerW: containerW
+                        )
                     }
                 }
-                .padding(.horizontal, DT.Space.pageH)
-
-                // Member-only Dramas
-                if !MockData.memberOnlyDramas.isEmpty {
-                    Text("Member-only Dramas").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
-                        .padding(.horizontal, DT.Space.pageH)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: DT.Space.sm) {
-                            ForEach(MockData.memberOnlyDramas) { drama in
-                                Button { playerDrama = drama } label: {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
-                                            cornerRadius: DB.posterRadius, width: 100, height: 150)
-                                        Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1).frame(width: 100)
-                                    }
-                                }.buttonStyle(.plain)
-                            }
-                        }
-                        .padding(.horizontal, DT.Space.pageH)
-                    }
-                }
-
-                // CTA
-                Button { showVIP = true } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "crown.fill")
-                        Text("Unlock all VIP dramas").font(.system(size: 16, weight: .bold))
-                    }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity).frame(height: 48)
-                    .background(DB.gold).cornerRadius(DB.ctaRadius)
-                }
-                .padding(.horizontal, DT.Space.pageH)
+            } else {
+                Text("No VIP content yet").font(.system(size: 14)).foregroundColor(DB.mutedText).padding(.top, 80)
             }
-            .padding(.bottom, 64)
+            Color.clear.frame(height: 64)
         }
         .refreshable { await viewModel.loadData() }
     }
 
-    /// R5: 真实路径不使用 MockData 兜底
-    private var featuredOrEmpty: [DramaItem] { viewModel.featuredDramas }
-
     // MARK: - Tab 6: Original+
 
     private func originalPlusTabContent(containerW: CGFloat) -> some View {
-        let dramas: [DramaItem] = viewModel.dramasForOriginalPlusTab.isEmpty
-            ? Array(featuredOrEmpty.filter { $0.isHot }.prefix(12))
-            : viewModel.dramasForOriginalPlusTab
-        let originals = Array(dramas.prefix(6))
-        let trending = Array(dramas.suffix(from: min(6, dramas.count)).prefix(6))
+        let heroItems = Array((viewModel.section("original_hero", in: "original_plus")?.items ?? []).prefix(3))
+        let railSections = [
+            ("original_exclusive", "Exclusive Originals"),
+            ("original_new_releases", "New Releases"),
+            ("original_nextgen", "NextGen Stories"),
+            ("original_hidden_identity", "Hidden Identity"),
+            ("original_sweet_love", "Sweet Love"),
+            ("original_werewolf_mafia", "Werewolf & Mafia")
+        ].compactMap { code, fallbackTitle -> (String, [DramaItem])? in
+            guard let section = viewModel.section(code, in: "original_plus"), !section.items.isEmpty else { return nil }
+            return (section.titleKey ?? fallbackTitle, section.items)
+        }
+        let topCharts = viewModel.section("original_top_charts", in: "original_plus")?.items ?? []
+        let hasContent = !heroItems.isEmpty || !railSections.isEmpty || !topCharts.isEmpty
 
         return ScrollView(showsIndicators: false) {
-            VStack(alignment: .leading, spacing: DT.Space.xl) {
-                // Banner
-                ZStack {
-                    LinearGradient(
-                        colors: [DB.pink.opacity(0.3), DB.pink.opacity(0.05)],
-                        startPoint: .leading, endPoint: .trailing
-                    )
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Original+").font(.system(size: 22, weight: .bold)).foregroundColor(.white)
-                            Text("Exclusive original series").font(.system(size: 13)).foregroundColor(DB.mutedText)
-                        }
-                        Spacer()
-                        Image(systemName: "play.rectangle.fill").font(.system(size: 32)).foregroundColor(DB.pink)
+            if hasContent {
+                VStack(alignment: .leading, spacing: 28) {
+                    if !heroItems.isEmpty {
+                        HomeHeroCarouselSection(
+                            dramas: heroItems,
+                            playerDrama: $playerDrama,
+                            containerW: containerW
+                        )
                     }
-                    .padding(.horizontal, DT.Space.pageH)
-                }
-                .frame(height: 90).cornerRadius(DB.cardRadius)
-                .padding(.horizontal, DT.Space.pageH).padding(.top, DT.Space.sm)
-
-                // Exclusive Originals
-                if !originals.isEmpty {
-                    Text("Exclusive Originals").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
-                        .padding(.horizontal, DT.Space.pageH)
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3),
-                        spacing: DT.Space.md
-                    ) {
-                        ForEach(originals) { drama in
-                            Button { playerDrama = drama } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
-                                        cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                                    Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                                }
-                            }.buttonStyle(.plain)
-                        }
+                    ForEach(Array(railSections.enumerated()), id: \.offset) { _, section in
+                        HomePosterRailSection(
+                            title: section.0,
+                            dramas: section.1,
+                            playerDrama: $playerDrama,
+                            containerW: containerW
+                        )
                     }
-                    .padding(.horizontal, DT.Space.pageH)
-                }
-
-                // Trending Originals
-                if !trending.isEmpty {
-                    Text("Trending Originals").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
-                        .padding(.horizontal, DT.Space.pageH)
-                    LazyVGrid(
-                        columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3),
-                        spacing: DT.Space.md
-                    ) {
-                        ForEach(trending) { drama in
-                            Button { playerDrama = drama } label: {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0,
-                                        cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                                    Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                                }
-                            }.buttonStyle(.plain)
-                        }
+                    if !topCharts.isEmpty {
+                        HomeDramaListSection(
+                            title: "Top Charts",
+                            dramas: topCharts,
+                            playerDrama: $playerDrama,
+                            containerW: containerW
+                        )
                     }
-                    .padding(.horizontal, DT.Space.pageH)
                 }
+            } else {
+                Text("No Original+ content yet").font(.system(size: 14)).foregroundColor(DB.mutedText).padding(.top, 80)
             }
-            .padding(.bottom, 64)
+            Color.clear.frame(height: 64)
         }
         .refreshable { await viewModel.loadData() }
     }
@@ -887,65 +810,6 @@ private extension RankCategory {
                 DB.black
             ]
         }
-    }
-}
-
-// MARK: - Anime Hero Carousel
-
-private struct AnimeHeroCarousel: View {
-    let dramas: [DramaItem]; let containerW: CGFloat
-    @Binding var playerDrama: DramaItem?
-    @State private var idx: Int = 0
-
-    private var items: [DramaItem] {
-        let src = Array(dramas.prefix(3)); guard !src.isEmpty else { return [] }
-        var r = src; while r.count < 3 { r.append(contentsOf: src.prefix(3 - r.count)) }
-        return Array(r.prefix(3))
-    }
-
-    var body: some View {
-        let w = max(1, containerW - 32)
-        let h = min(max(w * 0.54, 168), 214)
-        TabView(selection: $idx) {
-            ForEach(Array(items.enumerated()), id: \.offset) { i, drama in
-                Button { playerDrama = drama } label: {
-                    ZStack(alignment: .bottom) {
-                        CoverImageView(url: drama.bannerCoverURL ?? drama.coverURL, aspectRatio: w/h, cornerRadius: DB.posterRadius, width: w, height: h)
-                        LinearGradient(colors: [.clear, .black.opacity(0.65)], startPoint: .center, endPoint: .bottom)
-                            .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
-                        HStack {
-                            Text(drama.title).font(.system(size: 18, weight: .semibold)).foregroundColor(.white).lineLimit(1)
-                            Spacer()
-                            AnimeHeroIndicator(currentIndex: idx, count: 3)
-                        }.padding(.horizontal, 12).padding(.bottom, 10)
-                    }
-                }.buttonStyle(.plain).tag(i)
-            }
-        }
-        .tabViewStyle(.page(indexDisplayMode: .never))
-        .frame(width: w, height: h)
-        .clipShape(RoundedRectangle(cornerRadius: DB.posterRadius))
-        .onReceive(Timer.publish(every: 5, on: .main, in: .common).autoconnect()) { _ in
-            withAnimation(.easeInOut(duration: 0.4)) { idx = (idx + 1) % max(items.count, 1) }
-        }
-        .padding(.horizontal, 16).padding(.bottom, 24)
-    }
-}
-
-private struct AnimeHeroIndicator: View {
-    let currentIndex: Int
-    let count: Int
-
-    var body: some View {
-        HStack(spacing: 3) {
-            ForEach(0..<count, id: \.self) { index in
-                Capsule()
-                    .fill(index == currentIndex ? Color.white.opacity(0.58) : Color.white.opacity(0.16))
-                    .frame(width: index == currentIndex ? 16 : 6, height: 2)
-            }
-        }
-        .padding(.horizontal, 5)
-        .frame(height: 10)
     }
 }
 

@@ -37,6 +37,7 @@ struct FeedCardDTO: Decodable {
     let coverUrl: String?
     let horizontalCoverUrl: String?
     let displayFlags: [String]?
+    let placementBadge: PlacementBadgeDTO?
     let tags: [String]?
     let playAsset: PlayAssetDTO?
     let monetization: MonetizationDTO?
@@ -52,6 +53,12 @@ struct FeedCardDTO: Decodable {
     let episodeCount: Int?
     let freeEpisodeRange: FreeEpisodeRangeDTO?
     let recommendationTraceId: String?
+}
+
+struct PlacementBadgeDTO: Decodable {
+    let code: String
+    let label: String?
+    let tone: String?
 }
 
 /// 对应后端 `free_episode_range` {start, end}

@@ -12,18 +12,6 @@ struct RoundedCorner: Shape {
     func path(in rect: CGRect) -> Path { Path(UIBezierPath(roundedRect:rect,byRoundingCorners:corners,cornerRadii:CGSize(width:radius,height:radius)).cgPath) }
 }
 
-// MARK: - BadgeTagView
-struct BadgeTagView: View {
-    let type: BadgeType
-    var body: some View {
-        Text(type == .new ? "NEW" : type == .hot ? "HOT" : "VIP")
-            .font(.system(size:9,weight:.bold)).foregroundColor(.white)
-            .padding(.horizontal,6).padding(.vertical,3)
-            .background(type == .new ? DT.success : type == .hot ? DT.hotTag : DT.brandGold)
-            .clipShape(RoundedCorner(radius:2,corners:[.topRight,.bottomLeft]))
-    }
-}
-
 // MARK: - Helpers
 private func rankText(rank: Int) -> String? {
     guard rank <= 10 else { return nil }
@@ -56,7 +44,12 @@ struct MarketingCard: View {
     var body: some View {
         Button{playerDrama=drama}label:{
             VStack(alignment:.leading,spacing:0){
-                ZStack(alignment:.topTrailing){CoverImageView(url:drama.coverURL,cornerRadius:DB.posterRadius,width:colW,height:coverH);if let b=drama.badge{BadgeTagView(type:b)}}
+                ZStack(alignment: .topTrailing) {
+                    CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: colW, height: coverH)
+                    if let badge = drama.placementBadge {
+                        HomeCardBadgeView(badge: badge)
+                    }
+                }
                     .frame(width:colW,height:coverH)
                 Text(drama.title).font(.system(size:14,weight:.medium)).foregroundColor(DT.Color.textPrimary).lineLimit(2)
                     .padding(.horizontal,4).padding(.top,6).padding(.bottom,6).frame(maxWidth:colW,alignment:.leading)
@@ -132,7 +125,12 @@ struct WaterfallCard: View {
     var body: some View {
         Button{playerDrama=drama}label:{
             VStack(alignment:.leading,spacing:0){
-                ZStack(alignment:.topTrailing){CoverImageView(url:drama.coverURL,cornerRadius:DB.posterRadius,width:colW,height:coverH);if let b=drama.badge{BadgeTagView(type:b)}}
+                ZStack(alignment: .topTrailing) {
+                    CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: colW, height: coverH)
+                    if let badge = drama.placementBadge {
+                        HomeCardBadgeView(badge: badge)
+                    }
+                }
                 Text(drama.title).font(.system(size:14,weight:.semibold)).foregroundColor(DT.Color.textPrimary).lineLimit(2).padding(.horizontal,6).padding(.top,10).padding(.bottom,6)
                 footerRow.padding(.horizontal,6).padding(.bottom,8)
             }.frame(width:colW).background(DT.Color.bgCard).cornerRadius(2)
@@ -156,8 +154,8 @@ struct CategoryDramaCard: View {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .topTrailing) {
                     CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: cardW, height: coverH)
-                    if let badge = drama.badge {
-                        BadgeTagView(type: badge)
+                    if let badge = drama.placementBadge {
+                        HomeCardBadgeView(badge: badge)
                     }
                 }
                 Text(drama.title)

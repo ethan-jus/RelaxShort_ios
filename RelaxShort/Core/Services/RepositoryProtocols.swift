@@ -14,9 +14,11 @@ protocol HomeRepositoryProtocol {
     func fetchBanners() async throws -> [BannerItem]
     /// 按榜单类型获取排行（Task16：RankViewModel 通过协议调用后端 rankings）
     func fetchRankings(type: String) async throws -> [DramaItem]
-    /// 获取分类列表（Task16 R3：Home Categories tab 用）
+    /// 获取 Home Categories tab 的分类列表。
     func fetchHomeCategories() async throws -> [HomeCategory]
-    /// 按后端分类 code 获取剧集列表（Task17：协议收口，移除 HomeViewModel 对 RealHomeRepository 的直接依赖）
+    /// 获取首页 tab/section 运营配置内容
+    func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent]
+    /// 按后端分类 code 获取剧集列表。
     func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]
 }
 
@@ -28,6 +30,10 @@ extension HomeRepositoryProtocol {
     /// 默认实现：Mock 模式返回空或全量本地过滤
     func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
         return try await fetchDramas(category: .all)
+    }
+    /// 默认实现：Mock 模式暂不提供运营 section 数据
+    func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent] {
+        return []
     }
     /// 默认实现：本地排序降级（Mock 模式）
     func fetchRankings(type: String) async throws -> [DramaItem] {
