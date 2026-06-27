@@ -66,3 +66,13 @@
 - [ ] 执行 `git diff --check`。
 - [ ] 执行 iPhone 17 Pro Max clean build，预期 `BUILD SUCCEEDED`。
 - [ ] 等待用户进行小屏、标准屏、大屏模拟器视觉验收。
+
+### Task 5：搜索词与榜单 Tab 间距微调
+
+**Files:**
+
+- Modify: `RelaxShort/Views/Search/SearchDefaultView.swift`
+
+- [ ] 将搜索词区域底部间距从 36pt 调整为 20pt。
+- [ ] 不修改搜索词 chip、Tab 高度和榜单首行布局。
+- [ ] 重新执行 `git diff --check` 和 iPhone 17 Pro Max build。
