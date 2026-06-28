@@ -8,11 +8,19 @@ struct SeriesPlayerNav: Hashable {
     let startEpisode: Int
     let resumeTime: TimeInterval?
     let handoff: PlayerHandoffContext?
+    let sourceScene: String
 
-    init(drama: DramaItem, startEpisode: Int, resumeTime: TimeInterval? = nil, handoff: PlayerHandoffContext? = nil) {
+    init(
+        drama: DramaItem,
+        startEpisode: Int,
+        resumeTime: TimeInterval? = nil,
+        handoff: PlayerHandoffContext? = nil,
+        sourceScene: String = "unknown"
+    ) {
         self.drama = drama
         self.startEpisode = startEpisode
         self.resumeTime = resumeTime
         self.handoff = handoff
+        self.sourceScene = sourceScene
     }
 }

@@ -171,6 +171,20 @@ final class ShortVideoPlayerEngine: ObservableObject {
         log("pause: reason=\(reason) wantsPlayback=\(wantsPlayback)")
     }
 
+    /// 释放播放所有权：撤销播放意图，取消所有异步任务，使进行中的 prepare 失效
+    func deactivate() {
+        let wasPreparing = state == .preparing
+        wantsPlayback = false
+        generation &+= 1
+        cancelAllPreloadTasks()
+        subtitleTask?.cancel()
+        recoveryController.cancelPendingRecovery()
+        currentPlayer?.pause()
+        if wasPreparing { currentItem = nil }
+        state = .pausedBySystem
+        log("deactivate: wantsPlayback=false gen=\(generation) wasPreparing=\(wasPreparing)")
+    }
+
     func setRate(_ rate: Float) {
         currentPlayer?.rate = rate
         log("setRate: \(rate)")

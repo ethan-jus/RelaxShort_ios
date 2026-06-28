@@ -29,6 +29,13 @@ struct APIErrorDetail: Decodable {
 struct APIError: LocalizedError {
     let code: String?
     let message: String
+    let statusCode: Int?
+
+    init(code: String?, message: String, statusCode: Int? = nil) {
+        self.code = code
+        self.message = message
+        self.statusCode = statusCode
+    }
 
     var errorDescription: String? { message }
 }

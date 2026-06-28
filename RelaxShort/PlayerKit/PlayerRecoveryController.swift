@@ -24,6 +24,7 @@ final class PlayerRecoveryController {
     /// Task24: 每个 media item 连续恢复失败计数，防止无限 recovery
     private var failureCounts: [String: Int] = [:]
     private let maxRecoveryAttempts = 3
+    private var recoveryGeneration = 0
 
     // observer tokens — 可 detach
     private var failObserver: Any?
@@ -107,6 +108,19 @@ final class PlayerRecoveryController {
         stablePlaybackTask = nil
     }
 
+    // MARK: - 取消挂起恢复
+
+    func cancelPendingRecovery() {
+        recoveryTask?.cancel()
+        recoveryTask = nil
+        stablePlaybackTask?.cancel()
+        stablePlaybackTask = nil
+        wasPlaying = false
+        wasUserPaused = false
+        lastItem = nil
+        recoveryGeneration &+= 1
+    }
+
     // MARK: - 状态快照
 
     /// 公开 — engine item status KVO 需要快照
@@ -181,7 +195,6 @@ final class PlayerRecoveryController {
     func attemptRecovery(reason: RecoveryReason = .networkRestored) {
         guard let engine, let item = lastItem, wasPlaying else { return }
 
-        // Task24: 同一 media item 连续失败上限检查
         let count = (failureCounts[item.id] ?? 0) + 1
         failureCounts[item.id] = count
         if count > maxRecoveryAttempts {
@@ -191,6 +204,9 @@ final class PlayerRecoveryController {
         }
 
         recoveryTask?.cancel()
+        recoveryGeneration &+= 1
+        let token = recoveryGeneration
+        let expectedItemID = item.id
         let startTime = CACurrentMediaTime()
         let recoverTime = lastTime
         print("[PlayerKit] recovery start id=\(item.id) time=\(recoverTime) reason=\(reason.rawValue) attempt=\(count)/\(maxRecoveryAttempts)")
@@ -198,43 +214,47 @@ final class PlayerRecoveryController {
         engine.updateState(.recovering)
         engine.rebuildCurrentItem(autoplay: false)
 
-        // 等待新 item ready 后再 seek
-        recoveryTask = Task { @MainActor in
-            // 给 item 一点时间加载
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-            guard !Task.isCancelled else { return }
-            guard let player = engine.currentPlayer, let item = player.currentItem else {
-                print("[PlayerKit] recovery failed reason=no-player")
-                engine.updateState(.failed(message: "恢复失败"))
+        recoveryTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do { try await Task.sleep(nanoseconds: 300_000_000) }
+            catch { return }
+            guard self.recoveryGeneration == token, !Task.isCancelled else { return }
+            guard let player = engine.currentPlayer,
+                  let currentItem = player.currentItem,
+                  engine.currentItem?.id == expectedItemID else {
+                print("[PlayerKit] recovery failed reason=no-player-or-stale")
                 return
             }
 
             // 等待 item readyToPlay
             let deadline = Date().addingTimeInterval(5)
-            while item.status != .readyToPlay, Date() < deadline {
-                try? await Task.sleep(nanoseconds: 100_000_000)
-                if Task.isCancelled { return }
+            while currentItem.status != .readyToPlay, Date() < deadline {
+                do { try await Task.sleep(nanoseconds: 100_000_000) }
+                catch { return }
+                guard self.recoveryGeneration == token, !Task.isCancelled,
+                      engine.currentItem?.id == expectedItemID else { return }
             }
 
-            guard item.status == .readyToPlay else {
-                print("[PlayerKit] recovery seek complete time=\(recoverTime) finished=false")
-                engine.updateState(.failed(message: "恢复超时"))
-                return
-            }
-            print("[PlayerKit] recovery ready id=\(self.lastItem?.id ?? "?")")
+            guard self.recoveryGeneration == token,
+                  currentItem.status == .readyToPlay,
+                  engine.currentItem?.id == expectedItemID else { return }
 
-            // seek 到断点
+            print("[PlayerKit] recovery ready id=\(expectedItemID)")
+
             let target = CMTime(seconds: recoverTime, preferredTimescale: 600)
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
+                        guard let self,
+                              self.recoveryGeneration == token,
+                              engine.currentItem?.id == expectedItemID,
+                              engine.currentPlayer === player else {
+                            continuation.resume(); return
+                        }
                         print("[PlayerKit] recovery seek complete time=\(recoverTime) finished=\(finished)")
                         if finished, engine.wantsPlayback {
-                            player.play()
-                            engine.updateState(.playing)
+                            player.play(); engine.updateState(.playing)
                             print("[PlayerKit] recovery play resumed")
-                        } else if !engine.wantsPlayback {
-                            print("[PlayerKit] recovery skipped reason=userPaused")
                         }
                         continuation.resume()
                     }
@@ -243,7 +263,7 @@ final class PlayerRecoveryController {
 
             let durationMs = (CACurrentMediaTime() - startTime) * 1000
             engine.metrics.logRecovery(ms: durationMs)
-            self.recoveryTask = nil
+            if self.recoveryGeneration == token { self.recoveryTask = nil }
         }
     }
 

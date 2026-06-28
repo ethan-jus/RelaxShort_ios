@@ -42,6 +42,8 @@ enum APIEndpoint {
     case userMe
     case userWallet
     case updateUserPreferences(uiLanguage: String?, contentLanguage: String?, subtitleLanguage: String?, defaultQuality: String?)
+    // Task30 R4B-1
+    case discoveryEvents(DiscoveryEventBatchRequest)
 
     // MARK: - 旧 mock 端点（保留兼容）
 
@@ -74,7 +76,8 @@ extension APIEndpoint {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
-             .userMe, .userWallet, .updateUserPreferences:
+             .userMe, .userWallet, .updateUserPreferences,
+             .discoveryEvents:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -100,6 +103,7 @@ extension APIEndpoint {
         case .userMe:                           return "/api/v2/users/me"
         case .userWallet:                       return "/api/v2/users/me/wallet"
         case .updateUserPreferences:            return "/api/v2/users/me/preferences"
+        case .discoveryEvents:                  return "/api/v2/events/discovery/batch"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -130,6 +134,7 @@ extension APIEndpoint {
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet: return .get
         case .updateUserPreferences: return .patch
+        case .discoveryEvents:     return .post
         case .homeFeed, .banners, .dramaDetail, .episodes,
              .watchHistory, .userProfile, .subscriptionStatus,
              .bookmarks, .coinTransactions, .search: return .get
@@ -140,10 +145,22 @@ extension APIEndpoint {
         }
     }
 
-    /// 是否需要 X-User-Id 请求头（仅 user/profile/wallet 端点）
+    /// 真实 v2 端点标记（用于 X-Device-Id）
+    private var requiresRealV2Header: Bool {
+        switch self {
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
+             .userMe, .userWallet, .updateUserPreferences, .discoveryEvents:
+            return true
+        default: return false
+        }
+    }
+
+    /// 是否需要用户身份。播放鉴权同样依赖用户上下文；本地 real API
+    /// 模式在正式登录接入前使用固定开发用户。
     private var requiresUserIdHeader: Bool {
         switch self {
-        case .userMe, .userWallet, .updateUserPreferences:
+        case .episodePlay, .userMe, .userWallet, .updateUserPreferences:
             return true
         default:
             return false
@@ -175,6 +192,11 @@ extension APIEndpoint {
         // 登录 token
         if let token = StorageService.shared.accessToken {
             base["Authorization"] = "Bearer \(token)"
+        }
+
+        // Task30 R4B-1：所有真实 v2 请求发送安装标识
+        if requiresRealV2Header {
+            base["X-Device-Id"] = InstallIdentityProvider.shared.installID()
         }
 
         // 本地 dev 桥：用户端点需要 X-User-Id（仅 real API 模式生效）
@@ -230,6 +252,8 @@ extension APIEndpoint {
             if let v = subLang { dict["subtitle_language"] = v }
             if let v = quality { dict["default_quality"] = v }
             params = dict
+        case .discoveryEvents(let request):
+            return try? JSONEncoder.discoveryEncoder().encode(request)
         default:
             params = [:]
         }

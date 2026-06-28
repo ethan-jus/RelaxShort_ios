@@ -9,6 +9,7 @@ struct RelaxShortApp: App {
     @StateObject private var coinStore = CoinStore()
     @StateObject private var storeKit = StoreKitManager()
     @StateObject private var dependencies = DependencyContainer()
+    @StateObject private var playerCoordinator = PlayerCoordinator()
     @ObservedObject private var themeManager = ThemeManager.shared
     @StateObject private var adService = RealAdService.shared
 
@@ -61,7 +62,7 @@ struct RelaxShortApp: App {
                         await AppInitService.shared.initialize()
                     }
                 } else {
-                    MainTabView()
+                    MainTabView(playerCoordinator: playerCoordinator)
                         .environmentObject(appStore)
                         .environmentObject(authStore)
                         .environmentObject(coinStore)
@@ -86,7 +87,11 @@ struct RelaxShortApp: App {
             .statusBarHidden(true)
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active && !showSplash {
+                    dependencies.discoveryAnalytics.flushPending()
                     handleHotStartAd()
+                }
+                if newPhase == .background {
+                    dependencies.discoveryAnalytics.flushForBackground()
                 }
             }
         }

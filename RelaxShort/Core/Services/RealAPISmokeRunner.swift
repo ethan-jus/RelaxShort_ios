@@ -106,8 +106,8 @@ final class RealAPISmokeRunner: ObservableObject {
             let dto: RankingResponseDTO = try await self.client.requestData(
                 .rankings(type: "popular", contentLanguage: lang, countryCode: country)
             )
-            if let first = dto.items?.first { lastSeriesId = lastSeriesId ?? first.seriesId }
-            return "items=\(dto.items?.count ?? 0)"
+            if let first = dto.items.first { lastSeriesId = lastSeriesId ?? first.card.seriesId }
+            return "items=\(dto.items.count)"
         }
 
         // 9. Series Episodes

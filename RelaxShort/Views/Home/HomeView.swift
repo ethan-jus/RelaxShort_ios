@@ -142,7 +142,11 @@ struct HomeView: View {
         }
         .onChange(of: playerDrama) { _, drama in
             guard let drama else { return }
-            appStore.navigationTarget = SeriesPlayerNav(drama: drama, startEpisode: max(1, drama.currentEpisode))
+            appStore.navigationTarget = SeriesPlayerNav(
+                drama: drama,
+                startEpisode: max(1, drama.currentEpisode),
+                sourceScene: viewModel.selectedTab == 2 ? "rankings" : "home"
+            )
             playerDrama = nil
         }
         .navigationDestination(isPresented: $showVIP) {

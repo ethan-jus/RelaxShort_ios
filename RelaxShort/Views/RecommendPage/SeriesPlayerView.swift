@@ -9,6 +9,7 @@ struct SeriesPlayerView: View {
     let startEpisode: Int
     @EnvironmentObject var dependencies: DependencyContainer
     let handoff: PlayerHandoffContext?
+    let sourceScene: String
 
     @State private var currentEpisode: Int
     @State private var dragOffset: CGFloat = 0
@@ -32,6 +33,10 @@ struct SeriesPlayerView: View {
     @State private var playbackProgress = PlayerProgress()
     @State private var selectedPlaybackRate: Float = 1.0
     @State private var selectedQualityID = "auto"
+    @State private var hasTrackedImpression = false
+    @State private var qualifiedEpisodeIDs: Set<String> = []
+    @State private var completedEpisodeIDs: Set<String> = []
+    @State private var episodePrefetchTask: Task<Void, Never>?
 
     private enum ChromeMetrics {
         static let horizontalPadding: CGFloat = 16
@@ -61,10 +66,16 @@ struct SeriesPlayerView: View {
     /// 剧集列表加载后以接口返回为准；加载前用卡片字段兜底，避免展示不存在的集数。
     private var totalEpisodes: Int { episodes.isEmpty ? max(1, drama.episodeCount) : episodes.count }
 
-    init(drama: DramaItem, startEpisode: Int? = nil, handoff: PlayerHandoffContext? = nil) {
+    init(
+        drama: DramaItem,
+        startEpisode: Int? = nil,
+        handoff: PlayerHandoffContext? = nil,
+        sourceScene: String = "unknown"
+    ) {
         self.drama = drama
         self.startEpisode = startEpisode ?? max(1, drama.currentEpisode)
         self.handoff = handoff
+        self.sourceScene = sourceScene
         self._currentEpisode = State(initialValue: self.startEpisode)
     }
 
@@ -123,14 +134,6 @@ struct SeriesPlayerView: View {
                         currentEpisode: $currentEpisode,
                         unlockedEpisodes: unlockedEpisodes,
                         isPresented: $showEpisodeList,
-                        onUnlock: { ep in
-                            pendingLockedEpisode = ep
-                            unlockTargetEpisode = ep
-                            showEpisodeList = false
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                showUnlockSheet = true
-                            }
-                        },
                         onSelectEpisode: { ep in
                             showEpisodeList = false
                             switchToEpisode(ep)
@@ -190,7 +193,7 @@ struct SeriesPlayerView: View {
                 .presentationDragIndicator(.hidden)
             }
         }
-        .task { await loadEpisodes() }
+        .task(id: drama.id) { await startPlaybackSession() }
         .onChange(of: currentEpisode) { oldValue, newValue in
             guard oldValue != newValue else { return }
             requestEpisodeSwitch(newValue)
@@ -206,6 +209,7 @@ struct SeriesPlayerView: View {
         }
         .onReceive(playerCoordinator.engine.$progress) { progress in
             playbackProgress = progress
+            trackPlaybackMilestones(progress)
             if let preview = seriesSeekPreviewFraction, progress.duration > 0 {
                 let actual = CGFloat(progress.currentTime / progress.duration)
                 if abs(actual - preview) < 0.02 {
@@ -215,6 +219,7 @@ struct SeriesPlayerView: View {
         }
         .onDisappear {
             autoHideTask?.cancel()
+            episodePrefetchTask?.cancel()
             playerCoordinator.release(.series(dramaID: drama.id))
         }
     }
@@ -234,15 +239,50 @@ struct SeriesPlayerView: View {
 
     // MARK: - Episode Loading
 
+    private func startPlaybackSession() async {
+        playerCoordinator.beginSeries(dramaID: drama.id)
+        if !hasTrackedImpression {
+            hasTrackedImpression = true
+            dependencies.discoveryAnalytics.trackContentImpression(
+                seriesID: drama.id,
+                sourceScene: sourceScene
+            )
+        }
+
+        // 卡片已携带预览媒资时立即播放点击的短剧，正式剧集/鉴权接口并行补全。
+        if let previewItem = drama.toPlayerMediaItem() {
+            playerCoordinator.claimSeries(
+                drama: drama,
+                items: [previewItem],
+                startIndex: 0,
+                handoff: handoff
+            )
+        }
+
+        await loadEpisodes()
+    }
+
     private func loadEpisodes() async {
         let repo = dependencies.detailRepository
         do {
             episodes = try await repo.fetchEpisodes(dramaId: drama.id)
+        } catch is CancellationError {
+            return
         } catch {
+            guard !Task.isCancelled else { return }
             Logger.viewModel.error("SeriesPlayerView: fetchEpisodes failed: \(error)")
-            episodes = (try? await MockDetailRepository().fetchEpisodes(dramaId: drama.id)) ?? []
+            if playerCoordinator.engine.currentItem?.id != PlayerMediaItem.stableID(
+                dramaID: drama.id,
+                episodeNumber: currentEpisode
+            ) {
+                playerCoordinator.engine.deactivate()
+            }
+            return
         }
-        await ensurePlayAsset(for: currentEpisode)
+
+        guard !Task.isCancelled else { return }
+        _ = await ensurePlayAsset(for: currentEpisode, presentUnlockOnDenied: true)
+        guard !Task.isCancelled else { return }
         initializeEpisodePlayer()
     }
 
@@ -255,9 +295,27 @@ struct SeriesPlayerView: View {
             return
         }
         let playable = buildPlayableItems(from: episodes)
-        guard !playable.isEmpty else { return }
+        guard !playable.isEmpty else {
+            // 正式播放接口失败时保留已启动的卡片预览，不得回落到其他剧或 Mock。
+            if playerCoordinator.engine.currentItem?.id != PlayerMediaItem.stableID(
+                dramaID: drama.id,
+                episodeNumber: currentEpisode
+            ) {
+                playerCoordinator.engine.deactivate()
+            }
+            return
+        }
         let startIndex = playable.firstIndex(where: { $0.episodeNumber == currentEpisode }) ?? 0
-        playerCoordinator.claimSeries(drama: drama, items: playable.map(\.item), startIndex: startIndex, handoff: handoff)
+        let playerItems = playable.map(\.item)
+        if playerCoordinator.engine.currentItem != playerItems[safe: startIndex] {
+            playerCoordinator.claimSeries(
+                drama: drama,
+                items: playerItems,
+                startIndex: startIndex,
+                handoff: handoff
+            )
+        }
+        prefetchNextEpisode(after: currentEpisode)
         resetAutoHide()
     }
 
@@ -284,9 +342,21 @@ struct SeriesPlayerView: View {
                         viewCount: drama.formattedViewCount,
                         onBookmark: {
                             isBookmarked.toggle()
+                            if isBookmarked {
+                                dependencies.discoveryAnalytics.trackBookmark(
+                                    seriesID: drama.id,
+                                    sourceScene: sourceScene
+                                )
+                            }
                             resetAutoHide()
                         },
-                        onShare: { activeSheet = .share },
+                        onShare: {
+                            dependencies.discoveryAnalytics.trackShare(
+                                seriesID: drama.id,
+                                sourceScene: sourceScene
+                            )
+                            activeSheet = .share
+                        },
                         onEpisodes: { showEpisodeList = true }
                     )
                     .frame(width: actionRailWidth)
@@ -517,17 +587,10 @@ struct SeriesPlayerView: View {
     private func switchToEpisode(_ episodeNumber: Int) {
         guard !isSwitchingEpisode else { return }
         guard episodeNumber != currentEpisode else { return }
-        // 锁定集不能播放
-        guard !isEpisodeLocked(episodeNumber) else {
-            pendingLockedEpisode = episodeNumber
-            unlockTargetEpisode = episodeNumber
-            showUnlockSheet = true
-            return
-        }
         isSwitchingEpisode = true
         Task { @MainActor in
             defer { isSwitchingEpisode = false }
-            guard await ensurePlayAsset(for: episodeNumber) else {
+            guard await ensurePlayAsset(for: episodeNumber, presentUnlockOnDenied: true) else {
                 Logger.viewModel.warning("SeriesPlayerView: cannot switch EP\(episodeNumber), missing play asset")
                 return
             }
@@ -540,14 +603,44 @@ struct SeriesPlayerView: View {
             currentEpisode = episodeNumber
             playerCoordinator.engine.prepare(items: playable.map(\.item), index: playableIndex)
             playerCoordinator.engine.play()
+            prefetchNextEpisode(after: episodeNumber)
             Logger.viewModel.info("SeriesPlayerView: switched to EP\(episodeNumber) playableIndex=\(playableIndex)")
         }
     }
 
-    /// 三层回退支持 Real / Mock 两种模式：
-    /// 已有缓存、Episode.videoURL、本地/后端 repository 播放接口。
+    /// 提前获取下一集播放合同并验证媒体可用性。只预热一个相邻剧集，
+    /// 不创建第二个 AVPlayer，避免额外音频会话和内存占用。
+    private func prefetchNextEpisode(after episodeNumber: Int) {
+        episodePrefetchTask?.cancel()
+        guard let nextEpisode = episodes.first(where: { $0.episodeNumber == episodeNumber + 1 }),
+              episodeMediaSources[nextEpisode.id] == nil else { return }
+
+        episodePrefetchTask = Task { @MainActor in
+            guard await ensurePlayAsset(for: nextEpisode.episodeNumber, presentUnlockOnDenied: false),
+                  !Task.isCancelled,
+                  let source = episodeMediaSources[nextEpisode.id],
+                  let url = directURL(from: source) else { return }
+            let asset = AVURLAsset(url: url)
+            _ = try? await asset.load(.isPlayable)
+        }
+    }
+
+    private func directURL(from source: PlayerMediaSource) -> URL? {
+        switch source {
+        case .mp4(let url), .mp4WithEmbeddedSubtitles(let url):
+            return url
+        case .mp4WithExternalSubtitles(let url, _):
+            return url
+        case .hls(let url):
+            return url
+        case .hlsWithFallback(let masterURL, _):
+            return masterURL
+        }
+    }
+
+    /// 播放源按内存缓存、Episode URL、后端播放合同依次解析。
     @MainActor
-    private func ensurePlayAsset(for episodeNumber: Int) async -> Bool {
+    private func ensurePlayAsset(for episodeNumber: Int, presentUnlockOnDenied: Bool = false) async -> Bool {
         guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == episodeNumber }) else { return false }
         let ep = episodes[epIndex]
         let episodeId = ep.id
@@ -567,9 +660,19 @@ struct SeriesPlayerView: View {
             }
             if let source = dto.toPlayerMediaSource() {
                 episodeMediaSources[episodeId] = source
+                // 播放接口成功代表后端已完成免费/VIP/金币权限判定。
+                unlockedEpisodes.insert(episodeNumber)
                 Logger.viewModel.info("SeriesPlayerView: fetched play asset EP\(episodeNumber) type=\(dto.sourceType)")
                 return true
             }
+            return false
+        } catch let error as APIError where error.code == "EPISODE_LOCKED" {
+            if presentUnlockOnDenied {
+                pendingLockedEpisode = episodeNumber
+                unlockTargetEpisode = episodeNumber
+                showUnlockSheet = true
+            }
+            Logger.viewModel.info("SeriesPlayerView: EP\(episodeNumber) denied by playback entitlement")
             return false
         } catch {
             Logger.viewModel.warning("SeriesPlayerView: play asset failed EP\(episodeNumber): \(error.localizedDescription)")
@@ -610,6 +713,33 @@ struct SeriesPlayerView: View {
                 )
             )
         }
+    }
+
+    private func trackPlaybackMilestones(_ progress: PlayerProgress) {
+        guard playbackState == .playing,
+              let episodeID = currentBackendEpisodeID else { return }
+
+        if progress.currentTime >= 5, qualifiedEpisodeIDs.insert(episodeID).inserted {
+            dependencies.discoveryAnalytics.trackQualifiedPlay(
+                seriesID: drama.id,
+                episodeID: episodeID,
+                sourceScene: sourceScene
+            )
+        }
+
+        if progress.duration > 0,
+           progress.currentTime / progress.duration >= 0.9,
+           completedEpisodeIDs.insert(episodeID).inserted {
+            dependencies.discoveryAnalytics.trackPlayComplete(
+                seriesID: drama.id,
+                episodeID: episodeID,
+                sourceScene: sourceScene
+            )
+        }
+    }
+
+    private var currentBackendEpisodeID: String? {
+        episodes.first(where: { $0.episodeNumber == currentEpisode })?.id
     }
 
     private func playUnlockedPendingEpisode() {
@@ -846,7 +976,6 @@ private struct EpisodePickerSheet: View {
     @Binding var currentEpisode: Int
     let unlockedEpisodes: Set<Int>
     @Binding var isPresented: Bool
-    var onUnlock: (Int) -> Void
     var onSelectEpisode: (Int) -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 6)
@@ -944,7 +1073,9 @@ private struct EpisodePickerSheet: View {
         let freeRange = drama.freeEpisodeRange ?? 1...3
         let isLocked = !unlockedEpisodes.contains(ep) && !freeRange.contains(ep)
         Button {
-            if isLocked { onUnlock(ep) } else { onSelectEpisode(ep); dismiss() }
+            // 锁图标仅作预提示；最终权限以播放接口为准，支持已登录 VIP 直接播放。
+            onSelectEpisode(ep)
+            dismiss()
         } label: {
             ZStack(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: 5, style: .continuous)

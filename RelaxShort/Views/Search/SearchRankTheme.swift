@@ -10,12 +10,9 @@ enum SearchRankTheme: Int, CaseIterable, Hashable, Identifiable {
 
     var apiType: String {
         switch self {
-        case .topSearched:
-            return "trending"
-        case .mostTrending:
-            return "popular"
-        case .newReleases:
-            return "new"
+        case .topSearched:   return "top_searched"
+        case .mostTrending:  return "trending"
+        case .newReleases:   return "new_releases"
         }
     }
 

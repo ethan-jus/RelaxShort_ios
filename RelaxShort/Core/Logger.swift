@@ -27,4 +27,8 @@ enum Logger {
     static let auth = os.Logger(subsystem: "com.relaxshort.app", category: "auth")
     /// Store/金币/内购日志
     static let store = os.Logger(subsystem: "com.relaxshort.app", category: "store")
+    /// 事件分析日志
+    static let analytics = os.Logger(subsystem: "com.relaxshort.app", category: "analytics")
+    /// 播放引擎和页面播放权日志
+    static let player = os.Logger(subsystem: "com.relaxshort.app", category: "player")
 }

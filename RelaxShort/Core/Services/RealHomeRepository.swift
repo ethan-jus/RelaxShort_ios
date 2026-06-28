@@ -116,15 +116,22 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         }
     }
 
-    // MARK: - Rankings
+    // MARK: - Rankings (R4B-1: 返回 RankingEntry 领域模型)
 
-    func fetchRankings(type: String = "popular") async throws -> [DramaItem] {
+    func fetchRankingEntries(type: String) async throws -> [RankingEntry] {
         let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
         let dto: RankingResponseDTO = try await client.requestData(
             .rankings(type: type, contentLanguage: contentLang, countryCode: country)
         )
-        return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
+        return dto.items.map {
+            RankingEntry(
+                rankPosition: $0.rankPosition,
+                metricType: $0.metricType,
+                metricValue: $0.metricValue,
+                drama: FeedCardDTOMapper.toDramaItem(from: $0.card)
+            )
+        }
     }
 
     // MARK: - Categories
@@ -194,10 +201,6 @@ struct HomeResponseDTO: Decodable {
         let titleKey: String?
         let items: [FeedCardDTO]?
     }
-}
-
-struct RankingResponseDTO: Decodable {
-    let items: [FeedCardDTO]?
 }
 
 struct CategoriesResponseDTO: Decodable {

@@ -121,21 +121,36 @@ final class APIClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse
         }
-        switch httpResponse.statusCode {
-        case 200..<300:
-            return
-        case 401:
-            throw NetworkError.unauthorized
-        case 500...:
-            // 尝试解析服务端错误消息
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let message = json["message"] as? String {
-                throw NetworkError.serverMessage(message)
-            }
-            throw NetworkError.badStatus(httpResponse.statusCode)
-        default:
-            throw NetworkError.badStatus(httpResponse.statusCode)
+        if let error = Self.errorForHTTPResponse(statusCode: httpResponse.statusCode, data: data) {
+            throw error
         }
+    }
+
+    /// 将非 2xx 响应优先映射为后端业务错误，避免丢失错误码和可操作信息。
+    static func errorForHTTPResponse(statusCode: Int, data: Data) -> Error? {
+        guard !(200..<300).contains(statusCode) else { return nil }
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        if let envelope = try? decoder.decode(ErrorEnvelope.self, from: data),
+           let detail = envelope.error {
+            return APIError(
+                code: detail.code,
+                message: detail.message ?? "请求失败",
+                statusCode: statusCode
+            )
+        }
+
+        switch statusCode {
+        case 401:
+            return NetworkError.unauthorized
+        default:
+            return NetworkError.badStatus(statusCode)
+        }
+    }
+
+    private struct ErrorEnvelope: Decodable {
+        let error: APIErrorDetail?
     }
 
     // MARK: - Logging
@@ -144,6 +159,7 @@ final class APIClient {
         let method = request.httpMethod ?? "?"
         let url = request.url?.absoluteString ?? "?"
         logger.info("⬆️ \(method) \(url)")
+        if url.contains("/events/discovery") { return }
         if let body = request.httpBody,
            let json = try? JSONSerialization.jsonObject(with: body) {
             logger.debug("    Body: \(String(describing: json))")

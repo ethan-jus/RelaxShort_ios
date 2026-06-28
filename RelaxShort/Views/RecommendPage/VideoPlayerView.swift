@@ -94,6 +94,30 @@ import Combine
         poolVersion &+= 1
     }
 
+    func resumePlayback() {
+        guard let coordinator else {
+            engine.playFromSystemResume()
+            return
+        }
+        guard hasInitializedPool,
+              !playableItems.isEmpty,
+              let playableIndex = playableIndex(for: currentIndex) else { return }
+
+        if coordinator.owner == .forYou {
+            coordinator.resumeForYou()
+        } else {
+            coordinator.claimForYou(items: playableItems.map(\.item), index: playableIndex)
+        }
+    }
+
+    func pausePlayback() {
+        if let coordinator {
+            coordinator.pauseForYou()
+        } else {
+            engine.pause(reason: .system)
+        }
+    }
+
     func cleanup() {}
 }
 

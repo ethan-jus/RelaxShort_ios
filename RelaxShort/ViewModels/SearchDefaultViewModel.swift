@@ -59,11 +59,8 @@ final class SearchDefaultViewModel: ObservableObject {
     }
 
     private func fetchRanked(_ theme: SearchRankTheme) async throws -> [RankDrama] {
-        try await homeRepository.fetchRankings(type: theme.apiType)
-            .enumerated()
-            .map { index, drama in
-                RankDrama(from: drama, rank: index + 1)
-            }
+        let entries = try await homeRepository.fetchRankingEntries(type: theme.apiType)
+        return entries.map(RankDrama.init(entry:))
     }
 
     private func fetchSuggestions() async -> [String] {

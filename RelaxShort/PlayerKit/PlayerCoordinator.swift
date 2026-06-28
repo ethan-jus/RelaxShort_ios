@@ -14,13 +14,34 @@ final class PlayerCoordinator: ObservableObject {
     @Published private(set) var owner: Owner?
     @Published private(set) var engine = ShortVideoPlayerEngine()
 
+    private var seriesResumeTask: Task<Void, Never>?
+    private var claimGeneration: Int = 0
+
+    /// Series 在任何网络请求前先取得唯一播放权，阻止旧 For You 媒体继续播放。
+    func beginSeries(dramaID: String) {
+        invalidateCurrentClaim()
+        owner = .series(dramaID: dramaID)
+        engine.deactivate()
+    }
+
+    /// 只有 For You 仍持有播放权时，页面生命周期才允许暂停或恢复。
+    func pauseForYou() {
+        guard owner == .forYou else { return }
+        engine.pause(reason: .system)
+    }
+
+    func resumeForYou() {
+        guard owner == .forYou else { return }
+        engine.playFromSystemResume()
+    }
+
     /// For You 声明播放权 — 同 item 不重建
     func claimForYou(items: [PlayerMediaItem], index: Int) {
         let targetID = items[safe: index]?.id ?? ""
         if owner == .forYou, engine.currentItem?.id == targetID {
-            engine.play()
-            return
+            engine.play(); return
         }
+        invalidateCurrentClaim()
         owner = .forYou
         engine.prepare(items: items, index: index)
         engine.play()
@@ -33,56 +54,78 @@ final class PlayerCoordinator: ObservableObject {
         startIndex: Int,
         handoff: PlayerHandoffContext?
     ) {
-        owner = .series(dramaID: drama.id)
+        let seriesOwner = Owner.series(dramaID: drama.id)
+        if owner == seriesOwner {
+            invalidateCurrentClaim()
+        } else {
+            beginSeries(dramaID: drama.id)
+        }
         let targetItemID = items[safe: startIndex]?.id ?? ""
-        let currentMatches = engine.currentItem?.id == targetItemID
+        let targetItem = items[safe: startIndex]
+        let currentMatches = engine.currentItem == targetItem
+        let token = claimGeneration
 
-        if currentMatches {
-            print("[PlayerKit] handoff reuse current player id=\(targetItemID)")
-            engine.play()
-            return
+        if currentMatches, engine.currentPlayer != nil, engine.state != .preparing {
+            Logger.player.debug("Series reuses current media item")
+            engine.play(); return
         }
 
-        print("[PlayerKit] handoff fallback prepare id=\(targetItemID)")
+        Logger.player.debug("Series prepares a new media item")
+        engine.deactivate()
         engine.prepare(items: items, index: startIndex)
 
-        if let handoff, handoff.resumeTime > 0 {
-            let resumeTime = handoff.resumeTime
-            let eng = engine
-            Task { @MainActor in
-                var didStart = false
-                var obs: NSKeyValueObservation?
-                obs = eng.currentPlayer?.currentItem?.observe(\.status, options: [.new]) { item, _ in
-                    guard item.status == .readyToPlay else { return }
-                    obs?.invalidate()
-                    Task { @MainActor in
-                        guard !didStart else { return }; didStart = true
-                        eng.seekTime(resumeTime) { _ in eng.play() }
-                    }
-                }
-                // 如果已经 ready
-                if !didStart, eng.currentPlayer?.currentItem?.status == .readyToPlay {
-                    didStart = true
-                    eng.seekTime(resumeTime) { _ in eng.play() }
-                }
-                // 超时兜底
-                try? await Task.sleep(nanoseconds: 3_000_000_000)
-                if !didStart {
-                    didStart = true
-                    eng.seekTime(resumeTime) { _ in eng.play() }
-                }
+        guard let handoff, handoff.resumeTime > 0 else {
+            engine.play(); return
+        }
+
+        let resumeTime = handoff.resumeTime
+        let targetID = targetItemID
+        let eng = engine
+
+        seriesResumeTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let deadline = Date().addingTimeInterval(3)
+            while (eng.state == .preparing ||
+                   eng.currentPlayer?.currentItem?.status != .readyToPlay),
+                  Date() < deadline {
+                do { try await Task.sleep(nanoseconds: 100_000_000) }
+                catch { return }
+                guard !Task.isCancelled,
+                      self.isCurrentSeriesClaim(owner: seriesOwner, token: token),
+                      eng.currentItem?.id == targetID else { return }
             }
-        } else {
-            engine.play()
+            guard self.isCurrentSeriesClaim(owner: seriesOwner, token: token),
+                  eng.currentItem?.id == targetID,
+                  eng.state != .preparing,
+                  eng.currentPlayer?.currentItem?.status == .readyToPlay else { return }
+
+            eng.seekTime(resumeTime) { [weak self, weak eng] _ in
+                guard let self, let eng,
+                      self.isCurrentSeriesClaim(owner: seriesOwner, token: token),
+                      eng.currentItem?.id == targetID,
+                      eng.state != .preparing else { return }
+                eng.play()
+            }
         }
     }
 
-    /// 释放播放权。
-    /// 当前 owner 退出时必须暂停共享 engine，避免全屏播放器 dismiss 后继续漏音。
+    /// 释放播放权：撤销播放意图并取消所有异步 handoff
     func release(_ owner: Owner) {
         guard self.owner == owner else { return }
-        engine.pause(reason: .system)
+        invalidateCurrentClaim()
+        engine.deactivate()
         self.owner = nil
+        Logger.player.debug("Player ownership released")
+    }
+
+    private func invalidateCurrentClaim() {
+        seriesResumeTask?.cancel()
+        seriesResumeTask = nil
+        claimGeneration &+= 1
+    }
+
+    private func isCurrentSeriesClaim(owner: Owner, token: Int) -> Bool {
+        self.owner == owner && claimGeneration == token
     }
 }
 

@@ -10,10 +10,14 @@ struct SearchView: View {
 
     init(
         searchRepository: SearchRepositoryProtocol = MockSearchRepository(),
-        discoveryRepository: HomeRepositoryProtocol = MockHomeRepository()
+        discoveryRepository: HomeRepositoryProtocol = MockHomeRepository(),
+        analytics: (any DiscoveryAnalyticsTracking)? = nil
     ) {
         _viewModel = StateObject(
-            wrappedValue: SearchViewModel(repository: searchRepository)
+            wrappedValue: SearchViewModel(
+                repository: searchRepository,
+                analytics: analytics ?? NoopDiscoveryAnalyticsTracker()
+            )
         )
         _defaultViewModel = StateObject(
             wrappedValue: SearchDefaultViewModel(
@@ -36,9 +40,8 @@ struct SearchView: View {
         .background(DT.Color.bgPrimary.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
         .onChange(of: playerDrama) { _, drama in
-            guard let drama else {
-                return
-            }
+            guard let drama else { return }
+            viewModel.trackResultClick(dramaID: drama.id)
             openPlayer(drama)
             playerDrama = nil
         }
@@ -190,7 +193,8 @@ struct SearchView: View {
     private func openPlayer(_ drama: DramaItem) {
         appStore.navigationTarget = SeriesPlayerNav(
             drama: drama,
-            startEpisode: max(1, drama.currentEpisode)
+            startEpisode: max(1, drama.currentEpisode),
+            sourceScene: "search"
         )
     }
 }

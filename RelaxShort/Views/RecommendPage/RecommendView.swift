@@ -44,7 +44,9 @@ struct RecommendView: View {
     // MARK: - 路由遮挡状态
 
     private var routeBlocksPlayback: Bool {
-        appStore.isShowingSearch || appStore.isShowingMembership
+        appStore.isShowingSearch
+            || appStore.isShowingMembership
+            || appStore.navigationTarget != nil
     }
 
     private var isPlaybackVisible: Bool {
@@ -73,9 +75,9 @@ struct RecommendView: View {
             .onChange(of: isPlaybackVisible) { _, vis in
                 if vis {
                     initializePlaybackIfNeeded()
-                    session.engine.playFromSystemResume()
+                    session.resumePlayback()
                 } else {
-                    session.engine.pause(reason: .system)
+                    session.pausePlayback()
                 }
             }
             .onChange(of: viewModel.dramas.count) { _, count in
@@ -141,7 +143,8 @@ struct RecommendView: View {
                             appStore.navigationTarget = SeriesPlayerNav(
                                 drama: drama,
                                 startEpisode: max(1, drama.currentEpisode),
-                                handoff: handoff
+                                handoff: handoff,
+                                sourceScene: "for_you"
                             )
                         }
                     )
@@ -266,7 +269,8 @@ struct RecommendView: View {
                         appStore.navigationTarget = SeriesPlayerNav(
                             drama: drama,
                             startEpisode: max(1, drama.currentEpisode),
-                            handoff: handoff
+                            handoff: handoff,
+                            sourceScene: "for_you"
                         )
                     } label: {
                         Text("Watch Full Series")
@@ -643,19 +647,19 @@ private struct TabLifecycleModifier: ViewModifier {
                     if !session.hasInitializedPool, !viewModel.dramas.isEmpty {
                         session.initializePool(dramas: viewModel.dramas)
                     } else {
-                        session.engine.playFromSystemResume()
+                        session.resumePlayback()
                     }
                 } else {
-                    session.engine.pause(reason: .system)
+                    session.pausePlayback()
                 }
             }
             .onChange(of: appStore.isShowingSearch) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
+                if isShowing { session.pausePlayback() } else { session.resumePlayback() }
             }
             .onChange(of: appStore.isShowingMembership) { _, isShowing in
                 guard appStore.selectedTab == .forYou else { return }
-                if isShowing { session.engine.pause(reason: .system) } else { session.engine.playFromSystemResume() }
+                if isShowing { session.pausePlayback() } else { session.resumePlayback() }
             }
     }
 }

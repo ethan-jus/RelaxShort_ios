@@ -16,7 +16,19 @@ struct RankDrama: Identifiable {
     /// 原始 DramaItem，用于导航到播放页
     let drama: DramaItem
 
-    /// 从 `DramaItem` 创建排行榜条目
+    /// 从 RankingEntry 创建排行榜条目
+    init(entry: RankingEntry) {
+        self.id = entry.drama.id
+        self.rank = entry.rankPosition
+        self.title = entry.drama.title
+        self.coverURL = entry.drama.coverURL
+        self.category = entry.drama.category
+        self.tags = entry.drama.tags
+        self.hot = RankingMetricFormatter.string(from: entry.metricValue)
+        self.drama = entry.drama
+    }
+
+    /// 从 `DramaItem` 创建排行榜条目（Mock 降级）
     init(from drama: DramaItem, rank: Int) {
         self.id = drama.id
         self.rank = rank
@@ -24,7 +36,7 @@ struct RankDrama: Identifiable {
         self.coverURL = drama.coverURL
         self.category = drama.category
         self.tags = drama.tags
-        self.hot = drama.formattedViewCount
+        self.hot = RankingMetricFormatter.string(from: Int64(drama.viewCount))
         self.drama = drama
     }
 }
@@ -37,7 +49,7 @@ enum RankCategory: CaseIterable, Identifiable {
     var id: String { apiType }
     var apiType: String {
         switch self {
-        case .hot: "popular"; case .trending: "trending"; case .new: "new"
+        case .hot: "trending"; case .trending: "top_searched"; case .new: "new_releases"
         }
     }
     var title: String {

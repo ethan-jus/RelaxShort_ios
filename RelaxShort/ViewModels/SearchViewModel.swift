@@ -5,6 +5,7 @@ import SwiftUI
 @MainActor
 final class SearchViewModel: ObservableObject {
     private let repository: SearchRepositoryProtocol
+    private let analytics: any DiscoveryAnalyticsTracking
     private let historyKey = "com.relaxshort.searchHistory"
 
     @Published var searchText = ""
@@ -20,8 +21,12 @@ final class SearchViewModel: ObservableObject {
     private var searchGeneration = 0
     private var cancellables = Set<AnyCancellable>()
 
-    init(repository: SearchRepositoryProtocol) {
+    init(
+        repository: SearchRepositoryProtocol,
+        analytics: (any DiscoveryAnalyticsTracking)? = nil
+    ) {
         self.repository = repository
+        self.analytics = analytics ?? NoopDiscoveryAnalyticsTracker()
         loadHistory()
 
         $searchText
@@ -82,16 +87,22 @@ final class SearchViewModel: ObservableObject {
 
     func submitSearch() {
         let query = normalize(searchText)
-        guard !query.isEmpty else {
-            return
-        }
+        guard !query.isEmpty else { return }
         addToHistory(query)
+        analytics.trackSearchSubmit(query: query)
     }
 
     func searchFromHistory(_ query: String) {
         searchText = query
         submitSearch()
     }
+
+    func trackResultClick(dramaID: String) {
+        let query = normalize(searchText)
+        guard !query.isEmpty else { return }
+        analytics.trackSearchResultClick(query: query, seriesID: dramaID)
+    }
+
 
     func removeHistoryItem(_ item: String) {
         searchHistory.removeAll { $0 == item }
@@ -167,7 +178,10 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func normalize(_ query: String) -> String {
-        query.trimmingCharacters(in: .whitespacesAndNewlines)
+        query
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
     }
 
     private func isCurrent(query: String, generation: Int) -> Bool {

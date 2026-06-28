@@ -12,8 +12,8 @@ protocol HomeRepositoryProtocol {
     func fetchDramas(category: DramaCategory) async throws -> [DramaItem]
     /// 获取 Banner 轮播数据
     func fetchBanners() async throws -> [BannerItem]
-    /// 按榜单类型获取排行（Task16：RankViewModel 通过协议调用后端 rankings）
-    func fetchRankings(type: String) async throws -> [DramaItem]
+    /// 按榜单类型获取排行（Task30 R4B-1：返回 RankingEntry 领域模型）
+    func fetchRankingEntries(type: String) async throws -> [RankingEntry]
     /// 获取 Home Categories tab 的分类列表。
     func fetchHomeCategories() async throws -> [HomeCategory]
     /// 获取首页 tab/section 运营配置内容
@@ -35,14 +35,16 @@ extension HomeRepositoryProtocol {
     func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent] {
         return []
     }
-    /// 默认实现：本地排序降级（Mock 模式）
-    func fetchRankings(type: String) async throws -> [DramaItem] {
+    /// 默认实现：Mock 模式用 viewCount 生成测试指标
+    func fetchRankingEntries(type: String) async throws -> [RankingEntry] {
         let dramas = try await fetchDramas(category: .all)
-        switch type {
-        case "popular", "hot": return dramas.sorted { $0.viewCount > $1.viewCount }
-        case "trending":       return dramas.filter { $0.isTrending }.sorted { $0.viewCount > $1.viewCount }
-        case "new":            return dramas.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
-        default:        return Array(dramas.prefix(20))
+        return dramas.prefix(20).enumerated().map { index, drama in
+            RankingEntry(
+                rankPosition: index + 1,
+                metricType: "mock_view_count",
+                metricValue: Int64(drama.viewCount),
+                drama: drama
+            )
         }
     }
 }

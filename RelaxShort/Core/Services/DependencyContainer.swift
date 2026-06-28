@@ -23,6 +23,7 @@ final class DependencyContainer: ObservableObject {
     let authRepository: AuthRepositoryProtocol
     let vipRepository: VIPRepositoryProtocol
     let coinRewardRepository: CoinRewardRepositoryProtocol
+    let discoveryAnalytics: any DiscoveryAnalyticsTracking
 
     // MARK: - Toggle
 
@@ -41,7 +42,8 @@ final class DependencyContainer: ObservableObject {
         profileRepository: ProfileRepositoryProtocol? = nil,
         authRepository: AuthRepositoryProtocol = MockAuthRepository(),
         vipRepository: VIPRepositoryProtocol = MockVIPRepository(),
-        coinRewardRepository: CoinRewardRepositoryProtocol = MockCoinRewardRepository()
+        coinRewardRepository: CoinRewardRepositoryProtocol = MockCoinRewardRepository(),
+        discoveryAnalytics: (any DiscoveryAnalyticsTracking)? = nil
     ) {
         // Home：根据开关选择 Real 或 Mock
         if let hr = homeRepository {
@@ -71,5 +73,13 @@ final class DependencyContainer: ObservableObject {
         self.authRepository = authRepository
         self.vipRepository = vipRepository
         self.coinRewardRepository = coinRewardRepository
+        // Analytics: 真实 API 模式使用真实 Client，否则 Noop
+        if let da = discoveryAnalytics {
+            self.discoveryAnalytics = da
+        } else {
+            self.discoveryAnalytics = Self.useRealAPI
+                ? DiscoveryAnalyticsClient()
+                : NoopDiscoveryAnalyticsTracker()
+        }
     }
 }

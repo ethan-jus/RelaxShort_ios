@@ -33,10 +33,8 @@ final class RankViewModel: ObservableObject {
 
         do {
             let type = mapToRankingType(selectedCategory)
-            let items = try await repository.fetchRankings(type: type)
-            self.dramas = items.enumerated().map { index, drama in
-                RankDrama(from: drama, rank: index + 1)
-            }
+            let entries = try await repository.fetchRankingEntries(type: type)
+            self.dramas = entries.map(RankDrama.init(entry:))
         } catch {
             errorMessage = "排行榜数据加载失败"
             logError("RankViewModel.loadData failed: \(error)")
