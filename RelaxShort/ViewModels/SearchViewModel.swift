@@ -6,6 +6,7 @@ import SwiftUI
 final class SearchViewModel: ObservableObject {
     private let repository: SearchRepositoryProtocol
     private let analytics: any DiscoveryAnalyticsTracking
+    private let historyStore: UserDefaults
     private let historyKey = "com.relaxshort.searchHistory"
 
     @Published var searchText = ""
@@ -23,10 +24,12 @@ final class SearchViewModel: ObservableObject {
 
     init(
         repository: SearchRepositoryProtocol,
-        analytics: (any DiscoveryAnalyticsTracking)? = nil
+        analytics: (any DiscoveryAnalyticsTracking)? = nil,
+        historyStore: UserDefaults = .standard
     ) {
         self.repository = repository
         self.analytics = analytics ?? NoopDiscoveryAnalyticsTracker()
+        self.historyStore = historyStore
         loadHistory()
 
         $searchText
@@ -100,6 +103,7 @@ final class SearchViewModel: ObservableObject {
     func trackResultClick(dramaID: String) {
         let query = normalize(searchText)
         guard !query.isEmpty else { return }
+        addToHistory(query)
         analytics.trackSearchResultClick(query: query, seriesID: dramaID)
     }
 
@@ -189,7 +193,7 @@ final class SearchViewModel: ObservableObject {
     }
 
     private func loadHistory() {
-        guard let data = UserDefaults.standard.data(forKey: historyKey),
+        guard let data = historyStore.data(forKey: historyKey),
               let history = try? JSONDecoder().decode([String].self, from: data) else {
             return
         }
@@ -207,7 +211,7 @@ final class SearchViewModel: ObservableObject {
         guard let data = try? JSONEncoder().encode(searchHistory) else {
             return
         }
-        UserDefaults.standard.set(data, forKey: historyKey)
+        historyStore.set(data, forKey: historyKey)
     }
 
     private func logError(_ message: String) {

@@ -406,6 +406,21 @@ struct RecommendView: View {
 
     private func setupAutoPlay() {
         session.bind(to: playerCoordinator)
+        playerCoordinator.setForYouPlaybackFinishedHandler {
+            guard viewModel.dramas.indices.contains(session.currentIndex) else { return }
+            let drama = viewModel.dramas[session.currentIndex]
+            let episodeNumber = max(1, drama.currentEpisode)
+            let handoff = session.engine.makeHandoffContext(
+                dramaID: drama.id,
+                episodeNumber: episodeNumber
+            )
+            appStore.navigationTarget = SeriesPlayerNav(
+                drama: drama,
+                startEpisode: episodeNumber,
+                handoff: handoff,
+                sourceScene: "for_you"
+            )
+        }
     }
 
     // MARK: - 搜索按钮

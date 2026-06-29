@@ -15,6 +15,7 @@ final class PlayerCoordinator: ObservableObject {
     @Published private(set) var engine: ShortVideoPlayerEngine
 
     private var seriesResumeTask: Task<Void, Never>?
+    private var forYouPlaybackFinishedHandler: (@MainActor () -> Void)?
     private var seriesPlaybackFinishedHandler: (dramaID: String, action: @MainActor () -> Void)?
     private var claimGeneration: Int = 0
 
@@ -49,6 +50,13 @@ final class PlayerCoordinator: ObservableObject {
     ) {
         guard owner == .series(dramaID: dramaID) else { return }
         seriesPlaybackFinishedHandler = (dramaID, action)
+    }
+
+    /// For You 页面常驻期间注册结束动作，Coordinator 仅在 For You 持有播放权时派发。
+    func setForYouPlaybackFinishedHandler(
+        action: @escaping @MainActor () -> Void
+    ) {
+        forYouPlaybackFinishedHandler = action
     }
 
     /// 只有 For You 仍持有播放权时，页面生命周期才允许暂停或恢复。
@@ -162,8 +170,12 @@ final class PlayerCoordinator: ObservableObject {
     private func handlePlaybackFinished() {
         switch owner {
         case .forYou:
-            engine.pause(reason: .system)
-            engine.seek(to: 0)
+            if let forYouPlaybackFinishedHandler {
+                forYouPlaybackFinishedHandler()
+            } else {
+                engine.pause(reason: .system)
+                engine.seek(to: 0)
+            }
         case .series(let dramaID):
             guard let handler = seriesPlaybackFinishedHandler,
                   handler.dramaID == dramaID else {

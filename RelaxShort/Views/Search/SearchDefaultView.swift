@@ -88,7 +88,7 @@ struct SearchDefaultView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .padding(.bottom, 20)
+        .padding(.bottom, 8)
     }
 
     private var rankTabs: some View {

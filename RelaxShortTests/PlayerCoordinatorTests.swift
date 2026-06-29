@@ -39,6 +39,20 @@ struct PlayerCoordinatorTests {
     }
 
     @Test
+    func playbackCompletionRoutesToForYouOwner() {
+        let coordinator = PlayerCoordinator()
+        var completionCount = 0
+        coordinator.setForYouPlaybackFinishedHandler {
+            completionCount += 1
+        }
+        coordinator.claimForYou(items: [mediaItem(id: "series-1-1")], index: 0)
+
+        coordinator.engine.onPlaybackFinished?()
+
+        #expect(completionCount == 1)
+    }
+
+    @Test
     func playbackCompletionRoutesToCurrentSeriesOwner() {
         let coordinator = PlayerCoordinator()
         var completionCount = 0
@@ -97,5 +111,16 @@ struct PlayerCoordinatorTests {
         #expect(coordinator.owner == .forYou)
         #expect(coordinator.engine.currentItem?.id == "series-1-1")
         #expect(coordinator.engine.wantsPlayback == true)
+    }
+
+    private func mediaItem(id: String) -> PlayerMediaItem {
+        PlayerMediaItem(
+            id: id,
+            title: "Series",
+            episodeNumber: 1,
+            coverURL: "",
+            source: .mp4(URL(string: "https://example.com/video.mp4")!),
+            resumeTime: nil
+        )
     }
 }

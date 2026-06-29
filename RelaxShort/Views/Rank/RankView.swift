@@ -35,7 +35,7 @@ struct RankView: View {
     // MARK: - Category Tabs
 
     private var categoryTabs: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 8) {
             ForEach(RankCategory.allCases) { category in
                 rankCategoryPill(category)
                     .frame(maxWidth: .infinity)
@@ -43,7 +43,7 @@ struct RankView: View {
         }
         .padding(.horizontal, DT.Space.pageH)
         .padding(.top, DT.Space.sm)
-        .padding(.bottom, DT.Space.md)
+        .padding(.bottom, 10)
     }
 
     private func rankCategoryPill(_ category: RankCategory) -> some View {
@@ -59,8 +59,8 @@ struct RankView: View {
                 .lineLimit(1)
                 .foregroundColor(isSelected ? .white : DB.mutedText)
                 .minimumScaleFactor(0.86)
-                .padding(.horizontal, 8)
-                .frame(height: 40)
+                .padding(.horizontal, 6)
+                .frame(height: 34)
                 .frame(maxWidth: .infinity)
                 .background(Capsule().fill(isSelected ? category.pillColor : Color.clear))
                 .overlay(Capsule().stroke(isSelected ? Color.clear : Color.white.opacity(0.18), lineWidth: 1))
