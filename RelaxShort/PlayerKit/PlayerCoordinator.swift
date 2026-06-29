@@ -12,16 +12,43 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     @Published private(set) var owner: Owner?
-    @Published private(set) var engine = ShortVideoPlayerEngine()
+    @Published private(set) var engine: ShortVideoPlayerEngine
 
     private var seriesResumeTask: Task<Void, Never>?
+    private var seriesPlaybackFinishedHandler: (dramaID: String, action: @MainActor () -> Void)?
     private var claimGeneration: Int = 0
+
+    init() {
+        self.engine = ShortVideoPlayerEngine()
+        configurePlaybackFinishedRouting()
+    }
+
+    init(engine: ShortVideoPlayerEngine) {
+        self.engine = engine
+        configurePlaybackFinishedRouting()
+    }
+
+    private func configurePlaybackFinishedRouting() {
+        engine.onPlaybackFinished = { [weak self] in
+            self?.handlePlaybackFinished()
+        }
+    }
 
     /// Series 在任何网络请求前先取得唯一播放权，阻止旧 For You 媒体继续播放。
     func beginSeries(dramaID: String) {
         invalidateCurrentClaim()
+        seriesPlaybackFinishedHandler = nil
         owner = .series(dramaID: dramaID)
         engine.deactivate()
+    }
+
+    /// Series 的结束动作只绑定当前剧，页面释放或 owner 切换后不会收到迟到回调。
+    func setSeriesPlaybackFinishedHandler(
+        dramaID: String,
+        action: @escaping @MainActor () -> Void
+    ) {
+        guard owner == .series(dramaID: dramaID) else { return }
+        seriesPlaybackFinishedHandler = (dramaID, action)
     }
 
     /// 只有 For You 仍持有播放权时，页面生命周期才允许暂停或恢复。
@@ -42,6 +69,7 @@ final class PlayerCoordinator: ObservableObject {
             engine.play(); return
         }
         invalidateCurrentClaim()
+        seriesPlaybackFinishedHandler = nil
         owner = .forYou
         engine.prepare(items: items, index: index)
         engine.play()
@@ -113,6 +141,9 @@ final class PlayerCoordinator: ObservableObject {
     func release(_ owner: Owner) {
         guard self.owner == owner else { return }
         invalidateCurrentClaim()
+        if case .series = owner {
+            seriesPlaybackFinishedHandler = nil
+        }
         engine.deactivate()
         self.owner = nil
         Logger.player.debug("Player ownership released")
@@ -126,6 +157,23 @@ final class PlayerCoordinator: ObservableObject {
 
     private func isCurrentSeriesClaim(owner: Owner, token: Int) -> Bool {
         self.owner == owner && claimGeneration == token
+    }
+
+    private func handlePlaybackFinished() {
+        switch owner {
+        case .forYou:
+            engine.pause(reason: .system)
+            engine.seek(to: 0)
+        case .series(let dramaID):
+            guard let handler = seriesPlaybackFinishedHandler,
+                  handler.dramaID == dramaID else {
+                engine.pause(reason: .system)
+                return
+            }
+            handler.action()
+        case nil:
+            engine.deactivate()
+        }
     }
 }
 

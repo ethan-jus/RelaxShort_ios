@@ -39,6 +39,36 @@ struct PlayerCoordinatorTests {
     }
 
     @Test
+    func playbackCompletionRoutesToCurrentSeriesOwner() {
+        let coordinator = PlayerCoordinator()
+        var completionCount = 0
+        coordinator.beginSeries(dramaID: "series-2")
+        coordinator.setSeriesPlaybackFinishedHandler(dramaID: "series-2") {
+            completionCount += 1
+        }
+
+        coordinator.engine.onPlaybackFinished?()
+
+        #expect(completionCount == 1)
+    }
+
+    @Test
+    func releasedSeriesCannotReceiveLatePlaybackCompletion() {
+        let coordinator = PlayerCoordinator()
+        var completionCount = 0
+        coordinator.beginSeries(dramaID: "series-2")
+        coordinator.setSeriesPlaybackFinishedHandler(dramaID: "series-2") {
+            completionCount += 1
+        }
+        coordinator.release(.series(dramaID: "series-2"))
+
+        coordinator.engine.onPlaybackFinished?()
+
+        #expect(completionCount == 0)
+        #expect(coordinator.owner == nil)
+    }
+
+    @Test
     func returningToForYouReclaimsItsPlaylistAfterSeriesRelease() {
         let coordinator = PlayerCoordinator()
         let session = RecommendSession(engine: coordinator.engine)

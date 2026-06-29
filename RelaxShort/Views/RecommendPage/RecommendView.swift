@@ -406,11 +406,6 @@ struct RecommendView: View {
 
     private func setupAutoPlay() {
         session.bind(to: playerCoordinator)
-        session.engine.onPlaybackFinished = { [weak engine = session.engine] in
-            engine?.pause(reason: .system)
-            engine?.seek(to: 0)
-            // 推荐页第一版：播放结束不自动跳转到全屏
-        }
     }
 
     // MARK: - 搜索按钮

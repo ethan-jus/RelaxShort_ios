@@ -241,6 +241,9 @@ struct SeriesPlayerView: View {
 
     private func startPlaybackSession() async {
         playerCoordinator.beginSeries(dramaID: drama.id)
+        playerCoordinator.setSeriesPlaybackFinishedHandler(dramaID: drama.id) {
+            handlePlaybackFinished()
+        }
         if !hasTrackedImpression {
             hasTrackedImpression = true
             dependencies.discoveryAnalytics.trackContentImpression(
@@ -260,6 +263,21 @@ struct SeriesPlayerView: View {
         }
 
         await loadEpisodes()
+    }
+
+    /// Series 播放完成后优先切换下一集；最后一集回到首帧并等待用户重播。
+    private func handlePlaybackFinished() {
+        autoHideTask?.cancel()
+        if currentEpisode < totalEpisodes {
+            switchToEpisode(currentEpisode + 1)
+            return
+        }
+
+        playerCoordinator.engine.pause(reason: .user)
+        playerCoordinator.engine.seek(to: 0)
+        withAnimation(.easeOut(duration: 0.2)) {
+            isUIVisible = true
+        }
     }
 
     private func loadEpisodes() async {
