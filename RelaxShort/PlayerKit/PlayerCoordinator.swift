@@ -83,12 +83,41 @@ final class PlayerCoordinator: ObservableObject {
         engine.play()
     }
 
-    /// Series 声明播放权 — 同 item 接管，不同 item fallback
+    /// 纯函数：解析续播时间。
+    /// - handoff > 0 优先。
+    /// - 无 handoff 使用 backend。
+    /// - ≤0 返回 nil（不 seek）。
+    /// - duration - resume ≤ 3 返回 0（从头播放，避免尾帧）。
+    static func resolveResumeTime(
+        handoff: TimeInterval?,
+        backend: TimeInterval?,
+        duration: TimeInterval
+    ) -> TimeInterval? {
+        let raw: TimeInterval?
+        if let h = handoff, h > 0 {
+            raw = h
+        } else if let b = backend, b > 0 {
+            raw = b
+        } else {
+            return nil
+        }
+
+        guard let resume = raw, resume > 0 else { return nil }
+
+        if duration > 0, duration - resume <= 3 {
+            return 0
+        }
+        return resume
+    }
+
+    /// Series 声明播放权 — 同 item 接管，不同 item fallback。
+    /// resume 优先级：显式 handoff > 当前 episode play asset 的 backendResumeTime。
     func claimSeries(
         drama: DramaItem,
         items: [PlayerMediaItem],
         startIndex: Int,
-        handoff: PlayerHandoffContext?
+        handoff: PlayerHandoffContext?,
+        backendResumeTime: TimeInterval? = nil
     ) {
         let seriesOwner = Owner.series(dramaID: drama.id)
         if owner == seriesOwner {
@@ -110,11 +139,20 @@ final class PlayerCoordinator: ObservableObject {
         engine.deactivate()
         engine.prepare(items: items, index: startIndex)
 
-        guard let handoff, handoff.resumeTime > 0 else {
+        // 确定 resume time：handoff 优先，否则使用后端 resumeTime
+        let resolvedResume: TimeInterval?
+        if let handoff, handoff.resumeTime > 0 {
+            resolvedResume = handoff.resumeTime
+        } else if let backend = backendResumeTime, backend > 0 {
+            resolvedResume = backend
+        } else {
+            resolvedResume = nil
+        }
+
+        guard let resumeTime = resolvedResume, resumeTime > 0 else {
             engine.play(); return
         }
 
-        let resumeTime = handoff.resumeTime
         let targetID = targetItemID
         let eng = engine
 
@@ -135,12 +173,24 @@ final class PlayerCoordinator: ObservableObject {
                   eng.state != .preparing,
                   eng.currentPlayer?.currentItem?.status == .readyToPlay else { return }
 
-            eng.seekTime(resumeTime) { [weak self, weak eng] _ in
-                guard let self, let eng,
-                      self.isCurrentSeriesClaim(owner: seriesOwner, token: token),
-                      eng.currentItem?.id == targetID,
-                      eng.state != .preparing else { return }
+            // 接近结尾（≤3s）从 0 开始，避免重进只看到尾帧
+            let duration = eng.currentPlayer?.currentItem?.duration.seconds ?? 0
+            let effectiveResume = Self.resolveResumeTime(
+                handoff: handoff?.resumeTime,
+                backend: backendResumeTime,
+                duration: duration
+            )
+
+            if effectiveResume == nil || effectiveResume == 0 {
                 eng.play()
+            } else if let seekTo = effectiveResume {
+                eng.seekTime(seekTo) { [weak self, weak eng] _ in
+                    guard let self, let eng,
+                          self.isCurrentSeriesClaim(owner: seriesOwner, token: token),
+                          eng.currentItem?.id == targetID,
+                          eng.state != .preparing else { return }
+                    eng.play()
+                }
             }
         }
     }

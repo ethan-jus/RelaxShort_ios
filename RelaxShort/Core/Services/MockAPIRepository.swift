@@ -155,9 +155,9 @@ enum MockData {
         let m = Dictionary(uniqueKeysWithValues: dramas.map { ($0.id, $0) })
         let fallback = dramas[0]
         return [
-            WatchHistoryItem(id: "w_1", drama: m["1"] ?? fallback, currentEpisode: 18, watchedAt: Date(), progress: 0.34),
-            WatchHistoryItem(id: "w_2", drama: m["4"] ?? fallback, currentEpisode: 35, watchedAt: Date(), progress: 0.50),
-            WatchHistoryItem(id: "w_3", drama: m["6"] ?? fallback, currentEpisode: 8,  watchedAt: Date(), progress: 0.13),
+            WatchHistoryItem(id: "w_1", drama: m["1"] ?? fallback, episodeID: "ep_1_18", currentEpisode: 18, resumeTime: 34, watchedAt: Date(), progress: 0.34),
+            WatchHistoryItem(id: "w_2", drama: m["4"] ?? fallback, episodeID: "ep_4_35", currentEpisode: 35, resumeTime: 52, watchedAt: Date(), progress: 0.50),
+            WatchHistoryItem(id: "w_3", drama: m["6"] ?? fallback, episodeID: "ep_6_8", currentEpisode: 8,  resumeTime: 12, watchedAt: Date(), progress: 0.13),
         ]
     }()
 
@@ -268,12 +268,12 @@ enum MockData {
         let m = Dictionary(uniqueKeysWithValues: dramas.map { ($0.id, $0) })
         let fallback = dramas[0]
         return [
-            WatchHistoryItem(id: "w_1", drama: m["1"] ?? fallback, currentEpisode: 18, watchedAt: Date(), progress: 0.34),
-            WatchHistoryItem(id: "w_2", drama: m["4"] ?? fallback, currentEpisode: 35, watchedAt: Date(), progress: 0.50),
-            WatchHistoryItem(id: "w_3", drama: m["6"] ?? fallback, currentEpisode: 8,  watchedAt: Date(), progress: 0.13),
-            WatchHistoryItem(id: "w_4", drama: m["11"] ?? fallback, currentEpisode: 22, watchedAt: Date(), progress: 0.73),
-            WatchHistoryItem(id: "w_5", drama: m["8"] ?? fallback, currentEpisode: 12, watchedAt: Date(), progress: 0.21),
-            WatchHistoryItem(id: "w_6", drama: m["15"] ?? fallback, currentEpisode: 40, watchedAt: Date(), progress: 0.88),
+            WatchHistoryItem(id: "w_1", drama: m["1"] ?? fallback, episodeID: "ep_1_18", currentEpisode: 18, resumeTime: 34, watchedAt: Date(), progress: 0.34),
+            WatchHistoryItem(id: "w_2", drama: m["4"] ?? fallback, episodeID: "ep_4_35", currentEpisode: 35, resumeTime: 52, watchedAt: Date(), progress: 0.50),
+            WatchHistoryItem(id: "w_3", drama: m["6"] ?? fallback, episodeID: "ep_6_8", currentEpisode: 8, resumeTime: 12, watchedAt: Date(), progress: 0.13),
+            WatchHistoryItem(id: "w_4", drama: m["11"] ?? fallback, episodeID: "ep_11_22", currentEpisode: 22, resumeTime: 78, watchedAt: Date(), progress: 0.73),
+            WatchHistoryItem(id: "w_5", drama: m["8"] ?? fallback, episodeID: "ep_8_12", currentEpisode: 12, resumeTime: 22, watchedAt: Date(), progress: 0.21),
+            WatchHistoryItem(id: "w_6", drama: m["15"] ?? fallback, episodeID: "ep_15_40", currentEpisode: 40, resumeTime: 96, watchedAt: Date(), progress: 0.88),
         ]
     }()
 
@@ -338,11 +338,31 @@ struct MockDetailRepository: DetailRepositoryProtocol {
 }
 
 struct MockFavoritesRepository: FavoritesRepositoryProtocol {
-    func fetchWatchHistory(page: Int) async throws -> [WatchHistoryItem] {
-        try await Task.sleep(nanoseconds: MC.delay); return MockData.watchHistory
+    func fetchWatchHistory(cursor: String?, limit: Int) async throws
+        -> CursorPage<WatchHistoryItem> {
+        try await Task.sleep(nanoseconds: MC.delay)
+        // Mock: 返回全部历史，不真实分页
+        let history = MockData.watchHistory
+        return CursorPage(items: history, nextCursor: nil, hasMore: false)
     }
-    func fetchBookmarks(page: Int) async throws -> [DramaItem] {
-        try await Task.sleep(nanoseconds: MC.delay); return Array(MockData.dramas.shuffled().prefix(8))
+    func fetchBookmarks(cursor: String?, limit: Int) async throws
+        -> CursorPage<DramaItem> {
+        try await Task.sleep(nanoseconds: MC.delay)
+        let items = Array(MockData.dramas.shuffled().prefix(8))
+        return CursorPage(items: items, nextCursor: nil, hasMore: false)
+    }
+    func fetchBookmarkedSeriesIDs(_ seriesIDs: [String]) async throws -> Set<String> {
+        try await Task.sleep(nanoseconds: MC.delay)
+        // Mock: 随机返回约一半为已收藏
+        return Set(seriesIDs.filter { (Int($0) ?? 0) % 2 == 0 })
+    }
+    func setBookmarked(_ bookmarked: Bool, seriesID: String) async throws -> Bool {
+        try await Task.sleep(nanoseconds: MC.delay)
+        return bookmarked
+    }
+    func reportProgress(_ report: WatchProgressReport) async throws {
+        try await Task.sleep(nanoseconds: MC.delay)
+        // no-op in mock
     }
 }
 

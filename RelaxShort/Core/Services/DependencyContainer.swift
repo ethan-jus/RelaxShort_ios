@@ -25,6 +25,11 @@ final class DependencyContainer: ObservableObject {
     let coinRewardRepository: CoinRewardRepositoryProtocol
     let discoveryAnalytics: any DiscoveryAnalyticsTracking
 
+    // MARK: - Stores
+
+    let bookmarkStore: BookmarkStore
+    let watchProgressReporter: WatchProgressReporter
+
     // MARK: - Toggle
 
     /// 是否使用真实 API（UserDefaults 驱动，默认 false=Mock）
@@ -38,7 +43,7 @@ final class DependencyContainer: ObservableObject {
         homeRepository: HomeRepositoryProtocol? = nil,
         searchRepository: SearchRepositoryProtocol? = nil,
         detailRepository: DetailRepositoryProtocol? = nil,
-        favoritesRepository: FavoritesRepositoryProtocol = MockFavoritesRepository(),
+        favoritesRepository: FavoritesRepositoryProtocol? = nil,
         profileRepository: ProfileRepositoryProtocol? = nil,
         authRepository: AuthRepositoryProtocol = MockAuthRepository(),
         vipRepository: VIPRepositoryProtocol = MockVIPRepository(),
@@ -63,7 +68,12 @@ final class DependencyContainer: ObservableObject {
         } else {
             self.detailRepository = Self.useRealAPI ? RealDetailRepository() : MockDetailRepository()
         }
-        self.favoritesRepository = favoritesRepository
+        // Favorites：根据开关选择 Real 或 Mock（Task31）
+        if let fr = favoritesRepository {
+            self.favoritesRepository = fr
+        } else {
+            self.favoritesRepository = Self.useRealAPI ? RealFavoritesRepository() : MockFavoritesRepository()
+        }
         // Profile：根据开关选择 Real 或 Mock（Task23）
         if let pr = profileRepository {
             self.profileRepository = pr
@@ -81,5 +91,14 @@ final class DependencyContainer: ObservableObject {
                 ? DiscoveryAnalyticsClient()
                 : NoopDiscoveryAnalyticsTracker()
         }
+        // BookmarkStore: 使用选定的 favoritesRepository + analytics
+        self.bookmarkStore = BookmarkStore(
+            repository: self.favoritesRepository,
+            analytics: self.discoveryAnalytics
+        )
+        // WatchProgressReporter: 使用选定的 favoritesRepository
+        self.watchProgressReporter = WatchProgressReporter(
+            repository: self.favoritesRepository
+        )
     }
 }

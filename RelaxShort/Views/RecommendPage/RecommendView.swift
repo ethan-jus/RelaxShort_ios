@@ -17,6 +17,7 @@ struct RecommendView: View {
 
     @EnvironmentObject private var appStore: AppStore
     @EnvironmentObject var playerCoordinator: PlayerCoordinator
+    @EnvironmentObject var dependencies: DependencyContainer
     @ObservedObject private var viewModel: RecommendViewModel
     @ObservedObject private var session: RecommendSession
     let isVisible: Bool
@@ -26,7 +27,6 @@ struct RecommendView: View {
     @State private var showShare = false
     @State private var isSpeeding = false
     @State private var showSpeedHUD = false
-    @State private var isBookmarked = false
     @State private var showBookmarkToast = false
     @State private var isScrubbing = false
     @State private var scrubFraction: CGFloat = 0
@@ -85,6 +85,9 @@ struct RecommendView: View {
                 if isPlaybackVisible {
                     initializePlaybackIfNeeded()
                 }
+                // 批量查询当前页收藏状态
+                let ids = viewModel.dramas.map(\.id)
+                Task { await dependencies.bookmarkStore.loadStatus(seriesIDs: ids) }
             }
             .onChange(of: showAbout) { _, isShowing in
                 withAnimation(.easeOut(duration: 0.18)) {
@@ -122,10 +125,11 @@ struct RecommendView: View {
                         .transition(.opacity)
                 }
 
-                if showBookmarkToast {
+                if showBookmarkToast, let drama = currentDrama {
+                    let isBk = dependencies.bookmarkStore.isBookmarked(drama.id)
                     CollectToastView(
-                        message: isBookmarked ? "Added to 'My List'" : "Removed from 'My List'",
-                        systemImage: isBookmarked ? "bookmark.fill" : "bookmark.slash.fill"
+                        message: isBk ? "Added to 'My List'" : "Removed from 'My List'",
+                        systemImage: isBk ? "bookmark.fill" : "bookmark.slash.fill"
                     )
                     .position(x: geo.size.width / 2, y: geo.size.height * 0.65)
                     .zIndex(100)
@@ -248,11 +252,15 @@ struct RecommendView: View {
 
                         // 右侧操作栏
                         RightActionBar(
-                            isBookmarked: $isBookmarked,
+                            isBookmarked: .init(
+                                get: { dependencies.bookmarkStore.isBookmarked(drama.id) },
+                                set: { _ in }
+                            ),
                             viewCount: drama.formattedViewCount,
                             onBookmark: {
-                                withAnimation(.spring(response: 0.3)) {
-                                    isBookmarked.toggle(); showBookmarkToast = true
+                                showBookmarkToast = true
+                                Task {
+                                    await dependencies.bookmarkStore.toggle(seriesID: drama.id, sourceScene: "for_you")
                                 }
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
                                     withAnimation(.easeOut(duration: 0.3)) { showBookmarkToast = false }

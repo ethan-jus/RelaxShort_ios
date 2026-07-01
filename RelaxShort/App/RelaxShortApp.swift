@@ -92,6 +92,10 @@ struct RelaxShortApp: App {
                 }
                 if newPhase == .background {
                     dependencies.discoveryAnalytics.flushForBackground()
+                    // 短任务上报观看进度
+                    Task {
+                        await dependencies.watchProgressReporter.finalize(completed: false)
+                    }
                 }
             }
         }

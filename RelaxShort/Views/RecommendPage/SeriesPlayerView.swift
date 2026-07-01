@@ -17,8 +17,9 @@ struct SeriesPlayerView: View {
     @State private var showEpisodeList = false
     @State private var showUnlockSheet = false
     @State private var unlockTargetEpisode: Int = 0
-    @State private var isBookmarked = false
     @State private var episodes: [Episode] = []
+    /// 缓存每集的后端 resumeTime，切集时使用当前 episode 的值
+    @State private var episodeResumeTimes: [String: TimeInterval] = [:]
     @State private var unlockedEpisodes: Set<Int> = []
     @State private var pendingLockedEpisode: Int?
     @State private var isUIVisible = true
@@ -193,7 +194,10 @@ struct SeriesPlayerView: View {
                 .presentationDragIndicator(.hidden)
             }
         }
-        .task(id: drama.id) { await startPlaybackSession() }
+        .task(id: drama.id) {
+            await startPlaybackSession()
+            await dependencies.bookmarkStore.loadStatus(seriesIDs: [drama.id])
+        }
         .onChange(of: currentEpisode) { oldValue, newValue in
             guard oldValue != newValue else { return }
             requestEpisodeSwitch(newValue)
@@ -210,6 +214,15 @@ struct SeriesPlayerView: View {
         .onReceive(playerCoordinator.engine.$progress) { progress in
             playbackProgress = progress
             trackPlaybackMilestones(progress)
+            // 传递进度快照给 reporter（actor 内部节流）
+            if progress.duration > 0 {
+                Task {
+                    await dependencies.watchProgressReporter.observe(
+                        seconds: progress.currentTime,
+                        duration: progress.duration
+                    )
+                }
+            }
             if let preview = seriesSeekPreviewFraction, progress.duration > 0 {
                 let actual = CGFloat(progress.currentTime / progress.duration)
                 if abs(actual - preview) < 0.02 {
@@ -220,6 +233,7 @@ struct SeriesPlayerView: View {
         .onDisappear {
             autoHideTask?.cancel()
             episodePrefetchTask?.cancel()
+            Task { await dependencies.watchProgressReporter.finalize(completed: false) }
             playerCoordinator.release(.series(dramaID: drama.id))
         }
     }
@@ -268,6 +282,7 @@ struct SeriesPlayerView: View {
     /// Series 播放完成后优先切换下一集；最后一集回到首帧并等待用户重播。
     private func handlePlaybackFinished() {
         autoHideTask?.cancel()
+        Task { await dependencies.watchProgressReporter.finalize(completed: true) }
         if currentEpisode < totalEpisodes {
             switchToEpisode(currentEpisode + 1)
             return
@@ -325,16 +340,35 @@ struct SeriesPlayerView: View {
         }
         let startIndex = playable.firstIndex(where: { $0.episodeNumber == currentEpisode }) ?? 0
         let playerItems = playable.map(\.item)
+        let currentEpisodeID = episodeID(for: currentEpisode)
+        let backendResume = currentEpisodeID.flatMap { episodeResumeTimes[$0] }
+
         if playerCoordinator.engine.currentItem != playerItems[safe: startIndex] {
             playerCoordinator.claimSeries(
                 drama: drama,
                 items: playerItems,
                 startIndex: startIndex,
-                handoff: handoff
+                handoff: handoff,
+                backendResumeTime: backendResume
             )
         }
+
+        // 绑定 reporter session
+        if let epID = currentEpisodeID {
+            Task {
+                await dependencies.watchProgressReporter.begin(
+                    seriesID: drama.id,
+                    episodeID: epID
+                )
+            }
+        }
+
         prefetchNextEpisode(after: currentEpisode)
         resetAutoHide()
+    }
+
+    private func episodeID(for episodeNumber: Int) -> String? {
+        episodes.first(where: { $0.episodeNumber == episodeNumber })?.id
     }
 
     // MARK: - Bottom Chrome
@@ -356,15 +390,14 @@ struct SeriesPlayerView: View {
                     seriesInfoBlock(width: contentWidth)
 
                     RightActionBar(
-                        isBookmarked: $isBookmarked,
+                        isBookmarked: .init(
+                            get: { dependencies.bookmarkStore.isBookmarked(drama.id) },
+                            set: { _ in }
+                        ),
                         viewCount: drama.formattedViewCount,
                         onBookmark: {
-                            isBookmarked.toggle()
-                            if isBookmarked {
-                                dependencies.discoveryAnalytics.trackBookmark(
-                                    seriesID: drama.id,
-                                    sourceScene: sourceScene
-                                )
+                            Task {
+                                await dependencies.bookmarkStore.toggle(seriesID: drama.id, sourceScene: sourceScene)
                             }
                             resetAutoHide()
                         },
@@ -608,6 +641,8 @@ struct SeriesPlayerView: View {
         isSwitchingEpisode = true
         Task { @MainActor in
             defer { isSwitchingEpisode = false }
+            // 先 finalize 旧 session
+            await dependencies.watchProgressReporter.finalize(completed: false)
             guard await ensurePlayAsset(for: episodeNumber, presentUnlockOnDenied: true) else {
                 Logger.viewModel.warning("SeriesPlayerView: cannot switch EP\(episodeNumber), missing play asset")
                 return
@@ -678,6 +713,10 @@ struct SeriesPlayerView: View {
             }
             if let source = dto.toPlayerMediaSource() {
                 episodeMediaSources[episodeId] = source
+                // 缓存后端 resume time
+                if let resume = dto.resumeTime, resume > 0 {
+                    episodeResumeTimes[episodeId] = TimeInterval(resume)
+                }
                 // 播放接口成功代表后端已完成免费/VIP/金币权限判定。
                 unlockedEpisodes.insert(episodeNumber)
                 Logger.viewModel.info("SeriesPlayerView: fetched play asset EP\(episodeNumber) type=\(dto.sourceType)")
@@ -718,6 +757,7 @@ struct SeriesPlayerView: View {
             guard let source = sourceForEpisode(ep) else {
                 return nil
             }
+            let resume = episodeResumeTimes[ep.id]
             return EpisodePlayableItem(
                 id: ep.id,
                 episodeNumber: ep.episodeNumber,
@@ -727,7 +767,7 @@ struct SeriesPlayerView: View {
                     episodeNumber: ep.episodeNumber,
                     coverURL: drama.coverURL,
                     source: source,
-                    resumeTime: nil
+                    resumeTime: resume
                 )
             )
         }
@@ -843,7 +883,16 @@ struct SeriesPlayerView: View {
             if playbackState == .playing {
                 playerCoordinator.engine.pause(reason: .user)
                 autoHideTask?.cancel()
+                Task { await dependencies.watchProgressReporter.finalize(completed: false) }
             } else {
+                if let epID = currentBackendEpisodeID {
+                    Task {
+                        await dependencies.watchProgressReporter.begin(
+                            seriesID: drama.id,
+                            episodeID: epID
+                        )
+                    }
+                }
                 playerCoordinator.engine.play()
                 resetAutoHide()
             }

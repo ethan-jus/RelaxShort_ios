@@ -45,6 +45,14 @@ enum APIEndpoint {
     // Task30 R4B-1
     case discoveryEvents(DiscoveryEventBatchRequest)
 
+    // MARK: - Task31 收藏/观看进度 v2 端点
+
+    case watchHistoryV2(cursor: String?, limit: Int)
+    case watchProgress(WatchProgressReport)
+    case bookmarksV2(cursor: String?, limit: Int)
+    case bookmarkStatus(seriesIDs: [String])
+    case setBookmark(seriesID: String, bookmarked: Bool)
+
     // MARK: - 旧 mock 端点（保留兼容）
 
     case homeFeed(category: DramaCategory)
@@ -77,7 +85,8 @@ extension APIEndpoint {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences,
-             .discoveryEvents:
+             .discoveryEvents,
+             .watchHistoryV2, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -104,6 +113,12 @@ extension APIEndpoint {
         case .userWallet:                       return "/api/v2/users/me/wallet"
         case .updateUserPreferences:            return "/api/v2/users/me/preferences"
         case .discoveryEvents:                  return "/api/v2/events/discovery/batch"
+        // ── Task31 v2 ──
+        case .watchHistoryV2:                return "/api/v2/watch-history"
+        case .watchProgress:                 return "/api/v2/watch-progress"
+        case .bookmarksV2:                   return "/api/v2/users/me/bookmarks"
+        case .bookmarkStatus:                return "/api/v2/users/me/bookmark-status"
+        case .setBookmark(let seriesID, _):  return "/api/v2/series/\(seriesID)/bookmark"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -135,6 +150,9 @@ extension APIEndpoint {
              .userMe, .userWallet: return .get
         case .updateUserPreferences: return .patch
         case .discoveryEvents:     return .post
+        case .watchHistoryV2, .bookmarksV2, .bookmarkStatus: return .get
+        case .watchProgress: return .post
+        case .setBookmark(_, let bookmarked): return bookmarked ? .post : .delete
         case .homeFeed, .banners, .dramaDetail, .episodes,
              .watchHistory, .userProfile, .subscriptionStatus,
              .bookmarks, .coinTransactions, .search: return .get
@@ -150,7 +168,8 @@ extension APIEndpoint {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
-             .userMe, .userWallet, .updateUserPreferences, .discoveryEvents:
+             .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
+             .watchHistoryV2, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
         default: return false
         }
@@ -160,7 +179,8 @@ extension APIEndpoint {
     /// 模式在正式登录接入前使用固定开发用户。
     private var requiresUserIdHeader: Bool {
         switch self {
-        case .episodePlay, .userMe, .userWallet, .updateUserPreferences:
+        case .episodePlay, .userMe, .userWallet, .updateUserPreferences,
+             .watchHistoryV2, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
         default:
             return false
@@ -254,6 +274,10 @@ extension APIEndpoint {
             params = dict
         case .discoveryEvents(let request):
             return try? JSONEncoder.discoveryEncoder().encode(request)
+        case .watchProgress(let report):
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            return try? encoder.encode(report)
         default:
             params = [:]
         }
@@ -316,6 +340,19 @@ extension APIEndpoint {
             if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
             if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
             components?.queryItems = items
+        // ── Task31 v2 query params ──
+        case .watchHistoryV2(let cursor, let limit):
+            var items = [URLQueryItem(name: "limit", value: "\(limit)")]
+            if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
+            components?.queryItems = items
+        case .bookmarksV2(let cursor, let limit):
+            var items = [URLQueryItem(name: "limit", value: "\(limit)")]
+            if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
+            components?.queryItems = items
+        case .bookmarkStatus(let ids):
+            components?.queryItems = [URLQueryItem(name: "series_ids", value: ids.joined(separator: ","))]
+        case .watchProgress, .setBookmark:
+            break
         default:
             break
         }

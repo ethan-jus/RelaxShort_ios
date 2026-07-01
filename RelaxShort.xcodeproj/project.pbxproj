@@ -125,6 +125,11 @@
 		FB1270575E45544AA548243B /* RealSearchRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E07DF14795E56458A576B7D /* RealSearchRepository.swift */; };
 		FC841D8C8509F712A341D3E8 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A18DCB4AC5C2EA9ACBB0D8 /* ShareSheet.swift */; };
 		FD1C40888BB779A0CA0078DF /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7B5D6833951FB561F5C8BC0 /* FavoritesView.swift */; };
+		T31A00100000000000000001 /* WatchProgressReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00200000000000000002 /* WatchProgressReport.swift */; };
+		T31A00300000000000000003 /* FavoritesResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00400000000000000004 /* FavoritesResponseDTO.swift */; };
+		T31A00500000000000000005 /* RealFavoritesRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00600000000000000006 /* RealFavoritesRepository.swift */; };
+		T31A00700000000000000007 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00800000000000000008 /* BookmarkStore.swift */; };
+		T31A00900000000000000009 /* WatchProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A01000000000000000010 /* WatchProgressReporter.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -266,6 +271,11 @@
 		FC6168F0CDBC3B3FE810F657 /* SeriesPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeriesPlayerView.swift; sourceTree = "<group>"; };
 		FEFF42259D3447CB27B0DC6E /* DiscoveryAnalyticsClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DiscoveryAnalyticsClient.swift; path = RelaxShort/Core/Analytics/DiscoveryAnalyticsClient.swift; sourceTree = SOURCE_ROOT; };
 		FF389AD770099338D3F8AAF2 /* AdService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdService.swift; sourceTree = "<group>"; };
+		T31A00200000000000000002 /* WatchProgressReport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProgressReport.swift; sourceTree = "<group>"; };
+		T31A00400000000000000004 /* FavoritesResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FavoritesResponseDTO.swift; path = RelaxShort/Models/API/FavoritesResponseDTO.swift; sourceTree = SOURCE_ROOT; };
+		T31A00600000000000000006 /* RealFavoritesRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealFavoritesRepository.swift; sourceTree = "<group>"; };
+		T31A00800000000000000008 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
+		T31A01000000000000000010 /* WatchProgressReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProgressReporter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -315,6 +325,7 @@
 				5C29374A6E7484A2706B1824 /* Services */,
 				FBAECB0A12FDC819AA0DBF64 /* Stores */,
 				089B4B2CA7A67905359CAE33 /* Analytics */,
+				T31A01100000000000000011 /* Playback */,
 			);
 			path = Core;
 			sourceTree = "<group>";
@@ -450,6 +461,7 @@
 				065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */,
 				F1A23B000000000000000004 /* RealProfileRepository.swift */,
 				CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */,
+				T31A00600000000000000006 /* RealFavoritesRepository.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -484,6 +496,7 @@
 			isa = PBXGroup;
 			children = (
 				3ACE4BF9A6467F42C0968C1D /* RankingResponseDTO.swift */,
+				T31A00400000000000000004 /* FavoritesResponseDTO.swift */,
 			);
 			name = API;
 			sourceTree = "<group>";
@@ -609,6 +622,7 @@
 				0F9EDAF9DACFC07CD81B6706 /* AppStore.swift */,
 				A2A4E84BF38F1E7454707A70 /* AuthStore.swift */,
 				A2917162BA77C9AFCC147AD4 /* CoinStore.swift */,
+				T31A00800000000000000008 /* BookmarkStore.swift */,
 			);
 			path = Stores;
 			sourceTree = "<group>";
@@ -633,8 +647,17 @@
 				D6B6494EE4F755429B7FD0B2 /* HomeCategory.swift */,
 				73824753A11CF56629020B18 /* API */,
 				1C914768BFFF4524641958E9 /* RankingEntry.swift */,
+				T31A00200000000000000002 /* WatchProgressReport.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		T31A01100000000000000011 /* Playback */ = {
+			isa = PBXGroup;
+			children = (
+				T31A01000000000000000010 /* WatchProgressReporter.swift */,
+			);
+			path = Playback;
 			sourceTree = "<group>";
 		};
 		FDDD0125FCCEEBDBA339C1C0 /* MediaCache */ = {
@@ -833,6 +856,11 @@
 				E792C7488A231F2C32982561 /* RankViewModel.swift in Sources */,
 				515D6A18AF0E16B92039B736 /* RealAdService.swift in Sources */,
 				FB1270575E45544AA548243B /* RealSearchRepository.swift in Sources */,
+				T31A00100000000000000001 /* WatchProgressReport.swift in Sources */,
+				T31A00300000000000000003 /* FavoritesResponseDTO.swift in Sources */,
+				T31A00500000000000000005 /* RealFavoritesRepository.swift in Sources */,
+				T31A00700000000000000007 /* BookmarkStore.swift in Sources */,
+				T31A00900000000000000009 /* WatchProgressReporter.swift in Sources */,
 				E4C662B328DF8B393E7610D4 /* RecommendView.swift in Sources */,
 				6C6912FA41D55BA89E9652D3 /* RecommendViewModel.swift in Sources */,
 				63313C34915D61811BF274CD /* RelaxShortApp.swift in Sources */,

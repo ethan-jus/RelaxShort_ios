@@ -17,6 +17,7 @@ struct PlaybackMediaSourceDTO {
     let subtitleTracks: [SubtitleDTO]
     let defaultSubtitleLanguage: String?
     let thumbnailTrack: ThumbnailDTO?
+    let resumeTime: Int?
 
     init(
         sourceType: String,
@@ -25,7 +26,8 @@ struct PlaybackMediaSourceDTO {
         qualities: [QualityDTO] = [],
         subtitleTracks: [SubtitleDTO] = [],
         defaultSubtitleLanguage: String? = nil,
-        thumbnailTrack: ThumbnailDTO? = nil
+        thumbnailTrack: ThumbnailDTO? = nil,
+        resumeTime: Int? = nil
     ) {
         self.sourceType = sourceType
         self.masterUrl = masterUrl
@@ -34,6 +36,7 @@ struct PlaybackMediaSourceDTO {
         self.subtitleTracks = subtitleTracks
         self.defaultSubtitleLanguage = defaultSubtitleLanguage
         self.thumbnailTrack = thumbnailTrack
+        self.resumeTime = resumeTime
     }
 
     /// 兼容现有 `VideoPlayerView` 的推荐播放地址：HLS > MP4 fallback > 首个清晰度
@@ -51,6 +54,7 @@ struct PlaybackMediaSourceDTO {
         self.subtitleTracks = playResponse.subtitleTracks ?? []
         self.defaultSubtitleLanguage = playResponse.defaultSubtitleLanguage
         self.thumbnailTrack = playResponse.thumbnailTrack
+        self.resumeTime = playResponse.resumeTime
     }
 
     /// 将播放接口 DTO 转换为 PlayerKit 的 `PlayerMediaSource` 枚举。

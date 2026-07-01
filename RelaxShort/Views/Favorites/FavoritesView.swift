@@ -1,444 +1,307 @@
 import SwiftUI
 
-// MARK: - Favorites View
-
-/// My List 页 — 复刻 DramaBox
-/// 顶部「Following | History」分段控制器，卡片式列表，未登录弹出引导弹窗
+// MARK: - My List View
 
 struct FavoritesView: View {
     @EnvironmentObject var authStore: AuthStore
     @EnvironmentObject var appStore: AppStore
     @StateObject private var viewModel: FavoritesViewModel
 
-    @State private var selectedSegment: MyListSegment = .following
-
-    enum MyListSegment: String, CaseIterable {
-        case following = "Following"
-        case history = "History"
+    init(viewModel: FavoritesViewModel) {
+        _viewModel = StateObject(wrappedValue: viewModel)
     }
-
-    init(viewModel: FavoritesViewModel? = nil) {
-        let vm = viewModel ?? FavoritesViewModel(repository: MockFavoritesRepository())
-        _viewModel = StateObject(wrappedValue: vm)
-    }
-
-    @State private var showLoginView = false
 
     var body: some View {
         ZStack {
-            DB.black.ignoresSafeArea()
+            Color.black.ignoresSafeArea()
 
-            if authStore.isLoggedIn {
-                loggedInContent
+            if !authStore.isLoggedIn {
+                loggedOutGuide
             } else {
-                notLoggedInContent
-            }
-        }
-        .navigationTitle("My List")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if authStore.isLoggedIn {
-                Task { await viewModel.loadData() }
-            } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                    viewModel.presentLoginModal()
+                VStack(spacing: 0) {
+                    segmentHeader
+                    contentArea
                 }
             }
         }
-        .onChange(of: authStore.isLoggedIn) { _, newValue in
-            if newValue {
-                viewModel.dismissLoginModal()
-                Task { await viewModel.loadData() }
+        .onAppear { handleAppear() }
+        .onDisappear { handleDisappear() }
+        .sheet(isPresented: $viewModel.showLoginModal) {
+            LoginView().environmentObject(authStore)
+        }
+    }
+
+    // MARK: - Logged Out
+
+    private var loggedOutGuide: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "list.star").font(.system(size: 44)).foregroundColor(DB.mutedText)
+            Text(L10n.myListLoginGuide).font(.system(size: 15)).foregroundColor(DB.mutedText)
+            Button("Sign In") { viewModel.presentLoginModal() }
+                .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                .padding(.horizontal, 32).padding(.vertical, 10)
+                .background(DB.logoRed).cornerRadius(6)
+        }
+    }
+
+    // MARK: - Segment Header
+
+    private var segmentHeader: some View {
+        HStack(spacing: 24) {
+            if viewModel.isEditing {
+                Text(L10n.myListChoose)
+                    .font(.system(size: 20, weight: .semibold)).foregroundColor(.white)
+                Spacer()
+                Button(L10n.commonCancel) { viewModel.cancelEditing() }
+                    .font(.system(size: 16)).foregroundColor(.white)
+                    .frame(minWidth: 44, minHeight: 44)
+            } else {
+                ForEach(FavoritesViewModel.Segment.allCases, id: \.self) { seg in
+                    Button { viewModel.selectedSegment = seg } label: {
+                        Text(seg == .following ? L10n.myListFollowing : L10n.myListHistory)
+                            .font(.system(size: 20, weight: viewModel.selectedSegment == seg ? .semibold : .regular))
+                            .foregroundColor(viewModel.selectedSegment == seg ? .white : Color.white.opacity(0.55))
+                    }
+                }
+                Spacer()
+                if viewModel.canEdit {
+                    Button { viewModel.enterEditing() } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 18)).foregroundColor(.white)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                } else {
+                    Color.clear.frame(width: 44, height: 44)
+                }
             }
         }
-        .overlay {
-            if viewModel.showLoginModal && !authStore.isLoggedIn {
-                LoginGuideModal(
-                    isPresented: $viewModel.showLoginModal,
-                    onNavigateToLogin: { showLoginView = true }
+        .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
+    }
+
+    // MARK: - Content Area
+
+    @ViewBuilder
+    private var contentArea: some View {
+        GeometryReader { geo in
+            let coverW = min(max(geo.size.width * 0.22, 72), 92)
+            let coverH = coverW * 1.5
+
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    if viewModel.selectedSegment == .following {
+                        bookmarkList(coverW: coverW, coverH: coverH, containerW: geo.size.width)
+                    } else {
+                        historyList(coverW: coverW, coverH: coverH, containerW: geo.size.width)
+                    }
+
+                    // Most Trending
+                    trendingSection(containerW: geo.size.width)
+                }
+            }
+            .padding(.bottom, appStore.isBottomTabBarHidden ? 0 : 0)
+        }
+    }
+
+    // MARK: - Bookmark List
+
+    @ViewBuilder
+    private func bookmarkList(coverW: CGFloat, coverH: CGFloat, containerW: CGFloat) -> some View {
+        if viewModel.bookmarks.isEmpty && !viewModel.isBookmarksLoading {
+            emptyState(L10n.myListEmptyFollowing)
+        } else {
+            ForEach(viewModel.bookmarks) { drama in
+                let history = viewModel.historyItem(for: drama.id)
+                myListRow(
+                    drama: drama,
+                    episodeNumber: history?.currentEpisode ?? max(drama.currentEpisode, 1),
+                    totalEpisodes: max(drama.episodeCount, 1),
+                    progress: history.map { $0.progress } ?? 0,
+                    coverW: coverW, coverH: coverH,
+                    isEditing: viewModel.isEditing,
+                    isSelected: viewModel.selectedBookmarkIDs.contains(drama.id),
+                    onTap: { handleBookmarkTap(drama, history: history) },
+                    onToggle: { viewModel.toggleSelection(id: drama.id) }
                 )
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                .animation(.easeOut(duration: 0.25), value: viewModel.showLoginModal)
             }
-        }
-        .sheet(isPresented: $showLoginView) {
-            LoginView()
+            if viewModel.isBookmarksLoading { loadingFooter }
+            if let err = viewModel.bookmarksError { errorFooter(err) { Task { await viewModel.loadBookmarks() } } }
         }
     }
 
-    // MARK: - Logged In Content
+    // MARK: - History List
 
-    private var loggedInContent: some View {
-        VStack(spacing: 0) {
-            // Segmented control
-            HStack(spacing: 0) {
-                ForEach(MyListSegment.allCases, id: \.rawValue) { segment in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { selectedSegment = segment }
-                    } label: {
-                        VStack(spacing: 6) {
-                            Text(segment.rawValue)
-                                .font(.system(size: 15, weight: selectedSegment == segment ? .bold : .regular))
-                                .foregroundColor(selectedSegment == segment ? .white : DB.mutedText)
-                            Capsule()
-                                .fill(selectedSegment == segment ? DB.pink : Color.clear)
-                                .frame(width: 24, height: 3)
+    @ViewBuilder
+    private func historyList(coverW: CGFloat, coverH: CGFloat, containerW: CGFloat) -> some View {
+        if viewModel.watchHistory.isEmpty && !viewModel.isHistoryLoading {
+            emptyState(L10n.myListEmptyHistory)
+        } else {
+            ForEach(viewModel.watchHistory) { item in
+                myListRow(
+                    drama: item.drama,
+                    episodeNumber: item.currentEpisode,
+                    totalEpisodes: item.drama.episodeCount,
+                    progress: item.progress,
+                    coverW: coverW, coverH: coverH,
+                    isEditing: false, isSelected: false,
+                    onTap: { handleHistoryTap(item) },
+                    onToggle: {}
+                )
+            }
+            if viewModel.isHistoryLoading { loadingFooter }
+            if let err = viewModel.historyError { errorFooter(err) { Task { await viewModel.loadHistory() } } }
+        }
+    }
+
+    // MARK: - Row
+
+    @ViewBuilder
+    private func myListRow(
+        drama: DramaItem, episodeNumber: Int, totalEpisodes: Int, progress: Double,
+        coverW: CGFloat, coverH: CGFloat,
+        isEditing: Bool, isSelected: Bool,
+        onTap: @escaping () -> Void, onToggle: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 0) {
+            if isEditing {
+                selectionCircle(isSelected: isSelected, coverH: coverH)
+                    .onTapGesture { onToggle() }
+                    .padding(.trailing, 10)
+            }
+
+            Button(action: { isEditing ? onToggle() : onTap() }) {
+                HStack(alignment: .top, spacing: 14) {
+                    // Poster
+                    ZStack(alignment: .bottom) {
+                        CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: coverW, height: coverH)
+                            .frame(width: coverW, height: coverH)
+                            .cornerRadius(DB.posterRadius)
+                        // Progress bar
+                        Rectangle().fill(Color.white.opacity(0.25)).frame(height: 3)
+                        Rectangle().fill(DB.logoRed)
+                            .frame(width: coverW * CGFloat(clamp(progress, 0, 1)), height: 3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        // Selected overlay
+                        if isSelected {
+                            Color.black.opacity(0.45).cornerRadius(DB.posterRadius)
                         }
                     }
-                    .buttonStyle(.plain)
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(.horizontal, DT.Space.pageH)
-            .padding(.top, 8)
+                    .frame(width: coverW, height: coverH)
 
-            if viewModel.isLoading {
-                Spacer()
-                ProgressView().tint(DB.pink)
-                Spacer()
-            } else {
-                ScrollView {
-                    VStack(spacing: DT.Space.xl) {
-                        if selectedSegment == .following {
-                            followingContent
-                        } else {
-                            historyContent
-                        }
-                        recommendedSection
-                    }
-                    .padding(.bottom, DT.Space.xxl)
-                }
-            }
-        }
-    }
-
-    // MARK: - Following Content
-
-    private var followingContent: some View {
-        let followed = MockData.myListFollowing
-        return VStack(alignment: .leading, spacing: DT.Space.md) {
-            if followed.isEmpty {
-                emptyStateView(message: "No following yet")
-            } else {
-                ForEach(followed) { drama in
-                    HStack(spacing: DT.Space.md) {
-                        CoverImageView(
-                            url: drama.coverURL, aspectRatio: 2.0/3.0,
-                            cornerRadius: DB.posterRadius, width: 72, height: 96
-                        )
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(drama.title)
-                                .font(.system(size: 15, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                            Text("\(drama.episodeCount) EP · \(drama.category)")
-                                .font(.system(size: 12)).foregroundColor(DB.mutedText)
-                            if let region = drama.regionTag {
-                                Text(region)
-                                    .font(.system(size: 11)).foregroundColor(DB.gold)
-                            }
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12)).foregroundColor(DB.mutedText)
-                    }
-                    .padding(DT.Space.md)
-                    .background(DB.panel)
-                    .clipShape(RoundedRectangle(cornerRadius: DB.cardRadius))
-                }
-            }
-        }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.top, DT.Space.md)
-    }
-
-    // MARK: - History Content
-
-    private var historyContent: some View {
-        let history = MockData.moreWatchHistory
-        return VStack(spacing: DT.Space.sm) {
-            if history.isEmpty {
-                emptyStateView(message: "No watch history")
-            } else {
-                ForEach(history) { record in
-                    WatchHistoryCard(record: record)
-                }
-            }
-        }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.top, DT.Space.md)
-    }
-
-    // MARK: - Recommended Section
-
-    private var recommendedSection: some View {
-        VStack(alignment: .leading, spacing: DT.Space.md) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: 1.5).fill(DB.pink).frame(width: 3, height: 18)
-                Text("Recommended For You").font(.system(size: 18, weight: .bold)).foregroundColor(.white)
-            }
-
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3),
-                spacing: DT.Space.md
-            ) {
-                ForEach(MockData.homePopular.prefix(6)) { drama in
+                    // Text
                     VStack(alignment: .leading, spacing: 4) {
-                        CoverImageView(
-                            url: drama.coverURL, aspectRatio: 2.0/3.0,
-                            cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight
-                        )
-                        Text(drama.title)
-                            .font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
+                        Text(drama.title).font(.system(size: 17, weight: .semibold))
+                            .foregroundColor(.white).lineLimit(1)
+                        Text(dramaCategoryTags(drama)).font(.system(size: 15))
+                            .foregroundColor(Color.white.opacity(0.45)).lineLimit(1)
+                        Text("EP.\(episodeNumber) / EP.\(totalEpisodes)").font(.system(size: 16))
+                            .foregroundColor(Color.white.opacity(0.60))
                     }
+                    Spacer()
                 }
             }
+            .buttonStyle(.plain)
         }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.top, DT.Space.lg)
+        .padding(.horizontal, 16).padding(.vertical, 9)
     }
 
-    // MARK: - Not Logged In Content
+    // MARK: - Trending
 
-    private var notLoggedInContent: some View {
-        VStack(spacing: DT.Space.xl) {
-            Spacer()
-
-            ZStack {
-                Circle()
-                    .fill(DT.brandPink.opacity(0.12))
-                    .frame(width: 100, height: 100)
-                Image(systemName: "bookmark")
-                    .font(DT.Font.body(44))
-                    .foregroundColor(DT.brandPink)
+    @ViewBuilder
+    private func trendingSection(containerW: CGFloat) -> some View {
+        if let err = viewModel.trendingError {
+            VStack(spacing: 8) {
+                Text(err).font(.system(size: 14)).foregroundColor(DB.mutedText)
+                Button(L10n.commonRetry) { Task { await viewModel.loadTrending() } }.foregroundColor(DB.logoRed)
+            }.padding(.top, 32)
+        } else if !viewModel.trendingEntries.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(L10n.myListMostTrending).font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.white).padding(.horizontal, 16).padding(.top, 32)
+                trendingGrid(containerW: containerW)
             }
-
-            Text(L10n.loginToViewFavorites)
-                .font(DT.Font.body(17, weight: .semibold))
-                .foregroundColor(DT.Color.textPrimary)
-
-            Text(L10n.loginToSync)
-                .font(DT.Font.caption)
-                .foregroundColor(DT.Color.textTertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, DT.Space.xxl)
-
-            Button {
-                viewModel.presentLoginModal()
-            } label: {
-                Text(L10n.loginNow)
-                    .font(DT.Font.body(15, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 200, height: 44)
-                    .background(DT.brandPink)
-                    .clipShape(Capsule())
-            }
-
-            Spacer()
         }
     }
 
-    // MARK: - Empty State
-
-    private func emptyStateView(message: String) -> some View {
-        VStack(spacing: DT.Space.lg) {
-            Spacer().frame(height: 60)
-            ZStack {
-                Circle()
-                    .fill(DT.Color.overlaySubtle)
-                    .frame(width: 80, height: 80)
-                Image(systemName: "tray")
-                    .font(DT.Font.body(32))
-                    .foregroundColor(DT.Color.textTertiary)
-            }
-            Text(message)
-                .font(DT.Font.bodyDefault)
-                .foregroundColor(DT.Color.textTertiary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-// MARK: - Watch History Card
-
-/// 观看历史卡片 — 水平布局，含封面、标题、进度、集数
-struct WatchHistoryCard: View {
-    let record: WatchHistoryItem
-
-    var body: some View {
-        HStack(spacing: DT.Space.md) {
-            // Cover 80×106
-            CoverImageView(
-                url: record.drama.coverURL,
-                aspectRatio: DT.Layout.cardAspectRatio,
-                cornerRadius: DB.posterRadius,
-                width: 80,
-                height: 106
-            )
-            .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-
-            // Info
-            VStack(alignment: .leading, spacing: DT.Space.xs) {
-                Text(record.drama.title)
-                    .font(DT.Font.body(15, weight: .medium))
-                    .foregroundColor(DT.Color.textPrimary)
-                    .lineLimit(1)
-
-                // Progress bar + percentage
-                HStack(spacing: DT.Space.sm) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(DT.Color.overlaySubtle)
-                                .frame(height: 4)
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(DT.brandPink)
-                                .frame(width: geo.size.width * CGFloat(record.progress), height: 4)
-                        }
-                    }
-                    .frame(height: 4)
-
-                    Text(progressText)
-                        .font(DT.Font.small)
-                        .foregroundColor(DT.brandPink)
-                }
-
-                HStack(spacing: 2) {
-                    Text(L10n.episodeProgress(record.currentEpisode, record.drama.episodeCount))
-                        .font(DT.Font.small)
-                        .foregroundColor(DT.Color.textTertiary)
-
-                    Spacer().frame(width: 6)
-
-                    Text(record.relativeTime)
-                        .font(DT.Font.small)
-                        .foregroundColor(DT.Color.textTertiary)
-                }
-
-                Spacer().frame(height: 2)
-            }
-        }
-        .padding(DT.Space.md)
-        .background(DT.Color.bgCard)
-        .clipShape(RoundedRectangle(cornerRadius: DT.Radius.md))
-    }
-
-    private var progressText: String {
-        String(format: "%.0f%%", record.progress * 100)
-    }
-}
-
-// MARK: - Login Guide Modal
-
-/// 未登录引导弹窗 — 复刻 DramaBox
-/// Google / Apple 登录入口 + 协议条款
-struct LoginGuideModal: View {
-    @Binding var isPresented: Bool
-    var onNavigateToLogin: (() -> Void)?
-
-    var body: some View {
-        ZStack {
-            // Dimmed backdrop
-            Color.black.opacity(0.6)
-                .ignoresSafeArea()
-                .onTapGesture { isPresented = false }
-
-            // Modal card
-            VStack(spacing: DT.Space.lg) {
-                // Top decorative icon
-                ZStack {
-                    Circle()
-                        .fill(DT.brandPink.opacity(0.12))
-                        .frame(width: 64, height: 64)
-                    Image(systemName: "bookmark.fill")
-                        .font(DT.Font.body(28))
-                        .foregroundColor(DT.brandPink)
-                }
-
-                // Title
-                Text(L10n.saveYourList)
-                    .font(DT.Font.body(20, weight: .bold))
-                    .foregroundColor(DT.Color.textPrimary)
-
-                // Description
-                Text(L10n.loginRecommendation)
-                    .font(DT.Font.bodyDefault)
-                    .foregroundColor(DT.Color.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, DT.Space.sm)
-
-                // Google Login
+    @ViewBuilder
+    private func trendingGrid(containerW: CGFloat) -> some View {
+        let cols: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+        LazyVGrid(columns: cols, spacing: 18) {
+            ForEach(viewModel.trendingEntries) { entry in
                 Button {
-                    isPresented = false
-                    onNavigateToLogin?()
+                    appStore.navigationTarget = SeriesPlayerNav(drama: entry.drama, startEpisode: max(entry.drama.currentEpisode, 1), sourceScene: "my_list_trending")
                 } label: {
-                    HStack(spacing: DT.Space.sm) {
-                        Image(systemName: "g.circle.fill")
-                            .font(DT.Font.body(20))
-                        Text(L10n.loginWithGoogle)
-                            .font(DT.Font.body(15, weight: .semibold))
+                    VStack(alignment: .leading, spacing: 4) {
+                        CoverImageView(url: entry.drama.coverURL, cornerRadius: DB.posterRadius, width: (containerW - 42) / 3, height: ((containerW - 42) / 3) * 1.5)
+                            .cornerRadius(DB.posterRadius)
+                        Text(entry.drama.title).font(.system(size: 14)).foregroundColor(.white).lineLimit(2)
+                        Text(RankingMetricFormatter.string(from: entry.metricValue)).font(.system(size: 13)).foregroundColor(DB.mutedText).lineLimit(1)
                     }
-                    .foregroundColor(.black)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: DT.Layout.ctaButtonHeight)
-                    .background(.white)
-                    .clipShape(Capsule())
-                }
-
-                // Apple Login
-                Button {
-                    isPresented = false
-                    onNavigateToLogin?()
-                } label: {
-                    HStack(spacing: DT.Space.sm) {
-                        Image(systemName: "apple.logo")
-                            .font(DT.Font.body(20))
-                        Text(L10n.loginWithApple)
-                            .font(DT.Font.body(15, weight: .semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: DT.Layout.ctaButtonHeight)
-                    .background(.black)
-                    .clipShape(Capsule())
-                }
-
-                // Terms
-                Text(L10n.loginAgreement)
-                    .font(DT.Font.small)
-                    .foregroundColor(DT.Color.textTertiary)
-                    .multilineTextAlignment(.center)
+                }.buttonStyle(.plain)
             }
-            .padding(DT.Space.xxl)
-            .background(DT.Color.bgModal)
-            .clipShape(RoundedRectangle(cornerRadius: DT.Radius.xl))
-            .padding(.horizontal, DT.Space.xl)
+        }.padding(.horizontal, 16)
+    }
+
+    // MARK: - Helpers
+
+    private var loadingFooter: some View {
+        ProgressView().tint(DB.logoRed).padding(.vertical, 16).frame(maxWidth: .infinity)
+    }
+
+    private func errorFooter(_ msg: String, retry: @escaping () -> Void) -> some View {
+        VStack(spacing: 8) {
+            Text(msg).font(.system(size: 14)).foregroundColor(DB.mutedText)
+            Button(L10n.commonRetry, action: retry).foregroundColor(DB.logoRed)
+        }.padding(.vertical, 16)
+    }
+
+    private func emptyState(_ msg: String) -> some View {
+        Text(msg).font(.system(size: 15)).foregroundColor(DB.mutedText)
+            .frame(maxWidth: .infinity).padding(.top, 80)
+    }
+
+    @ViewBuilder
+    private func selectionCircle(isSelected: Bool, coverH: CGFloat) -> some View {
+        Circle()
+            .strokeBorder(isSelected ? Color.clear : Color.white.opacity(0.8), lineWidth: 2)
+            .background(Circle().fill(isSelected ? DB.logoRed : Color.clear))
+            .overlay { if isSelected { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundColor(.white) } }
+            .frame(width: 22, height: 22)
+            .frame(height: coverH, alignment: .center)
+    }
+
+    private func dramaCategoryTags(_ drama: DramaItem) -> String {
+        let parts = [drama.category].compactMap { $0 }.filter { !$0.isEmpty }
+        return parts.joined(separator: " · ")
+    }
+
+    private func clamp(_ val: Double, _ lo: Double, _ hi: Double) -> Double { min(max(val, lo), hi) }
+
+    // MARK: - Actions
+
+    private func handleAppear() {
+        if authStore.isLoggedIn {
+            Task { await viewModel.loadAll() }
         }
     }
-}
 
-// MARK: - Preview
+    private func handleDisappear() {
+        if viewModel.isEditing { appStore.isBottomTabBarHidden = false }
+    }
 
-#if DEBUG
-struct FavoritesView_Previews: PreviewProvider {
-    static var previews: some View {
-        let authStore = AuthStore()
-        authStore.isLoggedIn = true
-        authStore.currentUser = User(
-            id: "preview",
-            nickname: "Test",
-            isVip: true,
-            vipExpireDate: Date().addingTimeInterval(86400 * 30),
-            coinBalance: 100,
-            followedCount: 0
-        )
-        authStore.isVip = true
-        authStore.vipExpireDate = Date().addingTimeInterval(86400 * 30)
-        authStore.coinBalance = 100
-        authStore.loginMethod = .google
-        return FavoritesView()
-            .environmentObject(authStore)
-            .preferredColorScheme(.dark)
+    private func handleBookmarkTap(_ drama: DramaItem, history: WatchHistoryItem?) {
+        if let h = history {
+            appStore.navigationTarget = SeriesPlayerNav(
+                drama: drama, startEpisode: h.currentEpisode,
+                episodeID: h.episodeID, resumeTime: h.resumeTime, sourceScene: "my_list_following")
+        } else {
+            appStore.navigationTarget = SeriesPlayerNav(
+                drama: drama, startEpisode: max(drama.currentEpisode, 1), sourceScene: "my_list_following")
+        }
+    }
+
+    private func handleHistoryTap(_ item: WatchHistoryItem) {
+        appStore.navigationTarget = SeriesPlayerNav(
+            drama: item.drama, startEpisode: item.currentEpisode,
+            episodeID: item.episodeID, resumeTime: item.resumeTime, sourceScene: "my_list_history")
     }
 }
-#endif

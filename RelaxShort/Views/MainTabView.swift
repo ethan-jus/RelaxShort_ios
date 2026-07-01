@@ -127,7 +127,11 @@ private struct TabContentHost: View {
                 .opacity(appStore.selectedTab == .member ? 1 : 0)
                 .disabled(appStore.selectedTab != .member)
 
-            FavoritesView()
+            FavoritesView(viewModel: FavoritesViewModel(
+                repository: dependencies.favoritesRepository,
+                bookmarkStore: dependencies.bookmarkStore,
+                homeRepository: dependencies.homeRepository
+            ))
                 .id(AppStore.Tab.myList.rawValue)
                 .zIndex(appStore.selectedTab == .myList ? 1 : 0)
                 .opacity(appStore.selectedTab == .myList ? 1 : 0)

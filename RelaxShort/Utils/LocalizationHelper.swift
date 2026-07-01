@@ -767,4 +767,21 @@ enum L10n {
     static var buyNow: String { loc("coin.buy_now") }
     static var purchasing: String { loc("coin.purchasing") }
     static var purchaseSuccess: String { loc("coin.purchase_success") }
+
+    // MARK: - My List (Task31)
+
+    static var myListLoginGuide: String { loc("my_list.login_guide") }
+    static var myListFollowing: String { loc("my_list.following") }
+    static var myListHistory: String { loc("my_list.history") }
+    static var myListChoose: String { loc("my_list.choose") }
+    static var myListRemove: String { loc("my_list.remove") }
+    static var myListMostTrending: String { loc("my_list.most_trending") }
+    static var myListEmptyFollowing: String { loc("my_list.empty_following") }
+    static var myListEmptyHistory: String { loc("my_list.empty_history") }
+    static var myListLoadFailed: String { loc("my_list.load_failed") }
+    static var myListPartialRemoveFailed: String { loc("my_list.partial_remove_failed") }
+
+    // Re-export common keys for convenience
+    static var commonRetry: String { retry }
+    static var commonCancel: String { cancel }
 }

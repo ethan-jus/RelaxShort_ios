@@ -6,6 +6,7 @@ import SwiftUI
 struct SeriesPlayerNav: Hashable {
     let drama: DramaItem
     let startEpisode: Int
+    let episodeID: String?
     let resumeTime: TimeInterval?
     let handoff: PlayerHandoffContext?
     let sourceScene: String
@@ -13,12 +14,14 @@ struct SeriesPlayerNav: Hashable {
     init(
         drama: DramaItem,
         startEpisode: Int,
+        episodeID: String? = nil,
         resumeTime: TimeInterval? = nil,
         handoff: PlayerHandoffContext? = nil,
         sourceScene: String = "unknown"
     ) {
         self.drama = drama
         self.startEpisode = startEpisode
+        self.episodeID = episodeID
         self.resumeTime = resumeTime
         self.handoff = handoff
         self.sourceScene = sourceScene

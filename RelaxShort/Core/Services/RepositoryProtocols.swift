@@ -76,11 +76,19 @@ protocol DetailRepositoryProtocol {
 // MARK: - Favorites
 
 /// 收藏/历史数据仓库协议
-protocol FavoritesRepositoryProtocol {
-    /// 获取观看历史
-    func fetchWatchHistory(page: Int) async throws -> [WatchHistoryItem]
-    /// 获取收藏列表
-    func fetchBookmarks(page: Int) async throws -> [DramaItem]
+protocol FavoritesRepositoryProtocol: Sendable {
+    /// 获取观看历史（游标分页）
+    func fetchWatchHistory(cursor: String?, limit: Int) async throws
+        -> CursorPage<WatchHistoryItem>
+    /// 获取收藏列表（游标分页）
+    func fetchBookmarks(cursor: String?, limit: Int) async throws
+        -> CursorPage<DramaItem>
+    /// 批量查询收藏状态，返回当前已收藏的 series ID 集合
+    func fetchBookmarkedSeriesIDs(_ seriesIDs: [String]) async throws -> Set<String>
+    /// 设置/取消收藏，返回服务端最终状态
+    func setBookmarked(_ bookmarked: Bool, seriesID: String) async throws -> Bool
+    /// 上报观看进度
+    func reportProgress(_ report: WatchProgressReport) async throws
 }
 
 // MARK: - Profile
