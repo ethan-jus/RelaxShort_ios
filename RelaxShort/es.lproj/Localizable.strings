@@ -213,3 +213,16 @@
 "search.tab.most_trending" = "Tendencias";
 "search.tab.new_releases" = "Nuevos estrenos";
 "search.rank_accessibility_format" = "Puesto %d: %@";
+// My List (Task31)
+"my_list.login_guide" = "Login to view your list";
+"my_list.sign_in" = "Sign In";
+"my_list.following" = "Following";
+"my_list.history" = "History";
+"my_list.choose" = "Choose";
+"my_list.remove" = "Remove";
+"my_list.most_trending" = "Most Trending";
+"my_list.empty_following" = "No dramas in your list";
+"my_list.empty_history" = "No watch history";
+"my_list.load_failed" = "Load failed";
+"my_list.partial_remove_failed" = "Some items could not be removed";
+"my_list.episode_progress" = "EP.%d / EP.%d";

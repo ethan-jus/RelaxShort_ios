@@ -7,9 +7,13 @@ struct SeriesPlayerView: View {
 
     let drama: DramaItem
     let startEpisode: Int
+    let initialEpisodeID: String?
+    let initialResumeTime: TimeInterval?
     @EnvironmentObject var dependencies: DependencyContainer
     let handoff: PlayerHandoffContext?
     let sourceScene: String
+    /// 标记 My List 初始 resume 是否已被消费
+    @State private var hasConsumedInitialResume = false
 
     @State private var currentEpisode: Int
     @State private var dragOffset: CGFloat = 0
@@ -70,10 +74,14 @@ struct SeriesPlayerView: View {
     init(
         drama: DramaItem,
         startEpisode: Int? = nil,
+        initialEpisodeID: String? = nil,
+        initialResumeTime: TimeInterval? = nil,
         handoff: PlayerHandoffContext? = nil,
         sourceScene: String = "unknown"
     ) {
         self.drama = drama
+        self.initialEpisodeID = initialEpisodeID
+        self.initialResumeTime = initialResumeTime
         self.startEpisode = startEpisode ?? max(1, drama.currentEpisode)
         self.handoff = handoff
         self.sourceScene = sourceScene
@@ -277,6 +285,13 @@ struct SeriesPlayerView: View {
         }
 
         await loadEpisodes()
+
+        // My List 初始 episode 匹配
+        if let eid = initialEpisodeID, let matched = episodes.first(where: { String($0.id) == eid || String($0.episodeNumber) == eid }) {
+            if currentEpisode != matched.episodeNumber {
+                currentEpisode = matched.episodeNumber
+            }
+        }
     }
 
     /// Series 播放完成后优先切换下一集；最后一集回到首帧并等待用户重播。
@@ -342,6 +357,15 @@ struct SeriesPlayerView: View {
         let playerItems = playable.map(\.item)
         let currentEpisodeID = episodeID(for: currentEpisode)
         let backendResume = currentEpisodeID.flatMap { episodeResumeTimes[$0] }
+
+        // My List 显式 resume 优先级：仅初始剧集、无 handoff、未消费时生效
+        let myListResume: TimeInterval? = {
+            guard !hasConsumedInitialResume, handoff == nil,
+                  let rt = initialResumeTime, rt > 0 else { return nil }
+            hasConsumedInitialResume = true
+            return rt
+        }()
+        let effectiveResume = handoff?.resumeTime ?? myListResume ?? backendResume
 
         if playerCoordinator.engine.currentItem != playerItems[safe: startIndex] {
             playerCoordinator.claimSeries(

@@ -782,6 +782,11 @@ enum L10n {
     static var myListPartialRemoveFailed: String { loc("my_list.partial_remove_failed") }
 
     // Re-export common keys for convenience
+    static var myListSignIn: String { loc("my_list.sign_in") }
+    static func myListEpisodeProgress(_ current: Int, _ total: Int) -> String {
+        String(format: loc("my_list.episode_progress"), current, total)
+    }
+
     static var commonRetry: String { retry }
     static var commonCancel: String { cancel }
 }

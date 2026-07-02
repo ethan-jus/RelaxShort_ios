@@ -26,6 +26,12 @@ struct FavoritesView: View {
         }
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
+        .onChange(of: viewModel.isEditing) { _, editing in
+            appStore.isBottomTabBarHidden = editing
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if viewModel.isEditing { removeBar }
+        }
         .sheet(isPresented: $viewModel.showLoginModal) {
             LoginView().environmentObject(authStore)
         }
@@ -37,7 +43,7 @@ struct FavoritesView: View {
         VStack(spacing: 16) {
             Image(systemName: "list.star").font(.system(size: 44)).foregroundColor(DB.mutedText)
             Text(L10n.myListLoginGuide).font(.system(size: 15)).foregroundColor(DB.mutedText)
-            Button("Sign In") { viewModel.presentLoginModal() }
+            Button(L10n.myListSignIn) { viewModel.presentLoginModal() }
                 .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
                 .padding(.horizontal, 32).padding(.vertical, 10)
                 .background(DB.logoRed).cornerRadius(6)
@@ -123,6 +129,11 @@ struct FavoritesView: View {
                     onToggle: { viewModel.toggleSelection(id: drama.id) }
                 )
             }
+            if !viewModel.bookmarks.isEmpty {
+                Color.clear.frame(height: 1).onAppear {
+                    Task { await viewModel.loadMoreBookmarks() }
+                }
+            }
             if viewModel.isBookmarksLoading { loadingFooter }
             if let err = viewModel.bookmarksError { errorFooter(err) { Task { await viewModel.loadBookmarks() } } }
         }
@@ -146,6 +157,11 @@ struct FavoritesView: View {
                     onTap: { handleHistoryTap(item) },
                     onToggle: {}
                 )
+            }
+            if !viewModel.watchHistory.isEmpty {
+                Color.clear.frame(height: 1).onAppear {
+                    Task { await viewModel.loadMoreHistory() }
+                }
             }
             if viewModel.isHistoryLoading { loadingFooter }
             if let err = viewModel.historyError { errorFooter(err) { Task { await viewModel.loadHistory() } } }
@@ -193,7 +209,7 @@ struct FavoritesView: View {
                             .foregroundColor(.white).lineLimit(1)
                         Text(dramaCategoryTags(drama)).font(.system(size: 15))
                             .foregroundColor(Color.white.opacity(0.45)).lineLimit(1)
-                        Text("EP.\(episodeNumber) / EP.\(totalEpisodes)").font(.system(size: 16))
+                        Text(L10n.myListEpisodeProgress(episodeNumber, totalEpisodes)).font(.system(size: 16))
                             .foregroundColor(Color.white.opacity(0.60))
                     }
                     Spacer()
@@ -275,6 +291,36 @@ struct FavoritesView: View {
     }
 
     private func clamp(_ val: Double, _ lo: Double, _ hi: Double) -> Double { min(max(val, lo), hi) }
+
+    // MARK: - Remove Bar
+
+    private var removeBar: some View {
+        VStack(spacing: 0) {
+            Divider().background(Color.white.opacity(0.5))
+            HStack {
+                Spacer()
+                if viewModel.isRemoving {
+                    ProgressView().tint(DB.logoRed)
+                } else {
+                    Button {
+                        Task { await viewModel.removeSelectedBookmarks() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "trash")
+                            Text(L10n.myListRemove)
+                        }
+                        .font(.system(size: 16))
+                        .foregroundColor(viewModel.selectedBookmarkIDs.isEmpty ? Color.white.opacity(0.3) : .white)
+                    }
+                    .disabled(viewModel.selectedBookmarkIDs.isEmpty || viewModel.isRemoving)
+                    .frame(minWidth: 44, minHeight: 44)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .frame(height: 56)
+        .background(Color.black)
+    }
 
     // MARK: - Actions
 

@@ -57,6 +57,8 @@ struct MainTabView: View {
                 SeriesPlayerView(
                     drama: nav.drama,
                     startEpisode: nav.startEpisode,
+                    initialEpisodeID: nav.episodeID,
+                    initialResumeTime: nav.resumeTime,
                     handoff: nav.handoff,
                     sourceScene: nav.sourceScene
                 )
@@ -66,6 +68,8 @@ struct MainTabView: View {
                 SeriesPlayerView(
                     drama: nav.drama,
                     startEpisode: nav.startEpisode,
+                    initialEpisodeID: nav.episodeID,
+                    initialResumeTime: nav.resumeTime,
                     handoff: nav.handoff,
                     sourceScene: nav.sourceScene
                 )

@@ -89,6 +89,9 @@ final class BookmarkStore: ObservableObject {
         let wasBookmarked = bookmarkedIDs.contains(seriesID)
         let targetState = !wasBookmarked
 
+        // 先递增版本以防护迟到 loadStatus 覆盖乐观更新
+        seriesVersions[seriesID] = (seriesVersions[seriesID] ?? 0) + 1
+
         // 乐观更新
         pendingIDs.insert(seriesID)
         if targetState {
@@ -106,8 +109,6 @@ final class BookmarkStore: ObservableObject {
             } else {
                 bookmarkedIDs.remove(seriesID)
             }
-            // bump version 以防护迟到 loadStatus 覆盖
-            seriesVersions[seriesID] = (seriesVersions[seriesID] ?? 0) + 1
             // 只有新增收藏成功才发 analytics
             if targetState, serverState {
                 analytics.trackBookmark(seriesID: seriesID, sourceScene: sourceScene)
