@@ -6,6 +6,7 @@ import Combine
 /// My List 页面状态机：管理 bookmarks/history 独立分页、trending、编辑和多选删除。
 @MainActor
 final class FavoritesViewModel: ObservableObject {
+    private enum LoadFailureStage { case firstPage, nextPage }
 
     // MARK: - Segment
 
@@ -19,6 +20,7 @@ final class FavoritesViewModel: ObservableObject {
     @Published private(set) var bookmarksHasMore: Bool = false
     @Published private(set) var isBookmarksLoading: Bool = false
     @Published var bookmarksError: String?
+    private var bookmarksFailureStage: LoadFailureStage?
 
     // MARK: - History
 
@@ -27,6 +29,7 @@ final class FavoritesViewModel: ObservableObject {
     @Published private(set) var historyHasMore: Bool = false
     @Published private(set) var isHistoryLoading: Bool = false
     @Published var historyError: String?
+    private var historyFailureStage: LoadFailureStage?
 
     // MARK: - Trending
 
@@ -34,10 +37,10 @@ final class FavoritesViewModel: ObservableObject {
     @Published private(set) var isTrendingLoading: Bool = false
     @Published var trendingError: String?
 
-    // MARK: - Editing (Following only)
+    // MARK: - Editing
 
     @Published var isEditing: Bool = false
-    @Published var selectedBookmarkIDs: Set<String> = []
+    @Published var selectedItemIDs: Set<String> = []
     @Published var isRemoving: Bool = false
     @Published var removalError: String?
 
@@ -78,13 +81,17 @@ final class FavoritesViewModel: ObservableObject {
     }
 
     func retryBookmarks() async {
-        if bookmarks.isEmpty { await loadBookmarks() }
-        else { await loadMoreBookmarks() }
+        switch bookmarksFailureStage {
+        case .nextPage: await loadMoreBookmarks()
+        case .firstPage, .none: await loadBookmarks()
+        }
     }
 
     func retryHistory() async {
-        if watchHistory.isEmpty { await loadHistory() }
-        else { await loadMoreHistory() }
+        switch historyFailureStage {
+        case .nextPage: await loadMoreHistory()
+        case .firstPage, .none: await loadHistory()
+        }
     }
 
     var topTrendingEntries: [RankingEntry] {
@@ -99,8 +106,10 @@ final class FavoritesViewModel: ObservableObject {
         do {
             let page = try await repository.fetchBookmarks(cursor: nil, limit: 20)
             bookmarks = page.items; bookmarksCursor = page.nextCursor; bookmarksHasMore = page.hasMore
+            bookmarksFailureStage = nil
         } catch {
             bookmarksError = error.localizedDescription
+            bookmarksFailureStage = .firstPage
         }
         isBookmarksLoading = false
     }
@@ -108,12 +117,17 @@ final class FavoritesViewModel: ObservableObject {
     func loadMoreBookmarks() async {
         guard !isBookmarksLoading, bookmarksHasMore else { return }
         isBookmarksLoading = true
+        bookmarksError = nil
         do {
             let page = try await repository.fetchBookmarks(cursor: bookmarksCursor, limit: 20)
             let existing = Set(bookmarks.map(\.id))
             bookmarks.append(contentsOf: page.items.filter { !existing.contains($0.id) })
             bookmarksCursor = page.nextCursor; bookmarksHasMore = page.hasMore
-        } catch { bookmarksError = error.localizedDescription }
+            bookmarksFailureStage = nil
+        } catch {
+            bookmarksError = error.localizedDescription
+            bookmarksFailureStage = .nextPage
+        }
         isBookmarksLoading = false
     }
 
@@ -125,19 +139,28 @@ final class FavoritesViewModel: ObservableObject {
         do {
             let page = try await repository.fetchWatchHistory(cursor: nil, limit: 20)
             watchHistory = page.items; historyCursor = page.nextCursor; historyHasMore = page.hasMore
-        } catch { historyError = error.localizedDescription }
+            historyFailureStage = nil
+        } catch {
+            historyError = error.localizedDescription
+            historyFailureStage = .firstPage
+        }
         isHistoryLoading = false
     }
 
     func loadMoreHistory() async {
         guard !isHistoryLoading, historyHasMore else { return }
         isHistoryLoading = true
+        historyError = nil
         do {
             let page = try await repository.fetchWatchHistory(cursor: historyCursor, limit: 20)
             let existing = Set(watchHistory.map(\.id))
             watchHistory.append(contentsOf: page.items.filter { !existing.contains($0.id) })
             historyCursor = page.nextCursor; historyHasMore = page.hasMore
-        } catch { historyError = error.localizedDescription }
+            historyFailureStage = nil
+        } catch {
+            historyError = error.localizedDescription
+            historyFailureStage = .nextPage
+        }
         isHistoryLoading = false
     }
 
@@ -154,36 +177,67 @@ final class FavoritesViewModel: ObservableObject {
 
     // MARK: - Editing
 
-    var canEdit: Bool { selectedSegment == .following && !bookmarks.isEmpty }
+    var canEdit: Bool {
+        switch selectedSegment {
+        case .following: !bookmarks.isEmpty
+        case .history: !watchHistory.isEmpty
+        }
+    }
 
     func enterEditing() {
         guard canEdit else { return }
-        isEditing = true; selectedBookmarkIDs.removeAll()
+        isEditing = true; selectedItemIDs.removeAll()
     }
 
     func cancelEditing() {
-        isEditing = false; selectedBookmarkIDs.removeAll(); removalError = nil
+        isEditing = false; selectedItemIDs.removeAll(); removalError = nil
     }
 
     func toggleSelection(id: String) {
-        if selectedBookmarkIDs.contains(id) { selectedBookmarkIDs.remove(id) }
-        else { selectedBookmarkIDs.insert(id) }
+        if selectedItemIDs.contains(id) { selectedItemIDs.remove(id) }
+        else { selectedItemIDs.insert(id) }
     }
 
-    func removeSelectedBookmarks() async {
-        guard !isRemoving, !selectedBookmarkIDs.isEmpty else { return }
+    func removeSelectedItems() async {
+        guard !isRemoving, !selectedItemIDs.isEmpty else { return }
         isRemoving = true; removalError = nil
         var failed: Set<String> = []
-        for id in selectedBookmarkIDs {
+        let segment = selectedSegment
+        for id in selectedItemIDs {
             do {
-                let ok = try await repository.setBookmarked(false, seriesID: id)
-                if ok {
+                switch segment {
+                case .following:
+                    let ok = try await repository.setBookmarked(false, seriesID: id)
+                    if !ok {
+                        failed.insert(id)
+                        continue
+                    }
                     bookmarks.removeAll { $0.id == id }
                     bookmarkStore?.applyServerState(false, seriesID: id)
-                } else { failed.insert(id) }
+                case .history:
+                    try await repository.deleteWatchHistory(seriesID: id)
+                    watchHistory.removeAll { $0.drama.id == id }
+                }
             } catch { failed.insert(id) }
         }
-        selectedBookmarkIDs = failed
+
+        // DELETE 可能已在服务端成功，但客户端因响应中断误判失败。
+        // Following 可通过状态接口精确对账，避免退出重进后项目消失却仍提示删除失败。
+        if segment == .following, !failed.isEmpty {
+            do {
+                let stillBookmarked = try await repository.fetchBookmarkedSeriesIDs(Array(failed))
+                let confirmedRemoved = failed.subtracting(stillBookmarked)
+                for id in confirmedRemoved {
+                    bookmarks.removeAll { $0.id == id }
+                    bookmarkStore?.applyServerState(false, seriesID: id)
+                }
+                failed = stillBookmarked
+            } catch {
+                // 对账失败时保留原失败集合，避免错误地从本地移除仍在服务端的收藏。
+            }
+        }
+
+        selectedItemIDs = failed
         isRemoving = false
         if !failed.isEmpty { removalError = L10n.myListPartialRemoveFailed }
         if failed.isEmpty { cancelEditing() }

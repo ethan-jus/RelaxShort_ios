@@ -20,6 +20,11 @@ struct RealFavoritesRepository: FavoritesRepositoryProtocol, @unchecked Sendable
         return dto.toDomain()
     }
 
+    func deleteWatchHistory(seriesID: String) async throws {
+        let endpoint = APIEndpoint.deleteWatchHistory(seriesID: seriesID)
+        let _: Bool = try await client.requestData(endpoint)
+    }
+
     // MARK: - Bookmarks
 
     func fetchBookmarks(cursor: String?, limit: Int) async throws

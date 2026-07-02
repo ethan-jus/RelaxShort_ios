@@ -285,13 +285,6 @@ struct SeriesPlayerView: View {
         }
 
         await loadEpisodes()
-
-        // My List 初始 episode 匹配
-        if let eid = initialEpisodeID, let matched = episodes.first(where: { String($0.id) == eid || String($0.episodeNumber) == eid }) {
-            if currentEpisode != matched.episodeNumber {
-                currentEpisode = matched.episodeNumber
-            }
-        }
     }
 
     /// Series 播放完成后优先切换下一集；最后一集回到首帧并等待用户重播。
@@ -329,6 +322,14 @@ struct SeriesPlayerView: View {
         }
 
         guard !Task.isCancelled else { return }
+        // 必须在请求播放资源和初始化播放器之前匹配 My List 指定剧集，
+        // 避免先加载默认集、随后再切集造成错误续播和重复请求。
+        if let eid = initialEpisodeID,
+           let matched = episodes.first(where: {
+               String($0.id) == eid || String($0.episodeNumber) == eid
+           }) {
+            currentEpisode = matched.episodeNumber
+        }
         _ = await ensurePlayAsset(for: currentEpisode, presentUnlockOnDenied: true)
         guard !Task.isCancelled else { return }
         initializeEpisodePlayer()
@@ -373,7 +374,7 @@ struct SeriesPlayerView: View {
                 items: playerItems,
                 startIndex: startIndex,
                 handoff: handoff,
-                backendResumeTime: handoff == nil ? (myListResume ?? backendResume) : backendResume
+                backendResumeTime: handoff == nil ? effectiveResume : backendResume
             )
         }
 

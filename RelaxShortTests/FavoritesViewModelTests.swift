@@ -104,6 +104,51 @@ struct FavoritesViewModelTests {
         #expect(vm.bookmarks.count == 2)
         #expect(vm.watchHistory.count == 1)
     }
+
+    // MARK: - Edit
+
+    @Test
+    func historyWithItemsCanEnterEditing() async {
+        let repo = StubFavoritesVMRepo()
+        let vm = FavoritesViewModel(repository: repo)
+
+        await vm.loadHistory()
+        vm.selectedSegment = .history
+        vm.enterEditing()
+
+        #expect(vm.canEdit)
+        #expect(vm.isEditing)
+    }
+
+    @Test
+    func retryAfterFirstPageRefreshFailureUsesNilCursorEvenWithStaleItems() async {
+        let repo = StubFavoritesVMRepo()
+        let vm = FavoritesViewModel(repository: repo)
+        await vm.loadBookmarks()
+
+        repo.shouldFailBookmarks = true
+        await vm.loadBookmarks()
+        repo.shouldFailBookmarks = false
+        await vm.retryBookmarks()
+
+        #expect(repo.bookmarkCursors.suffix(2).allSatisfy { $0 == nil })
+    }
+
+    @Test
+    func removingSelectedHistoryCallsRepositoryAndRemovesRow() async {
+        let repo = StubFavoritesVMRepo()
+        let vm = FavoritesViewModel(repository: repo)
+        await vm.loadHistory()
+        vm.selectedSegment = .history
+        vm.enterEditing()
+        vm.toggleSelection(id: "1")
+
+        await vm.removeSelectedItems()
+
+        #expect(repo.deletedHistorySeriesIDs == ["1"])
+        #expect(vm.watchHistory.isEmpty)
+        #expect(!vm.isEditing)
+    }
 }
 
 // MARK: - Stub Repository
@@ -111,6 +156,8 @@ struct FavoritesViewModelTests {
 final class StubFavoritesVMRepo: FavoritesRepositoryProtocol, @unchecked Sendable {
     var shouldFailBookmarks: Bool
     var shouldFailHistory: Bool
+    var bookmarkCursors: [String?] = []
+    var deletedHistorySeriesIDs: [String] = []
 
     init(shouldFailBookmarks: Bool = false, shouldFailHistory: Bool = false) {
         self.shouldFailBookmarks = shouldFailBookmarks
@@ -133,7 +180,12 @@ final class StubFavoritesVMRepo: FavoritesRepositoryProtocol, @unchecked Sendabl
         return CursorPage(items: [item], nextCursor: "hcursor-2", hasMore: true)
     }
 
+    func deleteWatchHistory(seriesID: String) async throws {
+        deletedHistorySeriesIDs.append(seriesID)
+    }
+
     func fetchBookmarks(cursor: String?, limit: Int) async throws -> CursorPage<DramaItem> {
+        bookmarkCursors.append(cursor)
         if shouldFailBookmarks {
             throw NSError(domain: "stub", code: 500)
         }

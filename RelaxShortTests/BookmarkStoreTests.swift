@@ -204,6 +204,8 @@ final class StubFavoritesRepository: FavoritesRepositoryProtocol, @unchecked Sen
         throw NSError(domain: "stub", code: 0)
     }
 
+    func deleteWatchHistory(seriesID: String) async throws {}
+
     func fetchBookmarks(cursor: String?, limit: Int) async throws -> CursorPage<DramaItem> {
         throw NSError(domain: "stub", code: 0)
     }

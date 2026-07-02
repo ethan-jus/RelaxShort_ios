@@ -239,6 +239,46 @@ struct WatchProgressReporterTests {
     }
 
     @Test
+    func concurrentObserveWhileHeartbeatIsPendingSendsOnlyOneHeartbeat() async {
+        let repo = GatedProgressRepository()
+        let reporter = WatchProgressReporter(
+            repository: repo,
+            throttleInterval: .zero,
+            minProgressDelta: 3
+        )
+        await reporter.begin(seriesID: "1", episodeID: "101")
+
+        async let first: Void = reporter.observe(seconds: 10, duration: 100)
+        await repo.waitUntilSendCount(1)
+        async let second: Void = reporter.observe(seconds: 20, duration: 100)
+        await Task.yield()
+
+        #expect(await repo.sendCount == 1)
+        await repo.releaseFirstSend()
+        _ = await (first, second)
+        #expect(await repo.sendCount == 1)
+    }
+
+    @Test
+    func finalReportWaitsForPendingHeartbeat() async {
+        let repo = GatedProgressRepository()
+        let reporter = WatchProgressReporter(repository: repo)
+        await reporter.begin(seriesID: "1", episodeID: "101")
+
+        async let heartbeat: Void = reporter.observe(seconds: 10, duration: 100)
+        await repo.waitUntilSendCount(1)
+        async let final: Void = reporter.finalize(completed: false)
+        await Task.yield()
+
+        #expect(await repo.sendCount == 1)
+        await repo.releaseFirstSend()
+        _ = await (heartbeat, final)
+
+        let reports = await repo.reports
+        #expect(reports.map(\.finalReport) == [false, true])
+    }
+
+    @Test
     func newSessionReportsWithDifferentUUID() async {
         let repo = SpyFavoritesRepository()
         let uuidSeq = UUIDSequence()
@@ -312,6 +352,8 @@ actor SpyFavoritesRepository: FavoritesRepositoryProtocol, @unchecked Sendable {
         throw NSError(domain: "spy", code: 0)
     }
 
+    func deleteWatchHistory(seriesID: String) async throws {}
+
     func fetchBookmarks(cursor: String?, limit: Int) async throws -> CursorPage<DramaItem> {
         throw NSError(domain: "spy", code: 0)
     }
@@ -335,4 +377,46 @@ actor SpyFavoritesRepository: FavoritesRepositoryProtocol, @unchecked Sendable {
             throw NSError(domain: "spy", code: 500)
         }
     }
+}
+
+actor GatedProgressRepository: FavoritesRepositoryProtocol {
+    private(set) var reports: [WatchProgressReport] = []
+    private(set) var sendCount = 0
+    private var firstSendContinuation: CheckedContinuation<Void, Never>?
+    private var sendCountWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
+
+    func waitUntilSendCount(_ expected: Int) async {
+        if sendCount >= expected { return }
+        await withCheckedContinuation { continuation in
+            sendCountWaiters.append((expected, continuation))
+        }
+    }
+
+    func releaseFirstSend() {
+        firstSendContinuation?.resume()
+        firstSendContinuation = nil
+    }
+
+    func reportProgress(_ report: WatchProgressReport) async throws {
+        sendCount += 1
+        reports.append(report)
+        let ready = sendCountWaiters.filter { sendCount >= $0.0 }
+        sendCountWaiters.removeAll { sendCount >= $0.0 }
+        ready.forEach { $0.1.resume() }
+        if sendCount == 1 {
+            await withCheckedContinuation { continuation in
+                firstSendContinuation = continuation
+            }
+        }
+    }
+
+    func fetchWatchHistory(cursor: String?, limit: Int) async throws -> CursorPage<WatchHistoryItem> {
+        throw NSError(domain: "gate", code: 0)
+    }
+    func deleteWatchHistory(seriesID: String) async throws {}
+    func fetchBookmarks(cursor: String?, limit: Int) async throws -> CursorPage<DramaItem> {
+        throw NSError(domain: "gate", code: 0)
+    }
+    func fetchBookmarkedSeriesIDs(_ seriesIDs: [String]) async throws -> Set<String> { [] }
+    func setBookmarked(_ bookmarked: Bool, seriesID: String) async throws -> Bool { bookmarked }
 }

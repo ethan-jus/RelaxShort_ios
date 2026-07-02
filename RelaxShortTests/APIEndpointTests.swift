@@ -63,6 +63,18 @@ struct APIEndpointTests {
         #expect(items.contains(where: { $0.name == "limit" && $0.value == "10" }))
     }
 
+    @Test
+    func deleteWatchHistoryPathMethodAndHeaders() {
+        withUserDefaultsRestored {
+            enableRealAPI()
+            let endpoint = APIEndpoint.deleteWatchHistory(seriesID: "42")
+            #expect(endpoint.path == "/api/v2/watch-history/42")
+            #expect(endpoint.method == .delete)
+            #expect(endpoint.body == nil)
+            #expect(endpoint.headers["X-User-Id"] == "1")
+        }
+    }
+
     // MARK: - Task31: watchProgress
 
     @Test
@@ -187,6 +199,7 @@ struct APIEndpointTests {
             )
             let endpoints: [APIEndpoint] = [
                 .watchHistoryV2(cursor: nil, limit: 20),
+                .deleteWatchHistory(seriesID: "1"),
                 .watchProgress(report),
                 .bookmarksV2(cursor: nil, limit: 20),
                 .bookmarkStatus(seriesIDs: ["1"]),

@@ -80,6 +80,8 @@ protocol FavoritesRepositoryProtocol: Sendable {
     /// 获取观看历史（游标分页）
     func fetchWatchHistory(cursor: String?, limit: Int) async throws
         -> CursorPage<WatchHistoryItem>
+    /// 删除当前用户指定短剧的观看历史
+    func deleteWatchHistory(seriesID: String) async throws
     /// 获取收藏列表（游标分页）
     func fetchBookmarks(cursor: String?, limit: Int) async throws
         -> CursorPage<DramaItem>

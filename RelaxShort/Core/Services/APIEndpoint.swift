@@ -48,6 +48,7 @@ enum APIEndpoint {
     // MARK: - Task31 收藏/观看进度 v2 端点
 
     case watchHistoryV2(cursor: String?, limit: Int)
+    case deleteWatchHistory(seriesID: String)
     case watchProgress(WatchProgressReport)
     case bookmarksV2(cursor: String?, limit: Int)
     case bookmarkStatus(seriesIDs: [String])
@@ -86,7 +87,7 @@ extension APIEndpoint {
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences,
              .discoveryEvents,
-             .watchHistoryV2, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
+             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -115,6 +116,7 @@ extension APIEndpoint {
         case .discoveryEvents:                  return "/api/v2/events/discovery/batch"
         // ── Task31 v2 ──
         case .watchHistoryV2:                return "/api/v2/watch-history"
+        case .deleteWatchHistory(let seriesID): return "/api/v2/watch-history/\(seriesID)"
         case .watchProgress:                 return "/api/v2/watch-progress"
         case .bookmarksV2:                   return "/api/v2/users/me/bookmarks"
         case .bookmarkStatus:                return "/api/v2/users/me/bookmark-status"
@@ -151,6 +153,7 @@ extension APIEndpoint {
         case .updateUserPreferences: return .patch
         case .discoveryEvents:     return .post
         case .watchHistoryV2, .bookmarksV2, .bookmarkStatus: return .get
+        case .deleteWatchHistory: return .delete
         case .watchProgress: return .post
         case .setBookmark(_, let bookmarked): return bookmarked ? .post : .delete
         case .homeFeed, .banners, .dramaDetail, .episodes,
@@ -169,7 +172,7 @@ extension APIEndpoint {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
-             .watchHistoryV2, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
+             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
         default: return false
         }
@@ -180,7 +183,7 @@ extension APIEndpoint {
     private var requiresUserIdHeader: Bool {
         switch self {
         case .episodePlay, .userMe, .userWallet, .updateUserPreferences,
-             .watchHistoryV2, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
+             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
         default:
             return false

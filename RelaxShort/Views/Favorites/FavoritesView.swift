@@ -5,6 +5,7 @@ import SwiftUI
 struct FavoritesView: View {
     @EnvironmentObject var authStore: AuthStore
     @EnvironmentObject var appStore: AppStore
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var viewModel: FavoritesViewModel
 
     init(viewModel: FavoritesViewModel) {
@@ -34,7 +35,18 @@ struct FavoritesView: View {
             appStore.isBottomTabBarHidden = editing
         }
         .onChange(of: authStore.isLoggedIn) { _, loggedIn in
-            if !loggedIn { viewModel.cancelEditing(); appStore.isBottomTabBarHidden = false }
+            if loggedIn {
+                Task { await viewModel.refreshUserData() }
+            } else {
+                viewModel.cancelEditing()
+                appStore.isBottomTabBarHidden = false
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active,
+                  appStore.selectedTab == .myList,
+                  authStore.isLoggedIn else { return }
+            Task { await viewModel.refreshUserData() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if viewModel.isEditing { removeBar }
@@ -71,21 +83,26 @@ struct FavoritesView: View {
             } else {
                 ForEach(FavoritesViewModel.Segment.allCases, id: \.self) { seg in
                     Button { viewModel.selectedSegment = seg } label: {
-                        Text(seg == .following ? L10n.myListFollowing : L10n.myListHistory)
-                            .font(.system(size: 20, weight: viewModel.selectedSegment == seg ? .semibold : .regular))
-                            .foregroundColor(viewModel.selectedSegment == seg ? .white : Color.white.opacity(0.55))
+                        VStack(spacing: 6) {
+                            Text(seg == .following ? L10n.myListFollowing : L10n.myListHistory)
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(viewModel.selectedSegment == seg ? .white : Color.white.opacity(0.55))
+                            Capsule()
+                                .fill(viewModel.selectedSegment == seg ? Color.white : Color.clear)
+                                .frame(width: 28, height: 3)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
                 Spacer()
-                if viewModel.canEdit {
-                    Button { viewModel.enterEditing() } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18)).foregroundColor(.white)
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                } else {
-                    Color.clear.frame(width: 44, height: 44)
+                Button { viewModel.enterEditing() } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 18)).foregroundColor(.white)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .disabled(!viewModel.canEdit)
+                .opacity(viewModel.canEdit ? 1 : 0.35)
+                .accessibilityLabel(L10n.myListChoose)
             }
         }
         .padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 4)
@@ -131,7 +148,7 @@ struct FavoritesView: View {
                     progress: history.map { $0.progress } ?? 0,
                     coverW: coverW, coverH: coverH,
                     isEditing: viewModel.isEditing,
-                    isSelected: viewModel.selectedBookmarkIDs.contains(drama.id),
+                    isSelected: viewModel.selectedItemIDs.contains(drama.id),
                     onTap: { handleBookmarkTap(drama, history: history) },
                     onToggle: { viewModel.toggleSelection(id: drama.id) }
                 )
@@ -160,9 +177,10 @@ struct FavoritesView: View {
                     totalEpisodes: item.drama.episodeCount,
                     progress: item.progress,
                     coverW: coverW, coverH: coverH,
-                    isEditing: false, isSelected: false,
+                    isEditing: viewModel.isEditing,
+                    isSelected: viewModel.selectedItemIDs.contains(item.drama.id),
                     onTap: { handleHistoryTap(item) },
-                    onToggle: {}
+                    onToggle: { viewModel.toggleSelection(id: item.drama.id) }
                 )
             }
             if !viewModel.watchHistory.isEmpty {
@@ -198,15 +216,14 @@ struct FavoritesView: View {
                         CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: coverW, height: coverH)
                             .frame(width: coverW, height: coverH)
                             .cornerRadius(DB.posterRadius)
-                        // Progress bar
-                        Rectangle().fill(Color.white.opacity(0.25)).frame(height: 3)
-                        Rectangle().fill(DB.logoRed)
-                            .frame(width: coverW * CGFloat(clamp(progress, 0, 1)), height: 3)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        // Selected overlay
                         if isSelected {
                             Color.black.opacity(0.45).cornerRadius(DB.posterRadius)
                         }
+                        // Progress bar
+                        Rectangle().fill(Color(white: 0.30)).frame(height: 3)
+                        Rectangle().fill(DB.logoRed)
+                            .frame(width: coverW * CGFloat(clamp(progress, 0, 1)), height: 3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .frame(width: coverW, height: coverH)
 
@@ -254,22 +271,25 @@ struct FavoritesView: View {
         let cols: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
         let cardW = (containerW - 42) / 3
         LazyVGrid(columns: cols, spacing: 18) {
-            ForEach(Array(viewModel.topTrendingEntries.enumerated()), id: \.element.id) { idx, entry in
+            ForEach(viewModel.topTrendingEntries) { entry in
                 Button {
                     appStore.navigationTarget = SeriesPlayerNav(drama: entry.drama, startEpisode: max(entry.drama.currentEpisode, 1), sourceScene: "my_list_trending")
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
                         ZStack(alignment: .topLeading) {
                             CoverImageView(url: entry.drama.coverURL, cornerRadius: DB.posterRadius, width: cardW, height: cardW * 1.5)
+                                .frame(width: cardW, height: cardW * 1.5)
                             Text("\(entry.rankPosition)")
                                 .font(.system(size: 13, weight: .semibold)).foregroundColor(.white)
                                 .frame(width: 26, height: 26)
                                 .background(rankBadgeColor(entry.rankPosition))
-                                .cornerRadius(4)
-                                .padding(4)
+                                .clipShape(UnevenRoundedRectangle(topLeadingRadius: DB.posterRadius))
                         }
+                        .frame(width: cardW, height: cardW * 1.5)
                         Text(entry.drama.title).font(.system(size: 14)).foregroundColor(.white).lineLimit(2)
+                            .frame(height: 36, alignment: .top)
                         Text(entry.drama.category).font(.system(size: 13)).foregroundColor(DB.mutedText).lineLimit(1)
+                            .frame(height: 18, alignment: .top)
                     }
                 }.buttonStyle(.plain)
             }
@@ -306,6 +326,7 @@ struct FavoritesView: View {
             .overlay { if isSelected { Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundColor(.white) } }
             .frame(width: 22, height: 22)
             .frame(height: coverH, alignment: .center)
+            .accessibilityValue(isSelected ? L10n.myListSelectionSelected : L10n.myListSelectionUnselected)
     }
 
     private func dramaCategoryTags(_ drama: DramaItem) -> String {
@@ -329,22 +350,27 @@ struct FavoritesView: View {
                     ProgressView().tint(DB.logoRed)
                 } else {
                     Button {
-                        Task { await viewModel.removeSelectedBookmarks() }
+                        Task { await viewModel.removeSelectedItems() }
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "trash")
                             Text(L10n.myListRemove)
                         }
                         .font(.system(size: 16))
-                        .foregroundColor(viewModel.selectedBookmarkIDs.isEmpty ? Color.white.opacity(0.3) : .white)
+                        .foregroundColor(viewModel.selectedItemIDs.isEmpty ? Color.white.opacity(0.3) : .white)
                     }
-                    .disabled(viewModel.selectedBookmarkIDs.isEmpty || viewModel.isRemoving)
+                    .disabled(viewModel.selectedItemIDs.isEmpty || viewModel.isRemoving)
                     .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel(L10n.myListRemoveSelectedCount(viewModel.selectedItemIDs.count))
                 }
             }
             .padding(.horizontal, 16)
+            .frame(
+                height: DramaBoxBottomTabBar.totalHeight
+                    + UIApplication.safeAreaInsets.bottom
+                    - 1
+            )
         }
-        .frame(height: 56)
         .background(Color.black)
     }
 

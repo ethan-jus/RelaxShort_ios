@@ -32,6 +32,8 @@ actor WatchProgressReporter {
         var latestSeconds: Int = 0
         /// 最新 observe 传入的 duration（不受节流限制）
         var latestDuration: Int = 0
+        /// 已入发送队列、尚未完成的 heartbeat generation
+        var pendingHeartbeatGeneration: Int?
         var finalized: Bool = false
     }
 
@@ -43,6 +45,8 @@ actor WatchProgressReporter {
     private let uuidGenerator: @Sendable () -> UUID
     private let throttleInterval: Duration
     private let minProgressDelta: Int
+    private var sendTail: (id: Int, task: Task<Bool, Never>)?
+    private var nextSendID = 0
 
     // MARK: - Init
 
@@ -114,10 +118,16 @@ actor WatchProgressReporter {
             session = s
             return
         }
+        // 前一个 heartbeat 尚未返回时只更新最新快照，不重复入队。
+        guard s.pendingHeartbeatGeneration == nil else {
+            session = s
+            return
+        }
 
         s.generation &+= 1
         let gen = s.generation
         let sessionID = s.id
+        s.pendingHeartbeatGeneration = gen
         session = s
 
         let report = WatchProgressReport(
@@ -133,15 +143,20 @@ actor WatchProgressReporter {
             contentLanguage: s.contentLanguage,
             subtitleLanguage: s.subtitleLanguage
         )
-        let sent = await send(report, sessionID: sessionID, generation: gen)
+        let queued = enqueue(report)
+        let sent = await queued.task.value
+        clearSendTail(ifLatest: queued.id)
 
-        // 只在成功发送后更新节流状态
-        if sent {
-            guard var cur = session, cur.id == sessionID else { return }
+        guard var cur = session,
+              cur.id == sessionID,
+              cur.pendingHeartbeatGeneration == gen else { return }
+        cur.pendingHeartbeatGeneration = nil
+        // 只在当前 session 仍活跃且成功发送后更新节流状态。
+        if sent, !cur.finalized {
             cur.lastSentSeconds = secs
             cur.lastSentInstant = currentInstant
-            session = cur
         }
+        session = cur
     }
 
     /// 强制发送最终进度快照。
@@ -152,7 +167,6 @@ actor WatchProgressReporter {
         guard var s = session, !s.finalized else { return }
         s.finalized = true
         s.generation &+= 1
-        let gen = s.generation
         let sessionID = s.id
 
         // 使用最新进度而非 lastSentSeconds
@@ -174,7 +188,9 @@ actor WatchProgressReporter {
             contentLanguage: s.contentLanguage,
             subtitleLanguage: s.subtitleLanguage
         )
-        _ = await send(report, sessionID: sessionID, generation: gen)
+        let queued = enqueue(report)
+        _ = await queued.task.value
+        clearSendTail(ifLatest: queued.id)
 
         // 只在 session 未被替换时清理（防范 actor reentrancy）
         if let cur = session, cur.id == sessionID {
@@ -184,15 +200,29 @@ actor WatchProgressReporter {
 
     // MARK: - Private
 
-    /// 发送上报，返回是否成功。
-    /// 检查 sessionID 和 generation 以防止旧请求覆盖新 session 状态。
-    private func send(_ report: WatchProgressReport, sessionID: UUID, generation: Int) async -> Bool {
-        do {
-            try await repository.reportProgress(report)
-            return true
-        } catch {
-            Logger.viewModel.warning("WatchProgressReporter: send failed: \(error)")
-            return false
+    /// 所有 heartbeat/final 都串到同一条 task 链，保证请求开始与完成顺序一致。
+    private func enqueue(_ report: WatchProgressReport) -> (id: Int, task: Task<Bool, Never>) {
+        nextSendID &+= 1
+        let id = nextSendID
+        let previous = sendTail?.task
+        let repository = repository
+        let task = Task {
+            _ = await previous?.value
+            do {
+                try await repository.reportProgress(report)
+                return true
+            } catch {
+                Logger.viewModel.warning("WatchProgressReporter: send failed: \(error)")
+                return false
+            }
+        }
+        sendTail = (id, task)
+        return (id, task)
+    }
+
+    private func clearSendTail(ifLatest id: Int) {
+        if sendTail?.id == id {
+            sendTail = nil
         }
     }
 }

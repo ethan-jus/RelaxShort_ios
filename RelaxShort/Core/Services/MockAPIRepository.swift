@@ -345,6 +345,9 @@ struct MockFavoritesRepository: FavoritesRepositoryProtocol {
         let history = MockData.watchHistory
         return CursorPage(items: history, nextCursor: nil, hasMore: false)
     }
+    func deleteWatchHistory(seriesID: String) async throws {
+        try await Task.sleep(nanoseconds: MC.delay)
+    }
     func fetchBookmarks(cursor: String?, limit: Int) async throws
         -> CursorPage<DramaItem> {
         try await Task.sleep(nanoseconds: MC.delay)
