@@ -230,3 +230,7 @@
 "my_list.load_failed" = "Load failed";
 "my_list.partial_remove_failed" = "Some items could not be removed";
 "my_list.episode_progress" = "EP.%d / EP.%d";
+"my_list.selection_selected" = "Selected";
+"my_list.selection_unselected" = "Not selected";
+"my_list.remove_selected_count" = "Remove (%d)";
+"my_list.no_more_content" = "No more content";

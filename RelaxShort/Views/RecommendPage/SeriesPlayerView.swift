@@ -373,7 +373,7 @@ struct SeriesPlayerView: View {
                 items: playerItems,
                 startIndex: startIndex,
                 handoff: handoff,
-                backendResumeTime: backendResume
+                backendResumeTime: handoff == nil ? (myListResume ?? backendResume) : backendResume
             )
         }
 

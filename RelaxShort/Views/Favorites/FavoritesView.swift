@@ -26,8 +26,15 @@ struct FavoritesView: View {
         }
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
+        .onChange(of: appStore.selectedTab) { _, tab in
+            guard tab == .myList, authStore.isLoggedIn else { return }
+            Task { await viewModel.refreshUserData() }
+        }
         .onChange(of: viewModel.isEditing) { _, editing in
             appStore.isBottomTabBarHidden = editing
+        }
+        .onChange(of: authStore.isLoggedIn) { _, loggedIn in
+            if !loggedIn { viewModel.cancelEditing(); appStore.isBottomTabBarHidden = false }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if viewModel.isEditing { removeBar }
@@ -135,7 +142,7 @@ struct FavoritesView: View {
                 }
             }
             if viewModel.isBookmarksLoading { loadingFooter }
-            if let err = viewModel.bookmarksError { errorFooter(err) { Task { await viewModel.loadBookmarks() } } }
+            if let err = viewModel.bookmarksError { errorFooter(err) { Task { await viewModel.retryBookmarks() } } }
         }
     }
 
@@ -164,7 +171,7 @@ struct FavoritesView: View {
                 }
             }
             if viewModel.isHistoryLoading { loadingFooter }
-            if let err = viewModel.historyError { errorFooter(err) { Task { await viewModel.loadHistory() } } }
+            if let err = viewModel.historyError { errorFooter(err) { Task { await viewModel.retryHistory() } } }
         }
     }
 
@@ -234,6 +241,10 @@ struct FavoritesView: View {
                 Text(L10n.myListMostTrending).font(.system(size: 20, weight: .semibold))
                     .foregroundColor(.white).padding(.horizontal, 16).padding(.top, 32)
                 trendingGrid(containerW: containerW)
+                if viewModel.topTrendingEntries.count >= 6 {
+                    Text(L10n.myListNoMoreContent).font(.system(size: 14)).foregroundColor(DB.mutedText)
+                        .frame(maxWidth: .infinity).padding(.vertical, 12)
+                }
             }
         }
     }
@@ -241,20 +252,32 @@ struct FavoritesView: View {
     @ViewBuilder
     private func trendingGrid(containerW: CGFloat) -> some View {
         let cols: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
+        let cardW = (containerW - 42) / 3
         LazyVGrid(columns: cols, spacing: 18) {
-            ForEach(viewModel.trendingEntries) { entry in
+            ForEach(Array(viewModel.topTrendingEntries.enumerated()), id: \.element.id) { idx, entry in
                 Button {
                     appStore.navigationTarget = SeriesPlayerNav(drama: entry.drama, startEpisode: max(entry.drama.currentEpisode, 1), sourceScene: "my_list_trending")
                 } label: {
                     VStack(alignment: .leading, spacing: 4) {
-                        CoverImageView(url: entry.drama.coverURL, cornerRadius: DB.posterRadius, width: (containerW - 42) / 3, height: ((containerW - 42) / 3) * 1.5)
-                            .cornerRadius(DB.posterRadius)
+                        ZStack(alignment: .topLeading) {
+                            CoverImageView(url: entry.drama.coverURL, cornerRadius: DB.posterRadius, width: cardW, height: cardW * 1.5)
+                            Text("\(entry.rankPosition)")
+                                .font(.system(size: 13, weight: .semibold)).foregroundColor(.white)
+                                .frame(width: 26, height: 26)
+                                .background(rankBadgeColor(entry.rankPosition))
+                                .cornerRadius(4)
+                                .padding(4)
+                        }
                         Text(entry.drama.title).font(.system(size: 14)).foregroundColor(.white).lineLimit(2)
-                        Text(RankingMetricFormatter.string(from: entry.metricValue)).font(.system(size: 13)).foregroundColor(DB.mutedText).lineLimit(1)
+                        Text(entry.drama.category).font(.system(size: 13)).foregroundColor(DB.mutedText).lineLimit(1)
                     }
                 }.buttonStyle(.plain)
             }
         }.padding(.horizontal, 16)
+    }
+
+    private func rankBadgeColor(_ rank: Int) -> Color {
+        switch rank { case 1: .orange; case 2: .green; case 3: .blue; default: .gray }
     }
 
     // MARK: - Helpers
@@ -296,6 +319,9 @@ struct FavoritesView: View {
 
     private var removeBar: some View {
         VStack(spacing: 0) {
+            if let err = viewModel.removalError {
+                Text(err).font(.system(size: 13)).foregroundColor(DB.logoRed).padding(.horizontal, 16).padding(.vertical, 4)
+            }
             Divider().background(Color.white.opacity(0.5))
             HStack {
                 Spacer()
@@ -331,7 +357,8 @@ struct FavoritesView: View {
     }
 
     private func handleDisappear() {
-        if viewModel.isEditing { appStore.isBottomTabBarHidden = false }
+        viewModel.cancelEditing()
+        appStore.isBottomTabBarHidden = false
     }
 
     private func handleBookmarkTap(_ drama: DramaItem, history: WatchHistoryItem?) {

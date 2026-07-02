@@ -39,6 +39,7 @@ final class FavoritesViewModel: ObservableObject {
     @Published var isEditing: Bool = false
     @Published var selectedBookmarkIDs: Set<String> = []
     @Published var isRemoving: Bool = false
+    @Published var removalError: String?
 
     // MARK: - Login
 
@@ -67,6 +68,27 @@ final class FavoritesViewModel: ObservableObject {
         async let _h: () = loadHistory()
         async let _t: () = loadTrending()
         _ = await (_b, _h, _t)
+    }
+
+    /// Tab 激活/登录后刷新用户数据，不清空已有数据
+    func refreshUserData() async {
+        async let _b: () = loadBookmarks()
+        async let _h: () = loadHistory()
+        _ = await (_b, _h)
+    }
+
+    func retryBookmarks() async {
+        if bookmarks.isEmpty { await loadBookmarks() }
+        else { await loadMoreBookmarks() }
+    }
+
+    func retryHistory() async {
+        if watchHistory.isEmpty { await loadHistory() }
+        else { await loadMoreHistory() }
+    }
+
+    var topTrendingEntries: [RankingEntry] {
+        Array(trendingEntries.sorted { $0.rankPosition < $1.rankPosition }.prefix(6))
     }
 
     // MARK: - Bookmarks
@@ -140,7 +162,7 @@ final class FavoritesViewModel: ObservableObject {
     }
 
     func cancelEditing() {
-        isEditing = false; selectedBookmarkIDs.removeAll()
+        isEditing = false; selectedBookmarkIDs.removeAll(); removalError = nil
     }
 
     func toggleSelection(id: String) {
@@ -150,7 +172,7 @@ final class FavoritesViewModel: ObservableObject {
 
     func removeSelectedBookmarks() async {
         guard !isRemoving, !selectedBookmarkIDs.isEmpty else { return }
-        isRemoving = true
+        isRemoving = true; removalError = nil
         var failed: Set<String> = []
         for id in selectedBookmarkIDs {
             do {
@@ -163,6 +185,7 @@ final class FavoritesViewModel: ObservableObject {
         }
         selectedBookmarkIDs = failed
         isRemoving = false
+        if !failed.isEmpty { removalError = L10n.myListPartialRemoveFailed }
         if failed.isEmpty { cancelEditing() }
     }
 

@@ -786,6 +786,12 @@ enum L10n {
     static func myListEpisodeProgress(_ current: Int, _ total: Int) -> String {
         String(format: loc("my_list.episode_progress"), current, total)
     }
+    static var myListSelectionSelected: String { loc("my_list.selection_selected") }
+    static var myListSelectionUnselected: String { loc("my_list.selection_unselected") }
+    static func myListRemoveSelectedCount(_ count: Int) -> String {
+        String(format: loc("my_list.remove_selected_count"), count)
+    }
+    static var myListNoMoreContent: String { loc("my_list.no_more_content") }
 
     static var commonRetry: String { retry }
     static var commonCancel: String { cancel }
