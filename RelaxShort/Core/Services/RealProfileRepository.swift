@@ -12,7 +12,7 @@ enum ProfileDTOMapper {
         User(
             id: String(profile.userId),
             nickname: profile.nickname ?? "",
-            avatarURL: profile.avatarURL,
+            avatarURL: profile.avatarUrl,
             isVip: wallet.vip?.active ?? false,
             vipExpireDate: wallet.vip?.expiresAt.flatMap(parseISO8601),
             coinBalance: wallet.balance.map {

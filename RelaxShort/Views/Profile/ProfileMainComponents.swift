@@ -146,20 +146,18 @@ struct ProfileMembershipCard: View {
                         Text("profile.join_membership".localized)
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
-                        Text("profile.sign_in_subtitle".localized)
+                        Text("vip.unlock_all".localized)
                             .font(DT.Font.small)
                             .foregroundColor(DT.Color.textSecondary)
                     }
                     Spacer()
-                    Button(action: onJoin) {
-                        Text("profile.join_membership".localized)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, DT.Space.md)
-                            .padding(.vertical, DT.Space.xs)
-                            .background(DT.logoRed)
-                            .cornerRadius(DT.Radius.sm)
-                    }
+                    Text("profile.join_membership".localized)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, DT.Space.md)
+                        .padding(.vertical, DT.Space.xs)
+                        .background(DT.logoRed)
+                        .cornerRadius(DT.Radius.sm)
                 }
                 .padding(DT.Space.lg)
 
@@ -181,6 +179,9 @@ struct ProfileMembershipCard: View {
             )
         )
         .clipShape(RoundedRectangle(cornerRadius: DB.cardRadius))
+        .contentShape(RoundedRectangle(cornerRadius: DB.cardRadius))
+        .onTapGesture(perform: onJoin)
+        .accessibilityAddTraits(.isButton)
         .padding(.horizontal, DT.Space.pageH)
         .padding(.top, DT.Space.sm)
     }
@@ -193,7 +194,10 @@ struct ProfileMembershipCard: View {
             Text(text)
                 .font(.system(size: 10))
                 .foregroundColor(DT.Color.textSecondary)
-                .lineLimit(1)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .frame(minHeight: 24, alignment: .top)
         }
         .frame(maxWidth: .infinity)
     }
@@ -225,13 +229,22 @@ struct ProfileMenuRow: View {
     let iconColor: Color
     let title: String
     let subtitle: String?
+    let showsDivider: Bool
     let onTap: () -> Void
 
-    init(icon: String, iconColor: Color = .white, title: String, subtitle: String? = nil, onTap: @escaping () -> Void) {
+    init(
+        icon: String,
+        iconColor: Color = .white,
+        title: String,
+        subtitle: String? = nil,
+        showsDivider: Bool = true,
+        onTap: @escaping () -> Void
+    ) {
         self.icon = icon
         self.iconColor = iconColor
         self.title = title
         self.subtitle = subtitle
+        self.showsDivider = showsDivider
         self.onTap = onTap
     }
 
@@ -264,7 +277,7 @@ struct ProfileMenuRow: View {
         }
         .buttonStyle(.plain)
 
-        if title != "profile.help_feedback".localized {
+        if showsDivider {
             Divider()
                 .background(DB.divider)
                 .padding(.leading, 56)

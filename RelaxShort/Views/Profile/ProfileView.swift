@@ -55,18 +55,12 @@ struct ProfileView: View {
     @StateObject private var viewModel: ProfileViewModel
     @EnvironmentObject var authStore: AuthStore
     @EnvironmentObject var appStore: AppStore
-    @EnvironmentObject var dependencies: DependencyContainer
 
     @State private var selectedDestination: ProfileSheet?
     @State private var showLoginSheet = false
-    @State private var showLogoutAlert = false
 
     init(viewModel: ProfileViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
-    }
-
-    private var pageInset: CGFloat {
-        min(max(DT.Space.pageH, 16), 24)
     }
 
     var body: some View {
@@ -74,17 +68,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 0) {
                 // 顶部用户区
                 if authStore.isLoggedIn {
-                    switch viewModel.loadState {
-                    case .loading:
-                        ProfileHeaderSkeleton()
-                    case .failed(let msg):
-                        identityHeader
-                        ProfileInlineError(message: msg) {
-                            Task { await viewModel.loadProfile() }
-                        }
-                    default:
-                        identityHeader
-                    }
+                    loggedInHeader
                 } else {
                     guestHeader
                 }
@@ -95,8 +79,8 @@ struct ProfileView: View {
 
                 // 菜单第一组
                 ProfileMenuCard {
-                    if authStore.isLoggedIn, let user = viewModel.profile {
-                        ProfileMenuRow(icon: "bitcoinsign.circle.fill", iconColor: DB.gold, title: "profile.top_up".localized, subtitle: "@\(user.coinBalance)", onTap: { selectedDestination = .topUp })
+                    if authStore.isLoggedIn {
+                        ProfileMenuRow(icon: "bitcoinsign.circle.fill", iconColor: DB.gold, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
                     } else {
                         ProfileMenuRow(icon: "bitcoinsign.circle.fill", iconColor: DB.gold, title: "profile.top_up".localized, onTap: { presentLoginOrNavigate(.topUp) })
                     }
@@ -105,30 +89,18 @@ struct ProfileView: View {
                     } else {
                         ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, onTap: { presentLoginOrNavigate(.wallet) })
                     }
-                    ProfileMenuRow(icon: "gift.fill", iconColor: .orange, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
-                    ProfileMenuRow(icon: "clock.fill", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
-                    ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
+                    ProfileMenuRow(icon: "gift.fill", iconColor: .orange, title: "profile.earn_rewards".localized, onTap: { presentLoginOrNavigate(.welfare) })
+                    ProfileMenuRow(icon: "clock.fill", iconColor: .white, title: "profile.history".localized, onTap: { presentLoginOrNavigate(.watchHistory) })
+                    ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, showsDivider: false, onTap: { presentLoginOrNavigate(.downloads) })
                 }
                 .padding(.top, DT.Space.lg)
 
                 // 菜单第二组
                 ProfileMenuCard {
                     ProfileMenuRow(icon: "globe", iconColor: .white, title: L10n.language, onTap: { selectedDestination = .language })
-                    ProfileMenuRow(icon: "questionmark.circle.fill", iconColor: .white, title: "profile.help_feedback".localized, onTap: { selectedDestination = .customerService })
+                    ProfileMenuRow(icon: "questionmark.circle.fill", iconColor: .white, title: "profile.help_feedback".localized, showsDivider: false, onTap: { selectedDestination = .customerService })
                 }
                 .padding(.top, DT.Space.md)
-
-                // 登出
-                if authStore.isLoggedIn {
-                    Button(role: .destructive, action: { showLogoutAlert = true }) {
-                        Text(L10n.logout)
-                            .font(.system(size: 15))
-                            .foregroundColor(.red)
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .padding(.horizontal, DT.Space.pageH)
-                    .padding(.top, DT.Space.md)
-                }
             }
             .padding(.bottom, DT.Layout.tabBarHeight + DT.Space.xl)
         }
@@ -145,11 +117,33 @@ struct ProfileView: View {
             guard let user, authStore.isLoggedIn else { return }
             authStore.applyLoadedProfile(user)
         }
-        .alert(L10n.confirmLogout, isPresented: $showLogoutAlert) {
-            Button(L10n.logout, role: .destructive) { authStore.logout() }
-            Button(L10n.cancel, role: .cancel) {}
-        } message: {
-            Text(L10n.logoutConfirmMessage)
+        .sheet(isPresented: $showLoginSheet) {
+            LoginView()
+        }
+    }
+
+    // MARK: - Logged In Header
+
+    @ViewBuilder
+    private var loggedInHeader: some View {
+        switch viewModel.loadState {
+        case .idle, .loading:
+            ProfileHeaderSkeleton()
+        case .loaded:
+            if viewModel.profile != nil {
+                identityHeader
+            } else {
+                ProfileHeaderSkeleton()
+            }
+        case .failed(let message):
+            if viewModel.profile != nil {
+                identityHeader
+            } else {
+                ProfileHeaderSkeleton()
+            }
+            ProfileInlineError(message: message) {
+                Task { await viewModel.loadProfile() }
+            }
         }
     }
 
@@ -158,8 +152,8 @@ struct ProfileView: View {
     private var identityHeader: some View {
         ProfileIdentityHeader(
             avatarURL: viewModel.profile?.avatarURL,
-            title: viewModel.displayName.isEmpty ? "Guest" : viewModel.displayName,
-            subtitle: viewModel.shortId.isEmpty ? "profile.sign_in_subtitle".localized : viewModel.shortId,
+            title: viewModel.displayName,
+            subtitle: viewModel.shortId,
             followingText: viewModel.profile.map { L10n.followedCount($0.followedCount) },
             isVIP: viewModel.profile?.isVipValid ?? false,
             onTap: {},
@@ -179,17 +173,15 @@ struct ProfileView: View {
             onTap: { showLoginSheet = true },
             onSettings: { selectedDestination = .settings }
         )
-        .sheet(isPresented: $showLoginSheet) {
-            LoginView()
-        }
     }
 
     // MARK: - Membership Card
 
     private var membershipCard: some View {
-        ProfileMembershipCard(
-            isVIP: viewModel.profile?.isVipValid ?? false,
-            vipExpireDate: viewModel.profile?.vipExpireDate,
+        let profile = authStore.isLoggedIn ? viewModel.profile : nil
+        return ProfileMembershipCard(
+            isVIP: profile?.isVipValid ?? false,
+            vipExpireDate: profile?.vipExpireDate,
             onJoin: {
                 NotificationCenter.default.post(name: .showMembership, object: nil)
             }
@@ -240,19 +232,20 @@ struct ProfileView: View {
 
 private struct LanguagePickerView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appStore: AppStore
 
     var body: some View {
         List {
             ForEach(AppLanguage.allCases, id: \.self) { lang in
                 Button(action: {
-                    ThemeManager.shared.language = lang
+                    appStore.language = lang
                     dismiss()
                 }) {
                     HStack {
                         Text(lang.displayName)
                             .foregroundColor(.white)
                         Spacer()
-                        if ThemeManager.shared.language == lang {
+                        if appStore.language == lang {
                             Image(systemName: "checkmark")
                                 .foregroundColor(DT.logoRed)
                         }
@@ -273,19 +266,20 @@ private struct LanguagePickerView: View {
 
 private struct ThemePickerView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var appStore: AppStore
 
     var body: some View {
         List {
             ForEach(ThemeMode.allCases, id: \.self) { mode in
                 Button(action: {
-                    ThemeManager.shared.themeMode = mode
+                    appStore.themeMode = mode
                     dismiss()
                 }) {
                     HStack {
                         Text(mode.displayName)
                             .foregroundColor(.white)
                         Spacer()
-                        if ThemeManager.shared.themeMode == mode {
+                        if appStore.themeMode == mode {
                             Image(systemName: "checkmark")
                                 .foregroundColor(DT.logoRed)
                         }
@@ -321,10 +315,24 @@ struct ProfileView_Previews: PreviewProvider {
         authStore.vipExpireDate = Date().addingTimeInterval(86400 * 30)
         authStore.coinBalance = 100
         authStore.loginMethod = .google
-        return ProfileView(viewModel: ProfileViewModel(repository: RealProfileRepository()))
+        return ProfileView(
+            viewModel: ProfileViewModel(
+                repository: ProfilePreviewRepository(
+                    user: authStore.currentUser!
+                )
+            )
+        )
             .environmentObject(authStore)
             .environmentObject(AppStore())
             .preferredColorScheme(.dark)
+    }
+}
+
+private struct ProfilePreviewRepository: ProfileRepositoryProtocol {
+    let user: User
+
+    func fetchUserProfile() async throws -> User {
+        user
     }
 }
 #endif

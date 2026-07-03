@@ -9,6 +9,8 @@ struct SettingsView: View {
     @State private var personalizedRecs = true
     @State private var marketingComms = false
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var authStore: AuthStore
+    @State private var showLogoutAlert = false
 #if DEBUG
     @State private var showDebugPanel = false
 #endif
@@ -25,6 +27,17 @@ struct SettingsView: View {
             Section {
                 toggleRow(title: "Download with mobile data allowed", isOn: $downloadWithMobileData)
                 settingRow(title: "About", systemImage: "info.circle", color: .gray)
+            }
+
+            if authStore.isLoggedIn {
+                Section {
+                    Button(role: .destructive) {
+                        showLogoutAlert = true
+                    } label: {
+                        Text(L10n.logout)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
             }
 
             Section {
@@ -66,6 +79,15 @@ struct SettingsView: View {
             DebugSettingsView()
         }
 #endif
+        .alert(L10n.confirmLogout, isPresented: $showLogoutAlert) {
+            Button(L10n.cancel, role: .cancel) {}
+            Button(L10n.logout, role: .destructive) {
+                authStore.logout()
+                dismiss()
+            }
+        } message: {
+            Text(L10n.logoutConfirmMessage)
+        }
     }
 
     private func settingRow(title: String, systemImage: String, color: Color) -> some View {
