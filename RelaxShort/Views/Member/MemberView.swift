@@ -1,4 +1,97 @@
 import SwiftUI
+import UIKit
+
+/// 直接监听 SwiftUI ScrollView 底层 UIScrollView 的标准化滚动距离。
+/// 相比 PreferenceKey，该值不受视图吸附、惰性卸载和坐标空间重建影响。
+private struct MemberScrollOffsetReader: UIViewRepresentable {
+    @Binding var offsetY: CGFloat
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(offsetY: $offsetY)
+    }
+
+    func makeUIView(context: Context) -> ObserverView {
+        let view = ObserverView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateUIView(_ view: ObserverView, context: Context) {
+        view.coordinator = context.coordinator
+        context.coordinator.attach(to: view.nearestVerticalScrollView)
+    }
+
+    final class ObserverView: UIView {
+        weak var coordinator: Coordinator?
+
+        override func didMoveToSuperview() {
+            super.didMoveToSuperview()
+            attach()
+        }
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            attach()
+        }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            attach()
+        }
+
+        private func attach() {
+            coordinator?.attach(to: nearestVerticalScrollView)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        private var offsetY: Binding<CGFloat>
+        private weak var scrollView: UIScrollView?
+        private var observation: NSKeyValueObservation?
+
+        init(offsetY: Binding<CGFloat>) {
+            self.offsetY = offsetY
+        }
+
+        func attach(to scrollView: UIScrollView?) {
+            guard let scrollView, self.scrollView !== scrollView else { return }
+            self.scrollView = scrollView
+            publishOffset(from: scrollView)
+            observation = scrollView.observe(
+                \.contentOffset,
+                options: [.new]
+            ) { [weak self] scrollView, _ in
+                self?.publishOffset(from: scrollView)
+            }
+        }
+
+        private func publishOffset(from scrollView: UIScrollView) {
+            let normalizedOffset =
+                scrollView.contentOffset.y
+                + scrollView.adjustedContentInset.top
+            offsetY.wrappedValue = max(0, normalizedOffset)
+        }
+    }
+}
+
+private extension UIView {
+    var nearestVerticalScrollView: UIScrollView? {
+        var view = superview
+        while let current = view {
+            if let scrollView = current as? UIScrollView {
+                let isVertical =
+                    scrollView.alwaysBounceVertical
+                    || scrollView.contentSize.height > scrollView.bounds.height
+                if isVertical {
+                    return scrollView
+                }
+            }
+            view = current.superview
+        }
+        return nil
+    }
+}
 
 // MARK: - Member View (Task32: DramaBox-style subscription page)
 
@@ -18,7 +111,7 @@ struct MemberView: View {
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var viewModel: MemberViewModel
-    @State private var titleHeaderMinY: CGFloat = .greatestFiniteMagnitude
+    @State private var scrollOffsetY: CGFloat = 0
     let mode: Mode
 
     init(mode: Mode, repository: MemberRepositoryProtocol) {
@@ -58,7 +151,7 @@ struct MemberView: View {
                 : bottomInset
             let reservedBottomHeight =
                 ctaHeight + 30 + tabClearance + DT.Space.xl
-            let titlePinned = titleHeaderMinY <= 0.5
+            let titlePinned = scrollOffsetY >= titleInitialTop
 
             ZStack(alignment: .top) {
                 Color.black.ignoresSafeArea()
@@ -71,19 +164,12 @@ struct MemberView: View {
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Color.clear.frame(height: titleInitialTop)
+                        MemberScrollOffsetReader(offsetY: $scrollOffsetY)
+                            .frame(width: 1, height: 1)
+
+                        Color.clear.frame(height: titleInitialTop - 1)
 
                         memberTitle(isPinned: false)
-                            .background {
-                                GeometryReader { proxy in
-                                    Color.clear.preference(
-                                        key: MemberTitleMinYPreferenceKey.self,
-                                        value: proxy.frame(
-                                            in: .named("member-scroll")
-                                        ).minY
-                                    )
-                                }
-                            }
 
                         plansSection
                             .padding(.top, DT.Space.md)
@@ -96,10 +182,9 @@ struct MemberView: View {
                     }
                     .padding(.bottom, reservedBottomHeight)
                 }
-                .coordinateSpace(name: "member-scroll")
 
                 if titlePinned {
-                    pinnedTitleOverlay(topInset: topInset)
+                    pinnedTitleOverlay
                         .transition(.opacity)
                         .zIndex(2)
                 }
@@ -114,9 +199,6 @@ struct MemberView: View {
                         alignment: .bottom
                     )
                     .zIndex(3)
-            }
-            .onPreferenceChange(MemberTitleMinYPreferenceKey.self) {
-                titleHeaderMinY = $0
             }
             .animation(.easeOut(duration: 0.18), value: titlePinned)
         }
@@ -230,17 +312,13 @@ extension MemberView {
     }
 
     /// 吸附后使用独立顶层遮罩覆盖状态栏和标题区域，防止滚动内容透出。
-    private func pinnedTitleOverlay(topInset: CGFloat) -> some View {
-        VStack(spacing: 0) {
-            Color.black
-                .frame(height: topInset)
-
-            memberTitle(isPinned: true)
-                .background(Color.black)
-        }
+    private var pinnedTitleOverlay: some View {
+        memberTitle(isPinned: true)
         .frame(maxWidth: .infinity)
-        .background(Color.black)
-        .ignoresSafeArea(edges: .top)
+        .background(
+            Color.black
+                .ignoresSafeArea(edges: .top)
+        )
     }
 
     /// 第一版尚未接入恢复购买能力；只保留入口，不展示 Coming Soon。
@@ -616,15 +694,4 @@ extension View {
     )
         .environmentObject(AppStore())
         .preferredColorScheme(.dark)
-}
-
-private struct MemberTitleMinYPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = .greatestFiniteMagnitude
-
-    static func reduce(
-        value: inout CGFloat,
-        nextValue: () -> CGFloat
-    ) {
-        value = nextValue()
-    }
 }
