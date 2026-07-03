@@ -18,7 +18,7 @@ struct MemberView: View {
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var viewModel: MemberViewModel
-    @State private var scrollContentMinY: CGFloat = 0
+    @State private var titleHeaderMinY: CGFloat = .greatestFiniteMagnitude
     let mode: Mode
 
     init(mode: Mode, repository: MemberRepositoryProtocol) {
@@ -30,8 +30,8 @@ struct MemberView: View {
 
     // MARK: - Layout Constants
 
-    private let backgroundHeight: CGFloat = 300
-    private let titleInitialTop: CGFloat = 112
+    private let backgroundHeight: CGFloat = 260
+    private let titleInitialTop: CGFloat = 64
     private let titleHeight: CGFloat = 52
     private let pageInset: CGFloat = 16
     private let planCardGap: CGFloat = 12
@@ -57,8 +57,8 @@ struct MemberView: View {
                 ? DramaBoxBottomTabBar.totalHeight + bottomInset
                 : bottomInset
             let reservedBottomHeight =
-                ctaHeight + tabClearance + DT.Space.xl
-            let titlePinned = scrollContentMinY <= -titleInitialTop
+                ctaHeight + 30 + tabClearance + DT.Space.xl
+            let titlePinned = titleHeaderMinY <= 0.5
 
             ZStack(alignment: .top) {
                 Color.black.ignoresSafeArea()
@@ -70,46 +70,52 @@ struct MemberView: View {
                 .opacity(titlePinned ? 0 : 1)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: MemberScrollOffsetPreferenceKey.self,
-                            value: proxy.frame(
-                                in: .named("member-scroll")
-                            ).minY
-                        )
-                    }
-                    .frame(height: 0)
-
-                    LazyVStack(alignment: .leading, spacing: 0) {
+                    LazyVStack(
+                        alignment: .leading,
+                        spacing: 0,
+                        pinnedViews: [.sectionHeaders]
+                    ) {
                         Color.clear.frame(height: titleInitialTop)
-                        memberTitle
-                        plansSection
-                            .padding(.top, DT.Space.md)
-                        benefitsSection
-                            .padding(.top, DT.Space.xxl)
-                        memberDramasSection(width: geo.size.width)
-                            .padding(.top, DT.Space.xxl)
-                        termsSection
-                            .padding(.top, DT.Space.xl)
+
+                        Section {
+                            plansSection
+                                .padding(.top, DT.Space.md)
+                            benefitsSection
+                                .padding(.top, DT.Space.xxl)
+                            memberDramasSection(width: geo.size.width)
+                                .padding(.top, DT.Space.xxl)
+                            termsSection
+                                .padding(.top, DT.Space.xl)
+                        } header: {
+                            memberTitle(isPinned: titlePinned)
+                                .background {
+                                    GeometryReader { proxy in
+                                        Color.clear.preference(
+                                            key: MemberTitleMinYPreferenceKey.self,
+                                            value: proxy.frame(
+                                                in: .named("member-scroll")
+                                            ).minY
+                                        )
+                                    }
+                                }
+                        }
                     }
                     .padding(.bottom, reservedBottomHeight)
                 }
                 .coordinateSpace(name: "member-scroll")
 
-                if titlePinned {
-                    stickyMemberTitle
-                        .transition(.opacity)
-                }
-
-                fixedCTA(bottomClearance: tabClearance)
+                fixedCTA(
+                    bottomClearance: tabClearance,
+                    availableWidth: geo.size.width
+                )
                     .frame(
                         maxWidth: .infinity,
                         maxHeight: .infinity,
                         alignment: .bottom
                     )
             }
-            .onPreferenceChange(MemberScrollOffsetPreferenceKey.self) {
-                scrollContentMinY = $0
+            .onPreferenceChange(MemberTitleMinYPreferenceKey.self) {
+                titleHeaderMinY = $0
             }
             .animation(.easeOut(duration: 0.18), value: titlePinned)
         }
@@ -129,7 +135,7 @@ extension MemberView {
 
     @ViewBuilder
     private func fixedBackground(width: CGFloat, topInset: CGFloat) -> some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             if let poster = viewModel.backgroundPosters.first {
                 CoverImageView(
                     url: poster.coverURL,
@@ -156,36 +162,37 @@ extension MemberView {
                 endPoint: .bottom
             )
 
-            Button(action: logRestoreTap) {
-                Text("member.restore".localized)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, DT.Space.md)
-                    .padding(.vertical, DT.Space.xs)
+            HStack {
+                if mode == .push {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                    }
+                }
+
+                Spacer()
+
+                Button(action: logRestoreTap) {
+                    Text("member.restore".localized)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, DT.Space.md)
+                        .padding(.vertical, DT.Space.xs)
+                }
             }
             .padding(.top, topInset + DT.Space.sm)
-            .padding(.trailing, pageInset)
+            .padding(.horizontal, pageInset)
         }
         .frame(width: width, height: backgroundHeight + topInset)
         .offset(y: -topInset)
         .ignoresSafeArea(edges: .top)
     }
 
-    private var memberTitle: some View {
-        Text("member.title".localized)
-            .font(.system(size: 28, weight: .heavy))
-            .foregroundColor(.white)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: titleHeight,
-                alignment: .leading
-            )
-            .padding(.horizontal, pageInset)
-    }
-
-    private var stickyMemberTitle: some View {
+    private func memberTitle(isPinned: Bool) -> some View {
         HStack(spacing: DT.Space.xs) {
-            if mode == .push {
+            if isPinned, mode == .push {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .semibold))
@@ -195,20 +202,30 @@ extension MemberView {
             }
 
             Text("member.title".localized)
-                .font(.system(size: 22, weight: .bold))
+                .font(
+                    .system(
+                        size: isPinned ? 22 : 28,
+                        weight: isPinned ? .bold : .heavy
+                    )
+                )
                 .foregroundColor(.white)
 
             Spacer()
 
-            Button(action: logRestoreTap) {
-                Text("member.restore".localized)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white)
+            if isPinned {
+                Button(action: logRestoreTap) {
+                    Text("member.restore".localized)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white)
+                }
             }
         }
         .frame(height: titleHeight)
-        .padding(.horizontal, mode == .push ? DT.Space.sm : pageInset)
-        .background(Color.black)
+        .padding(
+            .horizontal,
+            isPinned && mode == .push ? DT.Space.sm : pageInset
+        )
+        .background(isPinned ? Color.black : Color.clear)
     }
 
     /// 第一版尚未接入恢复购买能力；只保留入口，不展示 Coming Soon。
@@ -479,25 +496,25 @@ extension MemberView {
 extension MemberView {
 
     private var termsSection: some View {
-        VStack(alignment: .leading, spacing: DT.Space.sm) {
-            HStack(spacing: 4) {
-                Text("member.service_agreement".localized)
-                    .font(DT.Font.caption)
-                    .underline()
-                    .foregroundColor(DT.Color.textSecondary)
-
-                Text(">")
-                    .font(DT.Font.caption)
-                    .foregroundColor(DT.Color.textTertiary)
-            }
-
+        VStack(alignment: .leading, spacing: DT.Space.md) {
             Text("member.tips.title".localized)
-                .font(DT.Font.small)
+                .font(.system(size: 15, weight: .medium))
                 .foregroundColor(DT.Color.textTertiary)
 
-            Text("member.auto_renew".localized)
-                .font(DT.Font.small)
-                .foregroundColor(DT.Color.textTertiary)
+            Text("member.service_agreement".localized)
+                .font(.system(size: 14))
+                .underline()
+                .foregroundColor(DT.Color.textSecondary)
+
+            VStack(alignment: .leading, spacing: DT.Space.sm) {
+                ForEach(1...10, id: \.self) { index in
+                    Text("member.tips.item\(index)".localized)
+                        .font(.system(size: 13))
+                        .foregroundColor(DT.Color.textTertiary)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .padding(.horizontal, pageInset)
     }
@@ -506,8 +523,13 @@ extension MemberView {
 // MARK: - Fixed CTA
 extension MemberView {
 
-    private func fixedCTA(bottomClearance: CGFloat) -> some View {
-        VStack(spacing: 0) {
+    private func fixedCTA(
+        bottomClearance: CGFloat,
+        availableWidth: CGFloat
+    ) -> some View {
+        let buttonWidth = max(272, min(availableWidth - 48, 340))
+
+        return VStack(spacing: DT.Space.sm) {
             Button {
                 #if DEBUG
                 Logger.ui.info("Member Join Now tapped — purchase not available")
@@ -524,7 +546,11 @@ extension MemberView {
                     )
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, pageInset)
+            .frame(width: buttonWidth)
+
+            Text("member.auto_renew".localized)
+                .font(.system(size: 12))
+                .foregroundColor(DT.Color.textTertiary)
         }
         .padding(.bottom, bottomClearance + DT.Space.sm)
         .background(
@@ -577,8 +603,8 @@ extension View {
         .preferredColorScheme(.dark)
 }
 
-private struct MemberScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+private struct MemberTitleMinYPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = .greatestFiniteMagnitude
 
     static func reduce(
         value: inout CGFloat,
