@@ -84,6 +84,7 @@ private extension UIView {
 /// 首页 — 搜索/会员/金币通过本地状态驱动 push destination
 struct HomeView: View {
     @EnvironmentObject private var appStore: AppStore
+    @EnvironmentObject private var dependencies: DependencyContainer
     @ObservedObject private var viewModel: HomeViewModel
     private let rankingRepository: HomeRepositoryProtocol
     @State private var playerDrama: DramaItem?
@@ -150,7 +151,10 @@ struct HomeView: View {
             playerDrama = nil
         }
         .navigationDestination(isPresented: $showVIP) {
-            MemberView(mode: .push)
+            MemberView(
+                mode: .push,
+                repository: dependencies.memberRepository
+            )
         }
         .navigationDestination(isPresented: $showReward) {
             CoinRewardView(mode: .pushed)

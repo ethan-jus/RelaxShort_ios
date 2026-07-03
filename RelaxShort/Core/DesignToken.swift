@@ -8,12 +8,12 @@ enum DT {
     
     // MARK: - Colors 色彩系统
     
-    /// 主品牌色 / VIP / CTA 按钮 #FF2E6D
-    static let brandPink      = SwiftUI.Color(hex: "#FF2E6D")
-    /// 品牌色深变体 #FF175D
-    static let brandPinkDark  = SwiftUI.Color(hex: "#FF175D")
-    /// App Logo 主红色，用于底部导航选中态等品牌识别位置
+    /// App 唯一品牌强调色：Logo 红。
     static let logoRed        = SwiftUI.Color(hex: "#E85048")
+    /// 历史命名兼容。所有旧 pink 调用统一落到 Logo 红，禁止继续产生粉色分支。
+    static let brandPink      = logoRed
+    /// 历史深色命名兼容；当前设计系统不再使用另一套粉色。
+    static let brandPinkDark  = logoRed
     /// 硬币/金币 #C29852
     static let brandGold      = SwiftUI.Color(hex: "#C29852")
     
@@ -30,8 +30,8 @@ enum DT {
 
     /// 排名页渐变起始 (橙) #FF9500
     static let rankGradientStart = SwiftUI.Color(hex: "#FF9500")
-    /// 排名页渐变中间 (粉红) #FF2E6D
-    static let rankGradientMid   = SwiftUI.Color(hex: "#FF2E6D")
+    /// 排名页渐变中间使用 App Logo 红。
+    static let rankGradientMid   = logoRed
     
     // MARK: - Color (Theme-aware 语义色)
     

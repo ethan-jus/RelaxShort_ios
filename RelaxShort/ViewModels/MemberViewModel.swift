@@ -76,6 +76,14 @@ final class MemberViewModel: ObservableObject {
         countdownTask = nil
     }
 
+    /// 促销倒计时展示文本，始终输出两位小时、分钟和秒。
+    var formattedPromotionCountdown: String {
+        let hours = promotionRemainingSeconds / 3_600
+        let minutes = (promotionRemainingSeconds % 3_600) / 60
+        let seconds = promotionRemainingSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+
     // MARK: - Private
 
     private func loadContent() async {

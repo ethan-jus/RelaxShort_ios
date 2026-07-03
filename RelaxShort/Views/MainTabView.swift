@@ -78,8 +78,10 @@ struct MainTabView: View {
                 )
             }
             .navigationDestination(isPresented: $appStore.isShowingMembership) {
-                MemberView(mode: .push)
-                    .environmentObject(dependencies)
+                MemberView(
+                    mode: .push,
+                    repository: dependencies.memberRepository
+                )
             }
         }
         .persistentSystemOverlays(appStore.selectedTab == .forYou ? .hidden : .visible)
@@ -122,8 +124,10 @@ private struct TabContentHost: View {
                 .disabled(appStore.selectedTab != .forYou)
 
             /// Task32：底部 Member Tab 使用新的 MemberView（Real-only）
-            MemberView(mode: .tab)
-                .environmentObject(dependencies)
+            MemberView(
+                mode: .tab,
+                repository: dependencies.memberRepository
+            )
                 .id(AppStore.Tab.member.rawValue)
                 .zIndex(appStore.selectedTab == .member ? 1 : 0)
                 .opacity(appStore.selectedTab == .member ? 1 : 0)

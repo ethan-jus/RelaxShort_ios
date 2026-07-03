@@ -6,7 +6,7 @@ import SwiftUI
 /// - 底部 Tab 模式：全屏展示，无返回按钮
 /// - Push 模式（profile/播放器入口）：显示返回按钮
 ///
-/// 顶部使用 `/api/v2/member` 返回的 background_posters 组成倾斜封面拼贴背景，
+/// 顶部暂时使用 `/api/v2/member` 返回的第一张 background poster 作为固定背景，
 /// 套餐、权益为第一版临时静态配置，会员专属剧集使用真实数据 + 真实播放器导航。
 struct MemberView: View {
     enum Mode {
@@ -15,20 +15,24 @@ struct MemberView: View {
     }
 
     @EnvironmentObject var appStore: AppStore
-    @EnvironmentObject var dependencies: DependencyContainer
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var viewModel: MemberViewModel
+    @State private var scrollContentMinY: CGFloat = 0
     let mode: Mode
 
-    init(mode: Mode) {
+    init(mode: Mode, repository: MemberRepositoryProtocol) {
         self.mode = mode
-        _viewModel = StateObject(wrappedValue: MemberViewModel())
+        _viewModel = StateObject(
+            wrappedValue: MemberViewModel(repository: repository)
+        )
     }
 
     // MARK: - Layout Constants
 
-    private let headerHeight: CGFloat = 230
+    private let backgroundHeight: CGFloat = 300
+    private let titleInitialTop: CGFloat = 112
+    private let titleHeight: CGFloat = 52
     private let pageInset: CGFloat = 16
     private let planCardGap: CGFloat = 12
     private let planRadius: CGFloat = 6
@@ -37,22 +41,50 @@ struct MemberView: View {
     private let benefitRowSpacing: CGFloat = 24
     private let ctaHeight: CGFloat = 56
 
-    private var reservedBottomHeight: CGFloat {
-        ctaHeight + DT.Layout.tabBarHeight + DT.Space.xl
-    }
-
     // MARK: - Body
 
     var body: some View {
         GeometryReader { geo in
-            ZStack(alignment: .bottom) {
+            let topInset = max(
+                geo.safeAreaInsets.top,
+                UIApplication.safeAreaInsets.top
+            )
+            let bottomInset = max(
+                geo.safeAreaInsets.bottom,
+                UIApplication.safeAreaInsets.bottom
+            )
+            let tabClearance = mode == .tab
+                ? DramaBoxBottomTabBar.totalHeight + bottomInset
+                : bottomInset
+            let reservedBottomHeight =
+                ctaHeight + tabClearance + DT.Space.xl
+            let titlePinned = scrollContentMinY <= -titleInitialTop
+
+            ZStack(alignment: .top) {
                 Color.black.ignoresSafeArea()
 
+                fixedBackground(
+                    width: geo.size.width,
+                    topInset: topInset
+                )
+                .opacity(titlePinned ? 0 : 1)
+
                 ScrollView(.vertical, showsIndicators: false) {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: MemberScrollOffsetPreferenceKey.self,
+                            value: proxy.frame(
+                                in: .named("member-scroll")
+                            ).minY
+                        )
+                    }
+                    .frame(height: 0)
+
                     LazyVStack(alignment: .leading, spacing: 0) {
-                        memberHeader(width: geo.size.width)
+                        Color.clear.frame(height: titleInitialTop)
+                        memberTitle
                         plansSection
-                            .padding(.top, DT.Space.xl)
+                            .padding(.top, DT.Space.md)
                         benefitsSection
                             .padding(.top, DT.Space.xxl)
                         memberDramasSection(width: geo.size.width)
@@ -62,10 +94,24 @@ struct MemberView: View {
                     }
                     .padding(.bottom, reservedBottomHeight)
                 }
+                .coordinateSpace(name: "member-scroll")
 
-                // 固定底部 CTA
-                fixedCTA
+                if titlePinned {
+                    stickyMemberTitle
+                        .transition(.opacity)
+                }
+
+                fixedCTA(bottomClearance: tabClearance)
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .bottom
+                    )
             }
+            .onPreferenceChange(MemberScrollOffsetPreferenceKey.self) {
+                scrollContentMinY = $0
+            }
+            .animation(.easeOut(duration: 0.18), value: titlePinned)
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -78,50 +124,67 @@ struct MemberView: View {
     }
 }
 
-// MARK: - Header (cover collage + title)
+// MARK: - Fixed Background + Sticky Title
 extension MemberView {
 
     @ViewBuilder
-    private func memberHeader(width: CGFloat) -> some View {
-        ZStack(alignment: .topLeading) {
-            // 封面拼贴背景
-            coverCollageBackground(width: width)
-                .frame(height: headerHeight)
+    private func fixedBackground(width: CGFloat, topInset: CGFloat) -> some View {
+        ZStack(alignment: .topTrailing) {
+            if let poster = viewModel.backgroundPosters.first {
+                CoverImageView(
+                    url: poster.coverURL,
+                    aspectRatio: DT.Layout.bannerAspectRatio,
+                    cornerRadius: 0,
+                    width: width,
+                    height: backgroundHeight + topInset
+                )
+                .frame(width: width, height: backgroundHeight + topInset)
                 .clipped()
+            } else {
+                Color(hex: "#0D0D0D")
+            }
 
-            // 从上到下的黑色渐变（保证标题可读）
+            // 固定封面只承担氛围背景，渐变保证前景内容始终可读。
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.1),
-                    Color.black.opacity(0.4),
-                    Color.black.opacity(0.85),
+                    Color.black.opacity(0.18),
+                    Color.black.opacity(0.34),
+                    Color.black.opacity(0.68),
                     Color.black
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: headerHeight)
 
-            // Top trailing: Restore 按钮
-            HStack {
-                Spacer()
-                if mode == .push {
-                    // Push 模式：返回按钮在左
-                }
-                Button(action: {
-                    // 第一版：展示提示，不执行真实恢复
-                }) {
-                    Text("member.restore".localized)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(DT.Color.textSecondary)
-                        .padding(.horizontal, DT.Space.md)
-                        .padding(.vertical, DT.Space.xs)
-                }
-                .padding(.top, DT.Space.xl)
-                .padding(.trailing, pageInset)
+            Button(action: logRestoreTap) {
+                Text("member.restore".localized)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, DT.Space.md)
+                    .padding(.vertical, DT.Space.xs)
             }
+            .padding(.top, topInset + DT.Space.sm)
+            .padding(.trailing, pageInset)
+        }
+        .frame(width: width, height: backgroundHeight + topInset)
+        .offset(y: -topInset)
+        .ignoresSafeArea(edges: .top)
+    }
 
-            // 返回按钮（push 模式）
+    private var memberTitle: some View {
+        Text("member.title".localized)
+            .font(.system(size: 28, weight: .heavy))
+            .foregroundColor(.white)
+            .frame(
+                maxWidth: .infinity,
+                minHeight: titleHeight,
+                alignment: .leading
+            )
+            .padding(.horizontal, pageInset)
+    }
+
+    private var stickyMemberTitle: some View {
+        HStack(spacing: DT.Space.xs) {
             if mode == .push {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
@@ -129,60 +192,30 @@ extension MemberView {
                         .foregroundColor(.white)
                         .frame(width: 36, height: 36)
                 }
-                .padding(.top, DT.Space.xl)
-                .padding(.leading, pageInset)
             }
 
-            // 左下标题
-            VStack(alignment: .leading, spacing: DT.Space.xs) {
-                Spacer()
-                Text("member.title".localized)
-                    .font(.system(size: 28, weight: .heavy))
+            Text("member.title".localized)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(.white)
+
+            Spacer()
+
+            Button(action: logRestoreTap) {
+                Text("member.restore".localized)
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
             }
-            .padding(.leading, pageInset)
-            .padding(.bottom, DT.Space.lg)
         }
+        .frame(height: titleHeight)
+        .padding(.horizontal, mode == .push ? DT.Space.sm : pageInset)
+        .background(Color.black)
     }
 
-    /// 使用 background_posters 真实封面组成的倾斜拼贴
-    @ViewBuilder
-    private func coverCollageBackground(width: CGFloat) -> some View {
-        let posters = viewModel.backgroundPosters
-        if posters.isEmpty {
-            // API 无图时仅显示深色背景
-            Color(hex: "#0D0D0D")
-        } else {
-            ZStack {
-                // 拼贴布局：3 列倾斜 -12°，彼此重叠
-                ForEach(Array(posters.prefix(8).enumerated()), id: \.element.id) { idx, drama in
-                    let col = idx % 3
-                    let row = idx / 3
-                    let xOffset = CGFloat(col - 1) * (width / 3.2)
-                    let yOffset = CGFloat(row) * (headerHeight / 3.5) - 20
-
-                    CoverImageView(
-                        url: drama.coverURL,
-                        aspectRatio: DT.Layout.cardAspectRatio,
-                        cornerRadius: 2,
-                        width: width / 3.0,
-                        height: (width / 3.0) / DT.Layout.cardAspectRatio
-                    )
-                    .rotationEffect(.degrees(-12))
-                    .offset(x: xOffset, y: yOffset)
-                    .opacity(0.65)
-                }
-                // 顶部到中部的黑色渐变覆盖
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.0),
-                        Color.black.opacity(0.5)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-        }
+    /// 第一版尚未接入恢复购买能力；只保留入口，不展示 Coming Soon。
+    private func logRestoreTap() {
+        #if DEBUG
+        Logger.ui.info("Member Restore tapped — purchase flow is not integrated")
+        #endif
     }
 }
 
@@ -211,7 +244,7 @@ extension MemberView {
                 // 左侧选中栏
                 ZStack {
                     Rectangle()
-                        .fill(isSelected ? DT.brandPink : DT.Color.textTertiary.opacity(0.3))
+                        .fill(isSelected ? DT.logoRed : DT.Color.textTertiary.opacity(0.3))
                         .frame(width: selectedRailWidth)
                         .cornerRadius(planRadius, corners: [.topLeft, .bottomLeft])
 
@@ -233,7 +266,9 @@ extension MemberView {
                                 .foregroundColor(.white)
 
                             if plan.showsPromotion {
-                                Text("member.discount".localized)
+                                Text(
+                                    "\("member.discount".localized) \(viewModel.formattedPromotionCountdown)"
+                                )
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 6)
@@ -276,7 +311,7 @@ extension MemberView {
             .overlay(
                 RoundedRectangle(cornerRadius: planRadius)
                     .stroke(
-                        isSelected ? DT.brandPink : DT.Color.textTertiary.opacity(0.3),
+                        isSelected ? DT.logoRed : DT.Color.textTertiary.opacity(0.3),
                         lineWidth: isSelected ? 1 : 0.5
                     )
             )
@@ -308,7 +343,7 @@ extension MemberView {
         HStack(spacing: DT.Space.md) {
             Image(systemName: benefit.icon)
                 .font(.system(size: 18, weight: .medium))
-                .foregroundColor(DT.brandPink)
+                .foregroundColor(.white)
                 .frame(width: benefitIconSize)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -432,7 +467,7 @@ extension MemberView {
             Button(action: { viewModel.retry() }) {
                 Text(L10n.commonRetry)
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(DT.brandPink)
+                    .foregroundColor(DT.logoRed)
             }
         }
         .frame(maxWidth: .infinity)
@@ -471,15 +506,13 @@ extension MemberView {
 // MARK: - Fixed CTA
 extension MemberView {
 
-    private var fixedCTA: some View {
+    private func fixedCTA(bottomClearance: CGFloat) -> some View {
         VStack(spacing: 0) {
-            Button(action: {
-                // 第一版：展示提示，不执行真实购买
-                let message = "member.purchase_unavailable".localized
+            Button {
                 #if DEBUG
                 Logger.ui.info("Member Join Now tapped — purchase not available")
                 #endif
-            }) {
+            } label: {
                 Text("member.join_now".localized)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(.white)
@@ -487,14 +520,13 @@ extension MemberView {
                     .frame(height: ctaHeight)
                     .background(
                         RoundedRectangle(cornerRadius: planRadius)
-                            .fill(DT.brandPink)
+                            .fill(DT.logoRed)
                     )
             }
             .buttonStyle(.plain)
             .padding(.horizontal, pageInset)
-            .padding(.bottom, DT.Space.xs)
         }
-        .padding(.bottom, DT.Layout.tabBarHeight)
+        .padding(.bottom, bottomClearance + DT.Space.sm)
         .background(
             LinearGradient(
                 colors: [Color.black.opacity(0), Color.black],
@@ -537,7 +569,21 @@ extension View {
 
 // MARK: - Preview
 #Preview {
-    MemberView(mode: .tab)
+    MemberView(
+        mode: .tab,
+        repository: RealMemberRepository()
+    )
         .environmentObject(AppStore())
         .preferredColorScheme(.dark)
+}
+
+private struct MemberScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(
+        value: inout CGFloat,
+        nextValue: () -> CGFloat
+    ) {
+        value = nextValue()
+    }
 }
