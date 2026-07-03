@@ -19,16 +19,11 @@ struct MainTabView: View {
     @StateObject private var homeVM: HomeViewModel
     @StateObject private var recommendVM: RecommendViewModel
     @StateObject private var recommendSession: RecommendSession
-    private let homeRepository: HomeRepositoryProtocol
 
-    init(playerCoordinator: PlayerCoordinator) {
-        let homeRepo = DependencyContainer.useRealAPI
-            ? RealHomeRepository() as HomeRepositoryProtocol
-            : MockHomeRepository() as HomeRepositoryProtocol
-        self.homeRepository = homeRepo
+    init(playerCoordinator: PlayerCoordinator, dependencies: DependencyContainer) {
         self.playerCoordinator = playerCoordinator
-        _homeVM = StateObject(wrappedValue: HomeViewModel(repository: homeRepo))
-        _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: homeRepo))
+        _homeVM = StateObject(wrappedValue: HomeViewModel(repository: dependencies.homeRepository))
+        _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: dependencies.homeRepository))
         _recommendSession = StateObject(wrappedValue: RecommendSession(engine: playerCoordinator.engine))
     }
 
@@ -37,7 +32,7 @@ struct MainTabView: View {
             ZStack(alignment: .bottom) {
                 TabContentHost(
                     homeVM: homeVM,
-                    homeRepository: homeRepository,
+                    homeRepository: dependencies.homeRepository,
                     recommendVM: recommendVM,
                     recommendSession: recommendSession
                 )
@@ -83,7 +78,8 @@ struct MainTabView: View {
                 )
             }
             .navigationDestination(isPresented: $appStore.isShowingMembership) {
-                MembershipView()
+                MemberView(mode: .push)
+                    .environmentObject(dependencies)
             }
         }
         .persistentSystemOverlays(appStore.selectedTab == .forYou ? .hidden : .visible)
@@ -125,7 +121,9 @@ private struct TabContentHost: View {
                 .opacity(appStore.selectedTab == .forYou ? 1 : 0)
                 .disabled(appStore.selectedTab != .forYou)
 
-            MembershipView(mode: .tab)
+            /// Task32：底部 Member Tab 使用新的 MemberView（Real-only）
+            MemberView(mode: .tab)
+                .environmentObject(dependencies)
                 .id(AppStore.Tab.member.rawValue)
                 .zIndex(appStore.selectedTab == .member ? 1 : 0)
                 .opacity(appStore.selectedTab == .member ? 1 : 0)

@@ -230,3 +230,31 @@
 "my_list.selection_unselected" = "Not selected";
 "my_list.remove_selected_count" = "Remove (%d)";
 "my_list.no_more_content" = "No more content";
+
+/* ---- Member (Task32) ---- */
+"member.title" = "Assinar Membro";
+"member.restore" = "Restaurar";
+"member.discount" = "Desconto";
+"member.plan.weekly" = "Semanal";
+"member.plan.yearly" = "Anual";
+"member.plan.weekly_detail" = "$12.99/semana, primeiras 3 semanas, depois $19.99/semana";
+"member.plan.yearly_detail" = "$149.99/ano";
+"member.why_join" = "Por que Assinar?";
+"member.benefit.unlimited" = "Acesso Ilimitado";
+"member.benefit.unlimited_detail" = "Mais de 16.000 séries grátis, mais de 100 novas por semana";
+"member.benefit.download" = "Download";
+"member.benefit.points" = "Pontos de Membro";
+"member.benefit.exclusive" = "Séries Exclusivas";
+"member.benefit.quality" = "Qualidade 1080p";
+"member.benefit.gift_drama" = "Presentear Séries";
+"member.benefit.gift_membership" = "Presentear Assinatura";
+"member.benefit.themes" = "Temas Exclusivos VIP";
+"member.benefit.ad_free" = "Sem Anúncios";
+"member.dramas.title" = "Séries Exclusivas para Membros";
+"member.tips.title" = "Dica: Renovação automática, cancele quando quiser. As taxas serão cobradas na sua conta Apple ID.";
+"member.service_agreement" = "Termos de Serviço e Política de Privacidade";
+"member.join_now" = "Assinar Agora";
+"member.auto_renew" = "Renovação automática, cancele quando quiser";
+"member.purchase_unavailable" = "A compra de assinatura estará disponível em uma atualização futura.";
+"member.content.empty" = "Nenhuma série exclusiva disponível";
+"member.content.failed" = "Falha ao carregar conteúdo de membro";

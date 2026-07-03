@@ -234,3 +234,31 @@
 "my_list.selection_unselected" = "Not selected";
 "my_list.remove_selected_count" = "Remove (%d)";
 "my_list.no_more_content" = "No more content";
+
+/* ---- Member (Task32) ---- */
+"member.title" = "Join Membership";
+"member.restore" = "Restore";
+"member.discount" = "Discount";
+"member.plan.weekly" = "Weekly";
+"member.plan.yearly" = "Yearly";
+"member.plan.weekly_detail" = "$12.99/week, first 3 weeks, then $19.99/week";
+"member.plan.yearly_detail" = "$149.99/year";
+"member.why_join" = "Why Join?";
+"member.benefit.unlimited" = "Unlimited Access";
+"member.benefit.unlimited_detail" = "16,000+ shows free to watch, 100+ new weekly";
+"member.benefit.download" = "Download";
+"member.benefit.points" = "Member Points";
+"member.benefit.exclusive" = "Members-Only Dramas";
+"member.benefit.quality" = "1080p Quality";
+"member.benefit.gift_drama" = "Gift Dramas to Friends";
+"member.benefit.gift_membership" = "Gift Memberships";
+"member.benefit.themes" = "VIP Exclusive Themes";
+"member.benefit.ad_free" = "Ad-Free";
+"member.dramas.title" = "Members-only Dramas";
+"member.tips.title" = "Tips: Auto-renewal, cancel anytime. Subscription fees will be charged to your Apple ID account.";
+"member.service_agreement" = "Terms of Service & Privacy Policy";
+"member.join_now" = "Join Now";
+"member.auto_renew" = "Auto-renewal, cancel anytime";
+"member.purchase_unavailable" = "Subscription purchase will be available in a future update.";
+"member.content.empty" = "No members-only dramas available";
+"member.content.failed" = "Failed to load member content";

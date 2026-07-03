@@ -150,7 +150,7 @@ struct HomeView: View {
             playerDrama = nil
         }
         .navigationDestination(isPresented: $showVIP) {
-            VIPView()
+            MemberView(mode: .push)
         }
         .navigationDestination(isPresented: $showReward) {
             CoinRewardView(mode: .pushed)

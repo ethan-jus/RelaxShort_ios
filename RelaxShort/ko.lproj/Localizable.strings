@@ -230,3 +230,31 @@
 "my_list.selection_unselected" = "Not selected";
 "my_list.remove_selected_count" = "Remove (%d)";
 "my_list.no_more_content" = "No more content";
+
+/* ---- Member (Task32) ---- */
+"member.title" = "멤버십 가입";
+"member.restore" = "구매 복원";
+"member.discount" = "할인";
+"member.plan.weekly" = "주간";
+"member.plan.yearly" = "연간";
+"member.plan.weekly_detail" = "$12.99/주, 첫 3주, 이후 $19.99/주";
+"member.plan.yearly_detail" = "$149.99/년";
+"member.why_join" = "멤버십 혜택";
+"member.benefit.unlimited" = "무제한 시청";
+"member.benefit.unlimited_detail" = "16,000편 이상의 드라마 무료 시청, 매주 100편 이상 신규 추가";
+"member.benefit.download" = "다운로드";
+"member.benefit.points" = "멤버 포인트";
+"member.benefit.exclusive" = "멤버 전용 드라마";
+"member.benefit.quality" = "1080p 화질";
+"member.benefit.gift_drama" = "친구에게 드라마 선물";
+"member.benefit.gift_membership" = "친구에게 멤버십 선물";
+"member.benefit.themes" = "VIP 전용 테마";
+"member.benefit.ad_free" = "광고 없음";
+"member.dramas.title" = "멤버 전용 드라마";
+"member.tips.title" = "팁: 자동 갱신, 언제든지 취소 가능합니다. 구독 요금은 Apple ID 계정으로 청구됩니다.";
+"member.service_agreement" = "서비스 약관 및 개인정보 처리방침";
+"member.join_now" = "지금 가입";
+"member.auto_renew" = "자동 갱신, 언제든지 취소 가능";
+"member.purchase_unavailable" = "구독 구매는 향후 업데이트에서 이용 가능합니다.";
+"member.content.empty" = "멤버 전용 드라마가 없습니다";
+"member.content.failed" = "멤버 콘텐츠 로드 실패";

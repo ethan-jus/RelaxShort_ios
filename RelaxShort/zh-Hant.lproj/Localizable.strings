@@ -230,3 +230,31 @@
 "my_list.selection_unselected" = "Not selected";
 "my_list.remove_selected_count" = "Remove (%d)";
 "my_list.no_more_content" = "No more content";
+
+/* ---- Member (Task32) ---- */
+"member.title" = "加入會員";
+"member.restore" = "恢復購買";
+"member.discount" = "限時優惠";
+"member.plan.weekly" = "週會員";
+"member.plan.yearly" = "年會員";
+"member.plan.weekly_detail" = "$12.99/週，前3週優惠價，之後$19.99/週";
+"member.plan.yearly_detail" = "$149.99/年";
+"member.why_join" = "為什麼加入會員？";
+"member.benefit.unlimited" = "無限暢看";
+"member.benefit.unlimited_detail" = "16,000+ 部劇集免費看，每週穩定上新 100+ 部";
+"member.benefit.download" = "離線下載";
+"member.benefit.points" = "會員積分";
+"member.benefit.exclusive" = "會員專屬劇集";
+"member.benefit.quality" = "1080p 高畫質";
+"member.benefit.gift_drama" = "贈送好友影片";
+"member.benefit.gift_membership" = "贈送好友會員";
+"member.benefit.themes" = "會員專屬主題";
+"member.benefit.ad_free" = "免廣告體驗";
+"member.dramas.title" = "會員專屬劇集";
+"member.tips.title" = "提示：自動續費，可隨時取消。訂閱費用將通過您的 Apple ID 賬戶收取。";
+"member.service_agreement" = "服務協議和隱私條款";
+"member.join_now" = "立即加入";
+"member.auto_renew" = "自動續費，可隨時取消";
+"member.purchase_unavailable" = "訂閱購買功能將在後續版本中接入。";
+"member.content.empty" = "暫無會員專屬劇集";
+"member.content.failed" = "會員內容載入失敗";

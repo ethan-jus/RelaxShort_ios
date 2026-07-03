@@ -230,3 +230,31 @@
 "my_list.selection_unselected" = "Not selected";
 "my_list.remove_selected_count" = "Remove (%d)";
 "my_list.no_more_content" = "No more content";
+
+/* ---- Member (Task32) ---- */
+"member.title" = "メンバーシップに加入";
+"member.restore" = "購入を復元";
+"member.discount" = "割引";
+"member.plan.weekly" = "週間";
+"member.plan.yearly" = "年間";
+"member.plan.weekly_detail" = "$12.99/週、最初の3週間、その後$19.99/週";
+"member.plan.yearly_detail" = "$149.99/年";
+"member.why_join" = "メンバー特典";
+"member.benefit.unlimited" = "見放題";
+"member.benefit.unlimited_detail" = "16,000本以上のドラマが見放題、毎週100本以上追加";
+"member.benefit.download" = "ダウンロード";
+"member.benefit.points" = "メンバーポイント";
+"member.benefit.exclusive" = "メンバー限定ドラマ";
+"member.benefit.quality" = "1080p 高画質";
+"member.benefit.gift_drama" = "友達にドラマをプレゼント";
+"member.benefit.gift_membership" = "友達にメンバーシップをプレゼント";
+"member.benefit.themes" = "VIP限定テーマ";
+"member.benefit.ad_free" = "広告なし";
+"member.dramas.title" = "メンバー限定ドラマ";
+"member.tips.title" = "ヒント：自動更新、いつでもキャンセル可能。サブスクリプション料金はApple IDアカウントに請求されます。";
+"member.service_agreement" = "利用規約とプライバシーポリシー";
+"member.join_now" = "今すぐ加入";
+"member.auto_renew" = "自動更新、いつでもキャンセル可能";
+"member.purchase_unavailable" = "サブスクリプション購入は今後のアップデートで利用可能になります。";
+"member.content.empty" = "メンバー限定ドラマはありません";
+"member.content.failed" = "メンバーコンテンツの読み込みに失敗しました";

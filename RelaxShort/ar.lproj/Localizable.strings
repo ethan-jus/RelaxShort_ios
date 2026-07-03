@@ -230,3 +230,31 @@
 "my_list.selection_unselected" = "Not selected";
 "my_list.remove_selected_count" = "Remove (%d)";
 "my_list.no_more_content" = "No more content";
+
+/* ---- Member (Task32) ---- */
+"member.title" = "انضم إلى العضوية";
+"member.restore" = "استعادة";
+"member.discount" = "خصم";
+"member.plan.weekly" = "أسبوعي";
+"member.plan.yearly" = "سنوي";
+"member.plan.weekly_detail" = "$12.99/أسبوع، أول 3 أسابيع، ثم $19.99/أسبوع";
+"member.plan.yearly_detail" = "$149.99/سنة";
+"member.why_join" = "لماذا تنضم؟";
+"member.benefit.unlimited" = "وصول غير محدود";
+"member.benefit.unlimited_detail" = "أكثر من 16,000 مسلسل مجاني، أكثر من 100 مسلسل جديد أسبوعياً";
+"member.benefit.download" = "تنزيل";
+"member.benefit.points" = "نقاط العضوية";
+"member.benefit.exclusive" = "مسلسلات حصرية للأعضاء";
+"member.benefit.quality" = "جودة 1080p";
+"member.benefit.gift_drama" = "إهداء مسلسلات للأصدقاء";
+"member.benefit.gift_membership" = "إهداء عضويات";
+"member.benefit.themes" = "سمات حصرية VIP";
+"member.benefit.ad_free" = "بدون إعلانات";
+"member.dramas.title" = "مسلسلات حصرية للأعضاء";
+"member.tips.title" = "نصيحة: تجديد تلقائي، يمكنك الإلغاء في أي وقت. سيتم خصم رسوم الاشتراك من حساب Apple ID الخاص بك.";
+"member.service_agreement" = "شروط الخدمة وسياسة الخصوصية";
+"member.join_now" = "انضم الآن";
+"member.auto_renew" = "تجديد تلقائي، يمكنك الإلغاء في أي وقت";
+"member.purchase_unavailable" = "ستتوفر عملية شراء الاشتراك في تحديث مستقبلي.";
+"member.content.empty" = "لا توجد مسلسلات حصرية متاحة";
+"member.content.failed" = "فشل تحميل محتوى العضوية";

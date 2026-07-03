@@ -123,6 +123,23 @@ protocol VIPRepositoryProtocol {
     func fetchBenefits() async throws -> [VIPBenefit]
 }
 
+// MARK: - Member
+
+/// Member 页面 UI 模型，由 Repository 从 DTO 转换而来。
+struct MemberContent {
+    let backgroundPosters: [DramaItem]
+    let memberOnlyDramas: [DramaItem]
+}
+
+/// Member 订阅页数据仓库协议
+protocol MemberRepositoryProtocol {
+    /// 获取 Member 页面内容：封面背景 + 会员专属剧集
+    func fetchMemberContent(
+        contentLanguage: String?,
+        countryCode: String?
+    ) async throws -> MemberContent
+}
+
 // MARK: - Coin Reward
 
 /// 福利中心/赚金币数据仓库协议

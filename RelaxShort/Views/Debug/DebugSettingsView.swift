@@ -6,7 +6,6 @@ import SwiftUI
 /// 开发/调试面板：查看和修改 Real API 设置，运行冒烟测试。
 /// 仅 DEBUG 构建可用，Release 不包含此文件。
 struct DebugSettingsView: View {
-    @State private var useRealAPI = UserDefaults.standard.bool(forKey: "use_real_api")
     @State private var apiBaseURL = UserDefaults.standard.string(forKey: "api_base_url") ?? ""
     @State private var effectiveBaseURL = APIConfig.baseURL
     @State private var uiLanguage = UserDefaults.standard.string(forKey: "app_ui_language") ?? "-"
@@ -20,11 +19,7 @@ struct DebugSettingsView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("API Mode") {
-                    Toggle("Use Real API", isOn: $useRealAPI)
-                        .onChange(of: useRealAPI) { _, v in
-                            UserDefaults.standard.set(v, forKey: "use_real_api")
-                        }
+                Section("API Config") {
                     HStack {
                         Text("Base URL")
                         TextField("http://127.0.0.1:8080", text: $apiBaseURL)
@@ -48,20 +43,12 @@ struct DebugSettingsView: View {
                 }
 
                 Section("Actions") {
-                    Button("Save Settings") {
-                        UserDefaults.standard.set(useRealAPI, forKey: "use_real_api")
+                    Button("Save Base URL") {
                         if !apiBaseURL.isEmpty {
                             UserDefaults.standard.set(apiBaseURL, forKey: "api_base_url")
+                        } else {
+                            UserDefaults.standard.removeObject(forKey: "api_base_url")
                         }
-                        effectiveBaseURL = APIConfig.baseURL
-                        refreshContext()
-                    }
-
-                    Button("Reset to Mock") {
-                        UserDefaults.standard.set(false, forKey: "use_real_api")
-                        UserDefaults.standard.removeObject(forKey: "api_base_url")
-                        useRealAPI = false
-                        apiBaseURL = ""
                         effectiveBaseURL = APIConfig.baseURL
                         refreshContext()
                     }

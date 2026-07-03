@@ -62,7 +62,7 @@ struct RelaxShortApp: App {
                         await AppInitService.shared.initialize()
                     }
                 } else {
-                    MainTabView(playerCoordinator: playerCoordinator)
+                    MainTabView(playerCoordinator: playerCoordinator, dependencies: dependencies)
                         .environmentObject(appStore)
                         .environmentObject(authStore)
                         .environmentObject(coinStore)

@@ -54,6 +54,10 @@ enum APIEndpoint {
     case bookmarkStatus(seriesIDs: [String])
     case setBookmark(seriesID: String, bookmarked: Bool)
 
+    // MARK: - Task32 Member 订阅页
+
+    case member(contentLanguage: String?, countryCode: String?)
+
     // MARK: - 旧 mock 端点（保留兼容）
 
     case homeFeed(category: DramaCategory)
@@ -87,7 +91,8 @@ extension APIEndpoint {
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences,
              .discoveryEvents,
-             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
+             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
+             .member:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -121,6 +126,8 @@ extension APIEndpoint {
         case .bookmarksV2:                   return "/api/v2/users/me/bookmarks"
         case .bookmarkStatus:                return "/api/v2/users/me/bookmark-status"
         case .setBookmark(let seriesID, _):  return "/api/v2/series/\(seriesID)/bookmark"
+        // ── Task32 v2 ──
+        case .member:                        return "/api/v2/member"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -152,6 +159,7 @@ extension APIEndpoint {
              .userMe, .userWallet: return .get
         case .updateUserPreferences: return .patch
         case .discoveryEvents:     return .post
+        case .member:              return .get
         case .watchHistoryV2, .bookmarksV2, .bookmarkStatus: return .get
         case .deleteWatchHistory: return .delete
         case .watchProgress: return .post
@@ -172,7 +180,8 @@ extension APIEndpoint {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
-             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
+             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
+             .member:
             return true
         default: return false
         }
@@ -222,10 +231,16 @@ extension APIEndpoint {
             base["X-Device-Id"] = InstallIdentityProvider.shared.installID()
         }
 
-        // 本地 dev 桥：用户端点需要 X-User-Id（仅 real API 模式生效）
+        // 本地 dev 桥：用户端点需要 X-User-Id
         if requiresUserIdHeader {
-            let userId = StorageService.shared.userId
-                ?? (UserDefaults.standard.bool(forKey: "use_real_api") ? "1" : nil)
+            let fallbackUserID: String? = {
+                #if DEBUG
+                return "1"
+                #else
+                return nil
+                #endif
+            }()
+            let userId = StorageService.shared.userId ?? fallbackUserID
             if let uid = userId {
                 base["X-User-Id"] = uid
             }
@@ -354,6 +369,11 @@ extension APIEndpoint {
             components?.queryItems = items
         case .bookmarkStatus(let ids):
             components?.queryItems = [URLQueryItem(name: "series_ids", value: ids.joined(separator: ","))]
+        case .member(let cl, let cc):
+            var items = [URLQueryItem]()
+            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
+            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            if !items.isEmpty { components?.queryItems = items }
         case .watchProgress, .setBookmark:
             break
         default:
