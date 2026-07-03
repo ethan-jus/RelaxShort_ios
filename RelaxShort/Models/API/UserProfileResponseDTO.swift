@@ -7,6 +7,8 @@ import Foundation
 struct UserProfileResponseDTO: Decodable {
     let userId: Int64
     let nickname: String?
+    let avatarURL: String?
+    let followingCount: Int?
     let role: String?
     let vipLevel: Int?
     let status: Int?

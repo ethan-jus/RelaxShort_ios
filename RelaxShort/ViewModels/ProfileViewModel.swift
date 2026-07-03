@@ -2,16 +2,25 @@ import SwiftUI
 
 // MARK: - Profile ViewModel
 
-/// 个人中心 ViewModel，遵循 MVVM 架构
-/// 通过 ProfileRepositoryProtocol 协议注入数据源，解耦视图与数据层
+/// 个人中心 ViewModel，遵循 MVVM 架构。
+/// 通过 ProfileRepositoryProtocol 协议注入数据源，解耦视图与数据层。
+/// 不使用 Mock fallback，不返回虚构数值。
 @MainActor
 final class ProfileViewModel: ObservableObject {
 
+    // MARK: - Load State
+
+    enum LoadState: Equatable {
+        case idle
+        case loading
+        case loaded
+        case failed(String)
+    }
+
     // MARK: - Published State
 
-    @Published var profile: User?
-    @Published var isLoading = false
-    @Published var errorMessage: String?
+    @Published private(set) var profile: User?
+    @Published private(set) var loadState: LoadState = .idle
 
     // MARK: - Dependencies
 
@@ -25,54 +34,35 @@ final class ProfileViewModel: ObservableObject {
 
     // MARK: - Public Methods
 
-    func loadProfile() {
-        isLoading = true
-        errorMessage = nil
-        Task {
-            do {
-                profile = try await repository.fetchUserProfile()
-            } catch {
-                errorMessage = error.localizedDescription
-                logError("ProfileViewModel.loadProfile failed: \(error)")
-            }
-            isLoading = false
+    func loadProfile() async {
+        loadState = .loading
+        do {
+            profile = try await repository.fetchUserProfile()
+            loadState = .loaded
+        } catch {
+            // 保留已加载的旧数据，不清空
+            loadState = .failed(error.localizedDescription)
+            #if DEBUG
+            Logger.viewModel.error("ProfileViewModel.loadProfile failed: \(error)")
+            #endif
         }
     }
 
     // MARK: - Computed Display Properties
 
+    /// 昵称，未加载时返回空
     var displayName: String {
-        guard let profile = profile else { return "" }
-        return profile.nickname
+        profile?.nickname ?? ""
     }
 
     /// Avatar 内显示的首字母缩写（2 字符上限）
     var avatarInitials: String {
-        guard let profile = profile else { return "" }
-        return String(profile.nickname.prefix(2)).uppercased()
+        guard let nick = profile?.nickname else { return "" }
+        return String(nick.prefix(2)).uppercased()
     }
 
     var shortId: String {
-        guard let profile = profile else { return "" }
-        return "ID \(profile.id)"
-    }
-
-    var dramaStats: String {
-        return "16K+"
-    }
-
-    var walletDisplay: String {
-        guard let profile = profile else { return "@0" }
-        return "@\(profile.coinBalance)"
-    }
-
-    var benefitCoinsDisplay: String {
-        return "+160"
-    }
-
-    private func logError(_ message: String) {
-        #if DEBUG
-        Logger.viewModel.error("\(message)")
-        #endif
+        guard let id = profile?.id else { return "" }
+        return "ID \(id)"
     }
 }

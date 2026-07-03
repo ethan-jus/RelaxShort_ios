@@ -271,3 +271,20 @@
 "member.auto_renew" = "Auto-renewal, cancel anytime";
 "member.content.empty" = "No members-only dramas available";
 "member.content.failed" = "Failed to load member content";
+
+/* ---- Profile (Task33) ---- */
+"profile.sign_in" = "Sign In";
+"profile.sign_in_subtitle" = "Sign in to sync your profile and assets";
+"profile.settings" = "Settings";
+"profile.join_membership" = "Join Membership";
+"profile.membership_active" = "Membership Active";
+"profile.membership_active_until" = "Active until %@";
+"profile.membership_benefit_series" = "16K+ Series";
+"profile.membership_benefit_points" = "Daily Points";
+"profile.membership_benefit_download" = "Download";
+"profile.membership_benefit_quality" = "1080p Quality";
+"profile.top_up" = "Top Up";
+"profile.earn_rewards" = "Earn Rewards";
+"profile.history" = "History";
+"profile.help_feedback" = "Help & Feedback";
+"profile.load_failed" = "Unable to load profile";

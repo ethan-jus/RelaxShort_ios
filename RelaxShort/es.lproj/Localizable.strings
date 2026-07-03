@@ -267,3 +267,20 @@
 "member.auto_renew" = "Renovación automática, cancela cuando quieras";
 "member.content.empty" = "No hay series exclusivas disponibles";
 "member.content.failed" = "Error al cargar el contenido de miembro";
+
+/* ---- Profile (Task33) ---- */
+"profile.sign_in" = "Iniciar sesión";
+"profile.sign_in_subtitle" = "Inicia sesión para sincronizar tu perfil y activos";
+"profile.settings" = "Configuración";
+"profile.join_membership" = "Unirse a la Membresía";
+"profile.membership_active" = "Membresía activa";
+"profile.membership_active_until" = "Activa hasta %@";
+"profile.membership_benefit_series" = "Más de 16K series";
+"profile.membership_benefit_points" = "Puntos diarios";
+"profile.membership_benefit_download" = "Descargar";
+"profile.membership_benefit_quality" = "Calidad 1080p";
+"profile.top_up" = "Recargar";
+"profile.earn_rewards" = "Ganar recompensas";
+"profile.history" = "Historial";
+"profile.help_feedback" = "Ayuda y comentarios";
+"profile.load_failed" = "No se pudo cargar el perfil";

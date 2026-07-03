@@ -267,3 +267,20 @@
 "member.auto_renew" = "自動更新、いつでもキャンセル可能";
 "member.content.empty" = "メンバー限定ドラマはありません";
 "member.content.failed" = "メンバーコンテンツの読み込みに失敗しました";
+
+/* ---- Profile (Task33) ---- */
+"profile.sign_in" = "ログイン";
+"profile.sign_in_subtitle" = "ログインしてプロフィールと資産を同期";
+"profile.settings" = "設定";
+"profile.join_membership" = "メンバーシップに加入";
+"profile.membership_active" = "メンバーシップ有効";
+"profile.membership_active_until" = "有効期限 %@";
+"profile.membership_benefit_series" = "16K以上のシリーズ";
+"profile.membership_benefit_points" = "デイリーポイント";
+"profile.membership_benefit_download" = "ダウンロード";
+"profile.membership_benefit_quality" = "1080p 画質";
+"profile.top_up" = "チャージ";
+"profile.earn_rewards" = "報酬を獲得";
+"profile.history" = "視聴履歴";
+"profile.help_feedback" = "ヘルプ・フィードバック";
+"profile.load_failed" = "プロフィールの読み込みに失敗しました";

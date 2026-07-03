@@ -131,6 +131,8 @@
 		D7D9F92CE08942F48FE5B6C4 /* MemberModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0797BAFECB9547DD90CE90AE /* MemberModels.swift */; };
 		71D41707ADD14AF18AA788EB /* MemberViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D8BBC63EA44177801BB30D /* MemberViewModel.swift */; };
 		04AD97E5CBAE40B48D335B50 /* MemberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC39FF880BF54A0AB34DA75A /* MemberView.swift */; };
+		CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408582F2968E474DADC30E92 /* ProfileDestinations.swift */; };
+		95BB863B0F6B4CAEAF73548D /* ProfileMainComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4539C92A78949F3A7C2630C /* ProfileMainComponents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -278,6 +280,8 @@
 		0797BAFECB9547DD90CE90AE /* MemberModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MemberModels.swift; path = RelaxShort/Models/MemberModels.swift; sourceTree = SOURCE_ROOT; };
 		86D8BBC63EA44177801BB30D /* MemberViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MemberViewModel.swift; path = RelaxShort/ViewModels/MemberViewModel.swift; sourceTree = SOURCE_ROOT; };
 		EC39FF880BF54A0AB34DA75A /* MemberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MemberView.swift; path = RelaxShort/Views/Member/MemberView.swift; sourceTree = SOURCE_ROOT; };
+		408582F2968E474DADC30E92 /* ProfileDestinations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProfileDestinations.swift; path = RelaxShort/Views/Profile/ProfileDestinations.swift; sourceTree = SOURCE_ROOT; };
+		F4539C92A78949F3A7C2630C /* ProfileMainComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProfileMainComponents.swift; path = RelaxShort/Views/Profile/ProfileMainComponents.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -914,6 +918,8 @@
 				D7D9F92CE08942F48FE5B6C4 /* MemberModels.swift in Sources */,
 				71D41707ADD14AF18AA788EB /* MemberViewModel.swift in Sources */,
 				04AD97E5CBAE40B48D335B50 /* MemberView.swift in Sources */,
+				CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */,
+				95BB863B0F6B4CAEAF73548D /* ProfileMainComponents.swift in Sources */,
 );
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -267,3 +267,20 @@
 "member.auto_renew" = "自動續費，可隨時取消";
 "member.content.empty" = "暫無會員專屬劇集";
 "member.content.failed" = "會員內容載入失敗";
+
+/* ---- Profile (Task33) ---- */
+"profile.sign_in" = "登入";
+"profile.sign_in_subtitle" = "登入後同步個人資料與資產";
+"profile.settings" = "設定";
+"profile.join_membership" = "加入會員";
+"profile.membership_active" = "會員已開通";
+"profile.membership_active_until" = "有效期至 %@";
+"profile.membership_benefit_series" = "16K+ 劇集";
+"profile.membership_benefit_points" = "每日積分";
+"profile.membership_benefit_download" = "離線下載";
+"profile.membership_benefit_quality" = "1080p 畫質";
+"profile.top_up" = "儲值";
+"profile.earn_rewards" = "賺取獎勵";
+"profile.history" = "觀看歷史";
+"profile.help_feedback" = "幫助與回饋";
+"profile.load_failed" = "個人資料載入失敗";

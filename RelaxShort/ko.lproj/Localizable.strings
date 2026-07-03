@@ -267,3 +267,20 @@
 "member.auto_renew" = "자동 갱신, 언제든지 취소 가능";
 "member.content.empty" = "멤버 전용 드라마가 없습니다";
 "member.content.failed" = "멤버 콘텐츠 로드 실패";
+
+/* ---- Profile (Task33) ---- */
+"profile.sign_in" = "로그인";
+"profile.sign_in_subtitle" = "로그인하여 프로필과 자산을 동기화하세요";
+"profile.settings" = "설정";
+"profile.join_membership" = "멤버십 가입";
+"profile.membership_active" = "멤버십 활성";
+"profile.membership_active_until" = "유효 기간 %@";
+"profile.membership_benefit_series" = "16K+ 시리즈";
+"profile.membership_benefit_points" = "일일 포인트";
+"profile.membership_benefit_download" = "다운로드";
+"profile.membership_benefit_quality" = "1080p 화질";
+"profile.top_up" = "충전";
+"profile.earn_rewards" = "보상 받기";
+"profile.history" = "시청 기록";
+"profile.help_feedback" = "도움말 및 피드백";
+"profile.load_failed" = "프로필을 불러올 수 없습니다";

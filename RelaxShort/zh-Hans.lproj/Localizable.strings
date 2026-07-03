@@ -272,3 +272,20 @@
 "member.auto_renew" = "自动续费，可随时取消";
 "member.content.empty" = "暂无会员专属剧集";
 "member.content.failed" = "会员内容加载失败";
+
+/* ---- Profile (Task33) ---- */
+"profile.sign_in" = "登录";
+"profile.sign_in_subtitle" = "登录后同步个人资料与资产";
+"profile.settings" = "设置";
+"profile.join_membership" = "加入会员";
+"profile.membership_active" = "会员已开通";
+"profile.membership_active_until" = "有效期至 %@";
+"profile.membership_benefit_series" = "16K+ 剧集";
+"profile.membership_benefit_points" = "每日积分";
+"profile.membership_benefit_download" = "离线下载";
+"profile.membership_benefit_quality" = "1080p 画质";
+"profile.top_up" = "充值";
+"profile.earn_rewards" = "赚取奖励";
+"profile.history" = "观看历史";
+"profile.help_feedback" = "帮助与反馈";
+"profile.load_failed" = "个人资料加载失败";
