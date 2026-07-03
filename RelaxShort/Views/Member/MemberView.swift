@@ -151,7 +151,17 @@ struct MemberView: View {
                 : bottomInset
             let reservedBottomHeight =
                 ctaHeight + 30 + tabClearance + DT.Space.xl
-            let titlePinned = scrollOffsetY >= titleInitialTop
+            let titleOffsetY = max(
+                titleInitialTop - scrollOffsetY,
+                0
+            )
+            let pinProgress = min(
+                max(
+                    (scrollOffsetY - titleInitialTop + 12) / 12,
+                    0
+                ),
+                1
+            )
 
             ZStack(alignment: .top) {
                 Color.black.ignoresSafeArea()
@@ -160,16 +170,16 @@ struct MemberView: View {
                     width: geo.size.width,
                     topInset: topInset
                 )
-                .opacity(titlePinned ? 0 : 1)
+                .opacity(1 - pinProgress)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
                         MemberScrollOffsetReader(offsetY: $scrollOffsetY)
                             .frame(width: 1, height: 1)
 
-                        Color.clear.frame(height: titleInitialTop - 1)
-
-                        memberTitle(isPinned: false)
+                        Color.clear.frame(
+                            height: titleInitialTop + titleHeight - 1
+                        )
 
                         plansSection
                             .padding(.top, DT.Space.md)
@@ -183,11 +193,13 @@ struct MemberView: View {
                     .padding(.bottom, reservedBottomHeight)
                 }
 
-                if titlePinned {
-                    pinnedTitleOverlay
-                        .transition(.opacity)
-                        .zIndex(2)
-                }
+                pinnedTitleMask
+                    .opacity(pinProgress)
+                    .zIndex(2)
+
+                memberTitle
+                    .offset(y: titleOffsetY)
+                    .zIndex(3)
 
                 fixedCTA(
                     bottomClearance: tabClearance,
@@ -198,9 +210,8 @@ struct MemberView: View {
                         maxHeight: .infinity,
                         alignment: .bottom
                     )
-                    .zIndex(3)
+                    .zIndex(4)
             }
-            .animation(.easeOut(duration: 0.18), value: titlePinned)
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -245,37 +256,16 @@ extension MemberView {
                 endPoint: .bottom
             )
 
-            HStack {
-                if mode == .push {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 36, height: 36)
-                    }
-                }
-
-                Spacer()
-
-                Button(action: logRestoreTap) {
-                    Text("member.restore".localized)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, DT.Space.md)
-                        .padding(.vertical, DT.Space.xs)
-                }
-            }
-            .padding(.top, topInset + DT.Space.sm)
-            .padding(.horizontal, pageInset)
         }
         .frame(width: width, height: backgroundHeight + topInset)
         .offset(y: -topInset)
         .ignoresSafeArea(edges: .top)
     }
 
-    private func memberTitle(isPinned: Bool) -> some View {
+    /// 标题和恢复购买始终使用同一个视图，仅连续改变纵向位置，避免吸附时闪切。
+    private var memberTitle: some View {
         HStack(spacing: DT.Space.xs) {
-            if isPinned, mode == .push {
+            if mode == .push {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 20, weight: .semibold))
@@ -285,40 +275,29 @@ extension MemberView {
             }
 
             Text("member.title".localized)
-                .font(
-                    .system(
-                        size: isPinned ? 22 : 28,
-                        weight: isPinned ? .bold : .heavy
-                    )
-                )
+                .font(.system(size: 28, weight: .heavy))
                 .foregroundColor(.white)
 
             Spacer()
 
-            if isPinned {
-                Button(action: logRestoreTap) {
-                    Text("member.restore".localized)
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white)
-                }
+            Button(action: logRestoreTap) {
+                Text("member.restore".localized)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white)
             }
         }
         .frame(height: titleHeight)
-        .padding(
-            .horizontal,
-            isPinned && mode == .push ? DT.Space.sm : pageInset
-        )
-        .background(isPinned ? Color.black : Color.clear)
+        .padding(.horizontal, mode == .push ? DT.Space.sm : pageInset)
     }
 
-    /// 吸附后使用独立顶层遮罩覆盖状态栏和标题区域，防止滚动内容透出。
-    private var pinnedTitleOverlay: some View {
-        memberTitle(isPinned: true)
-        .frame(maxWidth: .infinity)
-        .background(
-            Color.black
-                .ignoresSafeArea(edges: .top)
-        )
+    /// 接近吸附点时连续渐入，覆盖状态栏和标题区域，滚动内容不会透出。
+    private var pinnedTitleMask: some View {
+        Color.black
+            .frame(height: titleHeight)
+            .background(
+                Color.black
+                    .ignoresSafeArea(edges: .top)
+            )
     }
 
     /// 第一版尚未接入恢复购买能力；只保留入口，不展示 Coming Soon。
@@ -592,7 +571,7 @@ extension MemberView {
         VStack(alignment: .leading, spacing: DT.Space.md) {
             Text("member.tips.title".localized)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundColor(DT.Color.textTertiary)
+                .foregroundColor(DT.Color.textSecondary)
 
             Text("member.service_agreement".localized)
                 .font(.system(size: 14))
@@ -603,7 +582,7 @@ extension MemberView {
                 ForEach(1...10, id: \.self) { index in
                     Text("member.tips.item\(index)".localized)
                         .font(.system(size: 13))
-                        .foregroundColor(DT.Color.textTertiary)
+                        .foregroundColor(DT.Color.textSecondary)
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -643,7 +622,7 @@ extension MemberView {
 
             Text("member.auto_renew".localized)
                 .font(.system(size: 12))
-                .foregroundColor(DT.Color.textTertiary)
+                .foregroundColor(DT.Color.textSecondary)
         }
         .padding(.bottom, bottomClearance + DT.Space.sm)
         .background(
