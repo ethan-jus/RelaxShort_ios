@@ -39,7 +39,7 @@ struct MemberView: View {
     private let selectedRailWidth: CGFloat = 54
     private let benefitIconSize: CGFloat = 30
     private let benefitRowSpacing: CGFloat = 24
-    private let ctaHeight: CGFloat = 56
+    private let ctaHeight: CGFloat = 50
 
     // MARK: - Body
 
@@ -70,39 +70,39 @@ struct MemberView: View {
                 .opacity(titlePinned ? 0 : 1)
 
                 ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(
-                        alignment: .leading,
-                        spacing: 0,
-                        pinnedViews: [.sectionHeaders]
-                    ) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Color.clear.frame(height: titleInitialTop)
 
-                        Section {
-                            plansSection
-                                .padding(.top, DT.Space.md)
-                            benefitsSection
-                                .padding(.top, DT.Space.xxl)
-                            memberDramasSection(width: geo.size.width)
-                                .padding(.top, DT.Space.xxl)
-                            termsSection
-                                .padding(.top, DT.Space.xl)
-                        } header: {
-                            memberTitle(isPinned: titlePinned)
-                                .background {
-                                    GeometryReader { proxy in
-                                        Color.clear.preference(
-                                            key: MemberTitleMinYPreferenceKey.self,
-                                            value: proxy.frame(
-                                                in: .named("member-scroll")
-                                            ).minY
-                                        )
-                                    }
+                        memberTitle(isPinned: false)
+                            .background {
+                                GeometryReader { proxy in
+                                    Color.clear.preference(
+                                        key: MemberTitleMinYPreferenceKey.self,
+                                        value: proxy.frame(
+                                            in: .named("member-scroll")
+                                        ).minY
+                                    )
                                 }
-                        }
+                            }
+
+                        plansSection
+                            .padding(.top, DT.Space.md)
+                        benefitsSection
+                            .padding(.top, DT.Space.xxl)
+                        memberDramasSection(width: geo.size.width)
+                            .padding(.top, DT.Space.xxl)
+                        termsSection
+                            .padding(.top, DT.Space.xl)
                     }
                     .padding(.bottom, reservedBottomHeight)
                 }
                 .coordinateSpace(name: "member-scroll")
+
+                if titlePinned {
+                    pinnedTitleOverlay(topInset: topInset)
+                        .transition(.opacity)
+                        .zIndex(2)
+                }
 
                 fixedCTA(
                     bottomClearance: tabClearance,
@@ -113,6 +113,7 @@ struct MemberView: View {
                         maxHeight: .infinity,
                         alignment: .bottom
                     )
+                    .zIndex(3)
             }
             .onPreferenceChange(MemberTitleMinYPreferenceKey.self) {
                 titleHeaderMinY = $0
@@ -226,6 +227,20 @@ extension MemberView {
             isPinned && mode == .push ? DT.Space.sm : pageInset
         )
         .background(isPinned ? Color.black : Color.clear)
+    }
+
+    /// 吸附后使用独立顶层遮罩覆盖状态栏和标题区域，防止滚动内容透出。
+    private func pinnedTitleOverlay(topInset: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            Color.black
+                .frame(height: topInset)
+
+            memberTitle(isPinned: true)
+                .background(Color.black)
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.black)
+        .ignoresSafeArea(edges: .top)
     }
 
     /// 第一版尚未接入恢复购买能力；只保留入口，不展示 Coming Soon。
@@ -541,7 +556,7 @@ extension MemberView {
                     .frame(maxWidth: .infinity)
                     .frame(height: ctaHeight)
                     .background(
-                        RoundedRectangle(cornerRadius: planRadius)
+                        RoundedRectangle(cornerRadius: DB.posterRadius)
                             .fill(DT.logoRed)
                     )
             }
