@@ -95,7 +95,8 @@
 "profile.daily_points" = "每日";
 "profile.points" = "積分";
 "profile.quality" = "畫質";
-"profile.followed_count" = "已關注 %d";
+"profile.favorite_count" = "收藏 %d";
+"profile.copy_id" = "複製用戶 ID";
 "profile.login_to_view" = "登入後查看個人中心";
 "profile.login_to_sync" = "登入後即可存取個人資料、錢包等功能";
 

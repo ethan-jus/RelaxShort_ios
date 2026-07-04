@@ -89,7 +89,8 @@
 "profile.daily_points" = "Daily";
 "profile.points" = "Points";
 "profile.quality" = "Quality";
-"profile.followed_count" = "Following %d";
+"profile.favorite_count" = "Favorites %d";
+"profile.copy_id" = "Copy user ID";
 "profile.login_to_view" = "Login to View Profile";
 "profile.login_to_sync" = "Sign in to access your profile, wallet, and more";
 

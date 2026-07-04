@@ -151,7 +151,8 @@ enum L10n {
         "profile.daily_points": "每日",
         "profile.points": "积分",
         "profile.quality": "画质",
-        "profile.followed_count": "已关注 %d",
+        "profile.favorite_count": "收藏 %d",
+        "profile.copy_id": "复制用户 ID",
         "profile.login_to_view": "登录后查看个人中心",
         "profile.login_to_sync": "登录后即可访问个人资料、钱包等功能",
         "profile.logout": "退出登录",
@@ -580,8 +581,8 @@ enum L10n {
     static var dailyPoints: String { loc("profile.daily_points") }
     static var points: String { loc("profile.points") }
     static var quality: String { loc("profile.quality") }
-    static func followedCount(_ count: Int) -> String {
-        loc("profile.followed_count", formatArgs: [count])
+    static func favoriteCount(_ count: Int) -> String {
+        loc("profile.favorite_count", formatArgs: [count])
     }
     static var profileLoginToView: String { loc("profile.login_to_view") }
     static var profileLoginToSync: String { loc("profile.login_to_sync") }

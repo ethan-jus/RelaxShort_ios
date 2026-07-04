@@ -43,7 +43,7 @@ struct MockAuthProvider {
                 isVip: false,
                 vipExpireDate: nil,
                 coinBalance: 200,
-                followedCount: 0
+                favoriteCount: 0
             )
         case .apple:
             return User(
@@ -53,7 +53,7 @@ struct MockAuthProvider {
                 isVip: true,
                 vipExpireDate: Calendar.current.date(byAdding: .day, value: 30, to: Date()),
                 coinBalance: 500,
-                followedCount: 5
+                favoriteCount: 5
             )
         case .facebook:
             return User(
@@ -63,7 +63,7 @@ struct MockAuthProvider {
                 isVip: false,
                 vipExpireDate: nil,
                 coinBalance: 100,
-                followedCount: 1
+                favoriteCount: 1
             )
         case .guest:
             return User(
@@ -73,7 +73,7 @@ struct MockAuthProvider {
                 isVip: false,
                 vipExpireDate: nil,
                 coinBalance: 50,
-                followedCount: 0
+                favoriteCount: 0
             )
         }
     }

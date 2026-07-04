@@ -95,7 +95,8 @@
 "profile.daily_points" = "Diário";
 "profile.points" = "Pontos";
 "profile.quality" = "Qualidade";
-"profile.followed_count" = "Seguindo %d";
+"profile.favorite_count" = "Favoritos %d";
+"profile.copy_id" = "Copiar ID do usuário";
 "profile.login_to_view" = "Entre para ver o perfil";
 "profile.login_to_sync" = "Entre para acessar seu perfil, carteira e muito mais";
 

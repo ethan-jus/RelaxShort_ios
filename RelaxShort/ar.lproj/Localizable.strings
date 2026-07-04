@@ -95,7 +95,8 @@
 "profile.daily_points" = "يومي";
 "profile.points" = "نقاط";
 "profile.quality" = "الجودة";
-"profile.followed_count" = "متابَع %d";
+"profile.favorite_count" = "المفضلة %d";
+"profile.copy_id" = "نسخ معرّف المستخدم";
 "profile.login_to_view" = "سجّل الدخول لعرض الملف الشخصي";
 "profile.login_to_sync" = "سجّل الدخول للوصول إلى ملفك الشخصي ومحفظتك والمزيد";
 

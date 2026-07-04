@@ -14,8 +14,8 @@ struct User: Codable, Identifiable, Equatable {
     var vipExpireDate: Date?
     /// 金币余额
     var coinBalance: Int
-    /// 已关注数量
-    var followedCount: Int
+    /// 用户收藏的短剧数量
+    var favoriteCount: Int
     /// 画质等级 (如 "1080P")
     var qualityLevel: String?
     /// 剧集总数

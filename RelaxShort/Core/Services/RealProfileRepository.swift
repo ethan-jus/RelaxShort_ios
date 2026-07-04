@@ -18,7 +18,7 @@ enum ProfileDTOMapper {
             coinBalance: wallet.balance.map {
                 ($0 as NSDecimalNumber).intValue
             } ?? 0,
-            followedCount: profile.followingCount ?? 0,
+            favoriteCount: profile.bookmarkCount ?? 0,
             qualityLevel: profile.preferences?.defaultQuality,
             totalDramas: nil,
             benefitCoins: nil

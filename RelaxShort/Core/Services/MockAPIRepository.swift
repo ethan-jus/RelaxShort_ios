@@ -165,7 +165,7 @@ enum MockData {
         id: "u_mock_001", nickname: "ER", avatarURL: nil,
         isVip: true,
         vipExpireDate: Calendar.current.date(byAdding: .day, value: 180, to: Date()),
-        coinBalance: 1280, followedCount: 3
+        coinBalance: 1280, favoriteCount: 3
     )
 
     static let vipPlans: [VIPPlan] = [

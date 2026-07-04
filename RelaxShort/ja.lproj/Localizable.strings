@@ -95,7 +95,8 @@
 "profile.daily_points" = "毎日";
 "profile.points" = "ポイント";
 "profile.quality" = "画質";
-"profile.followed_count" = "フォロー %d";
+"profile.favorite_count" = "お気に入り %d";
+"profile.copy_id" = "ユーザーIDをコピー";
 "profile.login_to_view" = "ログインしてプロフィールを表示";
 "profile.login_to_sync" = "ログインするとプロフィールやウォレットなどにアクセスできます";
 

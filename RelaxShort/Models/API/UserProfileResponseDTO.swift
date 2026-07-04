@@ -10,7 +10,7 @@ struct UserProfileResponseDTO: Decodable {
     /// `convertFromSnakeCase` 会把 `avatar_url` 转成 `avatarUrl`，
     /// 属性必须保持该拼写，避免 URL 缩写导致头像静默解码为 nil。
     let avatarUrl: String?
-    let followingCount: Int?
+    let bookmarkCount: Int?
     let role: String?
     let vipLevel: Int?
     let status: Int?

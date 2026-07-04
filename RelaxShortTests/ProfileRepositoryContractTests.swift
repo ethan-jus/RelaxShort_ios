@@ -4,13 +4,13 @@ import Testing
 
 struct ProfileRepositoryContractTests {
     @Test
-    func decodesAvatarAndFollowingCount() throws {
+    func decodesAvatarAndBookmarkCount() throws {
         let json = """
         {
           "user_id": 1,
           "nickname": "Ethan",
           "avatar_url": "https://cdn.example/avatar.png",
-          "following_count": 3,
+          "bookmark_count": 3,
           "role": "USER",
           "vip_level": 1,
           "status": 1,
@@ -26,6 +26,6 @@ struct ProfileRepositoryContractTests {
         )
 
         #expect(dto.avatarUrl == "https://cdn.example/avatar.png")
-        #expect(dto.followingCount == 3)
+        #expect(dto.bookmarkCount == 3)
     }
 }

@@ -55,14 +55,4 @@ final class ProfileViewModel: ObservableObject {
         profile?.nickname ?? ""
     }
 
-    /// Avatar 内显示的首字母缩写（2 字符上限）
-    var avatarInitials: String {
-        guard let nick = profile?.nickname else { return "" }
-        return String(nick.prefix(2)).uppercased()
-    }
-
-    var shortId: String {
-        guard let id = profile?.id else { return "" }
-        return "ID \(id)"
-    }
 }

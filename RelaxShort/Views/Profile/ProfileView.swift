@@ -153,8 +153,9 @@ struct ProfileView: View {
         ProfileIdentityHeader(
             avatarURL: viewModel.profile?.avatarURL,
             title: viewModel.displayName,
-            subtitle: viewModel.shortId,
-            followingText: viewModel.profile.map { L10n.followedCount($0.followedCount) },
+            displayID: viewModel.profile?.id ?? "",
+            favoriteCount: viewModel.profile?.favoriteCount ?? 0,
+            isGuest: false,
             isVIP: viewModel.profile?.isVipValid ?? false,
             onTap: {},
             onSettings: { selectedDestination = .settings }
@@ -167,8 +168,11 @@ struct ProfileView: View {
         ProfileIdentityHeader(
             avatarURL: nil,
             title: "profile.sign_in".localized,
-            subtitle: "profile.sign_in_subtitle".localized,
-            followingText: nil,
+            displayID: ProfileGuestIdentity.shortID(
+                from: InstallIdentityProvider.shared.installID()
+            ),
+            favoriteCount: 0,
+            isGuest: true,
             isVIP: false,
             onTap: { showLoginSheet = true },
             onSettings: { selectedDestination = .settings }
@@ -309,7 +313,7 @@ struct ProfileView_Previews: PreviewProvider {
             isVip: true,
             vipExpireDate: Date().addingTimeInterval(86400 * 30),
             coinBalance: 100,
-            followedCount: 3
+            favoriteCount: 3
         )
         authStore.isVip = true
         authStore.vipExpireDate = Date().addingTimeInterval(86400 * 30)
