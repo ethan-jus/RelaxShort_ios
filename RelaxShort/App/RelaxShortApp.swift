@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import GoogleMobileAds
+import GoogleSignIn
 
 @main
 struct RelaxShortApp: App {
@@ -23,6 +24,10 @@ struct RelaxShortApp: App {
 
     init() {
         configureAudioSession()
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(
+            clientID: "1003872687588-5fij4u8cr2dr9plm6tbg0gfq19gj68r7.apps.googleusercontent.com",
+            serverClientID: "1003872687588-8518sh0gca5q8ei5a1d93pj0vlj36n1i.apps.googleusercontent.com"
+        )
 
         // 注册测试设备，确保真机+模拟器调试时都能加载测试广告
         GADMobileAds.sharedInstance().requestConfiguration.testDeviceIdentifiers = [
@@ -85,6 +90,12 @@ struct RelaxShortApp: App {
             }
             .preferredColorScheme(appStore.preferredColorScheme)
             .statusBarHidden(true)
+            .task {
+                await authStore.bootstrap()
+            }
+            .onOpenURL { url in
+                GIDSignIn.sharedInstance.handle(url)
+            }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active && !showSplash {
                     dependencies.discoveryAnalytics.flushPending()

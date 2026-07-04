@@ -375,18 +375,6 @@ struct MockProfileRepository: ProfileRepositoryProtocol {
     }
 }
 
-struct MockAuthRepository: AuthRepositoryProtocol {
-    func signInWithGoogle() async throws -> User {
-        try await Task.sleep(nanoseconds: 1_200_000_000); return MockData.profile
-    }
-    func signInWithApple() async throws -> User {
-        try await Task.sleep(nanoseconds: 1_200_000_000); return MockData.profile
-    }
-    func signInAsGuest() async throws -> User {
-        try await Task.sleep(nanoseconds: MC.delay); return MockData.profile
-    }
-}
-
 struct MockVIPRepository: VIPRepositoryProtocol {
     func fetchPlans() async throws -> [VIPPlan] {
         try await Task.sleep(nanoseconds: MC.delay); return MockData.vipPlans

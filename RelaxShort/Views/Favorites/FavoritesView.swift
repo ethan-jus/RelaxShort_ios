@@ -16,8 +16,8 @@ struct FavoritesView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if !authStore.isLoggedIn {
-                loggedOutGuide
+            if !authStore.hasSession {
+                sessionUnavailableView
             } else {
                 VStack(spacing: 0) {
                     segmentHeader
@@ -28,14 +28,14 @@ struct FavoritesView: View {
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
         .onChange(of: appStore.selectedTab) { _, tab in
-            guard tab == .myList, authStore.isLoggedIn else { return }
+            guard tab == .myList, authStore.hasSession else { return }
             Task { await viewModel.refreshUserData() }
         }
         .onChange(of: viewModel.isEditing) { _, editing in
             appStore.isBottomTabBarHidden = editing
         }
-        .onChange(of: authStore.isLoggedIn) { _, loggedIn in
-            if loggedIn {
+        .onChange(of: authStore.hasSession) { _, hasSession in
+            if hasSession {
                 Task { await viewModel.refreshUserData() }
             } else {
                 viewModel.cancelEditing()
@@ -45,7 +45,7 @@ struct FavoritesView: View {
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active,
                   appStore.selectedTab == .myList,
-                  authStore.isLoggedIn else { return }
+                  authStore.hasSession else { return }
             Task { await viewModel.refreshUserData() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -56,13 +56,22 @@ struct FavoritesView: View {
         }
     }
 
-    // MARK: - Logged Out
+    // MARK: - Session Bootstrap
 
-    private var loggedOutGuide: some View {
+    @ViewBuilder
+    private var sessionUnavailableView: some View {
+        if case .restoring = authStore.state {
+            ProgressView().tint(.white)
+        } else {
+            sessionRetryView
+        }
+    }
+
+    private var sessionRetryView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "list.star").font(.system(size: 44)).foregroundColor(DB.mutedText)
-            Text(L10n.myListLoginGuide).font(.system(size: 15)).foregroundColor(DB.mutedText)
-            Button(L10n.myListSignIn) { viewModel.presentLoginModal() }
+            Image(systemName: "wifi.exclamationmark").font(.system(size: 38)).foregroundColor(DB.mutedText)
+            Text(L10n.generalError).font(.system(size: 15)).foregroundColor(DB.mutedText)
+            Button(L10n.retry) { Task { await authStore.bootstrap() } }
                 .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
                 .padding(.horizontal, 32).padding(.vertical, 10)
                 .background(DB.logoRed).cornerRadius(6)

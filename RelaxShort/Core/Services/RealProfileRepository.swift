@@ -10,7 +10,7 @@ enum ProfileDTOMapper {
         wallet: WalletResponseDTO
     ) -> User {
         User(
-            id: String(profile.userId),
+            id: profile.publicId,
             nickname: profile.nickname ?? "",
             avatarURL: profile.avatarUrl,
             isVip: wallet.vip?.active ?? false,

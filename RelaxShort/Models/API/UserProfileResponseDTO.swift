@@ -6,6 +6,8 @@ import Foundation
 /// JSONDecoder 使用 `.convertFromSnakeCase`，后端返回 snake_case 自动映射
 struct UserProfileResponseDTO: Decodable {
     let userId: Int64
+    let publicId: String
+    let accountType: String
     let nickname: String?
     /// `convertFromSnakeCase` 会把 `avatar_url` 转成 `avatarUrl`，
     /// 属性必须保持该拼写，避免 URL 缩写导致头像静默解码为 nil。

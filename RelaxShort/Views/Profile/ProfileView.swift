@@ -90,7 +90,7 @@ struct ProfileView: View {
                         ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, onTap: { presentLoginOrNavigate(.wallet) })
                     }
                     ProfileMenuRow(icon: "gift.fill", iconColor: .orange, title: "profile.earn_rewards".localized, onTap: { presentLoginOrNavigate(.welfare) })
-                    ProfileMenuRow(icon: "clock.fill", iconColor: .white, title: "profile.history".localized, onTap: { presentLoginOrNavigate(.watchHistory) })
+                    ProfileMenuRow(icon: "clock.fill", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
                     ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, showsDivider: false, onTap: { presentLoginOrNavigate(.downloads) })
                 }
                 .padding(.top, DT.Space.lg)
@@ -109,12 +109,12 @@ struct ProfileView: View {
             profileDestination(for: destination)
         }
         .navigationBarHidden(true)
-        .task(id: authStore.isLoggedIn) {
-            guard authStore.isLoggedIn else { return }
+        .task(id: authStore.account?.publicID) {
+            guard authStore.hasSession else { return }
             await viewModel.loadProfile()
         }
         .onChange(of: viewModel.profile) { _, user in
-            guard let user, authStore.isLoggedIn else { return }
+            guard let user else { return }
             authStore.applyLoadedProfile(user)
         }
         .sheet(isPresented: $showLoginSheet) {
@@ -168,10 +168,9 @@ struct ProfileView: View {
         ProfileIdentityHeader(
             avatarURL: nil,
             title: "profile.sign_in".localized,
-            displayID: ProfileGuestIdentity.shortID(
-                from: InstallIdentityProvider.shared.installID()
-            ),
-            favoriteCount: 0,
+            displayID: authStore.account?.publicID
+                ?? ProfileGuestIdentity.shortID(from: InstallIdentityProvider.shared.installID()),
+            favoriteCount: viewModel.profile?.favoriteCount ?? 0,
             isGuest: true,
             isVIP: false,
             onTap: { showLoginSheet = true },
@@ -182,7 +181,7 @@ struct ProfileView: View {
     // MARK: - Membership Card
 
     private var membershipCard: some View {
-        let profile = authStore.isLoggedIn ? viewModel.profile : nil
+        let profile = viewModel.profile
         return ProfileMembershipCard(
             isVIP: profile?.isVipValid ?? false,
             vipExpireDate: profile?.vipExpireDate,
@@ -306,7 +305,6 @@ private struct ThemePickerView: View {
 struct ProfileView_Previews: PreviewProvider {
     static var previews: some View {
         let authStore = AuthStore()
-        authStore.isLoggedIn = true
         authStore.currentUser = User(
             id: "preview",
             nickname: "测试用户",
@@ -318,7 +316,6 @@ struct ProfileView_Previews: PreviewProvider {
         authStore.isVip = true
         authStore.vipExpireDate = Date().addingTimeInterval(86400 * 30)
         authStore.coinBalance = 100
-        authStore.loginMethod = .google
         return ProfileView(
             viewModel: ProfileViewModel(
                 repository: ProfilePreviewRepository(

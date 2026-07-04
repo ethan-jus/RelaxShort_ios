@@ -101,18 +101,6 @@ protocol ProfileRepositoryProtocol {
     func fetchUserProfile() async throws -> User
 }
 
-// MARK: - Auth
-
-/// 认证数据仓库协议
-protocol AuthRepositoryProtocol {
-    /// Google 登录
-    func signInWithGoogle() async throws -> User
-    /// Apple 登录
-    func signInWithApple() async throws -> User
-    /// 游客登录
-    func signInAsGuest() async throws -> User
-}
-
 // MARK: - VIP
 
 /// VIP 会员数据仓库协议

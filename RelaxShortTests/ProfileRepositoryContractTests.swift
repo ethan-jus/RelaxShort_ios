@@ -8,6 +8,8 @@ struct ProfileRepositoryContractTests {
         let json = """
         {
           "user_id": 1,
+          "public_id": "RS0000000001",
+          "account_type": "REGISTERED",
           "nickname": "Ethan",
           "avatar_url": "https://cdn.example/avatar.png",
           "bookmark_count": 3,
@@ -27,5 +29,6 @@ struct ProfileRepositoryContractTests {
 
         #expect(dto.avatarUrl == "https://cdn.example/avatar.png")
         #expect(dto.bookmarkCount == 3)
+        #expect(dto.publicId == "RS0000000001")
     }
 }

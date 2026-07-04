@@ -5,7 +5,7 @@ import Foundation
 /// 在 `RelaxShortApp.swift` 中创建为 `@StateObject`，通过 `.environmentObject()` 传递。
 ///
 /// Task32：真实 API 模块均直接注入 Real Repository，不再通过 use_real_api 开关切换。
-/// 未完成真实接入的 Auth / VIP / CoinReward 保持原有注入不变。
+/// Task34A：认证由 `AuthSessionCoordinator` 独立管理；未开发的 VIP / CoinReward 暂不扩面。
 @MainActor
 final class DependencyContainer: ObservableObject {
 
@@ -17,7 +17,6 @@ final class DependencyContainer: ObservableObject {
     let favoritesRepository: FavoritesRepositoryProtocol
     let profileRepository: ProfileRepositoryProtocol
     let memberRepository: MemberRepositoryProtocol
-    let authRepository: AuthRepositoryProtocol
     let vipRepository: VIPRepositoryProtocol
     let coinRewardRepository: CoinRewardRepositoryProtocol
     let discoveryAnalytics: any DiscoveryAnalyticsTracking
@@ -36,7 +35,6 @@ final class DependencyContainer: ObservableObject {
         favoritesRepository: FavoritesRepositoryProtocol? = nil,
         profileRepository: ProfileRepositoryProtocol? = nil,
         memberRepository: MemberRepositoryProtocol? = nil,
-        authRepository: AuthRepositoryProtocol = MockAuthRepository(),
         vipRepository: VIPRepositoryProtocol = MockVIPRepository(),
         coinRewardRepository: CoinRewardRepositoryProtocol = MockCoinRewardRepository(),
         discoveryAnalytics: (any DiscoveryAnalyticsTracking)? = nil
@@ -50,7 +48,6 @@ final class DependencyContainer: ObservableObject {
         self.memberRepository = memberRepository ?? RealMemberRepository()
 
         // 未完成真实接入的模块：保持原有注入方式
-        self.authRepository = authRepository
         self.vipRepository = vipRepository
         self.coinRewardRepository = coinRewardRepository
 

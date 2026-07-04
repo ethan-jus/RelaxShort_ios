@@ -48,14 +48,7 @@ final class APIClient {
     /// - Returns: 解码后的模型对象
     /// - Throws: `NetworkError` 封装的请求/解码错误
     func requestRaw<T: Decodable>(_ endpoint: APIEndpoint) async throws -> T {
-        let urlRequest = try buildRequest(for: endpoint)
-        logRequest(urlRequest)
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await session.data(for: urlRequest)
-        } catch {
-            throw NetworkError.from(error)
-        }
+        let (data, response) = try await perform(endpoint)
         try validateResponse(response, data: data)
         logResponse(response, data: data)
         do {
@@ -82,14 +75,7 @@ final class APIClient {
 
     /// 发起请求，解码为 `Decodable` 数组（不解包 envelope）。
     func requestArray<T: Decodable>(_ endpoint: APIEndpoint) async throws -> [T] {
-        let urlRequest = try buildRequest(for: endpoint)
-        logRequest(urlRequest)
-        let (data, response): (Data, URLResponse)
-        do {
-            (data, response) = try await session.data(for: urlRequest)
-        } catch {
-            throw NetworkError.from(error)
-        }
+        let (data, response) = try await perform(endpoint)
         try validateResponse(response, data: data)
         logResponse(response, data: data)
         do {
@@ -103,15 +89,47 @@ final class APIClient {
     // MARK: - Request Building
 
     /// 将 `APIEndpoint` 构造为 `URLRequest`
-    private func buildRequest(for endpoint: APIEndpoint) throws -> URLRequest {
+    private func buildRequest(for endpoint: APIEndpoint, forceRefresh: Bool = false) async throws -> URLRequest {
         guard let url = endpoint.url else {
             throw NetworkError.invalidURL
         }
         var request = URLRequest(url: url)
         request.httpMethod = endpoint.method.rawValue
         request.allHTTPHeaderFields = endpoint.headers
+        let token: String?
+        if endpoint.requiresAuthenticatedSession || forceRefresh {
+            token = try await AuthSessionCoordinator.shared.validAccessToken(forceRefresh: forceRefresh)
+        } else {
+            token = try? await AuthSessionCoordinator.shared.validAccessToken(forceRefresh: false)
+        }
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
         request.httpBody = endpoint.body
         return request
+    }
+
+    /// 401 时只触发一次全局 refresh，并用新 access token 重放原请求。
+    private func perform(_ endpoint: APIEndpoint) async throws -> (Data, URLResponse) {
+        var request = try await buildRequest(for: endpoint)
+        logRequest(request)
+        var result: (Data, URLResponse)
+        do {
+            result = try await session.data(for: request)
+        } catch {
+            throw NetworkError.from(error)
+        }
+
+        if (result.1 as? HTTPURLResponse)?.statusCode == 401 {
+            request = try await buildRequest(for: endpoint, forceRefresh: true)
+            logRequest(request)
+            do {
+                result = try await session.data(for: request)
+            } catch {
+                throw NetworkError.from(error)
+            }
+        }
+        return result
     }
 
     // MARK: - Response Validation

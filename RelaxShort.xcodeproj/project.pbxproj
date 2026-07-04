@@ -58,7 +58,14 @@
 		813920C7CB353C5DFF9EDFC0 /* PlayerComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1D03A03D2000E5D75B2B15 /* PlayerComponents.swift */; };
 		82AA4DB580892A726175B04F /* RankingEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C914768BFFF4524641958E9 /* RankingEntry.swift */; };
 		84521D9F5863A3752E137B86 /* RankDrama.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6BAACF8AF7E6C0BDECF3C3 /* RankDrama.swift */; };
-		84F6056860E085BBE1360CD7 /* MockAuthProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 154AC1C2320803FDF64375BF /* MockAuthProvider.swift */; };
+		A34B00000000000000000001 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000001 /* AuthModels.swift */; };
+		A34B00000000000000000002 /* AuthKeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000002 /* AuthKeychainStore.swift */; };
+		A34B00000000000000000003 /* AuthSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000003 /* AuthSessionCoordinator.swift */; };
+		A34B00000000000000000004 /* GoogleOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000004 /* GoogleOAuthClient.swift */; };
+		A34B00000000000000000005 /* RealAuthRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000005 /* RealAuthRepository.swift */; };
+		A34B00000000000000000006 /* AuthResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000006 /* AuthResponseDTO.swift */; };
+		A34B00000000000000000007 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A34D00000000000000000001 /* GoogleSignIn */; };
+		A34B00000000000000000008 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = A34D00000000000000000002 /* GoogleSignInSwift */; };
 		87397CD67B506164EAFE644C /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A4E84BF38F1E7454707A70 /* AuthStore.swift */; };
 		8CF74B95BAAEFB1AA410A620 /* InstallIdentityProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E25E4818A70A3AC4A3C0FDAC /* InstallIdentityProvider.swift */; };
 		8D9E4FFE568E4A3CC3F14A0A /* CoinRewardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15E0ECC75DBFD47BDC8BF48 /* CoinRewardView.swift */; };
@@ -152,7 +159,12 @@
 		0F907B906FB605748F73151A /* TopToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopToolbarView.swift; sourceTree = "<group>"; };
 		0F9EDAF9DACFC07CD81B6706 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		142D16FA5DD46D6AC295A967 /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageService.swift; sourceTree = "<group>"; };
-		154AC1C2320803FDF64375BF /* MockAuthProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAuthProvider.swift; sourceTree = "<group>"; };
+		A34F00000000000000000001 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthModels.swift; path = RelaxShort/Core/Auth/AuthModels.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000002 /* AuthKeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthKeychainStore.swift; path = RelaxShort/Core/Auth/AuthKeychainStore.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000003 /* AuthSessionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthSessionCoordinator.swift; path = RelaxShort/Core/Auth/AuthSessionCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000004 /* GoogleOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GoogleOAuthClient.swift; path = RelaxShort/Core/Auth/GoogleOAuthClient.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000005 /* RealAuthRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealAuthRepository.swift; path = RelaxShort/Core/Services/RealAuthRepository.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000006 /* AuthResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthResponseDTO.swift; path = RelaxShort/Models/API/AuthResponseDTO.swift; sourceTree = SOURCE_ROOT; };
 		158EE04959229D92A979E900 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
 		162A3AA839324704A0A1F73C /* ShortVideoPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortVideoPlayerEngine.swift; sourceTree = "<group>"; };
 		168FB1E2BB472B3B8D7E7253 /* PlayerSlotPool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSlotPool.swift; sourceTree = "<group>"; };
@@ -298,6 +310,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				C338F43626F4160B5B35BD86 /* GoogleMobileAds in Frameworks */,
+				A34B00000000000000000007 /* GoogleSignIn in Frameworks */,
+				A34B00000000000000000008 /* GoogleSignInSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -449,10 +463,15 @@
 				FF389AD770099338D3F8AAF2 /* AdService.swift */,
 				C0FBCC165022E5CCB45EA6E8 /* APIClient.swift */,
 				4BF71E8082163CE2F05D8E65 /* APIEndpoint.swift */,
+				A34F00000000000000000001 /* AuthModels.swift */,
+				A34F00000000000000000002 /* AuthKeychainStore.swift */,
+				A34F00000000000000000003 /* AuthSessionCoordinator.swift */,
+				A34F00000000000000000004 /* GoogleOAuthClient.swift */,
+				A34F00000000000000000005 /* RealAuthRepository.swift */,
+				A34F00000000000000000006 /* AuthResponseDTO.swift */,
 				2E94422D6C246A49C3BBEFCF /* DependencyContainer.swift */,
 				92BA45403A687DDCFEC0BFB2 /* ImageLoader.swift */,
 				83FB8814D1C728B6ACFF446E /* MockAPIRepository.swift */,
-				154AC1C2320803FDF64375BF /* MockAuthProvider.swift */,
 				59DE53B2962106BFD119821C /* NetworkError.swift */,
 				3F30DE30D08251279912E670 /* RealAdService.swift */,
 				816C2A833938C5A1359FED73 /* RepositoryProtocols.swift */,
@@ -689,6 +708,8 @@
 			name = RelaxShort;
 			packageProductDependencies = (
 				945B30FA95757C96CC22C8F1 /* GoogleMobileAds */,
+				A34D00000000000000000001 /* GoogleSignIn */,
+				A34D00000000000000000002 /* GoogleSignInSwift */,
 			);
 			productName = RelaxShort;
 			productReference = 6E8B492474AFC12A03F97878 /* RelaxShort.app */;
@@ -754,6 +775,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				9426733FD624226EADA96C67 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+				A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7ACAA7D6C835481FD46EAA02 /* Products */;
@@ -838,7 +860,12 @@
 				70625382EDA24FD51CA6C6C8 /* LoginViewModel.swift in Sources */,
 				3DA9ADA76FBF34BE2D573190 /* MainTabView.swift in Sources */,
 				D69868C98C54B6D60C649FEF /* MockAPIRepository.swift in Sources */,
-				84F6056860E085BBE1360CD7 /* MockAuthProvider.swift in Sources */,
+				A34B00000000000000000001 /* AuthModels.swift in Sources */,
+				A34B00000000000000000002 /* AuthKeychainStore.swift in Sources */,
+				A34B00000000000000000003 /* AuthSessionCoordinator.swift in Sources */,
+				A34B00000000000000000004 /* GoogleOAuthClient.swift in Sources */,
+				A34B00000000000000000005 /* RealAuthRepository.swift in Sources */,
+				A34B00000000000000000006 /* AuthResponseDTO.swift in Sources */,
 				A925386114185EA02BD70324 /* NavigationRoutes.swift in Sources */,
 				7CB8EC8C5350FC8F379062DF /* NetworkError.swift in Sources */,
 				813920C7CB353C5DFF9EDFC0 /* PlayerComponents.swift in Sources */,
@@ -1205,6 +1232,14 @@
 				minimumVersion = 11.0.0;
 			};
 		};
+		A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 9.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1212,6 +1247,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9426733FD624226EADA96C67 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
+		};
+		A34D00000000000000000001 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		A34D00000000000000000002 /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

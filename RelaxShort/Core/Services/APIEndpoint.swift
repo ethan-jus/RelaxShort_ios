@@ -187,12 +187,12 @@ extension APIEndpoint {
         }
     }
 
-    /// 是否需要用户身份。播放鉴权同样依赖用户上下文；本地 real API
-    /// 模式在正式登录接入前使用固定开发用户。
-    private var requiresUserIdHeader: Bool {
+    /// 后端必须从 Bearer 会话解析用户的端点；匿名账户也属于有效会话。
+    var requiresAuthenticatedSession: Bool {
         switch self {
         case .episodePlay, .userMe, .userWallet, .updateUserPreferences,
-             .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark:
+             .watchHistoryV2, .deleteWatchHistory, .watchProgress,
+             .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
         default:
             return false
@@ -221,29 +221,9 @@ extension APIEndpoint {
             base["X-Region-Code"] = country
         }
 
-        // 登录 token
-        if let token = StorageService.shared.accessToken {
-            base["Authorization"] = "Bearer \(token)"
-        }
-
         // Task30 R4B-1：所有真实 v2 请求发送安装标识
         if requiresRealV2Header {
             base["X-Device-Id"] = InstallIdentityProvider.shared.installID()
-        }
-
-        // 本地 dev 桥：用户端点需要 X-User-Id
-        if requiresUserIdHeader {
-            let fallbackUserID: String? = {
-                #if DEBUG
-                return "1"
-                #else
-                return nil
-                #endif
-            }()
-            let userId = StorageService.shared.userId ?? fallbackUserID
-            if let uid = userId {
-                base["X-User-Id"] = uid
-            }
         }
 
         return base
