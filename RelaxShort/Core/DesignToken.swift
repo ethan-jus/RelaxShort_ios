@@ -18,6 +18,8 @@ enum DT {
     static let brandGold      = SwiftUI.Color(hex: "#C29852")
     /// 会员卡金色 #D6B46A
     static let memberGold     = SwiftUI.Color(hex: "#D6B46A")
+    /// 金币色（耀眼金） #F5C842
+    static let coinGold       = SwiftUI.Color(hex: "#F5C842")
     
     /// 功能色
     /// 爆款角标 #FF3B30
