@@ -9,6 +9,13 @@ protocol RealAuthRepositoryProtocol {
         deviceID: String,
         mergeRequestID: UUID
     ) async throws -> AuthSession
+    func signInWithFacebook(
+        authenticationToken: String,
+        nonce: String,
+        anonymousAccessToken: String,
+        deviceID: String,
+        mergeRequestID: UUID
+    ) async throws -> AuthSession
     func logout(_ refreshToken: String) async throws
 }
 
@@ -50,6 +57,25 @@ final class RealAuthRepository: RealAuthRepositoryProtocol {
             path: "/api/v2/auth/oauth/google",
             body: [
                 "id_token": idToken,
+                "merge_request_id": mergeRequestID.uuidString.lowercased(),
+                "device_id": deviceID
+            ],
+            bearerToken: anonymousAccessToken
+        )
+    }
+
+    func signInWithFacebook(
+        authenticationToken: String,
+        nonce: String,
+        anonymousAccessToken: String,
+        deviceID: String,
+        mergeRequestID: UUID
+    ) async throws -> AuthSession {
+        try await requestSession(
+            path: "/api/v2/auth/oauth/facebook",
+            body: [
+                "authentication_token": authenticationToken,
+                "nonce": nonce,
                 "merge_request_id": mergeRequestID.uuidString.lowercased(),
                 "device_id": deviceID
             ],

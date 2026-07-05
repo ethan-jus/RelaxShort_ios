@@ -52,6 +52,10 @@ final class AuthStore: ObservableObject {
         Task { await coordinator.signInWithGoogle() }
     }
 
+    func signInWithFacebook() {
+        Task { await coordinator.signInWithFacebook() }
+    }
+
     func logout() {
         Task {
             await coordinator.logout()

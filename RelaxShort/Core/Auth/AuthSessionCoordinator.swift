@@ -1,6 +1,6 @@
 import Foundation
 
-/// App 唯一认证状态机。负责匿名账户、token 轮换、Google 升级和退出后重建匿名账户。
+/// App 唯一认证状态机。负责匿名账户、token 轮换、第三方升级和退出后重建匿名账户。
 @MainActor
 final class AuthSessionCoordinator: ObservableObject {
     static let shared = AuthSessionCoordinator()
@@ -12,21 +12,25 @@ final class AuthSessionCoordinator: ObservableObject {
     private let repository: RealAuthRepositoryProtocol
     private let tokenStore: AuthTokenStoring
     private let googleClient: GoogleOAuthClientProtocol
+    private let facebookClient: FacebookOAuthClientProtocol
     private var session: AuthSession?
     private var bootstrapTask: Task<Void, Never>?
     private var refreshTask: Task<AuthSession, Error>?
 
     private let bootstrapKeyName = "auth.anonymous-bootstrap-key"
     private let googleMergeRequestKeyName = "auth.google-merge-request-key"
+    private let facebookMergeRequestKeyName = "auth.facebook-merge-request-key"
 
     init(
         repository: RealAuthRepositoryProtocol = RealAuthRepository(),
         tokenStore: AuthTokenStoring = AuthKeychainStore.shared,
-        googleClient: GoogleOAuthClientProtocol = GoogleOAuthClient()
+        googleClient: GoogleOAuthClientProtocol = GoogleOAuthClient(),
+        facebookClient: FacebookOAuthClientProtocol = FacebookOAuthClient()
     ) {
         self.repository = repository
         self.tokenStore = tokenStore
         self.googleClient = googleClient
+        self.facebookClient = facebookClient
     }
 
     var hasSession: Bool { session != nil }
@@ -81,18 +85,9 @@ final class AuthSessionCoordinator: ObservableObject {
         do {
             let token = try await validAccessToken()
             let idToken = try await googleClient.signIn()
-            let defaults = UserDefaults.standard
-            let mergeRequestID: UUID
-            if let raw = defaults.string(forKey: googleMergeRequestKeyName),
-               let pending = UUID(uuidString: raw) {
-                mergeRequestID = pending
-            } else {
-                mergeRequestID = UUID()
-                defaults.set(
-                    mergeRequestID.uuidString.lowercased(),
-                    forKey: googleMergeRequestKeyName
-                )
-            }
+            let mergeRequestID = pendingMergeRequestID(
+                key: googleMergeRequestKeyName
+            )
             let upgraded = try await repository.signInWithGoogle(
                 idToken: idToken,
                 anonymousAccessToken: token,
@@ -100,13 +95,45 @@ final class AuthSessionCoordinator: ObservableObject {
                 mergeRequestID: mergeRequestID
             )
             try install(upgraded)
-            defaults.removeObject(forKey: googleMergeRequestKeyName)
+            UserDefaults.standard.removeObject(forKey: googleMergeRequestKeyName)
         } catch {
             if error is CancellationError { return }
             if let apiError = error as? APIError,
                apiError.code == "AUTH_ACCOUNT_MERGE_CONFLICT" {
                 // 身份与挂起请求不一致时废弃旧键，允许用户重新选择账号。
                 UserDefaults.standard.removeObject(forKey: googleMergeRequestKeyName)
+            }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func signInWithFacebook() async {
+        guard !isSigningIn else { return }
+        isSigningIn = true
+        errorMessage = nil
+        defer { isSigningIn = false }
+
+        do {
+            let token = try await validAccessToken()
+            let credential = try await facebookClient.signIn()
+            let mergeRequestID = pendingMergeRequestID(
+                key: facebookMergeRequestKeyName
+            )
+            let upgraded = try await repository.signInWithFacebook(
+                authenticationToken: credential.authenticationToken,
+                nonce: credential.nonce,
+                anonymousAccessToken: token,
+                deviceID: InstallIdentityProvider.shared.installID(),
+                mergeRequestID: mergeRequestID
+            )
+            try install(upgraded)
+            UserDefaults.standard.removeObject(forKey: facebookMergeRequestKeyName)
+        } catch {
+            if error is CancellationError { return }
+            if let apiError = error as? APIError,
+               apiError.code == "AUTH_ACCOUNT_MERGE_CONFLICT" {
+                // 身份与挂起请求不一致时废弃旧键，允许用户重新选择账号。
+                UserDefaults.standard.removeObject(forKey: facebookMergeRequestKeyName)
             }
             errorMessage = error.localizedDescription
         }
@@ -119,8 +146,10 @@ final class AuthSessionCoordinator: ObservableObject {
         state = .restoring
         try? tokenStore.deleteRefreshToken()
         googleClient.signOut()
+        facebookClient.signOut()
         UserDefaults.standard.removeObject(forKey: bootstrapKeyName)
         UserDefaults.standard.removeObject(forKey: googleMergeRequestKeyName)
+        UserDefaults.standard.removeObject(forKey: facebookMergeRequestKeyName)
         await bootstrap()
         if let oldRefreshToken {
             try? await repository.logout(oldRefreshToken)
@@ -177,5 +206,16 @@ final class AuthSessionCoordinator: ObservableObject {
         state = newSession.account.isRegistered
             ? .authenticated(newSession.account)
             : .anonymous(newSession.account)
+    }
+
+    private func pendingMergeRequestID(key: String) -> UUID {
+        let defaults = UserDefaults.standard
+        if let raw = defaults.string(forKey: key),
+           let pending = UUID(uuidString: raw) {
+            return pending
+        }
+        let requestID = UUID()
+        defaults.set(requestID.uuidString.lowercased(), forKey: key)
+        return requestID
     }
 }

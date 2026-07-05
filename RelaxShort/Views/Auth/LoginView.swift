@@ -1,7 +1,7 @@
 import SwiftUI
 import GoogleSignInSwift
 
-/// 真实登录页。当前阶段只展示已接通的 Google 登录，不放置不可用入口。
+/// 真实登录页。仅展示已接通后端认证闭环的第三方登录入口。
 struct LoginView: View {
     @EnvironmentObject private var authStore: AuthStore
     @Environment(\.dismiss) private var dismiss

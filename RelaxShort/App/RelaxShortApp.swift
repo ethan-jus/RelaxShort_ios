@@ -5,6 +5,9 @@ import GoogleSignIn
 
 @main
 struct RelaxShortApp: App {
+    @UIApplicationDelegateAdaptor(FacebookAppDelegate.self)
+    private var facebookAppDelegate
+
     @StateObject private var appStore = AppStore()
     @StateObject private var authStore = AuthStore()
     @StateObject private var coinStore = CoinStore()
@@ -95,10 +98,7 @@ struct RelaxShortApp: App {
                 await authStore.bootstrap()
             }
             .onOpenURL { url in
-                GIDSignIn.sharedInstance.handle(url)
-                ApplicationDelegate.shared.application(
-                    UIApplication.shared, open: url,
-                    sourceApplication: nil, annotation: nil)
+                _ = GIDSignIn.sharedInstance.handle(url)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active && !showSplash {

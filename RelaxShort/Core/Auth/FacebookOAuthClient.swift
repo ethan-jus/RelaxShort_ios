@@ -18,6 +18,8 @@ protocol FacebookOAuthClientProtocol {
 /// Facebook Limited Login：使用 AuthenticationToken JWT + nonce。
 /// 仅返回签名凭据；不返回 AccessToken、Profile.current 或 userID。
 final class FacebookOAuthClient: FacebookOAuthClientProtocol {
+    private let loginManager = LoginManager()
+
     @MainActor
     func signIn() async throws -> FacebookOAuthCredential {
         let nonce = UUID().uuidString.lowercased()
@@ -28,7 +30,7 @@ final class FacebookOAuthClient: FacebookOAuthClientProtocol {
         )
 
         return try await withCheckedThrowingContinuation { continuation in
-            LoginManager().logIn(viewController: nil, configuration: configuration) { result in
+            loginManager.logIn(viewController: nil, configuration: configuration) { result in
                 switch result {
                 case .cancelled:
                     continuation.resume(throwing: CancellationError())
@@ -51,6 +53,6 @@ final class FacebookOAuthClient: FacebookOAuthClientProtocol {
 
     @MainActor
     func signOut() {
-        LoginManager().logOut()
+        loginManager.logOut()
     }
 }

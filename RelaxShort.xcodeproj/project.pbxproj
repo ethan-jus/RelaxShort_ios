@@ -33,6 +33,7 @@
 		47CAE4E9748555F58485DF77 /* RealAPISmokeRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */; };
 		4C2A4B746B4E5FA8AD0D26AF /* AppInitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BC0029E1B4A5E50A277A299 /* AppInitService.swift */; };
 		4DDFA6F1D2EEC92162F6390A /* BannerCarouselViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57B73D1F27373372450CDDB7 /* BannerCarouselViewModel.swift */; };
+		4F313EAE05D04C59865E1629 /* FacebookAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */; };
 		4F550BBADB583BE70F1E0D4D /* ExitGuidePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E4D8688900319881D81FB88 /* ExitGuidePopupView.swift */; };
 		515D6A18AF0E16B92039B736 /* RealAdService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F30DE30D08251279912E670 /* RealAdService.swift */; };
 		534A609A4BC181567823C605 /* PlayerRecoveryController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33FF53CF2CD4F740B93648B2 /* PlayerRecoveryController.swift */; };
@@ -57,19 +58,12 @@
 		780220A30CA17D36AC00BCA2 /* VideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 369DBB3ED6B5D26D448FA5A9 /* VideoPlayerView.swift */; };
 		787FEE0511E957E8A50AE0CE /* API/PlayerMediaSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20FD7A3399158EFA990DE36 /* API/PlayerMediaSource.swift */; };
 		7CB8EC8C5350FC8F379062DF /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59DE53B2962106BFD119821C /* NetworkError.swift */; };
+		7DA9D1BA105945A397D0B25B /* AppRuntimeEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0BCFB0FFF44690934A6716 /* AppRuntimeEnvironment.swift */; };
 		7EA1F16846A1632410CBFF6B /* DependencyContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E94422D6C246A49C3BBEFCF /* DependencyContainer.swift */; };
 		7F0248C13E2DF858A93FAD7D /* SpeedHUDView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B070006A2A02CF44DB37D2A /* SpeedHUDView.swift */; };
 		813920C7CB353C5DFF9EDFC0 /* PlayerComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1D03A03D2000E5D75B2B15 /* PlayerComponents.swift */; };
 		82AA4DB580892A726175B04F /* RankingEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C914768BFFF4524641958E9 /* RankingEntry.swift */; };
 		84521D9F5863A3752E137B86 /* RankDrama.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6BAACF8AF7E6C0BDECF3C3 /* RankDrama.swift */; };
-		A34B00000000000000000001 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000001 /* AuthModels.swift */; };
-		A34B00000000000000000002 /* AuthKeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000002 /* AuthKeychainStore.swift */; };
-		A34B00000000000000000003 /* AuthSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000003 /* AuthSessionCoordinator.swift */; };
-		A34B00000000000000000004 /* GoogleOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000004 /* GoogleOAuthClient.swift */; };
-		A34B00000000000000000005 /* RealAuthRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000005 /* RealAuthRepository.swift */; };
-		A34B00000000000000000006 /* AuthResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000006 /* AuthResponseDTO.swift */; };
-		A34B00000000000000000007 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A34D00000000000000000001 /* GoogleSignIn */; };
-		A34B00000000000000000008 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = A34D00000000000000000002 /* GoogleSignInSwift */; };
 		87397CD67B506164EAFE644C /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2A4E84BF38F1E7454707A70 /* AuthStore.swift */; };
 		8CF74B95BAAEFB1AA410A620 /* InstallIdentityProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = E25E4818A70A3AC4A3C0FDAC /* InstallIdentityProvider.swift */; };
 		8D9E4FFE568E4A3CC3F14A0A /* CoinRewardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15E0ECC75DBFD47BDC8BF48 /* CoinRewardView.swift */; };
@@ -89,6 +83,14 @@
 		A30B00000000000000000001 /* SearchRankTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30F00000000000000000001 /* SearchRankTheme.swift */; };
 		A30B00000000000000000002 /* SearchRankCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30F00000000000000000002 /* SearchRankCardView.swift */; };
 		A30B00000000000000000003 /* SearchRankingPager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30F00000000000000000003 /* SearchRankingPager.swift */; };
+		A34B00000000000000000001 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000001 /* AuthModels.swift */; };
+		A34B00000000000000000002 /* AuthKeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000002 /* AuthKeychainStore.swift */; };
+		A34B00000000000000000003 /* AuthSessionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000003 /* AuthSessionCoordinator.swift */; };
+		A34B00000000000000000004 /* GoogleOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000004 /* GoogleOAuthClient.swift */; };
+		A34B00000000000000000005 /* RealAuthRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000005 /* RealAuthRepository.swift */; };
+		A34B00000000000000000006 /* AuthResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34F00000000000000000006 /* AuthResponseDTO.swift */; };
+		A34B00000000000000000007 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A34D00000000000000000001 /* GoogleSignIn */; };
+		A34B00000000000000000008 /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = A34D00000000000000000002 /* GoogleSignInSwift */; };
 		A41016AFF966DD48067E8DC1 /* SearchDefaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8EC9E6C0320ECBC023B4E17 /* SearchDefaultView.swift */; };
 		A904D3F3D117CE6F5C9FE9C4 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF861F910EFAE987BF1A60D /* ProfileView.swift */; };
 		A925386114185EA02BD70324 /* NavigationRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD5AB7221591FB4CB7E7C3A6 /* NavigationRoutes.swift */; };
@@ -110,6 +112,9 @@
 		C6680317189D82D2B9397409 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A121A77EFE00386139727 /* StoreKitManager.swift */; };
 		CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408582F2968E474DADC30E92 /* ProfileDestinations.swift */; };
 		CD9E95D7080A87ABF29CF072 /* RewardedAdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD821FD282081AB98852E2AF /* RewardedAdView.swift */; };
+		CE78B51CA94E42878A2D380B /* FacebookOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */; };
+		FBB340000000000000000001 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = FBD340000000000000000001 /* FacebookCore */; };
+		FBB340000000000000000002 /* FacebookLogin in Frameworks */ = {isa = PBXBuildFile; productRef = FBD340000000000000000002 /* FacebookLogin */; };
 		CE8C90F42794FBBC8959AE3F /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB78105AC58D39EA2526A89 /* Logger.swift */; };
 		CEDC26B856AE55F0A2AD1160 /* RealDetailRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */; };
 		D443C19FB03F5FAC37C37AC9 /* PlayerSlotPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168FB1E2BB472B3B8D7E7253 /* PlayerSlotPool.swift */; };
@@ -140,9 +145,6 @@
 		T31A00500000000000000005 /* RealFavoritesRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00600000000000000006 /* RealFavoritesRepository.swift */; };
 		T31A00700000000000000007 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00800000000000000008 /* BookmarkStore.swift */; };
 		T31A00900000000000000009 /* WatchProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A01000000000000000010 /* WatchProgressReporter.swift */; };
-		7DA9D1BA105945A397D0B25B /* AppRuntimeEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0BCFB0FFF44690934A6716 /* AppRuntimeEnvironment.swift */; };
-		4F313EAE05D04C59865E1629 /* FacebookAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */; };
-		CE78B51CA94E42878A2D380B /* FacebookOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -163,12 +165,6 @@
 		0F907B906FB605748F73151A /* TopToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopToolbarView.swift; sourceTree = "<group>"; };
 		0F9EDAF9DACFC07CD81B6706 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
 		142D16FA5DD46D6AC295A967 /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageService.swift; sourceTree = "<group>"; };
-		A34F00000000000000000001 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthModels.swift; path = RelaxShort/Core/Auth/AuthModels.swift; sourceTree = SOURCE_ROOT; };
-		A34F00000000000000000002 /* AuthKeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthKeychainStore.swift; path = RelaxShort/Core/Auth/AuthKeychainStore.swift; sourceTree = SOURCE_ROOT; };
-		A34F00000000000000000003 /* AuthSessionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthSessionCoordinator.swift; path = RelaxShort/Core/Auth/AuthSessionCoordinator.swift; sourceTree = SOURCE_ROOT; };
-		A34F00000000000000000004 /* GoogleOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GoogleOAuthClient.swift; path = RelaxShort/Core/Auth/GoogleOAuthClient.swift; sourceTree = SOURCE_ROOT; };
-		A34F00000000000000000005 /* RealAuthRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealAuthRepository.swift; path = RelaxShort/Core/Services/RealAuthRepository.swift; sourceTree = SOURCE_ROOT; };
-		A34F00000000000000000006 /* AuthResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthResponseDTO.swift; path = RelaxShort/Models/API/AuthResponseDTO.swift; sourceTree = SOURCE_ROOT; };
 		158EE04959229D92A979E900 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
 		162A3AA839324704A0A1F73C /* ShortVideoPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortVideoPlayerEngine.swift; sourceTree = "<group>"; };
 		168FB1E2BB472B3B8D7E7253 /* PlayerSlotPool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerSlotPool.swift; sourceTree = "<group>"; };
@@ -197,6 +193,7 @@
 		408582F2968E474DADC30E92 /* ProfileDestinations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProfileDestinations.swift; path = RelaxShort/Views/Profile/ProfileDestinations.swift; sourceTree = SOURCE_ROOT; };
 		457158D3B20C8360F9FE045F /* DramaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaItem.swift; sourceTree = "<group>"; };
 		45C2B9C4EFA543902B3CA1D1 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FacebookOAuthClient.swift; path = RelaxShort/Core/Auth/FacebookOAuthClient.swift; sourceTree = SOURCE_ROOT; };
 		4BF71E8082163CE2F05D8E65 /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		4E4D8688900319881D81FB88 /* ExitGuidePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExitGuidePopupView.swift; sourceTree = "<group>"; };
 		4F489C7DA1AC261114BF1CA0 /* CoinPurchaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinPurchaseSheet.swift; sourceTree = "<group>"; };
@@ -209,6 +206,7 @@
 		614217FBE8E7FD906F0E7F17 /* RulePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePopupView.swift; sourceTree = "<group>"; };
 		6734F3AADD3FC80F4E33192D /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		6E8B492474AFC12A03F97878 /* RelaxShort.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = RelaxShort.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FacebookAppDelegate.swift; path = RelaxShort/App/FacebookAppDelegate.swift; sourceTree = SOURCE_ROOT; };
 		74EC96B2706A84FEC688480B /* FavoritesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoritesViewModel.swift; sourceTree = "<group>"; };
 		796597558E1D7B3BE7678413 /* CoinRewardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinRewardViewModel.swift; sourceTree = "<group>"; };
 		7B070006A2A02CF44DB37D2A /* SpeedHUDView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeedHUDView.swift; sourceTree = "<group>"; };
@@ -224,6 +222,7 @@
 		89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCoordinator.swift; sourceTree = "<group>"; };
 		8ACD6CD70E7C49D0BFE32D57 /* PlayerOptionSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerOptionSheets.swift; sourceTree = "<group>"; };
 		8BB2B6C624119C5300B98C55 /* RecommendViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendViewModel.swift; sourceTree = "<group>"; };
+		8C0BCFB0FFF44690934A6716 /* AppRuntimeEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppRuntimeEnvironment.swift; path = RelaxShort/Core/Runtime/AppRuntimeEnvironment.swift; sourceTree = SOURCE_ROOT; };
 		9284B7B09C619F1A83F6B3A0 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		92BA45403A687DDCFEC0BFB2 /* ImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageLoader.swift; sourceTree = "<group>"; };
 		96DD43518DDDC1E3D0CCED7E /* DiscoveryEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DiscoveryEvent.swift; path = RelaxShort/Core/Analytics/DiscoveryEvent.swift; sourceTree = SOURCE_ROOT; };
@@ -238,6 +237,12 @@
 		A30F00000000000000000001 /* SearchRankTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRankTheme.swift; sourceTree = "<group>"; };
 		A30F00000000000000000002 /* SearchRankCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRankCardView.swift; sourceTree = "<group>"; };
 		A30F00000000000000000003 /* SearchRankingPager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRankingPager.swift; sourceTree = "<group>"; };
+		A34F00000000000000000001 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthModels.swift; path = RelaxShort/Core/Auth/AuthModels.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000002 /* AuthKeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthKeychainStore.swift; path = RelaxShort/Core/Auth/AuthKeychainStore.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000003 /* AuthSessionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthSessionCoordinator.swift; path = RelaxShort/Core/Auth/AuthSessionCoordinator.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000004 /* GoogleOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GoogleOAuthClient.swift; path = RelaxShort/Core/Auth/GoogleOAuthClient.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000005 /* RealAuthRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealAuthRepository.swift; path = RelaxShort/Core/Services/RealAuthRepository.swift; sourceTree = SOURCE_ROOT; };
+		A34F00000000000000000006 /* AuthResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthResponseDTO.swift; path = RelaxShort/Models/API/AuthResponseDTO.swift; sourceTree = SOURCE_ROOT; };
 		A473A2297B9A58E144BAFECD /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		AA1D03A03D2000E5D75B2B15 /* PlayerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerComponents.swift; sourceTree = "<group>"; };
 		AAAA5DE92FF18EFF00153BF7 /* RelaxShortTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RelaxShortTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -297,9 +302,6 @@
 		T31A00600000000000000006 /* RealFavoritesRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealFavoritesRepository.swift; sourceTree = "<group>"; };
 		T31A00800000000000000008 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
 		T31A01000000000000000010 /* WatchProgressReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProgressReporter.swift; sourceTree = "<group>"; };
-		8C0BCFB0FFF44690934A6716 /* AppRuntimeEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppRuntimeEnvironment.swift; path = RelaxShort/Core/Runtime/AppRuntimeEnvironment.swift; sourceTree = SOURCE_ROOT; };
-		6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FacebookAppDelegate.swift; path = RelaxShort/App/FacebookAppDelegate.swift; sourceTree = SOURCE_ROOT; };
-		4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FacebookOAuthClient.swift; path = RelaxShort/Core/Auth/FacebookOAuthClient.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -318,6 +320,8 @@
 				C338F43626F4160B5B35BD86 /* GoogleMobileAds in Frameworks */,
 				A34B00000000000000000007 /* GoogleSignIn in Frameworks */,
 				A34B00000000000000000008 /* GoogleSignInSwift in Frameworks */,
+				FBB340000000000000000001 /* FacebookCore in Frameworks */,
+				FBB340000000000000000002 /* FacebookLogin in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -571,6 +575,9 @@
 				EC39FF880BF54A0AB34DA75A /* MemberView.swift */,
 				408582F2968E474DADC30E92 /* ProfileDestinations.swift */,
 				F4539C92A78949F3A7C2630C /* ProfileMainComponents.swift */,
+				8C0BCFB0FFF44690934A6716 /* AppRuntimeEnvironment.swift */,
+				6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */,
+				4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -731,6 +738,8 @@
 				945B30FA95757C96CC22C8F1 /* GoogleMobileAds */,
 				A34D00000000000000000001 /* GoogleSignIn */,
 				A34D00000000000000000002 /* GoogleSignInSwift */,
+				FBD340000000000000000001 /* FacebookCore */,
+				FBD340000000000000000002 /* FacebookLogin */,
 			);
 			productName = RelaxShort;
 			productReference = 6E8B492474AFC12A03F97878 /* RelaxShort.app */;
@@ -797,6 +806,7 @@
 			packageReferences = (
 				9426733FD624226EADA96C67 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 				A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				FBE340000000000000000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7ACAA7D6C835481FD46EAA02 /* Products */;
@@ -968,10 +978,10 @@
 				04AD97E5CBAE40B48D335B50 /* MemberView.swift in Sources */,
 				CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */,
 				95BB863B0F6B4CAEAF73548D /* ProfileMainComponents.swift in Sources */,
-							7DA9D1BA105945A397D0B25B /* AppRuntimeEnvironment.swift in Sources */,
+				7DA9D1BA105945A397D0B25B /* AppRuntimeEnvironment.swift in Sources */,
 				4F313EAE05D04C59865E1629 /* FacebookAppDelegate.swift in Sources */,
 				CE78B51CA94E42878A2D380B /* FacebookOAuthClient.swift in Sources */,
-);
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
@@ -1264,6 +1274,14 @@
 				minimumVersion = 9.0.0;
 			};
 		};
+		FBE340000000000000000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/facebook-ios-sdk";
+			requirement = {
+				kind = exactVersion;
+				version = 18.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1281,6 +1299,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
 			productName = GoogleSignInSwift;
+		};
+		FBD340000000000000000001 /* FacebookCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FBE340000000000000000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
+			productName = FacebookCore;
+		};
+		FBD340000000000000000002 /* FacebookLogin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = FBE340000000000000000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
+			productName = FacebookLogin;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
