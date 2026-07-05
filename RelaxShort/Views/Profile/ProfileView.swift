@@ -81,7 +81,7 @@ struct ProfileView: View {
                 // 菜单第一组
                 ProfileMenuCard {
                     ProfileMenuRow(icon: "dollarsign.circle", iconColor: coinGold, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                    ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, onTap: { selectedDestination = .wallet })
+                    ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "🪙 \($0.coinBalance)" }, onTap: { selectedDestination = .wallet })
                     ProfileMenuRow(icon: "gift.fill", iconColor: .orange, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
                     ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
                     ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, showsDivider: false, onTap: { selectedDestination = .downloads })
