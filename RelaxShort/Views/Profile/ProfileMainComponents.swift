@@ -404,7 +404,7 @@ struct ProfileMenuRow: View {
                             .foregroundColor(subtitleIconColor)
                             .scaleEffect(coinPulse ? 1.5 : 1.0)
                             .onAppear {
-                                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                                withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
                                     coinPulse = true
                                 }
                             }
