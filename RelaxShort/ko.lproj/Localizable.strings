@@ -287,3 +287,5 @@
 "profile.load_failed" = "프로필을 불러올 수 없습니다";
 
 "profile.join_action" = "바로 가입";
+
+"profile.email" = "이메일";

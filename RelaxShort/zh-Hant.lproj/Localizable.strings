@@ -287,3 +287,5 @@
 "profile.load_failed" = "個人資料載入失敗";
 
 "profile.join_action" = "立即開通";
+
+"profile.email" = "電子郵件";

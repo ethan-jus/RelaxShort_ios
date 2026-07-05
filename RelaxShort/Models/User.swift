@@ -21,6 +21,8 @@ struct User: Codable, Identifiable, Equatable {
     /// 剧集总数
     var totalDramas: Int?
     /// 福利中心金币
+    /// 第三方认证后由后端返回的已验证邮箱
+    var email: String? = nil
     var benefitCoins: Int?
     
     // MARK: - Computed Properties

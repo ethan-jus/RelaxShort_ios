@@ -287,3 +287,5 @@
 "profile.load_failed" = "تعذر تحميل الملف الشخصي";
 
 "profile.join_action" = "انضم الآن";
+
+"profile.email" = "البريد الإلكتروني";

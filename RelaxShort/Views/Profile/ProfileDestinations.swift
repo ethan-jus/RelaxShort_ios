@@ -19,6 +19,16 @@ struct SettingsView: View {
         List {
             Section {
                 settingRow(title: "Manage Membership", systemImage: "crown.fill", color: DB.gold)
+                if authStore.isLoggedIn,
+                   let email = authStore.currentUser?.email,
+                   !email.isEmpty {
+                    settingRowWithValue(
+                        title: "profile.email".localized,
+                        systemImage: "envelope.fill",
+                        color: .white,
+                        value: email
+                    )
+                }
                 settingRow(title: "Appearance", systemImage: "paintpalette.fill", color: .blue)
                 settingRowWithValue(title: "Clear Cache", systemImage: "trash", color: .gray, value: "128 MB")
                 settingRow(title: "Account Deletion", systemImage: "person.crop.circle.badge.minus", color: .red)

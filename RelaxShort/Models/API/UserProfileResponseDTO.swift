@@ -13,6 +13,7 @@ struct UserProfileResponseDTO: Decodable {
     /// 属性必须保持该拼写，避免 URL 缩写导致头像静默解码为 nil。
     let avatarUrl: String?
     let bookmarkCount: Int?
+    let email: String?
     let role: String?
     let vipLevel: Int?
     let status: Int?

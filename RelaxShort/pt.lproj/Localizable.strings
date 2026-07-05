@@ -287,3 +287,5 @@
 "profile.load_failed" = "Não foi possível carregar o perfil";
 
 "profile.join_action" = "Assinar";
+
+"profile.email" = "E-mail";

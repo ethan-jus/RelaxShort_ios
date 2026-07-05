@@ -392,6 +392,7 @@ enum L10n {
         "profile.earn_rewards": "赚取奖励",
         "profile.history": "观看历史",
         "profile.help_feedback": "帮助与反馈",
+        "profile.email": "邮箱",
         "profile.load_failed": "个人资料加载失败",
     ]
 

@@ -9,18 +9,18 @@ enum ProfileDTOMapper {
         profile: UserProfileResponseDTO,
         wallet: WalletResponseDTO
     ) -> User {
-        User(
+        let balance = wallet.balance.map { ($0 as NSDecimalNumber).intValue } ?? 0
+        return User(
             id: profile.publicId,
             nickname: profile.nickname ?? "",
             avatarURL: profile.avatarUrl,
             isVip: wallet.vip?.active ?? false,
             vipExpireDate: wallet.vip?.expiresAt.flatMap(parseISO8601),
-            coinBalance: wallet.balance.map {
-                ($0 as NSDecimalNumber).intValue
-            } ?? 0,
+            coinBalance: balance,
             favoriteCount: profile.bookmarkCount ?? 0,
             qualityLevel: profile.preferences?.defaultQuality,
             totalDramas: nil,
+            email: profile.email,
             benefitCoins: nil
         )
     }

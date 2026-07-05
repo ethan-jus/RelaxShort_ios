@@ -86,16 +86,20 @@ struct LoginView: View {
             ) {
                 authStore.signInWithGoogle()
             }
-            .frame(height: 50)
 
             if authStore.isSigningIn {
                 Color.white
-                    .overlay { ProgressView().tint(.black) }
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    .overlay {
+                        ProgressView()
+                            .tint(.black)
+                    }
                     .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: 312)
+        .frame(height: 40)
+        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        .shadow(color: .black.opacity(0.28), radius: 12, y: 6)
     }
 
     private var agreement: some View {

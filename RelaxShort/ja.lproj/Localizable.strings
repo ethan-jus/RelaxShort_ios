@@ -287,3 +287,5 @@
 "profile.load_failed" = "プロフィールの読み込みに失敗しました";
 
 "profile.join_action" = "今すぐ加入";
+
+"profile.email" = "メールアドレス";

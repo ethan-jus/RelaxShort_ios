@@ -292,3 +292,5 @@
 "profile.load_failed" = "个人资料加载失败";
 
 "profile.join_action" = "立即开通";
+
+"profile.email" = "邮箱";

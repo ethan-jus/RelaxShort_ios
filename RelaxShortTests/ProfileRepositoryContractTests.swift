@@ -12,6 +12,7 @@ struct ProfileRepositoryContractTests {
           "account_type": "REGISTERED",
           "nickname": "Ethan",
           "avatar_url": "https://cdn.example/avatar.png",
+          "email": "user@example.com",
           "bookmark_count": 3,
           "role": "USER",
           "vip_level": 1,
@@ -28,6 +29,7 @@ struct ProfileRepositoryContractTests {
         )
 
         #expect(dto.avatarUrl == "https://cdn.example/avatar.png")
+        #expect(dto.email == "user@example.com")
         #expect(dto.bookmarkCount == 3)
         #expect(dto.publicId == "RS0000000001")
     }
