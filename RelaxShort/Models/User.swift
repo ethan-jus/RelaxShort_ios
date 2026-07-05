@@ -20,9 +20,9 @@ struct User: Codable, Identifiable, Equatable {
     var qualityLevel: String?
     /// 剧集总数
     var totalDramas: Int?
-    /// 福利中心金币
     /// 第三方认证后由后端返回的已验证邮箱
     var email: String? = nil
+    /// 福利中心金币
     var benefitCoins: Int?
     
     // MARK: - Computed Properties

@@ -115,7 +115,11 @@ struct SettingsView: View {
             Image(systemName: systemImage).font(.system(size: 16)).foregroundColor(color).frame(width: 24)
             Text(title).font(.system(size: 15)).foregroundColor(.white)
             Spacer()
-            Text(value).font(.system(size: 13)).foregroundColor(DB.mutedText)
+            Text(value)
+                .font(.system(size: 13))
+                .foregroundColor(DB.mutedText)
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
         .listRowBackground(DB.panel)
     }
