@@ -280,18 +280,7 @@ struct ProfileMembershipCard: View {
         .clipShape(RoundedRectangle(cornerRadius: DB.cardRadius))
         .overlay(
             RoundedRectangle(cornerRadius: DB.cardRadius)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            memberGold,
-                            memberGold.opacity(0.65),
-                            memberGold.opacity(0.35)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
+                .stroke(memberGold.opacity(0.55), lineWidth: 1.5)
         )
         .shadow(color: memberGold.opacity(0.2), radius: 18, y: 6)
         .contentShape(RoundedRectangle(cornerRadius: DB.cardRadius))
