@@ -32,7 +32,7 @@ struct ProfileIdentityHeader: View {
             HStack {
                 Spacer()
                 Button(action: onSettings) {
-                    Image(systemName: "gearshape.fill")
+                    Image(systemName: "gearshape")
                         .font(.system(size: 20, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 44, height: 44)
