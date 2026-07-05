@@ -357,6 +357,8 @@ struct ProfileMenuRow: View {
     let iconColor: Color
     let title: String
     let subtitle: String?
+    let subtitleIcon: String?
+    let subtitleIconColor: Color
     let showsDivider: Bool
     let onTap: () -> Void
 
@@ -365,6 +367,8 @@ struct ProfileMenuRow: View {
         iconColor: Color = .white,
         title: String,
         subtitle: String? = nil,
+        subtitleIcon: String? = nil,
+        subtitleIconColor: Color = DT.coinGold,
         showsDivider: Bool = true,
         onTap: @escaping () -> Void
     ) {
@@ -372,6 +376,8 @@ struct ProfileMenuRow: View {
         self.iconColor = iconColor
         self.title = title
         self.subtitle = subtitle
+        self.subtitleIcon = subtitleIcon
+        self.subtitleIconColor = subtitleIconColor
         self.showsDivider = showsDivider
         self.onTap = onTap
     }
@@ -391,6 +397,11 @@ struct ProfileMenuRow: View {
                 Spacer()
 
                 if let sub = subtitle {
+                    if let sIcon = subtitleIcon {
+                        Image(systemName: sIcon)
+                            .font(.system(size: 12))
+                            .foregroundColor(subtitleIconColor)
+                    }
                     Text(sub)
                         .font(.system(size: 13))
                         .foregroundColor(DT.Color.textSecondary)
