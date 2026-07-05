@@ -282,10 +282,10 @@
 "profile.join_membership" = "Join Membership";
 "profile.membership_active" = "Membership Active";
 "profile.membership_active_until" = "Active until %@";
-"profile.membership_benefit_series" = "16K+ Series";
-"profile.membership_benefit_points" = "Daily Points";
+"profile.membership_benefit_series" = "Unlock All Shows";
+"profile.membership_benefit_points" = "Daily Rewards";
 "profile.membership_benefit_download" = "Download";
-"profile.membership_benefit_quality" = "1080p Quality";
+"profile.membership_benefit_quality" = "HD Quality";
 "profile.top_up" = "Top Up";
 "profile.earn_rewards" = "Earn Rewards";
 "profile.history" = "History";

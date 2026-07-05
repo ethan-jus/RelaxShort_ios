@@ -276,10 +276,10 @@
 "profile.join_membership" = "멤버십 가입";
 "profile.membership_active" = "멤버십 활성";
 "profile.membership_active_until" = "유효 기간 %@";
-"profile.membership_benefit_series" = "16K+ 시리즈";
-"profile.membership_benefit_points" = "일일 포인트";
+"profile.membership_benefit_series" = "전편 시청 가능";
+"profile.membership_benefit_points" = "일일 보상";
 "profile.membership_benefit_download" = "다운로드";
-"profile.membership_benefit_quality" = "1080p 화질";
+"profile.membership_benefit_quality" = "고화질";
 "profile.top_up" = "충전";
 "profile.earn_rewards" = "보상 받기";
 "profile.history" = "시청 기록";

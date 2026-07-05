@@ -206,14 +206,15 @@ struct ProfileMembershipCard: View {
         return String(format: "profile.membership_active_until".localized, formatter.string(from: date))
     }
 
+    private var memberGold: Color { Color(hex: "#C9A45C") }
+
     var body: some View {
         VStack(spacing: 0) {
             if isVIP {
-                // 已开通会员
                 HStack {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 18))
-                        .foregroundColor(DB.gold)
+                        .foregroundColor(memberGold)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("profile.membership_active".localized)
                             .font(.system(size: 16, weight: .bold))
@@ -226,7 +227,6 @@ struct ProfileMembershipCard: View {
                 }
                 .padding(DT.Space.lg)
             } else {
-                // 非会员：加入会员
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("profile.join_membership".localized)
@@ -247,7 +247,6 @@ struct ProfileMembershipCard: View {
                 }
                 .padding(DT.Space.lg)
 
-                // 4 项核心权益：黑金风格，全部金色图标
                 HStack(spacing: 0) {
                     membershipBenefit(icon: "play.rectangle.fill", text: "profile.membership_benefit_series".localized)
                     membershipBenefit(icon: "gift.fill", text: "profile.membership_benefit_points".localized)
@@ -261,18 +260,18 @@ struct ProfileMembershipCard: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(hex: "#1E1A14"),
-                        Color(hex: "#161310"),
-                        Color(hex: "#0E0D10")
+                        Color(hex: "#1C1812"),
+                        Color(hex: "#141110"),
+                        Color(hex: "#0D0C0E")
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 RadialGradient(
-                    colors: [DB.gold.opacity(0.15), .clear],
+                    colors: [memberGold.opacity(0.22), .clear],
                     center: .topTrailing,
                     startRadius: 0,
-                    endRadius: 190
+                    endRadius: 200
                 )
             }
         }
@@ -282,9 +281,9 @@ struct ProfileMembershipCard: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            DB.gold.opacity(0.55),
-                            DB.gold.opacity(0.18),
-                            .white.opacity(0.06)
+                            memberGold.opacity(0.6),
+                            memberGold.opacity(0.2),
+                            .white.opacity(0.04)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -292,7 +291,7 @@ struct ProfileMembershipCard: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: DB.gold.opacity(0.12), radius: 14, y: 5)
+        .shadow(color: memberGold.opacity(0.15), radius: 16, y: 6)
         .contentShape(RoundedRectangle(cornerRadius: DB.cardRadius))
         .onTapGesture(perform: onJoin)
         .accessibilityAddTraits(.isButton)
@@ -301,10 +300,10 @@ struct ProfileMembershipCard: View {
     }
 
     private func membershipBenefit(icon: String, text: String) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(DB.gold.opacity(0.9))
+                .font(.system(size: 18))
+                .foregroundColor(memberGold)
             Text(text)
                 .font(.system(size: 10))
                 .foregroundColor(DT.Color.textSecondary)

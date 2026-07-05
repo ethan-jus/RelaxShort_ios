@@ -276,10 +276,10 @@
 "profile.join_membership" = "メンバーシップに加入";
 "profile.membership_active" = "メンバーシップ有効";
 "profile.membership_active_until" = "有効期限 %@";
-"profile.membership_benefit_series" = "16K以上のシリーズ";
-"profile.membership_benefit_points" = "デイリーポイント";
+"profile.membership_benefit_series" = "全話視聴可能";
+"profile.membership_benefit_points" = "デイリー報酬";
 "profile.membership_benefit_download" = "ダウンロード";
-"profile.membership_benefit_quality" = "1080p 画質";
+"profile.membership_benefit_quality" = "高画質";
 "profile.top_up" = "チャージ";
 "profile.earn_rewards" = "報酬を獲得";
 "profile.history" = "視聴履歴";

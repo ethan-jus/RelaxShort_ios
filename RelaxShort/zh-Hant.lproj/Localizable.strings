@@ -276,10 +276,10 @@
 "profile.join_membership" = "加入會員";
 "profile.membership_active" = "會員已開通";
 "profile.membership_active_until" = "有效期至 %@";
-"profile.membership_benefit_series" = "16K+ 劇集";
-"profile.membership_benefit_points" = "每日積分";
+"profile.membership_benefit_series" = "全劇解鎖";
+"profile.membership_benefit_points" = "每日獎勵";
 "profile.membership_benefit_download" = "離線下載";
-"profile.membership_benefit_quality" = "1080p 畫質";
+"profile.membership_benefit_quality" = "高畫質";
 "profile.top_up" = "儲值";
 "profile.earn_rewards" = "賺取獎勵";
 "profile.history" = "觀看歷史";

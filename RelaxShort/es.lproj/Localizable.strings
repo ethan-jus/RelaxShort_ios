@@ -276,10 +276,10 @@
 "profile.join_membership" = "Unirse a la Membresía";
 "profile.membership_active" = "Membresía activa";
 "profile.membership_active_until" = "Activa hasta %@";
-"profile.membership_benefit_series" = "Más de 16K series";
-"profile.membership_benefit_points" = "Puntos diarios";
+"profile.membership_benefit_series" = "Todas las series";
+"profile.membership_benefit_points" = "Recompensas diarias";
 "profile.membership_benefit_download" = "Descargar";
-"profile.membership_benefit_quality" = "Calidad 1080p";
+"profile.membership_benefit_quality" = "Calidad HD";
 "profile.top_up" = "Recargar";
 "profile.earn_rewards" = "Ganar recompensas";
 "profile.history" = "Historial";

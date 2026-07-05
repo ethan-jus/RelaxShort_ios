@@ -276,10 +276,10 @@
 "profile.join_membership" = "انضم إلى العضوية";
 "profile.membership_active" = "العضوية نشطة";
 "profile.membership_active_until" = "نشطة حتى %@";
-"profile.membership_benefit_series" = "أكثر من 16 ألف مسلسل";
-"profile.membership_benefit_points" = "نقاط يومية";
+"profile.membership_benefit_series" = "جميع المسلسلات";
+"profile.membership_benefit_points" = "مكافآت يومية";
 "profile.membership_benefit_download" = "تنزيل";
-"profile.membership_benefit_quality" = "جودة 1080p";
+"profile.membership_benefit_quality" = "جودة عالية";
 "profile.top_up" = "شحن";
 "profile.earn_rewards" = "اكسب مكافآت";
 "profile.history" = "السجل";
