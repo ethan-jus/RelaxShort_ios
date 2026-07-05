@@ -253,7 +253,7 @@ struct ProfileMembershipCard: View {
                     membershipBenefit(icon: "play.rectangle.fill", text: "profile.membership_benefit_series".localized)
                     membershipBenefit(icon: "gift.fill", text: "profile.membership_benefit_points".localized)
                     membershipBenefit(icon: "arrow.down.to.line", text: "profile.membership_benefit_download".localized)
-                    membershipBenefit(icon: "tv.fill", text: "profile.membership_benefit_quality".localized)
+                    membershipBenefit(icon: "h.square", text: "profile.membership_benefit_quality".localized)
                 }
                 .padding(.bottom, DT.Space.md)
             }
