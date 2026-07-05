@@ -250,8 +250,8 @@ struct ProfileMembershipCard: View {
                 .padding(DT.Space.lg)
 
                 HStack(spacing: 0) {
-                    membershipBenefit(icon: "play.rectangle.fill", text: "profile.membership_benefit_series".localized)
-                    membershipBenefit(icon: "gift.fill", text: "profile.membership_benefit_points".localized)
+                    membershipBenefit(icon: "play.rectangle", text: "profile.membership_benefit_series".localized)
+                    membershipBenefit(icon: "gift", text: "profile.membership_benefit_points".localized)
                     membershipBenefit(icon: "tray.and.arrow.down", text: "profile.membership_benefit_download".localized)
                     HDBenefitView()
                 }
