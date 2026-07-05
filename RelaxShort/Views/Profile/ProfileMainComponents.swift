@@ -206,7 +206,9 @@ struct ProfileMembershipCard: View {
         return String(format: "profile.membership_active_until".localized, formatter.string(from: date))
     }
 
-    private var memberGold: Color { Color(hex: "#C9A45C") }
+    private var memberGold: Color { Color(hex: "#D6B46A") }
+    private var benefitText: Color { Color(hex: "#B8B0AA") }
+    private var subtitleGray: Color { Color(hex: "#A39B96") }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -221,7 +223,7 @@ struct ProfileMembershipCard: View {
                             .foregroundColor(.white)
                         Text(expiryText)
                             .font(DT.Font.caption)
-                            .foregroundColor(DT.Color.textSecondary)
+                            .foregroundColor(subtitleGray)
                     }
                     Spacer()
                 }
@@ -234,7 +236,7 @@ struct ProfileMembershipCard: View {
                             .foregroundColor(.white)
                         Text("vip.unlock_all".localized)
                             .font(DT.Font.small)
-                            .foregroundColor(DT.Color.textSecondary)
+                            .foregroundColor(subtitleGray)
                     }
                     Spacer()
                     Text("profile.join_membership".localized)
@@ -260,38 +262,27 @@ struct ProfileMembershipCard: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(hex: "#1C1812"),
-                        Color(hex: "#141110"),
-                        Color(hex: "#0D0C0E")
+                        Color(hex: "#221719"),
+                        Color(hex: "#321D20"),
+                        Color(hex: "#1A1416")
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 RadialGradient(
-                    colors: [memberGold.opacity(0.22), .clear],
+                    colors: [memberGold.opacity(0.18), .clear],
                     center: .topTrailing,
                     startRadius: 0,
-                    endRadius: 200
+                    endRadius: 220
                 )
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: DB.cardRadius))
         .overlay(
             RoundedRectangle(cornerRadius: DB.cardRadius)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            memberGold.opacity(0.6),
-                            memberGold.opacity(0.2),
-                            .white.opacity(0.04)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+                .stroke(memberGold.opacity(0.28), lineWidth: 1)
         )
-        .shadow(color: memberGold.opacity(0.15), radius: 16, y: 6)
+        .shadow(color: memberGold.opacity(0.12), radius: 16, y: 6)
         .contentShape(RoundedRectangle(cornerRadius: DB.cardRadius))
         .onTapGesture(perform: onJoin)
         .accessibilityAddTraits(.isButton)
@@ -306,7 +297,7 @@ struct ProfileMembershipCard: View {
                 .foregroundColor(memberGold)
             Text(text)
                 .font(.system(size: 10))
-                .foregroundColor(DT.Color.textSecondary)
+                .foregroundColor(benefitText)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
