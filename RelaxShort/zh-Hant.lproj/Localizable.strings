@@ -285,3 +285,5 @@
 "profile.history" = "觀看歷史";
 "profile.help_feedback" = "幫助與回饋";
 "profile.load_failed" = "個人資料載入失敗";
+
+"profile.join_action" = "立即開通";

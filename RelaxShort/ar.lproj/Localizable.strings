@@ -285,3 +285,5 @@
 "profile.history" = "السجل";
 "profile.help_feedback" = "المساعدة والملاحظات";
 "profile.load_failed" = "تعذر تحميل الملف الشخصي";
+
+"profile.join_action" = "انضم الآن";

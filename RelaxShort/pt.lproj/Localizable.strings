@@ -285,3 +285,5 @@
 "profile.history" = "Histórico";
 "profile.help_feedback" = "Ajuda e feedback";
 "profile.load_failed" = "Não foi possível carregar o perfil";
+
+"profile.join_action" = "Assinar";

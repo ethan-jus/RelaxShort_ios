@@ -290,3 +290,5 @@
 "profile.history" = "观看历史";
 "profile.help_feedback" = "帮助与反馈";
 "profile.load_failed" = "个人资料加载失败";
+
+"profile.join_action" = "立即开通";

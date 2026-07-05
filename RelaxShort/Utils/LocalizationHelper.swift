@@ -381,6 +381,7 @@ enum L10n {
         "profile.sign_in_subtitle": "登录后同步个人资料与资产",
         "profile.settings": "设置",
         "profile.join_membership": "加入会员",
+        "profile.join_action": "立即开通",
         "profile.membership_active": "会员已开通",
         "profile.membership_active_until": "有效期至 %@",
         "profile.membership_benefit_series": "全剧解锁",

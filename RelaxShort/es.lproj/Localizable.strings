@@ -285,3 +285,5 @@
 "profile.history" = "Historial";
 "profile.help_feedback" = "Ayuda y comentarios";
 "profile.load_failed" = "No se pudo cargar el perfil";
+
+"profile.join_action" = "Unirse";

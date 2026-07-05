@@ -79,19 +79,11 @@ struct ProfileView: View {
 
                 // 菜单第一组
                 ProfileMenuCard {
-                    if authStore.isLoggedIn {
-                        ProfileMenuRow(icon: "bitcoinsign.circle.fill", iconColor: DB.gold, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                    } else {
-                        ProfileMenuRow(icon: "bitcoinsign.circle.fill", iconColor: DB.gold, title: "profile.top_up".localized, onTap: { presentLoginOrNavigate(.topUp) })
-                    }
-                    if authStore.isLoggedIn, let user = viewModel.profile {
-                        ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, subtitle: "@\(user.coinBalance)", onTap: { selectedDestination = .wallet })
-                    } else {
-                        ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, onTap: { presentLoginOrNavigate(.wallet) })
-                    }
-                    ProfileMenuRow(icon: "gift.fill", iconColor: .orange, title: "profile.earn_rewards".localized, onTap: { presentLoginOrNavigate(.welfare) })
+                    ProfileMenuRow(icon: "bitcoinsign.circle.fill", iconColor: DT.memberGold, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
+                    ProfileMenuRow(icon: "wallet.pass.fill", iconColor: DT.memberGold, title: L10n.myWallet, subtitle: viewModel.profile.map { "@\($0.coinBalance)" }, onTap: { selectedDestination = .wallet })
+                    ProfileMenuRow(icon: "gift.fill", iconColor: DT.memberGold, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
                     ProfileMenuRow(icon: "clock.fill", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
-                    ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, showsDivider: false, onTap: { presentLoginOrNavigate(.downloads) })
+                    ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, showsDivider: false, onTap: { selectedDestination = .downloads })
                 }
                 .padding(.top, DT.Space.lg)
 
@@ -189,16 +181,6 @@ struct ProfileView: View {
                 NotificationCenter.default.post(name: .showMembership, object: nil)
             }
         )
-    }
-
-    // MARK: - Helpers
-
-    private func presentLoginOrNavigate(_ destination: ProfileSheet) {
-        if authStore.isLoggedIn {
-            selectedDestination = destination
-        } else {
-            showLoginSheet = true
-        }
     }
 
     // MARK: - Navigation Destination

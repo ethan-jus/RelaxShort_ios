@@ -206,7 +206,7 @@ struct ProfileMembershipCard: View {
         return String(format: "profile.membership_active_until".localized, formatter.string(from: date))
     }
 
-    private var memberGold: Color { Color(hex: "#D6B46A") }
+    private var memberGold: Color { DT.memberGold }
     private var benefitText: Color { Color(hex: "#CBC4BC") }
     private var subtitleGray: Color { Color(hex: "#C5BFB8") }
 
@@ -239,7 +239,7 @@ struct ProfileMembershipCard: View {
                             .foregroundColor(subtitleGray)
                     }
                     Spacer()
-                    Text("profile.join_membership".localized)
+                    Text("profile.join_action".localized)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, DT.Space.lg)

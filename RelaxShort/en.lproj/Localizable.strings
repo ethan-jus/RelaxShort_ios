@@ -289,3 +289,5 @@
 "profile.history" = "History";
 "profile.help_feedback" = "Help & Feedback";
 "profile.load_failed" = "Unable to load profile";
+
+"profile.join_action" = "Join";
