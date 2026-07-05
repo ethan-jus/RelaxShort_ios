@@ -293,3 +293,5 @@
 "profile.join_action" = "Join";
 
 "profile.email" = "Email";
+
+"login.facebook_button" = "Continue with Facebook";

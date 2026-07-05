@@ -43,6 +43,7 @@ enum AuthState: Equatable {
 
 enum AuthError: LocalizedError {
     case missingGoogleIDToken
+    case missingFacebookAuthenticationToken
     case noPresentingViewController
     case invalidSession
     case keychain(OSStatus)
@@ -51,6 +52,8 @@ enum AuthError: LocalizedError {
         switch self {
         case .missingGoogleIDToken:
             return "Google 未返回有效身份令牌，请重试。"
+        case .missingFacebookAuthenticationToken:
+            return "未获取到 Facebook 认证令牌"
         case .noPresentingViewController:
             return "暂时无法打开登录页面，请重试。"
         case .invalidSession:

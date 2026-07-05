@@ -140,6 +140,9 @@
 		T31A00500000000000000005 /* RealFavoritesRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00600000000000000006 /* RealFavoritesRepository.swift */; };
 		T31A00700000000000000007 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00800000000000000008 /* BookmarkStore.swift */; };
 		T31A00900000000000000009 /* WatchProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A01000000000000000010 /* WatchProgressReporter.swift */; };
+		7DA9D1BA105945A397D0B25B /* AppRuntimeEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C0BCFB0FFF44690934A6716 /* AppRuntimeEnvironment.swift */; };
+		4F313EAE05D04C59865E1629 /* FacebookAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */; };
+		CE78B51CA94E42878A2D380B /* FacebookOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -294,6 +297,9 @@
 		T31A00600000000000000006 /* RealFavoritesRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealFavoritesRepository.swift; sourceTree = "<group>"; };
 		T31A00800000000000000008 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
 		T31A01000000000000000010 /* WatchProgressReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProgressReporter.swift; sourceTree = "<group>"; };
+		8C0BCFB0FFF44690934A6716 /* AppRuntimeEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppRuntimeEnvironment.swift; path = RelaxShort/Core/Runtime/AppRuntimeEnvironment.swift; sourceTree = SOURCE_ROOT; };
+		6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FacebookAppDelegate.swift; path = RelaxShort/App/FacebookAppDelegate.swift; sourceTree = SOURCE_ROOT; };
+		4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FacebookOAuthClient.swift; path = RelaxShort/Core/Auth/FacebookOAuthClient.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -962,7 +968,10 @@
 				04AD97E5CBAE40B48D335B50 /* MemberView.swift in Sources */,
 				CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */,
 				95BB863B0F6B4CAEAF73548D /* ProfileMainComponents.swift in Sources */,
-			);
+							7DA9D1BA105945A397D0B25B /* AppRuntimeEnvironment.swift in Sources */,
+				4F313EAE05D04C59865E1629 /* FacebookAppDelegate.swift in Sources */,
+				CE78B51CA94E42878A2D380B /* FacebookOAuthClient.swift in Sources */,
+);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

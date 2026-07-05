@@ -289,3 +289,5 @@
 "profile.join_action" = "바로 가입";
 
 "profile.email" = "이메일";
+
+"login.facebook_button" = "Facebook으로 계속하기";

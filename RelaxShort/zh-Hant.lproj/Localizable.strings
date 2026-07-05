@@ -289,3 +289,5 @@
 "profile.join_action" = "立即開通";
 
 "profile.email" = "電子郵件";
+
+"login.facebook_button" = "使用 Facebook 繼續";

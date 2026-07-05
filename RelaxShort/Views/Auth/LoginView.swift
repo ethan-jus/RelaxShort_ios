@@ -21,6 +21,8 @@ struct LoginView: View {
                 brand
                 Spacer(minLength: 44)
                 googleButton
+                facebookButton
+                    .padding(.top, 12)
                 agreement
                     .padding(.top, 20)
                 Spacer(minLength: 32)
@@ -100,6 +102,36 @@ struct LoginView: View {
         .frame(height: 40)
         .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
         .shadow(color: .black.opacity(0.28), radius: 12, y: 6)
+    }
+
+    private var facebookButton: some View {
+        ZStack {
+            Button(action: { authStore.signInWithFacebook() }) {
+                HStack(spacing: 10) {
+                    Image("FacebookLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 18, height: 18)
+                    Text("login.facebook_button".localized)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .background(Color(hex: "#1877F2"))
+                .cornerRadius(4)
+            }
+            .disabled(authStore.isSigningIn)
+
+            if authStore.isSigningIn {
+                Color(hex: "#1877F2")
+                    .overlay { ProgressView().tint(.white) }
+                    .frame(height: 40)
+                    .cornerRadius(4)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: 312)
     }
 
     private var agreement: some View {

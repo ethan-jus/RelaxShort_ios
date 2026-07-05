@@ -294,3 +294,5 @@
 "profile.join_action" = "立即开通";
 
 "profile.email" = "邮箱";
+
+"login.facebook_button" = "使用 Facebook 继续";
