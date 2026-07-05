@@ -252,8 +252,8 @@ struct ProfileMembershipCard: View {
                 HStack(spacing: 0) {
                     membershipBenefit(icon: "play.rectangle.fill", text: "profile.membership_benefit_series".localized)
                     membershipBenefit(icon: "gift.fill", text: "profile.membership_benefit_points".localized)
-                    membershipBenefit(icon: "arrow.down.to.line", text: "profile.membership_benefit_download".localized)
-                    membershipBenefit(icon: "h.square", text: "profile.membership_benefit_quality".localized)
+                    membershipBenefit(icon: "tray.and.arrow.down", text: "profile.membership_benefit_download".localized)
+                    HDBenefitView()
                 }
                 .padding(.bottom, DT.Space.md)
             }
@@ -298,6 +298,30 @@ struct ProfileMembershipCard: View {
             Text(text)
                 .font(.system(size: 10))
                 .foregroundColor(benefitText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .frame(minHeight: 24, alignment: .top)
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+/// 自定义 HD 文字徽章，弥补 SF Symbols 的缺失。
+private struct HDBenefitView: View {
+    var body: some View {
+        VStack(spacing: 5) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(DT.memberGold, lineWidth: 1.5)
+                    .frame(width: 30, height: 20)
+                Text("HD")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(DT.memberGold)
+            }
+            Text("profile.membership_benefit_quality".localized)
+                .font(.system(size: 10))
+                .foregroundColor(Color(hex: "#CBC4BC"))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
