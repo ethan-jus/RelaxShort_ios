@@ -270,7 +270,7 @@ struct ProfileMembershipCard: View {
                     endPoint: .bottomTrailing
                 )
                 RadialGradient(
-                    colors: [memberGold.opacity(0.18), .clear],
+                    colors: [memberGold.opacity(0.25), .clear],
                     center: .topTrailing,
                     startRadius: 0,
                     endRadius: 220
@@ -280,9 +280,20 @@ struct ProfileMembershipCard: View {
         .clipShape(RoundedRectangle(cornerRadius: DB.cardRadius))
         .overlay(
             RoundedRectangle(cornerRadius: DB.cardRadius)
-                .stroke(memberGold.opacity(0.28), lineWidth: 1)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            memberGold,
+                            memberGold.opacity(0.65),
+                            memberGold.opacity(0.35)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
         )
-        .shadow(color: memberGold.opacity(0.12), radius: 16, y: 6)
+        .shadow(color: memberGold.opacity(0.2), radius: 18, y: 6)
         .contentShape(RoundedRectangle(cornerRadius: DB.cardRadius))
         .onTapGesture(perform: onJoin)
         .accessibilityAddTraits(.isButton)
