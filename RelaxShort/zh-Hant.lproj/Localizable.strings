@@ -273,7 +273,7 @@
 "profile.sign_in" = "登入";
 "profile.sign_in_subtitle" = "登入後同步個人資料與資產";
 "profile.settings" = "設定";
-"profile.join_membership" = "加入會員";
+"profile.join_membership" = "會員權益";
 "profile.membership_active" = "會員已開通";
 "profile.membership_active_until" = "有效期至 %@";
 "profile.membership_benefit_series" = "全劇解鎖";

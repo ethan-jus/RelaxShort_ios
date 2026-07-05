@@ -245,7 +245,7 @@ struct ProfileMembershipCard: View {
                         .padding(.horizontal, DT.Space.lg)
                         .padding(.vertical, DT.Space.sm)
                         .background(DT.logoRed)
-                        .cornerRadius(DT.Radius.md)
+                        .cornerRadius(DT.Radius.sm)
                 }
                 .padding(DT.Space.lg)
 

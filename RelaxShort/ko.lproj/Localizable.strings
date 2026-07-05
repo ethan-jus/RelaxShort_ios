@@ -273,7 +273,7 @@
 "profile.sign_in" = "로그인";
 "profile.sign_in_subtitle" = "로그인하여 프로필과 자산을 동기화하세요";
 "profile.settings" = "설정";
-"profile.join_membership" = "멤버십 가입";
+"profile.join_membership" = "멤버 혜택";
 "profile.membership_active" = "멤버십 활성";
 "profile.membership_active_until" = "유효 기간 %@";
 "profile.membership_benefit_series" = "전편 시청 가능";

@@ -273,7 +273,7 @@
 "profile.sign_in" = "تسجيل الدخول";
 "profile.sign_in_subtitle" = "سجل الدخول لمزامنة ملفك الشخصي وأصولك";
 "profile.settings" = "الإعدادات";
-"profile.join_membership" = "انضم إلى العضوية";
+"profile.join_membership" = "مزايا العضوية";
 "profile.membership_active" = "العضوية نشطة";
 "profile.membership_active_until" = "نشطة حتى %@";
 "profile.membership_benefit_series" = "جميع المسلسلات";

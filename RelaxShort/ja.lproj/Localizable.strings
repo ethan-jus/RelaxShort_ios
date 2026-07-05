@@ -273,7 +273,7 @@
 "profile.sign_in" = "ログイン";
 "profile.sign_in_subtitle" = "ログインしてプロフィールと資産を同期";
 "profile.settings" = "設定";
-"profile.join_membership" = "メンバーシップに加入";
+"profile.join_membership" = "メンバー特典";
 "profile.membership_active" = "メンバーシップ有効";
 "profile.membership_active_until" = "有効期限 %@";
 "profile.membership_benefit_series" = "全話視聴可能";

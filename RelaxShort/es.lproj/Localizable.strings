@@ -273,7 +273,7 @@
 "profile.sign_in" = "Iniciar sesión";
 "profile.sign_in_subtitle" = "Inicia sesión para sincronizar tu perfil y activos";
 "profile.settings" = "Configuración";
-"profile.join_membership" = "Unirse a la Membresía";
+"profile.join_membership" = "Beneficios";
 "profile.membership_active" = "Membresía activa";
 "profile.membership_active_until" = "Activa hasta %@";
 "profile.membership_benefit_series" = "Todas las series";

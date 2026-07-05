@@ -80,8 +80,8 @@ struct ProfileView: View {
                 // 菜单第一组
                 ProfileMenuCard {
                     ProfileMenuRow(icon: "bitcoinsign.circle.fill", iconColor: DT.memberGold, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                    ProfileMenuRow(icon: "wallet.pass.fill", iconColor: DT.memberGold, title: L10n.myWallet, subtitle: viewModel.profile.map { "@\($0.coinBalance)" }, onTap: { selectedDestination = .wallet })
-                    ProfileMenuRow(icon: "gift.fill", iconColor: DT.memberGold, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
+                    ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "@\($0.coinBalance)" }, onTap: { selectedDestination = .wallet })
+                    ProfileMenuRow(icon: "gift.fill", iconColor: .orange, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
                     ProfileMenuRow(icon: "clock.fill", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
                     ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, showsDivider: false, onTap: { selectedDestination = .downloads })
                 }

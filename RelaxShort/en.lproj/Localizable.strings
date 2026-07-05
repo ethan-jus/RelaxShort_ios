@@ -277,7 +277,7 @@
 "profile.sign_in" = "Sign In";
 "profile.sign_in_subtitle" = "Sign in to sync your profile and assets";
 "profile.settings" = "Settings";
-"profile.join_membership" = "Join Membership";
+"profile.join_membership" = "Member Benefits";
 "profile.membership_active" = "Membership Active";
 "profile.membership_active_until" = "Active until %@";
 "profile.membership_benefit_series" = "Unlock All Shows";
