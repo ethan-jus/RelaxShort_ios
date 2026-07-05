@@ -295,3 +295,4 @@
 "profile.email" = "Email";
 
 "login.facebook_button" = "Continue with Facebook";
+"login.google_button" = "Continue with Google";

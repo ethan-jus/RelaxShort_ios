@@ -291,3 +291,4 @@
 "profile.email" = "이메일";
 
 "login.facebook_button" = "Facebook으로 계속하기";
+"login.google_button" = "Google로 계속하기";

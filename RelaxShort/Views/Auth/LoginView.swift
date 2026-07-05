@@ -1,5 +1,4 @@
 import SwiftUI
-import GoogleSignInSwift
 
 /// 真实登录页。仅展示已接通后端认证闭环的第三方登录入口。
 struct LoginView: View {
@@ -8,26 +7,29 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(hex: "#170B0C"), .black, .black],
-                startPoint: .top,
-                endPoint: .center
-            )
-            .ignoresSafeArea()
+            background
 
-            VStack(spacing: 0) {
-                topBar
-                Spacer(minLength: 24)
-                brand
-                Spacer(minLength: 44)
-                googleButton
-                facebookButton
-                    .padding(.top, 12)
-                agreement
-                    .padding(.top, 20)
-                Spacer(minLength: 32)
+            GeometryReader { proxy in
+                let compactHeight = proxy.size.height < 700
+                let bottomLift: CGFloat = compactHeight ? 40 : 212
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        topBar
+                        brand(compactHeight: compactHeight)
+
+                        Spacer(minLength: compactHeight ? 24 : 52)
+
+                        authArea
+                    }
+                    .frame(
+                        minHeight: max(0, proxy.size.height - bottomLift),
+                        alignment: .top
+                    )
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, bottomLift)
+                }
             }
-            .padding(.horizontal, 24)
         }
         .interactiveDismissDisabled(authStore.isSigningIn)
         .onChange(of: authStore.isLoggedIn) { _, isLoggedIn in
@@ -43,95 +45,171 @@ struct LoginView: View {
         }
     }
 
+    private var background: some View {
+        ZStack {
+            Color.black
+
+            LinearGradient(
+                colors: [
+                    Color(hex: "#210D0F"),
+                    Color(hex: "#090505"),
+                    .black
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    DT.logoRed.opacity(0.24),
+                    DT.logoRed.opacity(0.07),
+                    .clear
+                ],
+                center: UnitPoint(x: 0.5, y: 0.18),
+                startRadius: 10,
+                endRadius: 280
+            )
+        }
+        .ignoresSafeArea()
+    }
+
     private var topBar: some View {
         HStack {
             Button(action: { dismiss() }) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 19, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 40, height: 40)
+                    .background(Color.white.opacity(0.055))
+                    .clipShape(Circle())
                     .contentShape(Rectangle())
             }
             .disabled(authStore.isSigningIn)
             Spacer()
         }
-        .padding(.top, 8)
+        .padding(.top, 10)
     }
 
-    private var brand: some View {
-        VStack(spacing: 18) {
+    private func brand(compactHeight: Bool) -> some View {
+        VStack(spacing: 16) {
             Image("AppLogo")
                 .resizable()
                 .scaledToFit()
-                .frame(width: 88, height: 88)
-                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                .shadow(color: DT.logoRed.opacity(0.28), radius: 28, y: 12)
+                .frame(
+                    width: compactHeight ? 78 : 96,
+                    height: compactHeight ? 78 : 96
+                )
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: compactHeight ? 18 : 22,
+                        style: .continuous
+                    )
+                )
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: compactHeight ? 18 : 22,
+                        style: .continuous
+                    )
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                }
+                .shadow(color: DT.logoRed.opacity(0.32), radius: 30, y: 12)
 
-            VStack(spacing: 8) {
+            VStack(spacing: 7) {
                 Text(L10n.loginTitle)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(.system(size: compactHeight ? 29 : 32, weight: .bold, design: .rounded))
                     .foregroundStyle(.white)
+                    .tracking(-0.5)
+
                 Text(L10n.loginTagline)
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.white.opacity(0.62))
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundStyle(Color.white.opacity(0.56))
                     .multilineTextAlignment(.center)
             }
         }
+        .padding(.top, compactHeight ? 26 : 66)
     }
 
-    private var googleButton: some View {
-        ZStack {
-            GoogleSignInButton(
-                scheme: .light,
-                style: .wide,
-                state: authStore.isSigningIn ? .disabled : .normal
-            ) {
-                authStore.signInWithGoogle()
-            }
+    private var authArea: some View {
+        VStack(spacing: 14) {
+            authPanel
+            agreement
+        }
+    }
+
+    private var authPanel: some View {
+        VStack(spacing: 16) {
+            providerButton(
+                icon: "GoogleLogo",
+                title: L10n.loginGoogleButton,
+                background: .white,
+                foreground: Color(hex: "#3C4043"),
+                action: authStore.signInWithGoogle
+            )
+
+            providerButton(
+                icon: "FacebookLogo",
+                title: L10n.loginFacebookButton,
+                background: Color(hex: "#1877F2"),
+                foreground: .white,
+                action: authStore.signInWithFacebook
+            )
 
             if authStore.isSigningIn {
-                Color.white
-                    .overlay {
-                        ProgressView()
-                            .tint(.black)
-                    }
-                    .allowsHitTesting(false)
+                ProgressView()
+                    .tint(.white)
+                    .padding(.top, 2)
             }
         }
-        .frame(maxWidth: 312)
-        .frame(height: 40)
-        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-        .shadow(color: .black.opacity(0.28), radius: 12, y: 6)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color(hex: "#181415").opacity(0.82))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .stroke(Color.white.opacity(0.065), lineWidth: 1)
+                }
+        }
+        .shadow(color: .black.opacity(0.38), radius: 22, y: 10)
     }
 
-    private var facebookButton: some View {
-        ZStack {
-            Button(action: { authStore.signInWithFacebook() }) {
-                HStack(spacing: 10) {
-                    Image("FacebookLogo")
+    /// 第三方登录按钮统一图标基线与文字中心，后续 Apple 登录复用同一布局。
+    private func providerButton(
+        icon: String,
+        title: String,
+        background: Color,
+        foreground: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            ZStack {
+                Text(title)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(foreground)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+                    .padding(.horizontal, 54)
+
+                HStack {
+                    Image(icon)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 18, height: 18)
-                    Text("login.facebook_button".localized)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
+                        .frame(width: 20, height: 20)
+                    Spacer()
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: 40)
-                .background(Color(hex: "#1877F2"))
-                .cornerRadius(4)
+                .padding(.horizontal, 22)
             }
-            .disabled(authStore.isSigningIn)
-
-            if authStore.isSigningIn {
-                Color(hex: "#1877F2")
-                    .overlay { ProgressView().tint(.white) }
-                    .frame(height: 40)
-                    .cornerRadius(4)
-                    .allowsHitTesting(false)
-            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+            .background(background)
+            .clipShape(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+            )
         }
-        .frame(maxWidth: 312)
+        .disabled(authStore.isSigningIn)
+        .opacity(authStore.isSigningIn ? 0.58 : 1)
     }
 
     private var agreement: some View {
@@ -142,10 +220,11 @@ struct LoginView: View {
             + L10n.loginPrivacyPolicy
             + L10n.loginPeriod
         )
-        .font(.system(size: 11))
-        .foregroundStyle(Color.white.opacity(0.5))
+        .font(.system(size: 12, weight: .regular))
+        .foregroundStyle(Color.white.opacity(0.74))
         .multilineTextAlignment(.center)
-        .lineSpacing(3)
+        .lineSpacing(4)
+        .fixedSize(horizontal: false, vertical: true)
         .padding(.horizontal, 12)
     }
 }

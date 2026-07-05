@@ -291,3 +291,4 @@
 "profile.email" = "電子郵件";
 
 "login.facebook_button" = "使用 Facebook 繼續";
+"login.google_button" = "使用 Google 繼續";

@@ -296,3 +296,4 @@
 "profile.email" = "邮箱";
 
 "login.facebook_button" = "使用 Facebook 继续";
+"login.google_button" = "使用 Google 继续";

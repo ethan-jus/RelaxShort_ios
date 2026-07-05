@@ -291,3 +291,4 @@
 "profile.email" = "البريد الإلكتروني";
 
 "login.facebook_button" = "المتابعة باستخدام Facebook";
+"login.google_button" = "المتابعة باستخدام Google";

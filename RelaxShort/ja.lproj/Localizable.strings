@@ -291,3 +291,4 @@
 "profile.email" = "メールアドレス";
 
 "login.facebook_button" = "Facebookで続ける";
+"login.google_button" = "Googleで続ける";
