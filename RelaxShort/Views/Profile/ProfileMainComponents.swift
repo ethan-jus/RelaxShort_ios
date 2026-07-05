@@ -207,8 +207,8 @@ struct ProfileMembershipCard: View {
     }
 
     private var memberGold: Color { Color(hex: "#D6B46A") }
-    private var benefitText: Color { Color(hex: "#B8B0AA") }
-    private var subtitleGray: Color { Color(hex: "#A39B96") }
+    private var benefitText: Color { Color(hex: "#CBC4BC") }
+    private var subtitleGray: Color { Color(hex: "#C5BFB8") }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -232,7 +232,7 @@ struct ProfileMembershipCard: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("profile.join_membership".localized)
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.system(size: 19, weight: .bold))
                             .foregroundColor(.white)
                         Text("vip.unlock_all".localized)
                             .font(DT.Font.small)
@@ -240,12 +240,12 @@ struct ProfileMembershipCard: View {
                     }
                     Spacer()
                     Text("profile.join_membership".localized)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, DT.Space.md)
-                        .padding(.vertical, DT.Space.xs)
+                        .padding(.horizontal, DT.Space.lg)
+                        .padding(.vertical, DT.Space.sm)
                         .background(DT.logoRed)
-                        .cornerRadius(DT.Radius.sm)
+                        .cornerRadius(DT.Radius.md)
                 }
                 .padding(DT.Space.lg)
 
