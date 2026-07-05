@@ -402,9 +402,9 @@ struct ProfileMenuRow: View {
                         Image(systemName: sIcon)
                             .font(.system(size: 14))
                             .foregroundColor(subtitleIconColor)
-                            .scaleEffect(coinPulse ? 1.35 : 1.0)
+                            .scaleEffect(coinPulse ? 1.5 : 1.0)
                             .onAppear {
-                                withAnimation(.easeInOut(duration: 0.6).repeatForever(autoreverses: true)) {
+                                withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                                     coinPulse = true
                                 }
                             }
