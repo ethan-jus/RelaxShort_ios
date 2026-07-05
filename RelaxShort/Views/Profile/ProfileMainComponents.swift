@@ -247,12 +247,12 @@ struct ProfileMembershipCard: View {
                 }
                 .padding(DT.Space.lg)
 
-                // 4 项核心权益
+                // 4 项核心权益：黑金风格，全部金色图标
                 HStack(spacing: 0) {
                     membershipBenefit(icon: "play.rectangle.fill", text: "profile.membership_benefit_series".localized)
-                    membershipBenefit(icon: "star.fill", text: "profile.membership_benefit_points".localized)
+                    membershipBenefit(icon: "gift.fill", text: "profile.membership_benefit_points".localized)
                     membershipBenefit(icon: "arrow.down.to.line", text: "profile.membership_benefit_download".localized)
-                    membershipBenefit(icon: "4k.tv", text: "profile.membership_benefit_quality".localized)
+                    membershipBenefit(icon: "tv.fill", text: "profile.membership_benefit_quality".localized)
                 }
                 .padding(.bottom, DT.Space.md)
             }
@@ -261,15 +261,15 @@ struct ProfileMembershipCard: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(hex: "#342C2D"),
-                        Color(hex: "#221D1F"),
-                        Color(hex: "#121216")
+                        Color(hex: "#1E1A14"),
+                        Color(hex: "#161310"),
+                        Color(hex: "#0E0D10")
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 RadialGradient(
-                    colors: [DT.logoRed.opacity(0.2), .clear],
+                    colors: [DB.gold.opacity(0.15), .clear],
                     center: .topTrailing,
                     startRadius: 0,
                     endRadius: 190
@@ -282,9 +282,9 @@ struct ProfileMembershipCard: View {
                 .stroke(
                     LinearGradient(
                         colors: [
-                            DT.logoRed.opacity(0.72),
-                            DB.gold.opacity(0.25),
-                            .white.opacity(0.08)
+                            DB.gold.opacity(0.55),
+                            DB.gold.opacity(0.18),
+                            .white.opacity(0.06)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -292,7 +292,7 @@ struct ProfileMembershipCard: View {
                     lineWidth: 1
                 )
         )
-        .shadow(color: DT.logoRed.opacity(0.12), radius: 14, y: 5)
+        .shadow(color: DB.gold.opacity(0.12), radius: 14, y: 5)
         .contentShape(RoundedRectangle(cornerRadius: DB.cardRadius))
         .onTapGesture(perform: onJoin)
         .accessibilityAddTraits(.isButton)
