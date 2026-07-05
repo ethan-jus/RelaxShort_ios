@@ -359,6 +359,7 @@ struct ProfileMenuRow: View {
     let subtitle: String?
     let subtitleIcon: String?
     let subtitleIconColor: Color
+    @State private var coinPulse = false
     let showsDivider: Bool
     let onTap: () -> Void
 
@@ -399,12 +400,18 @@ struct ProfileMenuRow: View {
                 if let sub = subtitle {
                     if let sIcon = subtitleIcon {
                         Image(systemName: sIcon)
-                            .font(.system(size: 12))
+                            .font(.system(size: 14))
                             .foregroundColor(subtitleIconColor)
+                            .scaleEffect(coinPulse ? 1.15 : 1.0)
+                            .onAppear {
+                                withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                                    coinPulse = true
+                                }
+                            }
                     }
                     Text(sub)
-                        .font(.system(size: 13))
-                        .foregroundColor(DT.Color.textSecondary)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white)
                 }
 
                 Image(systemName: "chevron.right")
