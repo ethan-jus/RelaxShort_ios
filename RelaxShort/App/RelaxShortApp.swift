@@ -91,10 +91,14 @@ struct RelaxShortApp: App {
             .preferredColorScheme(appStore.preferredColorScheme)
             .statusBarHidden(true)
             .task {
+                guard !AppRuntimeEnvironment.isUnitTesting else { return }
                 await authStore.bootstrap()
             }
             .onOpenURL { url in
                 GIDSignIn.sharedInstance.handle(url)
+                ApplicationDelegate.shared.application(
+                    UIApplication.shared, open: url,
+                    sourceApplication: nil, annotation: nil)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active && !showSplash {
