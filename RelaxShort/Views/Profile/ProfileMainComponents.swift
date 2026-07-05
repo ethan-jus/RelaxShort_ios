@@ -312,7 +312,7 @@ private struct HDBenefitView: View {
     var body: some View {
         VStack(spacing: 5) {
             ZStack {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .stroke(DT.memberGold, lineWidth: 1.5)
                     .frame(width: 30, height: 20)
                 Text("HD")
