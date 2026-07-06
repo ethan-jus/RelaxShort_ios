@@ -298,3 +298,4 @@
 
 "login.facebook_button" = "Continue with Facebook";
 "login.google_button" = "Continue with Google";
+"login.apple_button" = "Continue with Apple";

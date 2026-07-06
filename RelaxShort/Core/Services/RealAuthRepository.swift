@@ -16,6 +16,15 @@ protocol RealAuthRepositoryProtocol {
         deviceID: String,
         mergeRequestID: UUID
     ) async throws -> AuthSession
+    func signInWithApple(
+        identityToken: String,
+        authorizationCode: String,
+        rawNonce: String,
+        displayName: String?,
+        anonymousAccessToken: String,
+        deviceID: String,
+        mergeRequestID: UUID
+    ) async throws -> AuthSession
     func logout(_ refreshToken: String) async throws
 }
 
@@ -79,6 +88,32 @@ final class RealAuthRepository: RealAuthRepositoryProtocol {
                 "merge_request_id": mergeRequestID.uuidString.lowercased(),
                 "device_id": deviceID
             ],
+            bearerToken: anonymousAccessToken
+        )
+    }
+
+    func signInWithApple(
+        identityToken: String,
+        authorizationCode: String,
+        rawNonce: String,
+        displayName: String?,
+        anonymousAccessToken: String,
+        deviceID: String,
+        mergeRequestID: UUID
+    ) async throws -> AuthSession {
+        var body: [String: String] = [
+            "identity_token": identityToken,
+            "authorization_code": authorizationCode,
+            "raw_nonce": rawNonce,
+            "merge_request_id": mergeRequestID.uuidString.lowercased(),
+            "device_id": deviceID
+        ]
+        if let displayName, !displayName.isEmpty {
+            body["display_name"] = displayName
+        }
+        return try await requestSession(
+            path: "/api/v2/auth/oauth/apple",
+            body: body,
             bearerToken: anonymousAccessToken
         )
     }

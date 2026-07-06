@@ -13,7 +13,8 @@ struct AuthSessionCoordinatorTests {
             repository: repository,
             tokenStore: tokens,
             googleClient: GoogleClientFake(),
-            facebookClient: FacebookClientFake()
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
         )
 
         await coordinator.bootstrap()
@@ -30,7 +31,8 @@ struct AuthSessionCoordinatorTests {
             repository: repository,
             tokenStore: TokenStoreFake(),
             googleClient: GoogleClientFake(),
-            facebookClient: FacebookClientFake()
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
         )
         await coordinator.bootstrap()
 
@@ -48,7 +50,8 @@ struct AuthSessionCoordinatorTests {
             repository: repository,
             tokenStore: TokenStoreFake(),
             googleClient: GoogleClientFake(),
-            facebookClient: FacebookClientFake()
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
         )
         await coordinator.bootstrap()
 
@@ -85,7 +88,8 @@ struct AuthSessionCoordinatorTests {
             repository: repository,
             tokenStore: TokenStoreFake(),
             googleClient: GoogleClientFake(),
-            facebookClient: FacebookClientFake()
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
         )
         await coordinator.bootstrap()
         await coordinator.signInWithGoogle()
@@ -105,7 +109,8 @@ struct AuthSessionCoordinatorTests {
             repository: repository,
             tokenStore: TokenStoreFake(),
             googleClient: GoogleClientFake(),
-            facebookClient: FacebookClientFake()
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
         )
         await coordinator.bootstrap()
 
@@ -124,7 +129,8 @@ struct AuthSessionCoordinatorTests {
             repository: repository,
             tokenStore: TokenStoreFake(),
             googleClient: GoogleClientFake(),
-            facebookClient: FacebookClientFake()
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
         )
         await coordinator.bootstrap()
 
@@ -167,6 +173,10 @@ private final class AuthRepositoryFake: RealAuthRepositoryProtocol {
     var facebookError: Error?
     var facebookMergeRequestIDs: [UUID] = []
     var facebookNonces: [String] = []
+    var appleError: Error?
+    var appleMergeRequestIDs: [UUID] = []
+    var appleRawNonces: [String] = []
+    var appleDisplayNames: [String?] = []
     var loggedOutRefreshTokens: [String] = []
 
     func createAnonymous(deviceID: String, idempotencyKey: UUID) async throws -> AuthSession {
@@ -199,6 +209,22 @@ private final class AuthRepositoryFake: RealAuthRepositoryProtocol {
         facebookNonces.append(nonce)
         if let facebookError { throw facebookError }
         return makeSession(type: .registered, prefix: "facebook", provider: "facebook")
+    }
+
+    func signInWithApple(
+        identityToken: String,
+        authorizationCode: String,
+        rawNonce: String,
+        displayName: String?,
+        anonymousAccessToken: String,
+        deviceID: String,
+        mergeRequestID: UUID
+    ) async throws -> AuthSession {
+        appleMergeRequestIDs.append(mergeRequestID)
+        appleRawNonces.append(rawNonce)
+        appleDisplayNames.append(displayName)
+        if let appleError { throw appleError }
+        return makeSession(type: .registered, prefix: "apple", provider: "apple")
     }
 
     func logout(_ refreshToken: String) async throws {
@@ -256,4 +282,105 @@ private final class FacebookClientFake: FacebookOAuthClientProtocol {
     }
 
     @MainActor func signOut() {}
+}
+
+// MARK: - Apple Tests
+
+extension AuthSessionCoordinatorTests {
+
+    @Test
+    func appleUpgradeReplacesAnonymousSession() async {
+        let repository = AuthRepositoryFake()
+        let coordinator = AuthSessionCoordinator(
+            repository: repository,
+            tokenStore: TokenStoreFake(),
+            googleClient: GoogleClientFake(),
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
+        )
+        await coordinator.bootstrap()
+
+        await coordinator.signInWithApple()
+
+        #expect(coordinator.isRegistered)
+        #expect(coordinator.account?.provider == "apple")
+        #expect(repository.appleRawNonces == ["apple-raw-nonce"])
+    }
+
+    @Test
+    func appleResponseLossReusesMergeRequestID() async {
+        let repository = AuthRepositoryFake()
+        repository.appleError = NetworkError.networkTimeout
+        let coordinator = AuthSessionCoordinator(
+            repository: repository,
+            tokenStore: TokenStoreFake(),
+            googleClient: GoogleClientFake(),
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
+        )
+        await coordinator.bootstrap()
+
+        await coordinator.signInWithApple()
+        repository.appleError = nil
+        await coordinator.signInWithApple()
+
+        #expect(repository.appleMergeRequestIDs.count == 2)
+        #expect(repository.appleMergeRequestIDs[0] == repository.appleMergeRequestIDs[1])
+        #expect(coordinator.isRegistered)
+    }
+
+    @Test
+    func appleCancellationDoesNotShowError() async {
+        let coordinator = AuthSessionCoordinator(
+            repository: AuthRepositoryFake(),
+            tokenStore: TokenStoreFake(),
+            googleClient: GoogleClientFake(),
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake(error: CancellationError())
+        )
+        await coordinator.bootstrap()
+
+        await coordinator.signInWithApple()
+
+        #expect(coordinator.errorMessage == nil)
+        #expect(coordinator.isRegistered == false)
+    }
+
+    @Test
+    func appleConcurrencyGateBlocksOtherProviders() async {
+        let repository = AuthRepositoryFake()
+        let coordinator = AuthSessionCoordinator(
+            repository: repository,
+            tokenStore: TokenStoreFake(),
+            googleClient: GoogleClientFake(),
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake(error: CancellationError())
+        )
+        await coordinator.bootstrap()
+
+        await coordinator.signInWithApple()
+
+        #expect(coordinator.isRegistered == false)
+    }
+
+    @Test
+    func logoutClearsApplePendingKey() async {
+        let repository = AuthRepositoryFake()
+        let coordinator = AuthSessionCoordinator(
+            repository: repository,
+            tokenStore: TokenStoreFake(),
+            googleClient: GoogleClientFake(),
+            facebookClient: FacebookClientFake(),
+            appleClient: AppleClientFake()
+        )
+        await coordinator.bootstrap()
+        await coordinator.signInWithApple()
+
+        #expect(coordinator.isRegistered)
+        await coordinator.logout()
+
+        #expect(coordinator.hasSession)
+        #expect(coordinator.isRegistered == false)
+        #expect(repository.loggedOutRefreshTokens == ["apple-refresh"])
+    }
 }

@@ -136,10 +136,15 @@ struct LoginView: View {
         }
     }
 
+    private enum ProviderIcon {
+        case asset(String)
+        case system(String)
+    }
+
     private var authPanel: some View {
         VStack(spacing: 16) {
             providerButton(
-                icon: "GoogleLogo",
+                icon: .asset("GoogleLogo"),
                 title: L10n.loginGoogleButton,
                 background: .white,
                 foreground: Color(hex: "#3C4043"),
@@ -147,12 +152,24 @@ struct LoginView: View {
             )
 
             providerButton(
-                icon: "FacebookLogo",
+                icon: .asset("FacebookLogo"),
                 title: L10n.loginFacebookButton,
                 background: Color(hex: "#1877F2"),
                 foreground: .white,
                 action: authStore.signInWithFacebook
             )
+
+            providerButton(
+                icon: .system("apple.logo"),
+                title: L10n.loginAppleButton,
+                background: .black,
+                foreground: .white,
+                action: authStore.signInWithApple
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
+            }
 
             if authStore.isSigningIn {
                 ProgressView()
@@ -174,9 +191,9 @@ struct LoginView: View {
         .shadow(color: .black.opacity(0.38), radius: 22, y: 10)
     }
 
-    /// 第三方登录按钮统一图标基线与文字中心，后续 Apple 登录复用同一布局。
+    /// 第三方登录按钮统一图标基线与文字中心。
     private func providerButton(
-        icon: String,
+        icon: ProviderIcon,
         title: String,
         background: Color,
         foreground: Color,
@@ -193,9 +210,7 @@ struct LoginView: View {
                     .padding(.horizontal, 54)
 
                 HStack {
-                    Image(icon)
-                        .resizable()
-                        .scaledToFit()
+                    providerIconView(icon)
                         .frame(width: 20, height: 20)
                     Spacer()
                 }
@@ -210,6 +225,20 @@ struct LoginView: View {
         }
         .disabled(authStore.isSigningIn)
         .opacity(authStore.isSigningIn ? 0.58 : 1)
+    }
+
+    @ViewBuilder
+    private func providerIconView(_ icon: ProviderIcon) -> some View {
+        switch icon {
+        case .asset(let name):
+            Image(name)
+                .resizable()
+                .scaledToFit()
+        case .system(let name):
+            Image(systemName: name)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(.white)
+        }
     }
 
     private var agreement: some View {

@@ -292,3 +292,4 @@
 
 "login.facebook_button" = "Facebookで続ける";
 "login.google_button" = "Googleで続ける";
+"login.apple_button" = "Appleで続ける";

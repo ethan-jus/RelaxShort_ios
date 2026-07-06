@@ -14,13 +14,13 @@ final class AuthStore: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     init(coordinator: AuthSessionCoordinator? = nil) {
-        let coordinator = coordinator ?? .shared
+        let coordinator = coordinator ?? AuthSessionCoordinator.shared
         self.coordinator = coordinator
         self.state = coordinator.state
 
         coordinator.$state
             .receive(on: RunLoop.main)
-            .sink { [weak self] state in
+            .sink { [weak self] (state: AuthState) in
                 self?.state = state
                 if state.account?.isRegistered != true {
                     self?.currentUser = nil
@@ -28,7 +28,7 @@ final class AuthStore: ObservableObject {
             }
             .store(in: &cancellables)
         coordinator.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
     }
 
@@ -54,6 +54,10 @@ final class AuthStore: ObservableObject {
 
     func signInWithFacebook() {
         Task { await coordinator.signInWithFacebook() }
+    }
+
+    func signInWithApple() {
+        Task { await coordinator.signInWithApple() }
     }
 
     func logout() {

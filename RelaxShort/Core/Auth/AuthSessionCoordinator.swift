@@ -13,6 +13,7 @@ final class AuthSessionCoordinator: ObservableObject {
     private let tokenStore: AuthTokenStoring
     private let googleClient: GoogleOAuthClientProtocol
     private let facebookClient: FacebookOAuthClientProtocol
+    private let appleClient: AppleOAuthClientProtocol
     private var session: AuthSession?
     private var bootstrapTask: Task<Void, Never>?
     private var refreshTask: Task<AuthSession, Error>?
@@ -20,17 +21,20 @@ final class AuthSessionCoordinator: ObservableObject {
     private let bootstrapKeyName = "auth.anonymous-bootstrap-key"
     private let googleMergeRequestKeyName = "auth.google-merge-request-key"
     private let facebookMergeRequestKeyName = "auth.facebook-merge-request-key"
+    private let appleMergeRequestKeyName = "auth.apple-merge-request-key"
 
     init(
         repository: RealAuthRepositoryProtocol = RealAuthRepository(),
         tokenStore: AuthTokenStoring = AuthKeychainStore.shared,
         googleClient: GoogleOAuthClientProtocol = GoogleOAuthClient(),
-        facebookClient: FacebookOAuthClientProtocol = FacebookOAuthClient()
+        facebookClient: FacebookOAuthClientProtocol = FacebookOAuthClient(),
+        appleClient: AppleOAuthClientProtocol = AppleOAuthClient()
     ) {
         self.repository = repository
         self.tokenStore = tokenStore
         self.googleClient = googleClient
         self.facebookClient = facebookClient
+        self.appleClient = appleClient
     }
 
     var hasSession: Bool { session != nil }
@@ -139,6 +143,39 @@ final class AuthSessionCoordinator: ObservableObject {
         }
     }
 
+    func signInWithApple() async {
+        guard !isSigningIn else { return }
+        isSigningIn = true
+        errorMessage = nil
+        defer { isSigningIn = false }
+
+        do {
+            let token = try await validAccessToken()
+            let credential = try await appleClient.signIn()
+            let mergeRequestID = pendingMergeRequestID(
+                key: appleMergeRequestKeyName
+            )
+            let upgraded = try await repository.signInWithApple(
+                identityToken: credential.identityToken,
+                authorizationCode: credential.authorizationCode,
+                rawNonce: credential.rawNonce,
+                displayName: credential.displayName,
+                anonymousAccessToken: token,
+                deviceID: InstallIdentityProvider.shared.installID(),
+                mergeRequestID: mergeRequestID
+            )
+            try install(upgraded)
+            UserDefaults.standard.removeObject(forKey: appleMergeRequestKeyName)
+        } catch {
+            if error is CancellationError { return }
+            if let apiError = error as? APIError,
+               apiError.code == "AUTH_ACCOUNT_MERGE_CONFLICT" {
+                UserDefaults.standard.removeObject(forKey: appleMergeRequestKeyName)
+            }
+            errorMessage = error.localizedDescription
+        }
+    }
+
     /// 退出注册账户后立即创建全新的匿名账户，避免旧注册资产继续留在当前设备会话。
     func logout() async {
         let oldRefreshToken = session?.refreshToken
@@ -150,6 +187,7 @@ final class AuthSessionCoordinator: ObservableObject {
         UserDefaults.standard.removeObject(forKey: bootstrapKeyName)
         UserDefaults.standard.removeObject(forKey: googleMergeRequestKeyName)
         UserDefaults.standard.removeObject(forKey: facebookMergeRequestKeyName)
+        UserDefaults.standard.removeObject(forKey: appleMergeRequestKeyName)
         await bootstrap()
         if let oldRefreshToken {
             try? await repository.logout(oldRefreshToken)
