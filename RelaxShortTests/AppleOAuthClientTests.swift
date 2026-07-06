@@ -1,4 +1,3 @@
-import CryptoKit
 import Foundation
 import Testing
 @testable import RelaxShort
@@ -11,18 +10,37 @@ struct AppleOAuthClientTests {
 
     @Test
     func sha256HexOutputIsStable64CharLowercase() {
-        // 使用确定性输入验证 SHA-256 输出
         let input = "test-raw-nonce-1234567890"
-        let inputData = Data(input.utf8)
-        let hashed = SHA256.hash(data: inputData)
-        let hex = hashed.compactMap { String(format: "%02x", $0) }.joined()
+        let hex = AppleNonce.sha256Hex(input)
 
         #expect(hex.count == 64)
         #expect(hex == hex.lowercased())
-        // 验证确定性
-        let again = SHA256.hash(data: inputData)
-            .compactMap { String(format: "%02x", $0) }.joined()
-        #expect(hex == again)
+        #expect(hex == "b003489bed192c917c3aff5a9647372ef26525e09636711540ab844012f1aa70")
+    }
+
+    @Test
+    func nonceGenerationUsesProvidedSecureBytesAndBase64URL() throws {
+        let nonce = try AppleNonce.generate { length in
+            #expect(length == 32)
+            return Array(0..<UInt8(length))
+        }
+
+        #expect(nonce == "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8")
+        #expect(nonce.count == 43)
+    }
+
+    @Test
+    func nonceGenerationMapsRandomSourceFailure() {
+        enum TestFailure: Error { case failed }
+
+        do {
+            _ = try AppleNonce.generate { _ in throw TestFailure.failed }
+            Issue.record("安全随机源失败时应抛出错误")
+        } catch AppleOAuthError.randomGenerationFailed {
+            // 预期错误
+        } catch {
+            Issue.record("错误类型不正确：\(error)")
+        }
     }
 
     @Test

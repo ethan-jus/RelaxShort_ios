@@ -43,6 +43,47 @@ enum AppleOAuthError: Error, LocalizedError {
     }
 }
 
+// MARK: - Nonce
+
+/// Apple 登录 nonce 的唯一生产实现，支持注入随机字节以验证安全边界。
+enum AppleNonce {
+    typealias RandomBytesProvider = (_ length: Int) throws -> [UInt8]
+
+    static func generate(
+        length: Int = 32,
+        randomBytes: RandomBytesProvider = secureRandomBytes
+    ) throws -> String {
+        let bytes: [UInt8]
+        do {
+            bytes = try randomBytes(length)
+        } catch {
+            throw AppleOAuthError.randomGenerationFailed
+        }
+        guard bytes.count == length else {
+            throw AppleOAuthError.randomGenerationFailed
+        }
+        return Data(bytes).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    static func sha256Hex(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    private static func secureRandomBytes(length: Int) throws -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: length)
+        let status = SecRandomCopyBytes(kSecRandomDefault, length, &bytes)
+        guard status == errSecSuccess else {
+            throw AppleOAuthError.randomGenerationFailed
+        }
+        return bytes
+    }
+}
+
 // MARK: - Delegate Bridge
 
 /// 持有 ASAuthorizationController 回调 continuation。
@@ -66,7 +107,7 @@ private final class AppleAuthBridge: NSObject,
             let provider = ASAuthorizationAppleIDProvider()
             let request = provider.createRequest()
             request.requestedScopes = [.fullName, .email]
-            request.nonce = sha256Hex(rawNonce)
+            request.nonce = AppleNonce.sha256Hex(rawNonce)
 
             let controller = ASAuthorizationController(authorizationRequests: [request])
             controller.delegate = self
@@ -152,13 +193,6 @@ private final class AppleAuthBridge: NSObject,
             ?? UIWindow()
     }
 
-    // MARK: Nonce
-
-    private func sha256Hex(_ input: String) -> String {
-        let inputData = Data(input.utf8)
-        let hashed = SHA256.hash(data: inputData)
-        return hashed.compactMap { String(format: "%02x", $0) }.joined()
-    }
 }
 
 // MARK: - Client Implementation
@@ -166,21 +200,8 @@ private final class AppleAuthBridge: NSObject,
 final class AppleOAuthClient: AppleOAuthClientProtocol {
     @MainActor
     func signIn() async throws -> AppleOAuthCredential {
-        let rawNonce = try generateNonce()
+        let rawNonce = try AppleNonce.generate()
         let bridge = AppleAuthBridge(rawNonce: rawNonce)
         return try await bridge.perform()
-    }
-
-    private func generateNonce() throws -> String {
-        let length = 32
-        var bytes = [UInt8](repeating: 0, count: length)
-        let status = SecRandomCopyBytes(kSecRandomDefault, length, &bytes)
-        guard status == errSecSuccess else {
-            throw AppleOAuthError.randomGenerationFailed
-        }
-        return Data(bytes).base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
     }
 }
