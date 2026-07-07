@@ -91,9 +91,9 @@ struct RecommendView: View {
                 let ids = viewModel.dramas.map(\.id)
                 Task { await dependencies.bookmarkStore.loadStatus(seriesIDs: ids) }
                 // Task36A: 分页追加后同步播放器池，让新增条目可播放
-                if count > oldCount {
+                if oldCount > 0, count > oldCount, session.hasInitializedPool {
                     let newDramas = Array(viewModel.dramas[oldCount..<count])
-                    session.syncDramas(newDramas)
+                    session.syncDramas(newDramas, startingAt: oldCount)
                 }
             }
             .onChange(of: showAbout) { _, isShowing in

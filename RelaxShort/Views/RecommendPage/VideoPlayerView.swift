@@ -43,10 +43,10 @@ import Combine
 
     /// Task36A: 追加新剧集到播放器池，不中断当前播放。
     /// 只映射尚未在 dramaToPlayable 中的新 DramaItem，并同步 engine 内部 items。
-    func syncDramas(_ newDramas: [DramaItem]) {
+    /// startingAt 必须使用追加数据在完整 dramas 数组中的真实起始下标，避免首屏或不可播放条目导致索引错位。
+    func syncDramas(_ newDramas: [DramaItem], startingAt startDramaIndex: Int) {
         guard !newDramas.isEmpty else { return }
         var newItems: [PlayerMediaItem] = []
-        let startDramaIndex = dramaToPlayable.keys.max().map { $0 + 1 } ?? 0
         for (offset, drama) in newDramas.enumerated() {
             let dIdx = startDramaIndex + offset
             guard dramaToPlayable[dIdx] == nil else { continue }
