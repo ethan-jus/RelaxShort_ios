@@ -21,6 +21,8 @@ final class RecommendViewModel: ObservableObject {
     private var nextCursor: String?
     /// 正在加载中标记，防止重复触发
     private var isLoadingMore: Bool = false
+    /// 当前页面会话已经展示过的 seriesId，用于 seed 耗尽后换 seed 续流时去重。
+    private var displayedSeriesIDs = Set<String>()
 
     init(repository: HomeRepositoryProtocol) {
         self.repository = repository
@@ -36,10 +38,11 @@ final class RecommendViewModel: ObservableObject {
         nextCursor = nil
         hasMore = true
         isLoadingMore = false
+        displayedSeriesIDs.removeAll()
 
         do {
             let result = try await loadFirstPage()
-            dramas = result
+            dramas = rememberUnique(result)
         } catch {
             errorMessage = L10n.recommendLoadFailed
             #if DEBUG
@@ -50,9 +53,9 @@ final class RecommendViewModel: ObservableObject {
     }
 
     /// 加载下一页（接近末尾时自动触发）。
-    /// 只在 hasMore=true 且未在加载中时执行。
+    /// 当前 seed 耗尽后自动生成新 seed 续流，并过滤已展示剧集，避免用户滑到末尾卡死。
     func loadNextPageIfNeeded(currentIndex: Int) async {
-        guard hasMore, !isLoadingMore, !dramas.isEmpty else { return }
+        guard !isLoadingMore, !dramas.isEmpty else { return }
         // 当距离末尾剩余 3 个以内时触发预加载
         let threshold = max(0, dramas.count - 3)
         guard currentIndex >= threshold else { return }
@@ -101,20 +104,52 @@ final class RecommendViewModel: ObservableObject {
         return result.items
     }
 
-    /// 加载下一页（复用已生成的 seed 和 nextCursor）
+    /// 加载下一页；当前 seed 耗尽后自动开启新 seed。
     private func loadNextPage() async throws -> [DramaItem] {
         guard let realRepo = repository as? RealHomeRepository else {
             return []
         }
         let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
-        let result = try await realRepo.fetchForYouPaginated(
-            contentLang: contentLang, country: country,
-            cursor: nextCursor, limit: pageSize,
-            feedSeed: feedSessionId
-        )
-        nextCursor = result.nextCursor
-        hasMore = result.hasMore
-        return result.items
+
+        // 最多连续探测 3 页：如果新 seed 首页全是已看内容，继续翻一页找新内容。
+        for _ in 0..<3 {
+            if feedSessionId == nil || (!hasMore && nextCursor == nil) {
+                feedSessionId = UUID().uuidString
+                nextCursor = nil
+                hasMore = true
+            }
+
+            let result = try await realRepo.fetchForYouPaginated(
+                contentLang: contentLang, country: country,
+                cursor: nextCursor, limit: pageSize,
+                feedSeed: feedSessionId
+            )
+            nextCursor = result.nextCursor
+            hasMore = result.hasMore
+
+            let uniqueItems = rememberUnique(result.items)
+            if !uniqueItems.isEmpty {
+                return uniqueItems
+            }
+
+            if !hasMore {
+                // 当前 seed 没有更多内容且本页也没有新内容，下一轮换 seed 再试。
+                feedSessionId = nil
+                nextCursor = nil
+            }
+        }
+
+        return []
+    }
+
+    /// 记录并返回本页面会话尚未展示过的剧集。
+    private func rememberUnique(_ items: [DramaItem]) -> [DramaItem] {
+        var result: [DramaItem] = []
+        for item in items where !displayedSeriesIDs.contains(item.id) {
+            displayedSeriesIDs.insert(item.id)
+            result.append(item)
+        }
+        return result
     }
 }
