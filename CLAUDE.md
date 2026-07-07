@@ -1,6 +1,6 @@
 # RelaxShort iOS CC Guide
 
-CC 在本仓库执行任务时遵守以下规则。
+CC 在本仓库执行任务时，先遵守根目录 `CLAUDE.md` 的通用规则。本文件只记录 iOS 工程差异约束，避免重复维护和浪费 token。
 
 ## 执行流程
 

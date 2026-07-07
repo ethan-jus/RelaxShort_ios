@@ -3,9 +3,13 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!--
+	个人免费开发者团队不支持 Sign in with Apple capability。
+	真机验收非 Apple 登录功能时先注释该 entitlement；加入付费 Apple Developer Program 后取消注释即可恢复。
 	<key>com.apple.developer.applesignin</key>
 	<array>
 		<string>Default</string>
 	</array>
+	-->
 </dict>
 </plist>
