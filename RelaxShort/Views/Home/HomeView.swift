@@ -106,7 +106,7 @@ struct HomeView: View {
         static let categoryFilterHideThreshold: CGFloat = 155
     }
 
-    init(viewModel: HomeViewModel, rankingRepository: HomeRepositoryProtocol = MockHomeRepository()) {
+    init(viewModel: HomeViewModel, rankingRepository: HomeRepositoryProtocol) {
         self.viewModel = viewModel
         self.rankingRepository = rankingRepository
     }

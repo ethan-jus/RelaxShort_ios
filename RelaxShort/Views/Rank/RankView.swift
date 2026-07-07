@@ -11,7 +11,7 @@ struct RankView: View {
 
     init(
         playerDrama: Binding<DramaItem?>,
-        repository: HomeRepositoryProtocol = MockHomeRepository(),
+        repository: HomeRepositoryProtocol,
         onCategoryChange: @escaping (RankCategory) -> Void = { _ in }
     ) {
         self._playerDrama = playerDrama
@@ -74,9 +74,10 @@ struct RankView: View {
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 0) {
                 if viewModel.isLoading {
-                    ProgressView()
-                        .tint(DT.Color.textSecondary)
-                        .padding(.top, 40)
+                    loadingState
+                } else if let errorMessage = viewModel.errorMessage,
+                          viewModel.dramas.isEmpty {
+                    errorState(errorMessage)
                 } else if viewModel.dramas.isEmpty {
                     emptyState
                 } else {
@@ -92,6 +93,53 @@ struct RankView: View {
             }
             .padding(.bottom, 64)
         }
+    }
+
+    // MARK: - Loading State
+
+    private var loadingState: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .tint(DB.logoRed)
+            Text(L10n.loading)
+                .font(.system(size: 13))
+                .foregroundColor(DT.Color.textSecondary)
+        }
+        .padding(.top, 60)
+    }
+
+    // MARK: - Error State
+
+    private func errorState(_ message: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 36))
+                .foregroundColor(DT.Color.textTertiary)
+
+            Text(message)
+                .font(.system(size: 14))
+                .foregroundColor(DT.Color.textSecondary)
+                .multilineTextAlignment(.center)
+
+            Button(action: {
+                Task { await viewModel.loadData() }
+            }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 13))
+                    Text(L10n.retry)
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .frame(height: 38)
+                .background(DB.logoRed.opacity(0.85))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 60)
     }
 
     // MARK: - Empty State
@@ -114,7 +162,7 @@ struct RankView: View {
 
 #if DEBUG
 #Preview("Rank View") {
-    RankView(playerDrama: .constant(nil))
+    RankView(playerDrama: .constant(nil), repository: MockHomeRepository())
         .background(DT.Color.bgPrimary)
 }
 #endif

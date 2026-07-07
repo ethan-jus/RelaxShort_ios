@@ -9,8 +9,8 @@ struct SearchView: View {
     @State private var playerDrama: DramaItem?
 
     init(
-        searchRepository: SearchRepositoryProtocol = MockSearchRepository(),
-        discoveryRepository: HomeRepositoryProtocol = MockHomeRepository(),
+        searchRepository: SearchRepositoryProtocol,
+        discoveryRepository: HomeRepositoryProtocol,
         analytics: (any DiscoveryAnalyticsTracking)? = nil
     ) {
         _viewModel = StateObject(
@@ -201,7 +201,10 @@ struct SearchView: View {
 
 #if DEBUG
 #Preview("Search") {
-    SearchView()
+    SearchView(
+        searchRepository: MockSearchRepository(),
+        discoveryRepository: MockHomeRepository()
+    )
         .environmentObject(AppStore())
         .preferredColorScheme(.dark)
 }
