@@ -62,6 +62,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     // MARK: - 公开 API
 
+    /// Task36A: 追加新播放条目到现有列表末尾，不中断当前播放。
+    /// 用于分页加载后同步播放器内部 items，确保后续 move(to:) 能索引到新条目。
+    func appendItems(_ newItems: [PlayerMediaItem]) {
+        guard !newItems.isEmpty else { return }
+        let before = items.count
+        items.append(contentsOf: newItems)
+        log("appendItems: \(before) → \(items.count)")
+    }
+
     func prepare(items: [PlayerMediaItem], index: Int) {
         guard !items.isEmpty, items.indices.contains(index) else { return }
         cancelAllPreloadTasks()

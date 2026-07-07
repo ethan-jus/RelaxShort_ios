@@ -82,7 +82,7 @@ struct RecommendView: View {
                     session.pausePlayback()
                 }
             }
-            .onChange(of: viewModel.dramas.count) { _, count in
+            .onChange(of: viewModel.dramas.count) { oldCount, count in
                 guard count > 0 else { return }
                 if isPlaybackVisible {
                     initializePlaybackIfNeeded()
@@ -90,6 +90,11 @@ struct RecommendView: View {
                 // 批量查询当前页收藏状态
                 let ids = viewModel.dramas.map(\.id)
                 Task { await dependencies.bookmarkStore.loadStatus(seriesIDs: ids) }
+                // Task36A: 分页追加后同步播放器池，让新增条目可播放
+                if count > oldCount {
+                    let newDramas = Array(viewModel.dramas[oldCount..<count])
+                    session.syncDramas(newDramas)
+                }
             }
             .onChange(of: showAbout) { _, isShowing in
                 withAnimation(.easeOut(duration: 0.18)) {

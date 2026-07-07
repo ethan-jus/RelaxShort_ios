@@ -74,19 +74,14 @@ final class RecommendViewModel: ObservableObject {
 
     // MARK: - Private
 
-    /// 生成种子并请求首页
+    /// 生成种子并请求首页。
+    /// For You 页面直接使用 /api/v2/feed/for-you（不优先走 Home），确保 seed 真正生效。
     private func loadFirstPage() async throws -> [DramaItem] {
         let seed = UUID().uuidString
         feedSessionId = seed
 
-        // Home 首页优先，不可用时走 For You
         let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
-
-        if let homeItems = try? await fetchHomeFirstPage(contentLang: contentLang, country: country),
-           !homeItems.isEmpty {
-            return homeItems
-        }
 
         return try await fetchForYouFirstPage(contentLang: contentLang, country: country, seed: seed)
     }
@@ -104,20 +99,6 @@ final class RecommendViewModel: ObservableObject {
         nextCursor = result.nextCursor
         hasMore = result.hasMore
         return result.items
-    }
-
-    /// 请求 Home 首页
-    private func fetchHomeFirstPage(contentLang: String?, country: String?) async throws -> [DramaItem]? {
-        guard let realRepo = repository as? RealHomeRepository else { return nil }
-        let tabs = try await realRepo.fetchHomeTabs(contentLang: contentLang, country: country)
-        for tab in tabs {
-            for section in tab.sections {
-                if !section.items.isEmpty {
-                    return section.items
-                }
-            }
-        }
-        return nil
     }
 
     /// 加载下一页（复用已生成的 seed 和 nextCursor）

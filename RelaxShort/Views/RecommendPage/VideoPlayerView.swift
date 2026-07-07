@@ -41,6 +41,27 @@ import Combine
         }
     }
 
+    /// Task36A: 追加新剧集到播放器池，不中断当前播放。
+    /// 只映射尚未在 dramaToPlayable 中的新 DramaItem，并同步 engine 内部 items。
+    func syncDramas(_ newDramas: [DramaItem]) {
+        guard !newDramas.isEmpty else { return }
+        var newItems: [PlayerMediaItem] = []
+        let startDramaIndex = dramaToPlayable.keys.max().map { $0 + 1 } ?? 0
+        for (offset, drama) in newDramas.enumerated() {
+            let dIdx = startDramaIndex + offset
+            guard dramaToPlayable[dIdx] == nil else { continue }
+            guard let mediaItem = drama.toPlayerMediaItem() else { continue }
+            let pIdx = playableItems.count + newItems.count
+            playableItems.append(RecommendPlayableItem(id: mediaItem.id, dramaIndex: dIdx, item: mediaItem))
+            dramaToPlayable[dIdx] = pIdx
+            newItems.append(mediaItem)
+        }
+        guard !newItems.isEmpty else { return }
+        // 同步 engine 内部 items 列表，使后续 move(to:) 能索引新条目
+        engine.appendItems(newItems)
+        poolVersion &+= 1
+    }
+
     func initializePool(dramas: [DramaItem]) {
         guard !dramas.isEmpty else { return }
         var items: [RecommendPlayableItem] = []
