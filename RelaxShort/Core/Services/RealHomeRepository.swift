@@ -70,14 +70,31 @@ final class RealHomeRepository: HomeRepositoryProtocol {
 
     // MARK: - For You
 
-    func fetchForYou(contentLang: String? = nil, country: String? = nil,
-                     cursor: String? = nil, limit: Int = 10) async throws -> [DramaItem] {
+    /// Task36A: 支持 feedSeed 和游标分页的 For You 请求。
+    /// 首次调用传入 feedSeed，后续翻页传入 cursor（含 seedHash），同一 session 内翻页稳定。
+    func fetchForYouPaginated(contentLang: String? = nil, country: String? = nil,
+                               cursor: String? = nil, limit: Int = 10,
+                               feedSeed: String? = nil) async throws -> (
+        items: [DramaItem], nextCursor: String?, hasMore: Bool
+    ) {
         let lang = contentLang ?? UserDefaults.standard.string(forKey: "app_content_language")
         let cty = country ?? UserDefaults.standard.string(forKey: "app_country_code")
         let dto: ForYouFeedResponseDTO = try await client.requestData(
-            .forYou(cursor: cursor, limit: limit, contentLanguage: lang, countryCode: cty)
+            .forYou(cursor: cursor, limit: limit, contentLanguage: lang, countryCode: cty,
+                    feedSeed: feedSeed)
         )
-        return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
+        return (
+            items: (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem),
+            nextCursor: dto.nextCursor,
+            hasMore: dto.hasMore ?? false
+        )
+    }
+
+    func fetchForYou(contentLang: String? = nil, country: String? = nil,
+                     cursor: String? = nil, limit: Int = 10) async throws -> [DramaItem] {
+        let result = try await fetchForYouPaginated(contentLang: contentLang, country: country,
+                                                     cursor: cursor, limit: limit, feedSeed: nil)
+        return result.items
     }
 
     // MARK: - Home

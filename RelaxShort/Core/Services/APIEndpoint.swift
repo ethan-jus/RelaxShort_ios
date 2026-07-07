@@ -21,8 +21,8 @@ enum APIEndpoint {
 
     /// App 冷启动初始化
     case appInit
-    /// For You 推荐流（cursor 分页）
-    case forYou(cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?)
+    /// For You 推荐流（cursor 分页 + feed_seed 种子扰动）
+    case forYou(cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?, feedSeed: String?)
     /// 某部短剧的所有剧集
     case seriesEpisodes(seriesId: String)
     /// 剧集播放地址
@@ -290,11 +290,12 @@ extension APIEndpoint {
         var components = URLComponents(string: baseURL + path)
 
         switch self {
-        case .forYou(let cursor, let limit, let contentLanguage, let countryCode):
+        case .forYou(let cursor, let limit, let contentLanguage, let countryCode, let feedSeed):
             var items: [URLQueryItem] = [URLQueryItem(name: "limit", value: "\(limit)")]
             if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
             if let cl = contentLanguage { items.append(URLQueryItem(name: "content_language", value: cl)) }
             if let cc = countryCode { items.append(URLQueryItem(name: "country_code", value: cc)) }
+            if let fs = feedSeed { items.append(URLQueryItem(name: "feed_seed", value: fs)) }
             components?.queryItems = items
         case .search(let keyword, let page):
             components?.queryItems = [

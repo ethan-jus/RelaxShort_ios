@@ -71,6 +71,8 @@ struct RecommendView: View {
                 // engine handles reset internally
                 session.handleTransition(from: oldValue, to: newValue, dramas: viewModel.dramas)
                 if isPlaybackVisible { session.engine.play() }
+                // Task36A: 接近末尾时自动加载下一页
+                Task { await viewModel.loadNextPageIfNeeded(currentIndex: newValue) }
             }
             .onChange(of: isPlaybackVisible) { _, vis in
                 if vis {
