@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import AVFoundation
 @testable import RelaxShort
 
 @MainActor
@@ -111,6 +112,16 @@ struct PlayerCoordinatorTests {
         #expect(coordinator.owner == .forYou)
         #expect(coordinator.engine.currentItem?.id == "series-1-1")
         #expect(coordinator.engine.wantsPlayback == true)
+    }
+
+    @Test
+    func stalePlayerLayerCallbackDoesNotMarkCurrentMediaReady() {
+        let engine = ShortVideoPlayerEngine()
+        let stalePlayer = AVPlayer()
+
+        engine.markReadyForDisplay(from: stalePlayer)
+
+        #expect(engine.isReadyForDisplay == false)
     }
 
     private func mediaItem(id: String) -> PlayerMediaItem {

@@ -35,7 +35,7 @@ struct ShortVideoPlayerView: View {
                 PlayerLayerViewRepresentable(player: player, engine: engine)
             }
 
-            // 封面：只有首帧未就绪时才显示
+            // 封面：视频真正开始出画前一直保留，避免 layer ready 与首帧播放之间露出黑屏
             if showCover {
                 coverView
             }
@@ -93,11 +93,11 @@ struct ShortVideoPlayerView: View {
 
     // MARK: - 封面逻辑
 
-    /// 封面显示条件：无播放器，或首帧尚未就绪
+    /// 封面显示条件：无播放器，或可见播放尚未开始。
+    /// 只用 AVPlayerLayer.isReadyForDisplay 会在部分网络/切换场景中过早撤封面，造成黑屏。
     private var showCover: Bool {
         if player == nil { return true }
-        if !engine.isReadyForDisplay { return true }
-        return false
+        return !engine.hasVisiblePlaybackStarted
     }
 
     @ViewBuilder
@@ -164,10 +164,12 @@ private struct PlayerLayerViewRepresentable: UIViewRepresentable {
 
         func startObserving(_ layer: AVPlayerLayer?) {
             stopObserving()
+            let observedPlayer = layer?.player
             observation = layer?.observe(\.isReadyForDisplay, options: [.new]) { [weak self] layer, _ in
                 guard let self, layer.isReadyForDisplay else { return }
                 Task { @MainActor in
-                    self.engine?.markReadyForDisplay()
+                    guard let observedPlayer else { return }
+                    self.engine?.markReadyForDisplay(from: observedPlayer)
                 }
             }
         }

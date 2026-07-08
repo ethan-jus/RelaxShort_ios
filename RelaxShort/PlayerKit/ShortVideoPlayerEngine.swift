@@ -18,6 +18,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     @Published private(set) var availableSubtitles: [PlayerSubtitleOption] = []
     @Published var selectedSubtitleID: String?
     @Published var isReadyForDisplay: Bool = false
+    @Published private(set) var hasVisiblePlaybackStarted: Bool = false
     @Published private(set) var diagnostics = PlayerDiagnostics()
 
     var metrics = PlayerMetricsLogger()
@@ -270,7 +271,13 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
-    func markReadyForDisplay() {
+    /// 只接受当前 AVPlayerLayer 对应 player 的首帧回调。
+    /// SwiftUI 快速切页时旧 layer 可能迟到回调，必须过滤，否则会提前隐藏当前封面造成黑屏。
+    func markReadyForDisplay(from player: AVPlayer) {
+        guard currentPlayer === player else {
+            log("markReadyForDisplay: 忽略旧 player 回调")
+            return
+        }
         guard !isReadyForDisplay else { return }
         isReadyForDisplay = true
         diagnostics.stateText = "first-frame"
@@ -399,6 +406,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     private func attach(player: AVPlayer) {
         removeObservers()
+        resetReadyState()
         currentPlayer = player
         setupItemStatusKVO(player)
         startObserving()
@@ -539,6 +547,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     private func resetReadyState() {
         isReadyForDisplay = false
+        hasVisiblePlaybackStarted = false
     }
 
     private func resetProgress() {
@@ -686,6 +695,14 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 }
                 self.progress = nextProgress
                 self.updateSubtitle(at: time.seconds)
+                if self.isReadyForDisplay,
+                   !self.hasVisiblePlaybackStarted,
+                   player.timeControlStatus == .playing,
+                   time.seconds > 0.05 {
+                    self.hasVisiblePlaybackStarted = true
+                    self.diagnostics.stateText = "visible-playback"
+                    self.log("visiblePlayback: started at \(String(format: "%.2f", time.seconds))s")
+                }
             }
         }
 
