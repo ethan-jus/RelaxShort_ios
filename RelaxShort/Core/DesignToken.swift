@@ -74,10 +74,10 @@ enum DT {
         }()
         
         // 封面占位渐变
-        static let bgCoverPlaceholderStart    = SwiftUI.Color(hex: "#2D1B69")
-        static let bgCoverPlaceholderEnd      = SwiftUI.Color(hex: "#1a1a3e")
-        static let bgCoverPlaceholderAltStart = SwiftUI.Color(hex: "#2D2D44")
-        static let bgCoverPlaceholderAltEnd   = SwiftUI.Color(hex: "#1C1C2E")
+        static let bgCoverPlaceholderStart    = SwiftUI.Color(hex: "#161616")
+        static let bgCoverPlaceholderEnd      = SwiftUI.Color(hex: "#09090B")
+        static let bgCoverPlaceholderAltStart = SwiftUI.Color(hex: "#1A1A1D")
+        static let bgCoverPlaceholderAltEnd   = SwiftUI.Color(hex: "#101012")
 
         /// 半透明白色覆盖 — dark: white.opacity(0.05), light: black.opacity(0.05)
         static let overlaySubtle: SwiftUI.Color = {

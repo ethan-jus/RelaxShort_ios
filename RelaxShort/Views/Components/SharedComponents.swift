@@ -1,11 +1,9 @@
 import SwiftUI
 
 // MARK: - Cover Image View
-/// 封面图片异步加载组件，使用 iOS 15+ AsyncImage + URLCache 自动缓存
+/// 封面图片异步加载组件，使用项目共享 ImageLoader 内存缓存
 ///
-/// 三态：加载中 → 渐变占位 + photo 图标
-///       加载成功 → 真实封面图（fill 模式）
-///       加载失败 → 渐变占位 + 破碎图标
+/// 加载中/失败均显示暗黑骨架占位，避免慢网或坏图时出现突兀色块。
 ///
 /// 使用示例：
 /// ```swift
@@ -18,42 +16,24 @@ struct CoverImageView: View {
     var cornerRadius: CGFloat = DB.posterRadius
     var width: CGFloat? = nil
     var height: CGFloat? = nil
+    @StateObject private var imageLoader = ImageLoader()
 
     var body: some View {
-        AsyncImage(url: URL(string: url)) { phase in
-            switch phase {
-            case .success(let image):
-                image
+        ZStack {
+            placeholderGradient
+
+            if imageLoader.imageKey == url, let image = imageLoader.image {
+                Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .clipped()
-            case .failure:
-                // 加载失败：渐变背景 + 错误图标
-                placeholderGradient
-                    .overlay(
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(DT.Font.body(22))
-                            .foregroundColor(DT.Color.textTertiary)
-                    )
-            case .empty:
-                // 加载中：渐变背景 + photo 图标
-                placeholderGradient
-                    .overlay(
-                        Image(systemName: "photo")
-                            .font(DT.Font.body(22))
-                            .foregroundColor(DT.Color.textPrimary.opacity(0.3))
-                    )
-            @unknown default:
-                placeholderGradient
-                    .overlay(
-                        Image(systemName: "photo")
-                            .font(DT.Font.body(22))
-                            .foregroundColor(DT.Color.textPrimary.opacity(0.3))
-                    )
             }
         }
         .applySize(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .task(id: url) {
+            await imageLoader.load(url)
+        }
     }
     
     /// 渐变占位背景
@@ -61,7 +41,7 @@ struct CoverImageView: View {
         Rectangle()
             .fill(
                 LinearGradient(
-                    colors: [DT.Color.bgCoverPlaceholderStart, DT.Color.bgCoverPlaceholderEnd],
+                    colors: [DT.Color.bgCoverPlaceholderAltStart, DT.Color.bgCoverPlaceholderAltEnd],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )

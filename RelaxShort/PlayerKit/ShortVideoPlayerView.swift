@@ -86,7 +86,9 @@ struct ShortVideoPlayerView: View {
             }
             #endif
         }
-        .task { await imageLoader.load(coverURL) }
+        .task(id: coverURL) {
+            await imageLoader.load(coverURL)
+        }
     }
 
     // MARK: - 封面逻辑
@@ -100,7 +102,7 @@ struct ShortVideoPlayerView: View {
 
     @ViewBuilder
     private var coverView: some View {
-        if let image = imageLoader.image {
+        if imageLoader.imageKey == coverURL, let image = imageLoader.image {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()
@@ -109,7 +111,7 @@ struct ShortVideoPlayerView: View {
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [Color(hex: "#2D1B69"), Color(hex: "#1a1a3e")],
+                        colors: [Color(hex: "#161616"), Color(hex: "#09090B")],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
                 )

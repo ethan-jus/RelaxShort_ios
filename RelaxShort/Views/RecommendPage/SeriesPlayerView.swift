@@ -19,13 +19,10 @@ struct SeriesPlayerView: View {
     @State private var dragOffset: CGFloat = 0
     @State private var showSpeedHUD = false
     @State private var showEpisodeList = false
-    @State private var showUnlockSheet = false
-    @State private var unlockTargetEpisode: Int = 0
     @State private var episodes: [Episode] = []
     /// 缓存每集的后端 resumeTime，切集时使用当前 episode 的值
     @State private var episodeResumeTimes: [String: TimeInterval] = [:]
     @State private var unlockedEpisodes: Set<Int> = []
-    @State private var pendingLockedEpisode: Int?
     @State private var isUIVisible = true
     @State private var autoHideTask: Task<Void, Never>?
     /// 缓存播放接口返回的媒体源（key = episodeId），避免切回已访问剧集时重复请求。
@@ -153,25 +150,6 @@ struct SeriesPlayerView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                if showUnlockSheet {
-                    UnlockEpisodeSheet(
-                        episodeNumber: unlockTargetEpisode,
-                        coinPrice: 100,
-                        isPresented: $showUnlockSheet,
-                        onUnlockWithCoins: {
-                            unlockedEpisodes.insert(unlockTargetEpisode)
-                            showUnlockSheet = false
-                            playUnlockedPendingEpisode()
-                        },
-                        onWatchAd: {
-                            unlockedEpisodes.insert(unlockTargetEpisode)
-                            showUnlockSheet = false
-                            playUnlockedPendingEpisode()
-                        }
-                    )
-                    .zIndex(300)
-                    .transition(.opacity)
-                }
             }
         }
         .ignoresSafeArea()
@@ -210,10 +188,6 @@ struct SeriesPlayerView: View {
         .onChange(of: currentEpisode) { oldValue, newValue in
             guard oldValue != newValue else { return }
             requestEpisodeSwitch(newValue)
-        }
-        .onChange(of: showUnlockSheet) { _, isShowing in
-            guard !isShowing, let pending = pendingLockedEpisode, isEpisodeLocked(pending) else { return }
-            pendingLockedEpisode = nil
         }
         .onReceive(playerCoordinator.engine.$state) { state in
             playbackState = state
@@ -337,13 +311,6 @@ struct SeriesPlayerView: View {
     }
 
     private func initializeEpisodePlayer() {
-        guard !isEpisodeLocked(currentEpisode) else {
-            pendingLockedEpisode = currentEpisode
-            unlockTargetEpisode = currentEpisode
-            showUnlockSheet = true
-            playerCoordinator.engine.pause(reason: .system)
-            return
-        }
         let playable = buildPlayableItems(from: episodes)
         guard !playable.isEmpty else {
             // 正式播放接口失败时保留已启动的卡片预览，不得回落到其他剧或 Mock。
@@ -439,11 +406,6 @@ struct SeriesPlayerView: View {
                     .frame(width: actionRailWidth)
                 }
 
-                if isEpisodeLocked(currentEpisode) {
-                    unlockCurrentEpisodeButton(width: contentWidth)
-                        .padding(.top, 2)
-                }
-
                 seriesProgressBar(totalWidth: progressWidth, engine: playerCoordinator.engine)
                     .frame(width: progressWidth, height: seriesIsScrubbing ? ChromeMetrics.progressScrubbingHeight : ChromeMetrics.progressIdleHeight)
                     .padding(.top, 2)
@@ -491,25 +453,6 @@ struct SeriesPlayerView: View {
             .lineSpacing(3)
         }
         .frame(width: width, alignment: .leading)
-    }
-
-    private func unlockCurrentEpisodeButton(width: CGFloat) -> some View {
-        Button {
-            unlockTargetEpisode = currentEpisode
-            showUnlockSheet = true
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 12, weight: .semibold))
-                Text("Unlock EP \(currentEpisode)")
-                    .font(.system(size: 15, weight: .semibold))
-            }
-            .foregroundColor(.white)
-            .frame(width: width, height: 40)
-            .background(DB.pink)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        }
-        .buttonStyle(.plain)
     }
 
     private var membershipDownloadRow: some View {
@@ -678,7 +621,6 @@ struct SeriesPlayerView: View {
                 Logger.viewModel.warning("SeriesPlayerView: no playable index for EP\(episodeNumber)")
                 return
             }
-            pendingLockedEpisode = nil
             currentEpisode = episodeNumber
             playerCoordinator.engine.prepare(items: playable.map(\.item), index: playableIndex)
             playerCoordinator.engine.play()
@@ -750,12 +692,11 @@ struct SeriesPlayerView: View {
             }
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
+            // 解锁流程尚未正式设计，当前版本不展示半成品弹窗；后续由专门任务接入正式解锁页。
             if presentUnlockOnDenied {
-                pendingLockedEpisode = episodeNumber
-                unlockTargetEpisode = episodeNumber
-                showUnlockSheet = true
+                playerCoordinator.engine.pause(reason: .system)
             }
-            Logger.viewModel.info("SeriesPlayerView: EP\(episodeNumber) denied by playback entitlement")
+            Logger.viewModel.info("SeriesPlayerView: EP\(episodeNumber) denied by playback entitlement, unlock UI deferred")
             return false
         } catch {
             Logger.viewModel.warning("SeriesPlayerView: play asset failed EP\(episodeNumber): \(error.localizedDescription)")
@@ -824,11 +765,6 @@ struct SeriesPlayerView: View {
 
     private var currentBackendEpisodeID: String? {
         episodes.first(where: { $0.episodeNumber == currentEpisode })?.id
-    }
-
-    private func playUnlockedPendingEpisode() {
-        guard let pending = pendingLockedEpisode else { return }
-        switchToEpisode(pending)
     }
 
     // MARK: - Top Chrome
@@ -1218,24 +1154,6 @@ private struct EpisodePickerSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func dismiss() { withAnimation(.easeOut(duration: 0.25)) { isPresented = false } }
-}
-
-// MARK: - Unlock Episode Sheet (unchanged)
-
-private struct UnlockEpisodeSheet: View {
-    let episodeNumber: Int; let coinPrice: Int; @Binding var isPresented: Bool; var onUnlockWithCoins: () -> Void; var onWatchAd: () -> Void
-    var body: some View {
-        ZStack { Color.black.opacity(0.6).ignoresSafeArea().onTapGesture { dismiss() }
-            VStack(spacing: 0) {
-                Image(systemName: "lock.shield.fill").font(.system(size: 40)).foregroundColor(DB.gold).padding(.top, 28).padding(.bottom, 16)
-                Text("Unlock Episode \(episodeNumber)").font(.system(size: 20, weight: .bold)).foregroundColor(.white).padding(.bottom, 8)
-                Text("This episode requires coins to unlock. Choose your method below.").font(.system(size: 13)).foregroundColor(DB.mutedText).multilineTextAlignment(.center).padding(.horizontal, 24).padding(.bottom, 24)
-                Button { onUnlockWithCoins(); dismiss() } label: { HStack(spacing: 8) { Image(systemName: "bitcoinsign.circle.fill"); Text("Unlock with \(coinPrice) Coins").font(.system(size: 15, weight: .semibold)) }.foregroundColor(.black).frame(maxWidth: .infinity).frame(height: 48).background(DB.gold).cornerRadius(DB.ctaRadius) }.padding(.horizontal, 24).padding(.bottom, 10)
-                Button { onWatchAd(); dismiss() } label: { HStack(spacing: 8) { Image(systemName: "play.rectangle.fill"); Text("Watch Ad to Unlock").font(.system(size: 15, weight: .semibold)) }.foregroundColor(.white).frame(maxWidth: .infinity).frame(height: 48).background(RoundedRectangle(cornerRadius: DB.ctaRadius).stroke(DB.pink, lineWidth: 1.5)) }.padding(.horizontal, 24).padding(.bottom, 24)
-            }.frame(width: 300).background(DB.panelElevated).clipShape(RoundedRectangle(cornerRadius: DB.sheetCornerRadius))
-        }
-    }
     private func dismiss() { withAnimation(.easeOut(duration: 0.25)) { isPresented = false } }
 }
 
