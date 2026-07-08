@@ -47,8 +47,14 @@ final class PlayerSlotPool {
             ? PlayerItemFactory.makePlaybackItem(from: item.source)
             : PlayerItemFactory.makeDirectItem(from: item.source)
         let player = AVPlayer(playerItem: managed.item)
-        player.currentItem?.preferredForwardBufferDuration = slot == .current ? 1.5 : 1.0
-        player.automaticallyWaitsToMinimizeStalling = slot == .current
+        if slot == .current {
+            // 当前视频必须优先首帧速度；弱网卡顿由封面兜底、恢复状态机和后续预加载处理。
+            player.currentItem?.preferredForwardBufferDuration = 0
+            player.automaticallyWaitsToMinimizeStalling = false
+        } else {
+            player.currentItem?.preferredForwardBufferDuration = 1.0
+            player.automaticallyWaitsToMinimizeStalling = false
+        }
         slots[idx] = PlayerSlotContext(
             player: player, item: managed.item,
             resourceLoaderDelegate: managed.resourceLoaderDelegate,

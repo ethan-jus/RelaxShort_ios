@@ -156,6 +156,15 @@ struct PlayerCoordinatorTests {
     }
 
     @Test
+    func currentPlaybackDoesNotWaitForLargeBufferBeforeStarting() {
+        let coordinator = PlayerCoordinator()
+        coordinator.claimForYou(items: [mediaItem(id: "series-quick-1")], index: 0)
+
+        #expect(coordinator.engine.currentPlayer?.automaticallyWaitsToMinimizeStalling == false)
+        #expect(coordinator.engine.currentPlayer?.currentItem?.preferredForwardBufferDuration == 0)
+    }
+
+    @Test
     func seriesKeepsCurrentPlayerWhenSameEpisodeReceivesOfficialAsset() {
         let coordinator = PlayerCoordinator()
         let drama = DramaItem(

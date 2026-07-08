@@ -95,7 +95,6 @@ struct SeriesPlayerView: View {
                 // 全屏手势层（视频上面，UI 下面 — 点击切换 UI 显隐）
                 Color.clear
                     .contentShape(Rectangle())
-                    .gesture(episodeDragGesture)
                     .simultaneousGesture(longPressGesture)
                     .simultaneousGesture(tapPauseGesture(in: geo))
                     .simultaneousGesture(edgeBackGesture(in: geo))
@@ -151,6 +150,10 @@ struct SeriesPlayerView: View {
                 }
 
             }
+            .contentShape(Rectangle())
+            // 上下切集挂在页面根层，避免底部信息区、右侧按钮或中心按钮吃掉拖拽事件。
+            // 具体冲突保护在 episodeDragGesture 内处理。
+            .simultaneousGesture(episodeDragGesture)
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
@@ -906,12 +909,17 @@ struct SeriesPlayerView: View {
     private var episodeDragGesture: some Gesture {
         DragGesture(minimumDistance: 10)
             .onChanged { value in
+                guard canHandleEpisodeDrag(value) else { return }
                 let t = value.translation.height
                 if currentEpisode == 1 && t > 0 { dragOffset = t * 0.4 }
                 else if currentEpisode == totalEpisodes && t < 0 { dragOffset = t * 0.4 }
                 else { dragOffset = t }
             }
             .onEnded { value in
+                guard canHandleEpisodeDrag(value) else {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { dragOffset = 0 }
+                    return
+                }
                 let velocity = value.predictedEndTranslation.height - value.translation.height
                 let oldEpisode = currentEpisode
                 var targetEpisode = oldEpisode
@@ -925,6 +933,15 @@ struct SeriesPlayerView: View {
                     requestEpisodeSwitch(targetEpisode)
                 }
             }
+    }
+
+    /// Series 全屏切集必须像 For You 一样从页面大部分区域可触发，
+    /// 但要避开左边缘返回、进度条拖动、弹层和明显横滑。
+    private func canHandleEpisodeDrag(_ value: DragGesture.Value) -> Bool {
+        guard !seriesIsScrubbing, !showEpisodeList, activeSheet == nil else { return false }
+        guard value.startLocation.x > 24 else { return false }
+        guard abs(value.translation.height) > abs(value.translation.width) * 1.2 else { return false }
+        return true
     }
 
     private var longPressGesture: some Gesture {

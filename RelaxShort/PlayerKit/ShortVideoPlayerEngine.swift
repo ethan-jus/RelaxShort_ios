@@ -102,7 +102,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
             case .success(let player):
                 self.log("prepare: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
-                self.schedulePreloadAdjacent(gen: gen, delayMs: 700)
                 self.logTTFF()
             case .failure(let err):
                 self.log("prepare: 失败 err=\(err.localizedDescription)")
@@ -140,7 +139,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
             case .success(let player):
                 self.log("move: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
-                self.schedulePreloadAdjacent(gen: gen, delayMs: 450)
                 self.logTTFF()
                 // 预加载升 current 超时检测：800ms 未 ready 则重建
                 self.startReadinessTimeout(gen: gen, index: index)
@@ -414,8 +412,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
         startObserving()
         recoveryController.attachObservers(to: player)
 
-        // 设置播放策略：短剧优先快速出画，卡顿恢复由状态机兜底
-        player.currentItem?.preferredForwardBufferDuration = 1.5
+        // 设置播放策略：短剧优先快速出画，卡顿恢复由状态机兜底。
+        // 不等待大缓冲，避免用户点击后长时间停留在封面。
+        player.currentItem?.preferredForwardBufferDuration = 0
         player.automaticallyWaitsToMinimizeStalling = false
 
         // 自动加载字幕（按 source 类型）
@@ -644,7 +643,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     /// HLS 不走自研 Range 缓存，先用 AVFoundation 异步预热 master/媒体选择信息
     private func startHLSWarmIfNeeded(for item: PlayerMediaItem, reason: String) {
-        guard let url = PlayerItemFactory.hlsURL(from: item.source) else { return }
+        guard case .hls(let url) = item.source else { return }
         let task = Task(priority: .utility) { [weak self] in
             let asset = AVURLAsset(url: url)
             let playable = (try? await asset.load(.isPlayable)) == true
@@ -715,6 +714,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                     self.hasVisiblePlaybackStarted = true
                     self.diagnostics.stateText = "visible-playback"
                     self.log("visiblePlayback: started at \(String(format: "%.2f", time.seconds))s")
+                    self.schedulePreloadAdjacent(gen: self.generation, delayMs: 100)
                 }
             }
         }
