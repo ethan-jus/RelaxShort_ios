@@ -155,6 +155,51 @@ struct PlayerCoordinatorTests {
         #expect(coordinator.engine.wantsPlayback == true)
     }
 
+    @Test
+    func seriesKeepsCurrentPlayerWhenSameEpisodeReceivesOfficialAsset() {
+        let coordinator = PlayerCoordinator()
+        let drama = DramaItem(
+            id: "series-3",
+            title: "Series 3",
+            coverURL: "https://example.com/cover.jpg",
+            videoURL: "https://example.com/preview.mp4",
+            category: "Drama",
+            tags: [],
+            viewCount: 1,
+            episodeCount: 1,
+            currentEpisode: 1,
+            synopsis: "",
+            isHot: false,
+            isTrending: false,
+            rating: 0
+        )
+        let preview = PlayerMediaItem(
+            id: "series-3-1",
+            title: "Series 3",
+            episodeNumber: 1,
+            coverURL: "",
+            source: .mp4(URL(string: "https://example.com/preview.mp4")!),
+            resumeTime: nil
+        )
+        let official = PlayerMediaItem(
+            id: "series-3-1",
+            title: "Series 3",
+            episodeNumber: 1,
+            coverURL: "",
+            source: .hlsWithFallback(
+                masterURL: URL(string: "https://example.com/master.m3u8")!,
+                fallbackMP4URL: URL(string: "https://example.com/official.mp4")!
+            ),
+            resumeTime: nil
+        )
+
+        coordinator.claimSeries(drama: drama, items: [preview], startIndex: 0, handoff: nil)
+        coordinator.claimSeries(drama: drama, items: [official], startIndex: 0, handoff: nil)
+
+        #expect(coordinator.engine.currentItem?.source == preview.source)
+        #expect(coordinator.engine.wantsPlayback == true)
+    }
+
     private func mediaItem(id: String) -> PlayerMediaItem {
         PlayerMediaItem(
             id: id,

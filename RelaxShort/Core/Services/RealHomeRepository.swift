@@ -236,7 +236,8 @@ enum FeedCardDTOMapper {
             return nil
         }()
 
-        let resolvedVideoURL = card.playAsset?.hlsMasterUrl ?? card.playAsset?.mp4FallbackUrl
+        // 首页点击后的首播体验优先选择 MP4 fallback：省去 HLS master/segment 探测，首帧更快。
+        let resolvedVideoURL = card.playAsset?.mp4FallbackUrl ?? card.playAsset?.hlsMasterUrl
 
         var item = DramaItem(
             id: String(card.seriesId),

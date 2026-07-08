@@ -127,11 +127,11 @@ final class PlayerCoordinator: ObservableObject {
         }
         let targetItemID = items[safe: startIndex]?.id ?? ""
         let targetItem = items[safe: startIndex]
-        let currentMatches = engine.currentItem == targetItem
+        let currentMediaIDMatches = engine.currentItem?.id == targetItemID
         let token = claimGeneration
 
-        if currentMatches, engine.currentPlayer != nil, engine.state != .preparing {
-            Logger.player.debug("Series reuses current media item")
+        if currentMediaIDMatches, engine.currentPlayer != nil {
+            Logger.player.debug("Series keeps current media item for same episode")
             engine.play(); return
         }
 

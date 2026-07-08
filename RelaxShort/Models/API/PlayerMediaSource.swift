@@ -39,10 +39,11 @@ struct PlaybackMediaSourceDTO {
         self.resumeTime = resumeTime
     }
 
-    /// 兼容现有 `VideoPlayerView` 的推荐播放地址：HLS > MP4 fallback > 首个清晰度
+    /// 兼容现有 `VideoPlayerView` 的推荐播放地址：MP4 fallback > HLS > 首个清晰度。
+    /// 短剧首播以出画速度优先，MP4 通常比 HLS 少一次 playlist/segment 探测。
     var preferredPlaybackURL: String? {
-        if let hls = masterUrl, !hls.isEmpty { return hls }
         if let mp4 = fallbackMp4Url, !mp4.isEmpty { return mp4 }
+        if let hls = masterUrl, !hls.isEmpty { return hls }
         return qualities.first?.url
     }
 

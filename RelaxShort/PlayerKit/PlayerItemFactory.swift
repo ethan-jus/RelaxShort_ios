@@ -63,8 +63,10 @@ enum PlayerItemFactory {
             url = videoURL
         case .hls(let masterURL):
             url = masterURL
-        case .hlsWithFallback(let masterURL, _):
-            url = masterURL
+        case .hlsWithFallback(_, let fallbackMP4URL):
+            // 当前播放链路优先 MP4 fallback，HLS 作为可恢复路径保留在 source 中。
+            // 这样可以少一次 HLS master/segment 探测，提升短剧首帧速度。
+            url = fallbackMP4URL
         }
         return PlayerManagedItem(item: AVPlayerItem(url: url), resourceLoaderDelegate: nil)
     }

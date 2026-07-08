@@ -654,8 +654,8 @@ struct SeriesPlayerView: View {
             return url
         case .hls(let url):
             return url
-        case .hlsWithFallback(let masterURL, _):
-            return masterURL
+        case .hlsWithFallback(_, let fallbackMP4URL):
+            return fallbackMP4URL
         }
     }
 
@@ -693,9 +693,6 @@ struct SeriesPlayerView: View {
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
             // 解锁流程尚未正式设计，当前版本不展示半成品弹窗；后续由专门任务接入正式解锁页。
-            if presentUnlockOnDenied {
-                playerCoordinator.engine.pause(reason: .system)
-            }
             Logger.viewModel.info("SeriesPlayerView: EP\(episodeNumber) denied by playback entitlement, unlock UI deferred")
             return false
         } catch {
