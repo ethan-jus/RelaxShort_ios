@@ -54,6 +54,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var readinessTimeoutTask: Task<Void, Never>?
     // 单个媒体只做一次直连降级，避免坏缓存和坏网络之间反复重建
     private var directFallbackMediaIDs = Set<String>()
+    /// 后台预热只缓存较小首段，避免弱网下与当前视频首帧抢带宽。
+    private let preloadLeadBytes: Int64 = 262_144
 
     init() {
         recoveryController.engine = self
@@ -100,7 +102,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
             case .success(let player):
                 self.log("prepare: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
-                self.preloadAdjacent(gen: gen)
+                self.schedulePreloadAdjacent(gen: gen, delayMs: 700)
                 self.logTTFF()
             case .failure(let err):
                 self.log("prepare: 失败 err=\(err.localizedDescription)")
@@ -138,7 +140,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
             case .success(let player):
                 self.log("move: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
-                self.preloadAdjacent(gen: gen)
+                self.schedulePreloadAdjacent(gen: gen, delayMs: 450)
                 self.logTTFF()
                 // 预加载升 current 超时检测：800ms 未 ready 则重建
                 self.startReadinessTimeout(gen: gen, index: index)
@@ -496,7 +498,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 }
             }
             preloadTasks.append(task)
-            startWarmCache(for: items[nextIdx], byteCount: 1_048_576, reason: "next")
+            startWarmCache(for: items[nextIdx], byteCount: preloadLeadBytes, reason: "next")
             startHLSWarmIfNeeded(for: items[nextIdx], reason: "next")
             // Task36B-1: 轻量预热 next+1 的 metadata，不创建 AVPlayer
             warmUpcomingItem(at: nextIdx + 1, gen: gen)
@@ -526,7 +528,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         guard index >= 0, index < items.count else { return }
         let item = items[index]
         log("preload: warm metadata idx=\(index) id=\(item.id)")
-        startWarmCache(for: item, byteCount: 1_048_576, reason: "upcoming:\(index)")
+        startWarmCache(for: item, byteCount: preloadLeadBytes, reason: "upcoming:\(index)")
         startHLSWarmIfNeeded(for: item, reason: "upcoming:\(index)")
         // 对于 mp4 直链，额外触发 URLSession 临时连接以避免冷 DNS
         if PlayerItemFactory.mp4URL(from: item.source) != nil {
@@ -543,6 +545,17 @@ final class ShortVideoPlayerEngine: ObservableObject {
             }
             preloadTasks.append(task)
         }
+    }
+
+    /// 延后启动预加载，先把当前视频的首帧和播放请求让出去。
+    /// DramaBox 类短剧体验的核心是“当前点击优先”：封面兜底 + 立即 play + 首帧后再轻量预热下一条。
+    private func schedulePreloadAdjacent(gen: Int, delayMs: UInt64) {
+        let task = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delayMs * 1_000_000)
+            guard let self, !Task.isCancelled, self.generation == gen else { return }
+            self.preloadAdjacent(gen: gen)
+        }
+        preloadTasks.append(task)
     }
 
     private func resetReadyState() {

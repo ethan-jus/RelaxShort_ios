@@ -138,6 +138,9 @@ final class PlayerCoordinator: ObservableObject {
         Logger.player.debug("Series prepares a new media item")
         engine.deactivate()
         engine.prepare(items: items, index: startIndex)
+        // Series 进入播放页必须立即产生播放意图，不能因为等待 resume/seek 而表现为默认暂停。
+        // 如果需要续播，后续在 item ready 后再 seek；首屏体验优先保证快速开始播放。
+        engine.play()
 
         // 确定 resume time：handoff 优先，否则使用后端 resumeTime
         let resolvedResume: TimeInterval?
@@ -149,9 +152,7 @@ final class PlayerCoordinator: ObservableObject {
             resolvedResume = nil
         }
 
-        guard let resumeTime = resolvedResume, resumeTime > 0 else {
-            engine.play(); return
-        }
+        guard let resumeTime = resolvedResume, resumeTime > 0 else { return }
 
         let targetID = targetItemID
         let eng = engine

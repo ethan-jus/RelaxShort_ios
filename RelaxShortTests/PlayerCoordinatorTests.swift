@@ -124,6 +124,37 @@ struct PlayerCoordinatorTests {
         #expect(engine.isReadyForDisplay == false)
     }
 
+    @Test
+    func seriesWithResumeTimeStillStartsPlaybackImmediately() {
+        let coordinator = PlayerCoordinator()
+        let drama = DramaItem(
+            id: "series-2",
+            title: "Series 2",
+            coverURL: "https://example.com/cover.jpg",
+            videoURL: "https://example.com/video.mp4",
+            category: "Drama",
+            tags: [],
+            viewCount: 1,
+            episodeCount: 1,
+            currentEpisode: 1,
+            synopsis: "",
+            isHot: false,
+            isTrending: false,
+            rating: 0
+        )
+
+        coordinator.claimSeries(
+            drama: drama,
+            items: [mediaItem(id: "series-2-1")],
+            startIndex: 0,
+            handoff: nil,
+            backendResumeTime: 12
+        )
+
+        #expect(coordinator.owner == .series(dramaID: "series-2"))
+        #expect(coordinator.engine.wantsPlayback == true)
+    }
+
     private func mediaItem(id: String) -> PlayerMediaItem {
         PlayerMediaItem(
             id: id,
