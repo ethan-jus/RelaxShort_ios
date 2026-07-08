@@ -45,8 +45,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var ttffStart: Double = 0
     // move TTFF 计时
     private var moveTTFFStart: Double = 0
-    // cache warm task
-    private var warmCacheTask: Task<Void, Never>?
+    // cache warm tasks：按 URL 维度并发预热，避免 next+1 预热取消 next 的首段缓存
+    private var warmCacheTasks: [String: Task<Void, Never>] = [:]
     // item status KVO
     private var itemStatusObs: NSKeyValueObservation?
     // 预加载升 current 的超时检测
@@ -529,6 +529,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 _ = try? await URLSession.shared.data(for: req)
                 guard !Task.isCancelled else { return }
                 await MainActor.run {
+                    guard self?.generation == gen else { return }
                     self?.diagnostics.preloadState = "warm:metadata:ready idx=\(index)"
                 }
             }
@@ -575,8 +576,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
             diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url)
             return
         }
-        warmCacheTask?.cancel()
-        warmCacheTask = Task(priority: .background) { [weak self] in
+        let taskKey = url.absoluteString
+        warmCacheTasks[taskKey]?.cancel()
+        let task = Task(priority: .background) { [weak self] in
             var req = URLRequest(url: url)
             let requestedRange: ClosedRange<Int64> = 0...(byteCount - 1)
             req.setValue("bytes=\(requestedRange.lowerBound)-\(requestedRange.upperBound)", forHTTPHeaderField: "Range")
@@ -615,6 +617,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 self?.log("warmCache skipped reason=\(reason) status=\(httpResp?.statusCode ?? 0)")
             }
         }
+        warmCacheTasks[taskKey] = task
     }
 
     /// HLS 不走自研 Range 缓存，先用 AVFoundation 异步预热 master/媒体选择信息
@@ -636,7 +639,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     private func cancelAllPreloadTasks() {
         readinessTimeoutTask?.cancel(); readinessTimeoutTask = nil
-        warmCacheTask?.cancel(); warmCacheTask = nil
+        for task in warmCacheTasks.values { task.cancel() }
+        warmCacheTasks.removeAll()
         for task in preloadTasks { task.cancel() }
         preloadTasks.removeAll()
     }
