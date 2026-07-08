@@ -101,6 +101,7 @@ struct SeriesPlayerView: View {
                     .gesture(episodeDragGesture)
                     .simultaneousGesture(longPressGesture)
                     .simultaneousGesture(tapPauseGesture(in: geo))
+                    .simultaneousGesture(edgeBackGesture(in: geo))
 
                 // UI 叠层（可隐藏）
                 if isUIVisible, !showSpeedHUD {
@@ -1016,6 +1017,21 @@ struct SeriesPlayerView: View {
                 if isUIVisible, playerCoordinator.engine.state == .playing {
                     resetAutoHide()
                 }
+            }
+    }
+
+    /// Task36B-1: 屏幕左边缘右滑返回上一页。
+    /// 限制起点 x ≤ 24 避免与上下切集手势冲突；要求横向位移 > 80 且横向明显大于纵向，
+    /// 防止垂直翻页被误判为返回。
+    private func edgeBackGesture(in geo: GeometryProxy) -> some Gesture {
+        DragGesture(minimumDistance: 4)
+            .onEnded { value in
+                // 只在左边缘触发（起点 x ≤ 24pt），避免全屏滑动干扰上下切集
+                guard value.startLocation.x <= 24 else { return }
+                // 水平位移足够且主导（横向 > 80pt，横向 > 纵向 × 1.5）
+                guard value.translation.width > 80,
+                      abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
+                dismiss()
             }
     }
 

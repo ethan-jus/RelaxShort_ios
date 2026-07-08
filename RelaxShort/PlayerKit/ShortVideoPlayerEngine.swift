@@ -475,22 +475,62 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private func preloadAdjacent(gen: Int) {
         let nextIdx = currentIndex + 1
         if nextIdx < items.count {
-        log("preload: start next=\(nextIdx)")
+            log("preload: start next=\(nextIdx)")
             let task = Task { [weak self] in
                 guard let self else { return }
-                self.slotPool.prepare(item: self.items[nextIdx], slot: .next, generation: gen) { _ in }
+                self.slotPool.prepare(item: self.items[nextIdx], slot: .next, generation: gen) { result in
+                    let item = self.items[nextIdx]
+                    if case .success = result {
+                        Task { @MainActor in self.diagnostics.preloadState = "hit:next:\(item.id)" }
+                    } else {
+                        Task { @MainActor in self.diagnostics.preloadState = "miss:next:\(item.id)" }
+                    }
+                }
             }
             preloadTasks.append(task)
-            diagnostics.preloadState = "next:\(items[nextIdx].id)"
             startWarmCache(for: items[nextIdx], byteCount: 1_048_576, reason: "next")
             startHLSWarmIfNeeded(for: items[nextIdx], reason: "next")
+            // Task36B-1: 轻量预热 next+1 的 metadata，不创建 AVPlayer
+            warmUpcomingItem(at: nextIdx + 1, gen: gen)
         }
         let prevIdx = currentIndex - 1
         if prevIdx >= 0 {
             log("preload: start prev=\(prevIdx)")
             let task = Task { [weak self] in
                 guard let self else { return }
-                self.slotPool.prepare(item: self.items[prevIdx], slot: .previous, generation: gen) { _ in }
+                self.slotPool.prepare(item: self.items[prevIdx], slot: .previous, generation: gen) { result in
+                    let item = self.items[prevIdx]
+                    if case .success = result {
+                        Task { @MainActor in self.diagnostics.preloadState = "hit:prev:\(item.id)" }
+                    } else {
+                        Task { @MainActor in self.diagnostics.preloadState = "miss:prev:\(item.id)" }
+                    }
+                }
+            }
+            preloadTasks.append(task)
+        }
+    }
+
+    /// Task36B-1: 轻量预热 upcoming 条目（next+1 及之后）。
+    /// 只做 URL 层 warm（mp4 Range 请求首段或 HLS metadata），不分配 AVPlayer 槽位。
+    /// 适用于 For You 连续快速下滑场景：下次 move 到该索引时大概率已命中缓存。
+    func warmUpcomingItem(at index: Int, gen: Int) {
+        guard index >= 0, index < items.count else { return }
+        let item = items[index]
+        log("preload: warm metadata idx=\(index) id=\(item.id)")
+        startWarmCache(for: item, byteCount: 1_048_576, reason: "upcoming:\(index)")
+        startHLSWarmIfNeeded(for: item, reason: "upcoming:\(index)")
+        // 对于 mp4 直链，额外触发 URLSession 临时连接以避免冷 DNS
+        if PlayerItemFactory.mp4URL(from: item.source) != nil {
+            let task = Task(priority: .background) { [weak self] in
+                guard let mp4 = PlayerItemFactory.mp4URL(from: item.source) else { return }
+                var req = URLRequest(url: mp4)
+                req.httpMethod = "HEAD"
+                _ = try? await URLSession.shared.data(for: req)
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self?.diagnostics.preloadState = "warm:metadata:ready idx=\(index)"
+                }
             }
             preloadTasks.append(task)
         }
