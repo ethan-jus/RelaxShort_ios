@@ -246,6 +246,8 @@ struct SeriesPlayerView: View {
     private func startPlaybackSession() async {
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "open"
+        var trace = PlaybackDiagnosticsTrace(scene: "series", seriesID: drama.id, episodeNumber: currentEpisode)
+        playerCoordinator.engine.startPlaybackTrace(trace)
         Logger.player.info("SeriesTrace 打开播放页开始 剧ID=\(drama.id) 起始集=\(currentEpisode) 来源=\(sourceScene)")
         playerCoordinator.beginSeries(dramaID: drama.id)
         playerCoordinator.setSeriesPlaybackFinishedHandler(dramaID: drama.id) {
@@ -262,6 +264,7 @@ struct SeriesPlayerView: View {
         // 卡片已携带预览媒资时立即播放点击的短剧，正式剧集/鉴权接口并行补全。
         if let previewItem = drama.toPlayerMediaItem() {
             Logger.player.info("SeriesTrace 使用卡片预览源先播 剧ID=\(drama.id) 集数=\(previewItem.episodeNumber ?? -1)")
+            playerCoordinator.engine.markTrace("卡片预览源")
             playerCoordinator.claimSeries(
                 drama: drama,
                 items: [previewItem],
@@ -296,6 +299,7 @@ struct SeriesPlayerView: View {
             episodes = try await repo.fetchEpisodes(dramaId: drama.id)
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.info("SeriesTrace 剧集列表加载完成 剧ID=\(drama.id) 数量=\(episodes.count) 耗时=\(Int(elapsed))ms")
+            playerCoordinator.engine.markTrace("剧集列表")
         } catch is CancellationError {
             return
         } catch {
@@ -321,6 +325,7 @@ struct SeriesPlayerView: View {
         }
         _ = await ensurePlayAsset(for: currentEpisode, presentUnlockOnDenied: true)
         guard !Task.isCancelled else { return }
+        playerCoordinator.engine.markTrace("播放源")
         initializeEpisodePlayer()
     }
 
@@ -727,6 +732,7 @@ struct SeriesPlayerView: View {
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
             // 解锁流程尚未正式设计，当前版本不展示半成品弹窗；后续由专门任务接入正式解锁页。
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+            playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
             Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 解锁UI暂未接入")
             return false
         } catch {

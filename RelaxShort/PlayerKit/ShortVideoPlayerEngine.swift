@@ -56,6 +56,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var directFallbackMediaIDs = Set<String>()
     /// 后台预热只缓存较小首段，避免弱网下与当前视频首帧抢带宽。
     private let preloadLeadBytes: Int64 = 262_144
+    /// Task36B-2: 当前会话播放诊断追踪
+    private var playbackTrace: PlaybackDiagnosticsTrace?
+    /// 记录当前 prepare/move 对应的 index，供首帧和 Move 区分
+    private var traceCurrentIndex: Int = -1
 
     init() {
         recoveryController.engine = self
@@ -64,6 +68,21 @@ final class ShortVideoPlayerEngine: ObservableObject {
     }
 
     // MARK: - 公开 API
+
+    /// Task36B-2: 开始播放诊断追踪（由 RecommendSession 或 SeriesPlayerView 调用）
+    func startPlaybackTrace(_ trace: PlaybackDiagnosticsTrace) {
+        playbackTrace = trace
+        traceCurrentIndex = trace.targetIndex ?? currentIndex
+    }
+    /// 在诊断追踪中记录一个阶段
+    func markTrace(_ name: String) {
+        playbackTrace?.mark(name)
+    }
+    /// 完成诊断追踪并输出汇总日志
+    func finishTrace() {
+        playbackTrace?.summary()
+        playbackTrace = nil
+    }
 
     /// Task36A: 追加新播放条目到现有列表末尾，不中断当前播放。
     /// 用于分页加载后同步播放器内部 items，确保后续 move(to:) 能索引到新条目。
@@ -91,6 +110,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         ttffStart = CACurrentMediaTime()
 
         log("prepare: idx=\(index) id=\(items[index].id) gen=\(gen) url=\(String(describing: items[index].source))")
+        markTrace("AVPlayer准备")
 
         slotPool.prepare(item: items[index], slot: .current, generation: gen) { [weak self] result in
             guard let self, self.generation == gen else {
@@ -102,6 +122,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
             case .success(let player):
                 self.log("prepare: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
+                self.markTrace("attach播放器")
                 self.logTTFF()
             case .failure(let err):
                 self.log("prepare: 失败 err=\(err.localizedDescription)")
@@ -128,6 +149,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
         log("move: \(oldIndex)→\(index) gen=\(gen)")
         moveTTFFStart = CACurrentMediaTime()
+        markTrace("AVPlayer准备")
 
         slotPool.move(from: oldIndex, to: index, items: items, generation: gen) { [weak self] result in
             guard let self, self.generation == gen else {
@@ -139,6 +161,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
             case .success(let player):
                 self.log("move: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
+                self.markTrace("attach播放器")
                 self.logTTFF()
                 // 预加载升 current 超时检测：800ms 未 ready 则重建
                 self.startReadinessTimeout(gen: gen, index: index)
@@ -281,6 +304,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
         guard !isReadyForDisplay else { return }
         isReadyForDisplay = true
         diagnostics.stateText = "first-frame"
+        markTrace("首帧可见")
+        finishTrace()
+        /// DEBUG-only: 首帧后异步检查媒体 URL 响应质量，帮助诊断 CDN/源站性能
+        if let url = currentPlayer?.currentItem?.asset as? AVURLAsset {
+            MediaURLProbe.probe(url.url, label: "当前播放")
+        }
         if moveTTFFStart > 0 {
             let ms = (CACurrentMediaTime() - moveTTFFStart) * 1000
             diagnostics.moveTTFFMs = ms
@@ -770,5 +799,132 @@ final class ShortVideoPlayerEngine: ObservableObject {
         case .playing: return "playing"
         @unknown default: return "unknown"
         }
+    }
+}
+
+// MARK: - 播放诊断追踪模型
+
+/// 记录一次播放启动链路的阶段耗时，供 For You 和 Series 复用。
+/// DEBUG 下输出中文日志；Release 下只记录不输出大规模日志。
+public struct PlaybackDiagnosticsTrace {
+    let traceID: String
+    let scene: String
+    let seriesID: String?
+    let episodeNumber: Int?
+    let targetIndex: Int?
+    let startedAt: CFTimeInterval
+    var marks: [PlaybackDiagnosticsMark] = []
+
+    public init(scene: String, seriesID: String? = nil, episodeNumber: Int? = nil,
+                targetIndex: Int? = nil) {
+        self.traceID = Self.shortID()
+        self.scene = scene
+        self.seriesID = seriesID
+        self.episodeNumber = episodeNumber
+        self.targetIndex = targetIndex
+        self.startedAt = CACurrentMediaTime()
+    }
+
+    /// 记录一个阶段结束
+    mutating func mark(_ name: String) {
+        let elapsed = Int((CACurrentMediaTime() - startedAt) * 1000)
+        marks.append(PlaybackDiagnosticsMark(name: name, elapsedMs: elapsed))
+        #if DEBUG
+        let episodeLabel = episodeNumber.map { " 集=\($0)" } ?? ""
+        let seriesLabel = seriesID.map { " 剧=\($0.prefix(12))" } ?? ""
+        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(seriesLabel)\(episodeLabel) 阶段=\(name) 耗时=\(elapsed)ms")
+        #endif
+    }
+
+    /// 输出汇总日志
+    func summary() {
+        #if DEBUG
+        let episodeLabel = episodeNumber.map { " 集=\($0)" } ?? ""
+        let seriesLabel = seriesID.map { " 剧=\($0.prefix(12))" } ?? ""
+        let segments = marks.map { "\($0.name):\($0.elapsedMs)" }.joined(separator: ", ")
+        let total = marks.last?.elapsedMs ?? 0
+        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(seriesLabel)\(episodeLabel) 首帧总耗时=\(total)ms 分段=\(segments)")
+        #endif
+    }
+
+    /// 生成短追踪 ID
+    private static func shortID() -> String {
+        let bytes = (0..<4).map { _ in UInt8.random(in: 0...255) }
+        return bytes.map { String(format: "%02x", $0) }.joined()
+    }
+}
+
+/// 单个阶段标记
+public struct PlaybackDiagnosticsMark: Equatable {
+    let name: String
+    let elapsedMs: Int
+}
+
+// MARK: - 媒体 URL 轻量检查工具
+
+/// DEBUG-only：对播放 URL 做轻量 HEAD + 小 Range 检查，不下载完整视频。
+public enum MediaURLProbe {
+    public static func probe(_ url: URL, label: String = "播放源") {
+        #if DEBUG
+        Task(priority: .background) {
+            let short = sanitizedURL(url)
+            var report = "[媒资检查]"
+
+            var headStatus = "?"
+            var headMs = 0
+            var supportsRange = false
+            var contentLength: Int64 = 0
+            do {
+                var headReq = URLRequest(url: url)
+                headReq.httpMethod = "HEAD"
+                headReq.timeoutInterval = 10
+                let t0 = CACurrentMediaTime()
+                let (_, headResp) = try await URLSession.shared.data(for: headReq)
+                headMs = Int((CACurrentMediaTime() - t0) * 1000)
+                let httpResp = headResp as? HTTPURLResponse
+                headStatus = "\(httpResp?.statusCode ?? 0)"
+                supportsRange = (httpResp?.value(forHTTPHeaderField: "Accept-Ranges") ?? "").lowercased() == "bytes"
+                if let cl = httpResp?.value(forHTTPHeaderField: "Content-Length") {
+                    contentLength = Int64(cl) ?? 0
+                }
+            } catch {
+                headStatus = "失败"
+            }
+            report += " URL=\(short) HEAD状态=\(headStatus) HEAD耗时=\(headMs)ms 支持Range=\(supportsRange) 长度=\(contentLength)"
+
+            var rangeStatus = "?"
+            var rangeMs = 0
+            var rangeBytes = 0
+            if supportsRange || contentLength > 0 {
+                do {
+                    var rangeReq = URLRequest(url: url)
+                    rangeReq.setValue("bytes=0-262143", forHTTPHeaderField: "Range")
+                    rangeReq.timeoutInterval = 10
+                    let t0 = CACurrentMediaTime()
+                    let (data, rangeResp) = try await URLSession.shared.data(for: rangeReq)
+                    rangeMs = Int((CACurrentMediaTime() - t0) * 1000)
+                    rangeBytes = data.count
+                    let httpResp = rangeResp as? HTTPURLResponse
+                    rangeStatus = "\(httpResp?.statusCode ?? 0)"
+                    if httpResp?.statusCode == 200, data.count > 262144 {
+                        report += " 警告=源站忽略Range返回全文件"
+                    }
+                } catch {
+                    rangeStatus = "失败"
+                }
+            } else {
+                rangeStatus = "跳过(HEAD未通过)"
+            }
+            report += " Range状态=\(rangeStatus) Range耗时=\(rangeMs)ms 字节=\(rangeBytes)"
+            print(report)
+        }
+        #endif
+    }
+
+    private static func sanitizedURL(_ url: URL) -> String {
+        guard let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = comps.host else { return url.absoluteString }
+        let path = comps.path.split(separator: "/").last.map(String.init) ?? comps.path
+        return "\(host)/\(path)"
     }
 }

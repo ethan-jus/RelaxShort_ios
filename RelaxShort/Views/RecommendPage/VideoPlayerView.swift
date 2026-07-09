@@ -79,6 +79,8 @@ import Combine
         playableItems = items
         dramaToPlayable = d2p
         let playerItems = items.map(\.item)
+        // Task36B-2: 开始 For You 播放诊断追踪
+        engine.startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you", targetIndex: 0))
         if let coordinator {
             coordinator.claimForYou(items: playerItems, index: 0)
         } else {
