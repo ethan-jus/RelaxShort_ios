@@ -199,7 +199,7 @@ struct SeriesPlayerView: View {
         .onReceive(playerCoordinator.engine.$hasVisiblePlaybackStarted) { started in
             guard started else { return }
             let elapsed = (CACurrentMediaTime() - playbackTraceStartedAt) * 1000
-            Logger.player.info("SeriesTrace visiblePlayback reason=\(playbackTraceReason) ep=\(currentEpisode) totalMs=\(Int(elapsed))")
+            Logger.player.info("SeriesTrace 首帧可见 原因=\(playbackTraceReason) 当前集=\(currentEpisode) 总耗时=\(Int(elapsed))ms")
         }
         .onReceive(playerCoordinator.engine.$progress) { progress in
             playbackProgress = progress
@@ -246,7 +246,7 @@ struct SeriesPlayerView: View {
     private func startPlaybackSession() async {
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "open"
-        Logger.player.info("SeriesTrace open start series=\(drama.id) startEP=\(currentEpisode) source=\(sourceScene)")
+        Logger.player.info("SeriesTrace 打开播放页开始 剧ID=\(drama.id) 起始集=\(currentEpisode) 来源=\(sourceScene)")
         playerCoordinator.beginSeries(dramaID: drama.id)
         playerCoordinator.setSeriesPlaybackFinishedHandler(dramaID: drama.id) {
             handlePlaybackFinished()
@@ -261,7 +261,7 @@ struct SeriesPlayerView: View {
 
         // 卡片已携带预览媒资时立即播放点击的短剧，正式剧集/鉴权接口并行补全。
         if let previewItem = drama.toPlayerMediaItem() {
-            Logger.player.info("SeriesTrace preview claim series=\(drama.id) ep=\(previewItem.episodeNumber ?? -1)")
+            Logger.player.info("SeriesTrace 使用卡片预览源先播 剧ID=\(drama.id) 集数=\(previewItem.episodeNumber ?? -1)")
             playerCoordinator.claimSeries(
                 drama: drama,
                 items: [previewItem],
@@ -295,7 +295,7 @@ struct SeriesPlayerView: View {
         do {
             episodes = try await repo.fetchEpisodes(dramaId: drama.id)
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            Logger.player.info("SeriesTrace episodes loaded series=\(drama.id) count=\(episodes.count) ms=\(Int(elapsed))")
+            Logger.player.info("SeriesTrace 剧集列表加载完成 剧ID=\(drama.id) 数量=\(episodes.count) 耗时=\(Int(elapsed))ms")
         } catch is CancellationError {
             return
         } catch {
@@ -616,7 +616,7 @@ struct SeriesPlayerView: View {
         let previous = currentEpisode
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "switch"
-        Logger.player.info("SeriesGesture accepted fromEP=\(previous) toEP=\(target)")
+        Logger.player.info("SeriesGesture 接受切集手势 原集=\(previous) 目标集=\(target)")
 
         // 先切 UI 页码，保证手势像 For You 一样停在目标页；播放源随后异步补齐。
         playerCoordinator.engine.deactivate()
@@ -637,20 +637,20 @@ struct SeriesPlayerView: View {
             // 先 finalize 旧 session
             await dependencies.watchProgressReporter.finalize(completed: false)
             guard await ensurePlayAsset(for: episodeNumber, presentUnlockOnDenied: true) else {
-                Logger.player.warning("SeriesTrace switch blocked targetEP=\(episodeNumber) previousEP=\(previousEpisode ?? -1) reason=missing-or-locked-play-asset")
+                Logger.player.warning("SeriesTrace 切集被阻断 目标集=\(episodeNumber) 原集=\(previousEpisode ?? -1) 原因=播放源缺失或剧集锁定")
                 return
             }
             let playable = buildPlayableItems(from: episodes)
             guard let playableIndex = playable.firstIndex(where: { $0.episodeNumber == episodeNumber }) else {
-                Logger.player.warning("SeriesTrace switch failed targetEP=\(episodeNumber) reason=no-playable-index")
+                Logger.player.warning("SeriesTrace 切集失败 目标集=\(episodeNumber) 原因=没有可播放索引")
                 return
             }
             if currentEpisode != episodeNumber { currentEpisode = episodeNumber }
-            Logger.player.info("SeriesTrace switch prepare targetEP=\(episodeNumber) playableIndex=\(playableIndex)")
+            Logger.player.info("SeriesTrace 切集准备播放器 目标集=\(episodeNumber) 播放索引=\(playableIndex)")
             playerCoordinator.engine.prepare(items: playable.map(\.item), index: playableIndex)
             playerCoordinator.engine.play()
             prefetchNextEpisode(after: episodeNumber)
-            Logger.player.info("SeriesTrace switch play-called targetEP=\(episodeNumber)")
+            Logger.player.info("SeriesTrace 切集已调用播放 目标集=\(episodeNumber)")
         }
     }
 
@@ -692,19 +692,19 @@ struct SeriesPlayerView: View {
         let episodeId = ep.id
 
         if episodeMediaSources[episodeId] != nil {
-            Logger.player.info("SeriesTrace playAsset cache-hit ep=\(episodeNumber)")
+            Logger.player.info("SeriesTrace 播放源命中内存缓存 集数=\(episodeNumber)")
             return true
         }
 
         if let url = URL(string: ep.videoURL),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             episodeMediaSources[episodeId] = .mp4(url)
-            Logger.player.info("SeriesTrace playAsset episode-url ep=\(episodeNumber)")
+            Logger.player.info("SeriesTrace 播放源使用剧集URL 集数=\(episodeNumber)")
             return true
         }
 
         let startedAt = CACurrentMediaTime()
-        Logger.player.info("SeriesTrace playAsset request ep=\(episodeNumber) episodeId=\(episodeId)")
+        Logger.player.info("SeriesTrace 请求播放源 集数=\(episodeNumber) 剧集ID=\(episodeId)")
         do {
             let dto = try await dependencies.detailRepository.fetchPlayAsset(episodeId: episodeId)
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
@@ -719,19 +719,19 @@ struct SeriesPlayerView: View {
                 }
                 // 播放接口成功代表后端已完成免费/VIP/金币权限判定。
                 unlockedEpisodes.insert(episodeNumber)
-                Logger.player.info("SeriesTrace playAsset success ep=\(episodeNumber) type=\(dto.sourceType) ms=\(Int(elapsed))")
+                Logger.player.info("SeriesTrace 播放源请求成功 集数=\(episodeNumber) 类型=\(dto.sourceType) 耗时=\(Int(elapsed))ms")
                 return true
             }
-            Logger.player.warning("SeriesTrace playAsset empty-source ep=\(episodeNumber) ms=\(Int(elapsed))")
+            Logger.player.warning("SeriesTrace 播放源为空 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
             // 解锁流程尚未正式设计，当前版本不展示半成品弹窗；后续由专门任务接入正式解锁页。
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            Logger.player.warning("SeriesTrace playAsset locked ep=\(episodeNumber) ms=\(Int(elapsed)) unlock-ui-deferred")
+            Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 解锁UI暂未接入")
             return false
         } catch {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            Logger.player.warning("SeriesTrace playAsset failed ep=\(episodeNumber) ms=\(Int(elapsed)) error=\(error.localizedDescription)")
+            Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
             return false
         }
     }
@@ -958,7 +958,7 @@ struct SeriesPlayerView: View {
             }
             .onEnded { value in
                 guard canHandleEpisodeDrag(value) else {
-                    Logger.player.info("SeriesGesture ignored startX=\(Int(value.startLocation.x)) dx=\(Int(value.translation.width)) dy=\(Int(value.translation.height))")
+                    Logger.player.info("SeriesGesture 忽略手势 起点X=\(Int(value.startLocation.x)) 横向=\(Int(value.translation.width)) 纵向=\(Int(value.translation.height))")
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { dragOffset = 0 }
                     return
                 }
@@ -970,7 +970,7 @@ struct SeriesPlayerView: View {
                 } else if value.translation.height > 80 || velocity > 300 {
                     targetEpisode = max(oldEpisode - 1, 1)
                 }
-                Logger.player.info("SeriesGesture ended fromEP=\(oldEpisode) targetEP=\(targetEpisode) dy=\(Int(value.translation.height)) velocity=\(Int(velocity)) total=\(totalEpisodes)")
+                Logger.player.info("SeriesGesture 手势结束 原集=\(oldEpisode) 目标集=\(targetEpisode) 纵向=\(Int(value.translation.height)) 速度=\(Int(velocity)) 总集数=\(totalEpisodes)")
                 if targetEpisode != oldEpisode {
                     requestEpisodeSwitch(targetEpisode)
                 } else {
