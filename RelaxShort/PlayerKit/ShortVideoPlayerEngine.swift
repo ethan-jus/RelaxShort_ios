@@ -713,7 +713,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
                    time.seconds > 0.05 {
                     self.hasVisiblePlaybackStarted = true
                     self.diagnostics.stateText = "visible-playback"
-                    self.log("visiblePlayback: started at \(String(format: "%.2f", time.seconds))s")
+                    let totalMs = (CACurrentMediaTime() - self.ttffStart) * 1000
+                    self.log("visiblePlayback: started at \(String(format: "%.2f", time.seconds))s totalMs=\(String(format: "%.0f", totalMs))")
                     self.schedulePreloadAdjacent(gen: self.generation, delayMs: 100)
                 }
             }
