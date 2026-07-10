@@ -83,9 +83,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
         playbackTrace?.finish(termination: termination)
         playbackTrace = nil
     }
-    /// 保存当前 trace（供预取旁路操作），返回旧 trace 供后续恢复。预取时调用防止污染当前集 trace。
-    func saveTrace() -> PlaybackDiagnosticsTrace? { let t = playbackTrace; playbackTrace = nil; return t }
-    func restoreTrace(_ t: PlaybackDiagnosticsTrace?) { playbackTrace = t }
 
     /// Task36A: 追加新播放条目到现有列表末尾，不中断当前播放。
     /// 用于分页加载后同步播放器内部 items，确保后续 move(to:) 能索引到新条目。
@@ -623,7 +620,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
-    /// 后台 warm cache：当前视频播放链路不走这里，只为下一条提前缓存首段
+    /// 后台 warm cache：使用流式 Range 请求，非 206 立刻取消，累计达到 byteCount 立刻取消。
+    /// 任何路径都不先下载完整视频再丢弃。
     private func startWarmCache(for item: PlayerMediaItem, byteCount: Int64, reason: String) {
         guard let url = PlayerItemFactory.mp4URL(from: item.source) else { return }
         if HTTPRangeMediaCache.shared.hasPlayableLeadCache(for: url, minimumBytes: byteCount) {
@@ -634,48 +632,32 @@ final class ShortVideoPlayerEngine: ObservableObject {
         let taskKey = url.absoluteString
         warmCacheTasks[taskKey]?.cancel()
         let task = Task(priority: .background) { [weak self] in
-            var req = URLRequest(url: url)
-            let requestedRange: ClosedRange<Int64> = 0...(byteCount - 1)
-            req.setValue("bytes=\(requestedRange.lowerBound)-\(requestedRange.upperBound)", forHTTPHeaderField: "Range")
-            guard let (data, response) = try? await URLSession.shared.data(for: req),
-                  !Task.isCancelled else { return }
-            // 校验 HTTP 206 / Content-Range
-            guard !data.isEmpty else { self?.log("warmCache skipped reason=\(reason) empty data"); return }
-            let httpResp = response as? HTTPURLResponse
-            if httpResp?.statusCode == 206 {
-                guard let contentRange = httpResp?.value(forHTTPHeaderField: "Content-Range"),
-                      let byteRange = contentRange.components(separatedBy: "/").first?
-                          .replacingOccurrences(of: "bytes ", with: ""),
-                      let dashIdx = byteRange.firstIndex(of: "-") else {
-                    self?.log("warmCache skipped reason=\(reason) 206 missing/malformed Content-Range")
-                    return
-                }
-                let loStr = String(byteRange[..<dashIdx])
-                let hiStr = String(byteRange[byteRange.index(after: dashIdx)...])
-                guard let lo = Int64(loStr), let hi = Int64(hiStr), hi >= lo,
-                      hi - lo + 1 == Int64(data.count) else {
-                    self?.log("warmCache skipped reason=\(reason) 206 range \(loStr)-\(hiStr) != data.count \(data.count)")
-                    return
-                }
-                let actualRange = lo...hi
-                let totalLen = contentRange.components(separatedBy: "/").last.flatMap(Int64.init)
-                HTTPRangeMediaCache.shared.write(data: data, for: url, range: actualRange, len: totalLen, mime: "video/mp4")
-                await MainActor.run { self?.diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url) }
-                self?.log("warmCache reason=\(reason) wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen?.description ?? "unknown")")
-            } else if httpResp?.statusCode == 200 {
-                // 源站忽略 Range 返回 200 时 data(for:) 可能已下载整个文件。
-                // 超出请求范围 2 倍以上视为全量下载，丢弃不缓存避免弱网抢带宽。
-                guard !data.isEmpty else { self?.log("warmCache skipped reason=\(reason) 200 empty data"); return }
-                if data.count > byteCount * 2 {
-                    self?.log("warmCache skipped reason=\(reason) 200 oversized data=\(data.count) > limit=\(byteCount*2)")
-                    return
-                }
+            let result = await StreamedRangeFetcher.fetch(
+                url: url, requestedRange: 0...(byteCount - 1), maxBytes: Int(byteCount)
+            )
+            guard !Task.isCancelled else { return }
+            switch result {
+            case .success(let data, let totalLength):
                 let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
-                HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: Int64(data.count), mime: "video/mp4")
+                HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange,
+                                                  len: totalLength ?? Int64(data.count), mime: "video/mp4")
                 await MainActor.run { self?.diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url) }
-                self?.log("warmCache reason=\(reason) wrote 0-\(data.count-1) status=200")
-            } else {
-                self?.log("warmCache skipped reason=\(reason) status=\(httpResp?.statusCode ?? 0)")
+                self?.log("warmCache reason=\(reason) wrote 0-\(data.count-1) total=\(totalLength?.description ?? "?")")
+            case .notRange(let statusCode, let data):
+                if let d = data, d.count <= byteCount {
+                    let wr: ClosedRange<Int64> = 0...Int64(d.count - 1)
+                    HTTPRangeMediaCache.shared.write(data: d, for: url, range: wr, len: Int64(d.count), mime: "video/mp4")
+                    self?.log("warmCache reason=\(reason) wrote 0-\(d.count-1) status=\(statusCode)")
+                } else {
+                    self?.log("warmCache skipped reason=\(reason) 非206-\(statusCode) body=\(data?.count ?? 0)")
+                }
+            case .truncated(let data, let totalLength):
+                let wr: ClosedRange<Int64> = 0...Int64(data.count - 1)
+                HTTPRangeMediaCache.shared.write(data: data, for: url, range: wr,
+                                                  len: totalLength ?? Int64(data.count), mime: "video/mp4")
+                self?.log("warmCache reason=\(reason) truncated wrote 0-\(data.count-1)")
+            case .failed(let error):
+                self?.log("warmCache skipped reason=\(reason) error=\(error.localizedDescription.prefix(50))")
             }
         }
         warmCacheTasks[taskKey] = task
@@ -817,24 +799,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
 /// 记录一次播放启动链路的阶段耗时，供 For You 和 Series 复用。
 public struct PlaybackDiagnosticsTrace {
-    let traceID: String
-    let scene: String
-    let seriesID: String?
-    let episodeNumber: Int?
-    let targetIndex: Int?
-    let startedAt: CFTimeInterval
-    var marks: [PlaybackDiagnosticsMark] = []
+    public let traceID: String; public let scene: String
+    public let seriesID: String?; public let episodeNumber: Int?; public let targetIndex: Int?
+    public let startedAt: CFTimeInterval; private(set) public var marks: [PlaybackDiagnosticsMark] = []
 
-    public init(scene: String, seriesID: String? = nil, episodeNumber: Int? = nil,
-                targetIndex: Int? = nil) {
-        self.traceID = Self.shortID()
-        self.scene = scene
-        self.seriesID = seriesID
-        self.episodeNumber = episodeNumber
-        self.targetIndex = targetIndex
+    public init(scene: String, seriesID: String? = nil, episodeNumber: Int? = nil, targetIndex: Int? = nil) {
+        self.traceID = Self.shortID(); self.scene = scene
+        self.seriesID = seriesID; self.episodeNumber = episodeNumber; self.targetIndex = targetIndex
         self.startedAt = CACurrentMediaTime()
     }
-
     public mutating func mark(_ name: String) {
         let elapsed = Int((CACurrentMediaTime() - startedAt) * 1000)
         marks.append(PlaybackDiagnosticsMark(name: name, elapsedMs: elapsed))
@@ -844,8 +817,6 @@ public struct PlaybackDiagnosticsTrace {
         print("[播放诊断] trace=\(traceID) 场景=\(scene)\(sid)\(ep) 阶段=\(name) 耗时=\(elapsed)ms")
         #endif
     }
-
-    /// 结束追踪并输出汇总日志。termination 说明终止原因（完成/锁集阻断/播放源失败/网络失败）。
     public func finish(termination: String = "完成") {
         #if DEBUG
         let ep = episodeNumber.map { " 集=\($0)" } ?? ""
@@ -855,24 +826,16 @@ public struct PlaybackDiagnosticsTrace {
         print("[播放诊断] trace=\(traceID) 场景=\(scene)\(sid)\(ep) 终止=\(termination) 首帧总耗时=\(total)ms 分段=\(segs)")
         #endif
     }
-
     private static func shortID() -> String {
-        let bytes = (0..<4).map { _ in UInt8.random(in: 0...255) }
-        return bytes.map { String(format: "%02x", $0) }.joined()
+        String((0..<4).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined().prefix(8))
     }
 }
+public struct PlaybackDiagnosticsMark: Equatable { public let name: String; public let elapsedMs: Int }
 
-public struct PlaybackDiagnosticsMark: Equatable {
-    public let name: String
-    public let elapsedMs: Int
-}
+// MARK: - 媒体 URL 轻量检查 (Task36B-2 返工 v4：复用 StreamedRangeFetcher，修正日志)
 
-// MARK: - 媒体 URL 轻量检查工具 (Task36B-2 返工：增加 Range 上限保护)
-
-/// DEBUG-only：HEAD + 流式小 Range 检查。URLSessionDataTask+delegate，非206立刻取消不读body，206最多256KB主动截断。
 public enum MediaURLProbe {
-    private static let maxBytes = 262_144
-
+    private static let probeBytes = 262_144
     public static func probe(_ url: URL, label: String = "播放源") {
         #if DEBUG
         Task(priority: .background) {
@@ -889,55 +852,91 @@ public enum MediaURLProbe {
             } catch { hs = "失败" }
             r += " URL=\(short) HEAD状态=\(hs) HEAD耗时=\(hm)ms 支持Range=\(sR) 长度=\(cl)"
 
-            if sR || cl > 0 {
-                let res = await streamedCheck(url: url, maxB: maxBytes)
-                r += " Range状态=\(res.st) Range耗时=\(res.ms)ms 字节=\(res.rx)"
-                if res.trunc { r += " 截断=超过\(maxBytes)字节已主动取消(源站忽略Range返回全文件)" }
-                if !res.is206 { r += " 警告=源站忽略Range(未返回206)" }
-            } else { r += " Range状态=跳过(HEAD未通过)" }
+            let t0 = CACurrentMediaTime()
+            let result = await StreamedRangeFetcher.fetch(url: url, requestedRange: 0...Int64(probeBytes - 1), maxBytes: probeBytes)
+            let ms = Int((CACurrentMediaTime() - t0) * 1000)
+            switch result {
+            case .success(let data, _): r += " Range状态=206 Range耗时=\(ms)ms 字节=\(data.count)"
+            case .truncated(let data, _): r += " Range状态=206-主动截断 Range耗时=\(ms)ms 字节=\(data.count) 截断=超过\(probeBytes)字节已主动取消"
+            case .notRange(let code, let data): r += " Range状态=非206-\(code) Range耗时=\(ms)ms 字节=\(data?.count ?? 0)" + (code == 200 ? " 警告=源站忽略Range(返回200)" : "")
+            case .failed(let e): r += " Range状态=失败 Range耗时=\(ms)ms 错误=\(e.localizedDescription.prefix(40))"
+            }
             print(r)
         }
         #endif
     }
-
-    // MARK: 流式 Range：收到 header 非206立刻 cancel；206 最多读 maxB
-    private struct SR { let st: String; let ms: Int; let rx: Int; let trunc: Bool; let is206: Bool }
-    private static func streamedCheck(url: URL, maxB: Int) async -> SR {
-        await withCheckedContinuation { cc in
-            let d = RD(maxB: maxB) { cc.resume(returning: $0) }
-            var req = URLRequest(url: url)
-            req.setValue("bytes=0-\(maxB - 1)", forHTTPHeaderField: "Range"); req.timeoutInterval = 10
-            let s = URLSession(configuration: .ephemeral, delegate: d, delegateQueue: nil)
-            d.task = s.dataTask(with: req); d.task?.resume()
-        }
-    }
-
-    private final class RD: NSObject, URLSessionDataDelegate {
-        let maxB: Int; let cb: (SR) -> Void; let t0 = CACurrentMediaTime()
-        var task: URLSessionDataTask?; var rx = 0; var code = 0; var early = false; var is206 = false
-        init(maxB: Int, cb: @escaping (SR) -> Void) { self.maxB = maxB; self.cb = cb }
-
-        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive r: URLResponse,
-                        ch: @escaping (URLSession.ResponseDisposition) -> Void) {
-            if let h = r as? HTTPURLResponse { code = h.statusCode; is206 = (code == 206) }
-            if code != 206 { early = true; task?.cancel(); ch(.cancel); return }
-            ch(.allow)
-        }
-        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive d: Data) {
-            rx += d.count; if rx > maxB { early = true; s.invalidateAndCancel(); task?.cancel() }
-        }
-        func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError e: Error?) {
-            let ms = Int((CACurrentMediaTime() - t0) * 1000)
-            let st = early ? (code == 0 ? "主动取消(非206)" : "\(code)-主动截断")
-                  : (e.map { ($0 as NSError).code == NSURLErrorCancelled ? "主动取消" : "失败" } ?? "\(code)")
-            s.invalidateAndCancel()
-            cb(SR(st: st, ms: ms, rx: early ? min(rx, maxB) : rx, trunc: early && code != 0, is206: is206))
-        }
-    }
-
     private static func sanitizedURL(_ url: URL) -> String {
         guard let c = URLComponents(url: url, resolvingAgainstBaseURL: false), let h = c.host
         else { return url.absoluteString }
         return "\(h)/\(c.path.split(separator: "/").last.map(String.init) ?? c.path)"
+    }
+}
+
+// MARK: - 共享流式 Range 请求 (Task36B-2 返工 v4)
+
+/// 流式 Range：URLSessionDataTask+delegate，非206立刻cancel不读body，
+/// 206验证Content-Range与请求范围一致，累计maxBytes立刻cancel。供warmCache/MediaURLProbe复用。
+public enum StreamedRangeFetcher {
+    public enum FetchResult {
+        case success(data: Data, totalLength: Int64?)
+        case truncated(data: Data, totalLength: Int64?)
+        case notRange(statusCode: Int, data: Data?)
+        case failed(Error)
+    }
+    /// 测试可注入 session（nil 使用 ephemeral）
+    public static var testSession: URLSession?
+
+    public static func fetch(url: URL, requestedRange: ClosedRange<Int64>, maxBytes: Int) async -> FetchResult {
+        await withCheckedContinuation { cc in
+            let d = FD(reqRange: requestedRange, maxB: maxBytes) { cc.resume(returning: $0) }
+            var req = URLRequest(url: url)
+            req.setValue("bytes=\(requestedRange.lowerBound)-\(requestedRange.upperBound)", forHTTPHeaderField: "Range")
+            req.timeoutInterval = 10
+            let s = testSession ?? URLSession(configuration: .ephemeral, delegate: d, delegateQueue: nil)
+            d.session = s; d.task = s.dataTask(with: req); d.task?.resume()
+        }
+    }
+    private final class FD: NSObject, URLSessionDataDelegate {
+        let reqRange: ClosedRange<Int64>; let maxB: Int; let cb: (FetchResult) -> Void
+        var session: URLSession?; var task: URLSessionDataTask?
+        var chunks: [Data] = []; var total = 0; var code = 0; var crHeader: String?
+        init(reqRange: ClosedRange<Int64>, maxB: Int, cb: @escaping (FetchResult) -> Void) {
+            self.reqRange = reqRange; self.maxB = maxB; self.cb = cb
+        }
+        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive r: URLResponse,
+                        ch: @escaping (URLSession.ResponseDisposition) -> Void) {
+            if let h = r as? HTTPURLResponse { code = h.statusCode; crHeader = h.value(forHTTPHeaderField: "Content-Range") }
+            if code != 206 { task?.cancel(); ch(.cancel); return }
+            ch(.allow)
+        }
+        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive d: Data) {
+            total += d.count
+            if total > maxB { session?.invalidateAndCancel(); task?.cancel(); return }
+            chunks.append(d)
+        }
+        func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError e: Error?) {
+            let data = chunks.reduce(into: Data()) { $0.append($1) }
+            if code != 206 { s.invalidateAndCancel(); cb(.notRange(statusCode: code, data: data.isEmpty ? nil : data)); return }
+            if total > maxB {
+                let tl = crHeader?.components(separatedBy: "/").last.flatMap { Int64($0) }
+                s.invalidateAndCancel(); cb(.truncated(data: data, totalLength: tl)); return
+            }
+            if let err = e, (err as NSError).code != NSURLErrorCancelled {
+                s.invalidateAndCancel(); cb(.failed(err)); return
+            }
+            // 校验 Content-Range 与请求范围一致
+            guard let cr = crHeader,
+                  let br = cr.components(separatedBy: "/").first?.replacingOccurrences(of: "bytes ", with: ""),
+                  let di = br.firstIndex(of: "-") else {
+                s.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -1, userInfo: [NSLocalizedDescriptionKey: "Content-Range缺失"]))); return
+            }
+            let loS = String(br[..<di]); let hiS = String(br[br.index(after: di)...])
+            guard let lo = Int64(loS), let hi = Int64(hiS),
+                  lo == reqRange.lowerBound, hi - lo + 1 == Int64(data.count) else {
+                s.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -2, userInfo: [NSLocalizedDescriptionKey: "Content-Range不匹配: \(br)"]))); return
+            }
+            let tl = cr.components(separatedBy: "/").last.flatMap { Int64($0) }
+            s.invalidateAndCancel(); cb(.success(data: data, totalLength: tl))
+        }
     }
 }

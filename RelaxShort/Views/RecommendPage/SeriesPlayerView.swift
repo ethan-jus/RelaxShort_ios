@@ -672,7 +672,7 @@ struct SeriesPlayerView: View {
               episodeMediaSources[nextEpisode.id] == nil else { return }
 
         episodePrefetchTask = Task { @MainActor in
-            guard await ensurePlayAsset(for: nextEpisode.episodeNumber, presentUnlockOnDenied: false),
+            guard await ensurePlayAsset(for: nextEpisode.episodeNumber, presentUnlockOnDenied: false, recordTrace: false),
                   !Task.isCancelled,
                   let source = episodeMediaSources[nextEpisode.id],
                   let url = directURL(from: source) else { return }
@@ -695,30 +695,31 @@ struct SeriesPlayerView: View {
     }
 
     /// 播放源按内存缓存、Episode URL、后端播放合同依次解析。
+    /// recordTrace: 是否记录 trace 标记。当前播放目标集为 true，预取为 false。
     @MainActor
     private func ensurePlayAsset(for episodeNumber: Int, presentUnlockOnDenied: Bool = false,
-                                 isPrefetch: Bool = false) async -> Bool {
+                                 recordTrace: Bool = true) async -> Bool {
         guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == episodeNumber }) else { return false }
         let ep = episodes[epIndex]
         let episodeId = ep.id
 
-        // Task36B-2 返工 v3: 预取不能污染当前集 trace。保存并清空当前 trace，
-        // 预取完成后恢复。预取的各阶段标记不会影响正在播放的集。
-        let savedTrace = isPrefetch ? playerCoordinator.engine.saveTrace() : nil
-        defer { if let t = savedTrace { playerCoordinator.engine.restoreTrace(t) } }
-
+        // 内存缓存命中
         if episodeMediaSources[episodeId] != nil {
             Logger.player.info("SeriesTrace 播放源命中内存缓存 集数=\(episodeNumber)")
+            if recordTrace { playerCoordinator.engine.markTrace("缓存命中") }
             return true
         }
 
+        // Episode 自带 videoURL
         if let url = URL(string: ep.videoURL),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             episodeMediaSources[episodeId] = .mp4(url)
             Logger.player.info("SeriesTrace 播放源使用剧集URL 集数=\(episodeNumber)")
+            if recordTrace { playerCoordinator.engine.markTrace("剧集URL") }
             return true
         }
 
+        // 请求后端播放合同
         let startedAt = CACurrentMediaTime()
         Logger.player.info("SeriesTrace 请求播放源 集数=\(episodeNumber) 剧集ID=\(episodeId)")
         do {
@@ -729,32 +730,35 @@ struct SeriesPlayerView: View {
             }
             if let source = dto.toPlayerMediaSource() {
                 episodeMediaSources[episodeId] = source
-                // 缓存后端 resume time
                 if let resume = dto.resumeTime, resume > 0 {
                     episodeResumeTimes[episodeId] = TimeInterval(resume)
                 }
-                // 播放接口成功代表后端已完成免费/VIP/金币权限判定。
                 unlockedEpisodes.insert(episodeNumber)
                 Logger.player.info("SeriesTrace 播放源请求成功 集数=\(episodeNumber) 类型=\(dto.sourceType) 耗时=\(Int(elapsed))ms")
-                playerCoordinator.engine.markTrace("播放源")
+                if recordTrace { playerCoordinator.engine.markTrace("播放源") }
                 return true
             }
             Logger.player.warning("SeriesTrace 播放源为空 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
-            playerCoordinator.engine.markTrace("播放源失败-EP\(episodeNumber)")
-            if !isPrefetch { playerCoordinator.engine.finishTrace(termination: "播放源失败") }
+            if recordTrace {
+                playerCoordinator.engine.markTrace("播放源失败-EP\(episodeNumber)")
+                playerCoordinator.engine.finishTrace(termination: "播放源失败")
+            }
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
-            // 解锁流程尚未正式设计，当前版本不展示半成品弹窗；后续由专门任务接入正式解锁页。
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
-            playerCoordinator.engine.finishTrace(termination: "锁集阻断")
             Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 解锁UI暂未接入")
+            if recordTrace {
+                playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
+                playerCoordinator.engine.finishTrace(termination: "锁集阻断")
+            }
             return false
         } catch {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            playerCoordinator.engine.markTrace("网络失败-EP\(episodeNumber)")
-            if !isPrefetch { playerCoordinator.engine.finishTrace(termination: "网络失败") }
             Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
+            if recordTrace {
+                playerCoordinator.engine.markTrace("网络失败-EP\(episodeNumber)")
+                playerCoordinator.engine.finishTrace(termination: "网络失败")
+            }
             return false
         }
     }
