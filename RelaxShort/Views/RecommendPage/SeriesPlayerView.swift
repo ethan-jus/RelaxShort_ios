@@ -621,10 +621,6 @@ struct SeriesPlayerView: View {
         let previous = currentEpisode
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "switch"
-        // Task36B-2 返工：每次切集启动新诊断 trace
-        playerCoordinator.engine.startPlaybackTrace(
-            PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: drama.id, episodeNumber: target)
-        )
         Logger.player.info("SeriesGesture 接受切集手势 原集=\(previous) 目标集=\(target)")
 
         // 先切 UI 页码，保证手势像 For You 一样停在目标页；播放源随后异步补齐。
@@ -641,6 +637,11 @@ struct SeriesPlayerView: View {
     private func switchToEpisode(_ episodeNumber: Int, previousEpisode: Int? = nil) {
         guard !isSwitchingEpisode else { return }
         isSwitchingEpisode = true
+        // Task36B-2 返工 v3: trace 下沉到 switchToEpisode 统一入口，
+        // 覆盖手势切集、选集面板、播放结束自动下一集三种路径
+        playerCoordinator.engine.startPlaybackTrace(
+            PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: drama.id, episodeNumber: episodeNumber)
+        )
         Task { @MainActor in
             defer { isSwitchingEpisode = false }
             // 先 finalize 旧 session
@@ -695,10 +696,16 @@ struct SeriesPlayerView: View {
 
     /// 播放源按内存缓存、Episode URL、后端播放合同依次解析。
     @MainActor
-    private func ensurePlayAsset(for episodeNumber: Int, presentUnlockOnDenied: Bool = false) async -> Bool {
+    private func ensurePlayAsset(for episodeNumber: Int, presentUnlockOnDenied: Bool = false,
+                                 isPrefetch: Bool = false) async -> Bool {
         guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == episodeNumber }) else { return false }
         let ep = episodes[epIndex]
         let episodeId = ep.id
+
+        // Task36B-2 返工 v3: 预取不能污染当前集 trace。保存并清空当前 trace，
+        // 预取完成后恢复。预取的各阶段标记不会影响正在播放的集。
+        let savedTrace = isPrefetch ? playerCoordinator.engine.saveTrace() : nil
+        defer { if let t = savedTrace { playerCoordinator.engine.restoreTrace(t) } }
 
         if episodeMediaSources[episodeId] != nil {
             Logger.player.info("SeriesTrace 播放源命中内存缓存 集数=\(episodeNumber)")
@@ -734,15 +741,19 @@ struct SeriesPlayerView: View {
             }
             Logger.player.warning("SeriesTrace 播放源为空 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("播放源失败-EP\(episodeNumber)")
+            if !isPrefetch { playerCoordinator.engine.finishTrace(termination: "播放源失败") }
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
             // 解锁流程尚未正式设计，当前版本不展示半成品弹窗；后续由专门任务接入正式解锁页。
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
+            playerCoordinator.engine.finishTrace(termination: "锁集阻断")
             Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 解锁UI暂未接入")
             return false
         } catch {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+            playerCoordinator.engine.markTrace("网络失败-EP\(episodeNumber)")
+            if !isPrefetch { playerCoordinator.engine.finishTrace(termination: "网络失败") }
             Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
             return false
         }

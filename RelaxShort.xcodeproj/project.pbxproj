@@ -49,6 +49,7 @@
 		67E0C2900E4691C0AA7431B7 /* DramaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 457158D3B20C8360F9FE045F /* DramaItem.swift */; };
 		6C6912FA41D55BA89E9652D3 /* RecommendViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BB2B6C624119C5300B98C55 /* RecommendViewModel.swift */; };
 		70625382EDA24FD51CA6C6C8 /* LoginViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89C8F67782EEB85783956169 /* LoginViewModel.swift */; };
+		71B9DFD83EFB4C6FB1351396 /* AppleOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A417F5D242674800BFF73810 /* AppleOAuthClient.swift */; };
 		71D41707ADD14AF18AA788EB /* MemberViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86D8BBC63EA44177801BB30D /* MemberViewModel.swift */; };
 		725ED73B1C90C685469604A4 /* ShortVideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E638B042AF7EB7EEEB410B2 /* ShortVideoPlayerView.swift */; };
 		7439D1A1EE4D4FA88873524E /* PlayerOptionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ACD6CD70E7C49D0BFE32D57 /* PlayerOptionSheets.swift */; };
@@ -113,9 +114,6 @@
 		CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408582F2968E474DADC30E92 /* ProfileDestinations.swift */; };
 		CD9E95D7080A87ABF29CF072 /* RewardedAdView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD821FD282081AB98852E2AF /* RewardedAdView.swift */; };
 		CE78B51CA94E42878A2D380B /* FacebookOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */; };
-		71B9DFD83EFB4C6FB1351396 /* AppleOAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A417F5D242674800BFF73810 /* AppleOAuthClient.swift */; };
-		FBB340000000000000000001 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = FBD340000000000000000001 /* FacebookCore */; };
-		FBB340000000000000000002 /* FacebookLogin in Frameworks */ = {isa = PBXBuildFile; productRef = FBD340000000000000000002 /* FacebookLogin */; };
 		CE8C90F42794FBBC8959AE3F /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB78105AC58D39EA2526A89 /* Logger.swift */; };
 		CEDC26B856AE55F0A2AD1160 /* RealDetailRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */; };
 		D443C19FB03F5FAC37C37AC9 /* PlayerSlotPool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 168FB1E2BB472B3B8D7E7253 /* PlayerSlotPool.swift */; };
@@ -139,6 +137,8 @@
 		F1A23B000000000000000003 /* RealProfileRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A23B000000000000000004 /* RealProfileRepository.swift */; };
 		F675DC72662B935D840C12B4 /* SubtitleRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E419E4384060BF195ED3C9DF /* SubtitleRenderer.swift */; };
 		FB1270575E45544AA548243B /* RealSearchRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E07DF14795E56458A576B7D /* RealSearchRepository.swift */; };
+		FBB340000000000000000001 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = FBD340000000000000000001 /* FacebookCore */; };
+		FBB340000000000000000002 /* FacebookLogin in Frameworks */ = {isa = PBXBuildFile; productRef = FBD340000000000000000002 /* FacebookLogin */; };
 		FC841D8C8509F712A341D3E8 /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84A18DCB4AC5C2EA9ACBB0D8 /* ShareSheet.swift */; };
 		FD1C40888BB779A0CA0078DF /* FavoritesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7B5D6833951FB561F5C8BC0 /* FavoritesView.swift */; };
 		T31A00100000000000000001 /* WatchProgressReport.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00200000000000000002 /* WatchProgressReport.swift */; };
@@ -195,8 +195,6 @@
 		457158D3B20C8360F9FE045F /* DramaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaItem.swift; sourceTree = "<group>"; };
 		45C2B9C4EFA543902B3CA1D1 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FacebookOAuthClient.swift; path = RelaxShort/Core/Auth/FacebookOAuthClient.swift; sourceTree = SOURCE_ROOT; };
-		A417F5D242674800BFF73810 /* AppleOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppleOAuthClient.swift; path = RelaxShort/Core/Auth/AppleOAuthClient.swift; sourceTree = SOURCE_ROOT; };
-		AA90D1B5DEC74B93A7443C79 /* RelaxShort.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = RelaxShort.entitlements; path = RelaxShort/RelaxShort.entitlements; sourceTree = SOURCE_ROOT; };
 		4BF71E8082163CE2F05D8E65 /* APIEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIEndpoint.swift; sourceTree = "<group>"; };
 		4E4D8688900319881D81FB88 /* ExitGuidePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExitGuidePopupView.swift; sourceTree = "<group>"; };
 		4F489C7DA1AC261114BF1CA0 /* CoinPurchaseSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinPurchaseSheet.swift; sourceTree = "<group>"; };
@@ -246,6 +244,7 @@
 		A34F00000000000000000004 /* GoogleOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = GoogleOAuthClient.swift; path = RelaxShort/Core/Auth/GoogleOAuthClient.swift; sourceTree = SOURCE_ROOT; };
 		A34F00000000000000000005 /* RealAuthRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealAuthRepository.swift; path = RelaxShort/Core/Services/RealAuthRepository.swift; sourceTree = SOURCE_ROOT; };
 		A34F00000000000000000006 /* AuthResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthResponseDTO.swift; path = RelaxShort/Models/API/AuthResponseDTO.swift; sourceTree = SOURCE_ROOT; };
+		A417F5D242674800BFF73810 /* AppleOAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppleOAuthClient.swift; path = RelaxShort/Core/Auth/AppleOAuthClient.swift; sourceTree = SOURCE_ROOT; };
 		A473A2297B9A58E144BAFECD /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		AA1D03A03D2000E5D75B2B15 /* PlayerComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerComponents.swift; sourceTree = "<group>"; };
 		AAAA5DE92FF18EFF00153BF7 /* RelaxShortTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RelaxShortTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };

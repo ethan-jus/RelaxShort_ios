@@ -78,11 +78,14 @@ final class ShortVideoPlayerEngine: ObservableObject {
     func markTrace(_ name: String) {
         playbackTrace?.mark(name)
     }
-    /// 完成诊断追踪并输出汇总日志
-    func finishTrace() {
-        playbackTrace?.summary()
+    /// 完成诊断追踪并输出汇总日志。termination 传终止原因（完成/锁集阻断/播放源失败/网络失败）。
+    func finishTrace(termination: String = "完成") {
+        playbackTrace?.finish(termination: termination)
         playbackTrace = nil
     }
+    /// 保存当前 trace（供预取旁路操作），返回旧 trace 供后续恢复。预取时调用防止污染当前集 trace。
+    func saveTrace() -> PlaybackDiagnosticsTrace? { let t = playbackTrace; playbackTrace = nil; return t }
+    func restoreTrace(_ t: PlaybackDiagnosticsTrace?) { playbackTrace = t }
 
     /// Task36A: 追加新播放条目到现有列表末尾，不中断当前播放。
     /// 用于分页加载后同步播放器内部 items，确保后续 move(to:) 能索引到新条目。
@@ -660,7 +663,13 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 await MainActor.run { self?.diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url) }
                 self?.log("warmCache reason=\(reason) wrote \(actualRange.lowerBound)-\(actualRange.upperBound) count=\(data.count) total=\(totalLen?.description ?? "unknown")")
             } else if httpResp?.statusCode == 200 {
+                // 源站忽略 Range 返回 200 时 data(for:) 可能已下载整个文件。
+                // 超出请求范围 2 倍以上视为全量下载，丢弃不缓存避免弱网抢带宽。
                 guard !data.isEmpty else { self?.log("warmCache skipped reason=\(reason) 200 empty data"); return }
+                if data.count > byteCount * 2 {
+                    self?.log("warmCache skipped reason=\(reason) 200 oversized data=\(data.count) > limit=\(byteCount*2)")
+                    return
+                }
                 let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
                 HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange, len: Int64(data.count), mime: "video/mp4")
                 await MainActor.run { self?.diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url) }
@@ -836,13 +845,14 @@ public struct PlaybackDiagnosticsTrace {
         #endif
     }
 
-    public func summary() {
+    /// 结束追踪并输出汇总日志。termination 说明终止原因（完成/锁集阻断/播放源失败/网络失败）。
+    public func finish(termination: String = "完成") {
         #if DEBUG
         let ep = episodeNumber.map { " 集=\($0)" } ?? ""
         let sid = seriesID.map { " 剧=\($0.prefix(12))" } ?? ""
         let segs = marks.map { "\($0.name):\($0.elapsedMs)" }.joined(separator: ", ")
         let total = marks.last?.elapsedMs ?? 0
-        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(sid)\(ep) 首帧总耗时=\(total)ms 分段=\(segs)")
+        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(sid)\(ep) 终止=\(termination) 首帧总耗时=\(total)ms 分段=\(segs)")
         #endif
     }
 
@@ -859,55 +869,75 @@ public struct PlaybackDiagnosticsMark: Equatable {
 
 // MARK: - 媒体 URL 轻量检查工具 (Task36B-2 返工：增加 Range 上限保护)
 
-/// DEBUG-only：HEAD + 小 Range 检查。Range 响应超过 256KB 立即截断，绝不下载完整视频。
+/// DEBUG-only：HEAD + 流式小 Range 检查。URLSessionDataTask+delegate，非206立刻取消不读body，206最多256KB主动截断。
 public enum MediaURLProbe {
-    private static let maxRangeBytes = 262_144
+    private static let maxBytes = 262_144
 
     public static func probe(_ url: URL, label: String = "播放源") {
         #if DEBUG
         Task(priority: .background) {
-            let short = sanitizedURL(url)
-            var report = "[媒资检查]"
-            var headStatus = "?", headMs = 0, supportsRange = false, cl: Int64 = 0
-
+            let short = sanitizedURL(url); var r = "[媒资检查]"
+            var hs = "?", hm = 0, sR = false, cl: Int64 = 0
             do {
-                var r = URLRequest(url: url); r.httpMethod = "HEAD"; r.timeoutInterval = 10
+                var req = URLRequest(url: url); req.httpMethod = "HEAD"; req.timeoutInterval = 10
                 let t0 = CACurrentMediaTime()
-                let (_, resp) = try await URLSession.shared.data(for: r)
-                headMs = Int((CACurrentMediaTime() - t0) * 1000)
-                let http = resp as? HTTPURLResponse
-                headStatus = "\(http?.statusCode ?? 0)"
-                supportsRange = (http?.value(forHTTPHeaderField: "Accept-Ranges") ?? "").lowercased() == "bytes"
-                if let v = http?.value(forHTTPHeaderField: "Content-Length") { cl = Int64(v) ?? 0 }
-            } catch { headStatus = "失败" }
-            report += " URL=\(short) HEAD状态=\(headStatus) HEAD耗时=\(headMs)ms 支持Range=\(supportsRange) 长度=\(cl)"
+                let (_, resp) = try await URLSession.shared.data(for: req)
+                hm = Int((CACurrentMediaTime() - t0) * 1000)
+                let h = resp as? HTTPURLResponse; hs = "\(h?.statusCode ?? 0)"
+                sR = (h?.value(forHTTPHeaderField: "Accept-Ranges") ?? "").lowercased() == "bytes"
+                if let v = h?.value(forHTTPHeaderField: "Content-Length") { cl = Int64(v) ?? 0 }
+            } catch { hs = "失败" }
+            r += " URL=\(short) HEAD状态=\(hs) HEAD耗时=\(hm)ms 支持Range=\(sR) 长度=\(cl)"
 
-            var rs = "?", rms = 0, rb = 0
-            if supportsRange || cl > 0 {
-                do {
-                    var r = URLRequest(url: url)
-                    r.setValue("bytes=0-262143", forHTTPHeaderField: "Range"); r.timeoutInterval = 10
-                    let t0 = CACurrentMediaTime()
-                    let (data, resp) = try await URLSession.shared.data(for: r)
-                    rms = Int((CACurrentMediaTime() - t0) * 1000)
-                    rb = data.count
-                    let http = resp as? HTTPURLResponse; rs = "\(http?.statusCode ?? 0)"
-                    if data.count > maxRangeBytes {
-                        rb = maxRangeBytes
-                        report += " 截断=超过\(maxRangeBytes)字节已丢弃(源站忽略Range)"
-                    }
-                } catch { rs = "失败" }
-            } else { rs = "跳过(HEAD未通过)" }
-            report += " Range状态=\(rs) Range耗时=\(rms)ms 字节=\(min(rb, maxRangeBytes))"
-            print(report)
+            if sR || cl > 0 {
+                let res = await streamedCheck(url: url, maxB: maxBytes)
+                r += " Range状态=\(res.st) Range耗时=\(res.ms)ms 字节=\(res.rx)"
+                if res.trunc { r += " 截断=超过\(maxBytes)字节已主动取消(源站忽略Range返回全文件)" }
+                if !res.is206 { r += " 警告=源站忽略Range(未返回206)" }
+            } else { r += " Range状态=跳过(HEAD未通过)" }
+            print(r)
         }
         #endif
+    }
+
+    // MARK: 流式 Range：收到 header 非206立刻 cancel；206 最多读 maxB
+    private struct SR { let st: String; let ms: Int; let rx: Int; let trunc: Bool; let is206: Bool }
+    private static func streamedCheck(url: URL, maxB: Int) async -> SR {
+        await withCheckedContinuation { cc in
+            let d = RD(maxB: maxB) { cc.resume(returning: $0) }
+            var req = URLRequest(url: url)
+            req.setValue("bytes=0-\(maxB - 1)", forHTTPHeaderField: "Range"); req.timeoutInterval = 10
+            let s = URLSession(configuration: .ephemeral, delegate: d, delegateQueue: nil)
+            d.task = s.dataTask(with: req); d.task?.resume()
+        }
+    }
+
+    private final class RD: NSObject, URLSessionDataDelegate {
+        let maxB: Int; let cb: (SR) -> Void; let t0 = CACurrentMediaTime()
+        var task: URLSessionDataTask?; var rx = 0; var code = 0; var early = false; var is206 = false
+        init(maxB: Int, cb: @escaping (SR) -> Void) { self.maxB = maxB; self.cb = cb }
+
+        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive r: URLResponse,
+                        ch: @escaping (URLSession.ResponseDisposition) -> Void) {
+            if let h = r as? HTTPURLResponse { code = h.statusCode; is206 = (code == 206) }
+            if code != 206 { early = true; task?.cancel(); ch(.cancel); return }
+            ch(.allow)
+        }
+        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive d: Data) {
+            rx += d.count; if rx > maxB { early = true; s.invalidateAndCancel(); task?.cancel() }
+        }
+        func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError e: Error?) {
+            let ms = Int((CACurrentMediaTime() - t0) * 1000)
+            let st = early ? (code == 0 ? "主动取消(非206)" : "\(code)-主动截断")
+                  : (e.map { ($0 as NSError).code == NSURLErrorCancelled ? "主动取消" : "失败" } ?? "\(code)")
+            s.invalidateAndCancel()
+            cb(SR(st: st, ms: ms, rx: early ? min(rx, maxB) : rx, trunc: early && code != 0, is206: is206))
+        }
     }
 
     private static func sanitizedURL(_ url: URL) -> String {
         guard let c = URLComponents(url: url, resolvingAgainstBaseURL: false), let h = c.host
         else { return url.absoluteString }
-        let lastSegment = c.path.split(separator: "/").last.map(String.init) ?? c.path
-        return "\(h)/\(lastSegment)"
+        return "\(h)/\(c.path.split(separator: "/").last.map(String.init) ?? c.path)"
     }
 }
