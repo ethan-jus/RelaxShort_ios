@@ -323,9 +323,9 @@ struct SeriesPlayerView: View {
            }) {
             currentEpisode = matched.episodeNumber
         }
+        // Task36B-2 返工：播放源标记移到 ensurePlayAsset 内部，成功/锁集/失败分别标记
         _ = await ensurePlayAsset(for: currentEpisode, presentUnlockOnDenied: true)
         guard !Task.isCancelled else { return }
-        playerCoordinator.engine.markTrace("播放源")
         initializeEpisodePlayer()
     }
 
@@ -621,6 +621,10 @@ struct SeriesPlayerView: View {
         let previous = currentEpisode
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "switch"
+        // Task36B-2 返工：每次切集启动新诊断 trace
+        playerCoordinator.engine.startPlaybackTrace(
+            PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: drama.id, episodeNumber: target)
+        )
         Logger.player.info("SeriesGesture 接受切集手势 原集=\(previous) 目标集=\(target)")
 
         // 先切 UI 页码，保证手势像 For You 一样停在目标页；播放源随后异步补齐。
@@ -725,9 +729,11 @@ struct SeriesPlayerView: View {
                 // 播放接口成功代表后端已完成免费/VIP/金币权限判定。
                 unlockedEpisodes.insert(episodeNumber)
                 Logger.player.info("SeriesTrace 播放源请求成功 集数=\(episodeNumber) 类型=\(dto.sourceType) 耗时=\(Int(elapsed))ms")
+                playerCoordinator.engine.markTrace("播放源")
                 return true
             }
             Logger.player.warning("SeriesTrace 播放源为空 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
+            playerCoordinator.engine.markTrace("播放源失败-EP\(episodeNumber)")
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
             // 解锁流程尚未正式设计，当前版本不展示半成品弹窗；后续由专门任务接入正式解锁页。

@@ -133,6 +133,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     func move(to index: Int) {
         guard items.indices.contains(index), index != currentIndex else { return }
+        // Task36B-2 返工：每次 move 启动新的诊断 trace，记录本次滑动的完整链路
+        startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you_move", targetIndex: index))
         cancelAllPreloadTasks()
 
         let oldIndex = currentIndex
@@ -802,10 +804,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
     }
 }
 
-// MARK: - 播放诊断追踪模型
+// MARK: - 播放诊断追踪模型 (Task36B-2 返工)
 
 /// 记录一次播放启动链路的阶段耗时，供 For You 和 Series 复用。
-/// DEBUG 下输出中文日志；Release 下只记录不输出大规模日志。
 public struct PlaybackDiagnosticsTrace {
     let traceID: String
     let scene: String
@@ -825,106 +826,88 @@ public struct PlaybackDiagnosticsTrace {
         self.startedAt = CACurrentMediaTime()
     }
 
-    /// 记录一个阶段结束
-    mutating func mark(_ name: String) {
+    public mutating func mark(_ name: String) {
         let elapsed = Int((CACurrentMediaTime() - startedAt) * 1000)
         marks.append(PlaybackDiagnosticsMark(name: name, elapsedMs: elapsed))
         #if DEBUG
-        let episodeLabel = episodeNumber.map { " 集=\($0)" } ?? ""
-        let seriesLabel = seriesID.map { " 剧=\($0.prefix(12))" } ?? ""
-        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(seriesLabel)\(episodeLabel) 阶段=\(name) 耗时=\(elapsed)ms")
+        let ep = episodeNumber.map { " 集=\($0)" } ?? ""
+        let sid = seriesID.map { " 剧=\($0.prefix(12))" } ?? ""
+        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(sid)\(ep) 阶段=\(name) 耗时=\(elapsed)ms")
         #endif
     }
 
-    /// 输出汇总日志
-    func summary() {
+    public func summary() {
         #if DEBUG
-        let episodeLabel = episodeNumber.map { " 集=\($0)" } ?? ""
-        let seriesLabel = seriesID.map { " 剧=\($0.prefix(12))" } ?? ""
-        let segments = marks.map { "\($0.name):\($0.elapsedMs)" }.joined(separator: ", ")
+        let ep = episodeNumber.map { " 集=\($0)" } ?? ""
+        let sid = seriesID.map { " 剧=\($0.prefix(12))" } ?? ""
+        let segs = marks.map { "\($0.name):\($0.elapsedMs)" }.joined(separator: ", ")
         let total = marks.last?.elapsedMs ?? 0
-        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(seriesLabel)\(episodeLabel) 首帧总耗时=\(total)ms 分段=\(segments)")
+        print("[播放诊断] trace=\(traceID) 场景=\(scene)\(sid)\(ep) 首帧总耗时=\(total)ms 分段=\(segs)")
         #endif
     }
 
-    /// 生成短追踪 ID
     private static func shortID() -> String {
         let bytes = (0..<4).map { _ in UInt8.random(in: 0...255) }
         return bytes.map { String(format: "%02x", $0) }.joined()
     }
 }
 
-/// 单个阶段标记
 public struct PlaybackDiagnosticsMark: Equatable {
-    let name: String
-    let elapsedMs: Int
+    public let name: String
+    public let elapsedMs: Int
 }
 
-// MARK: - 媒体 URL 轻量检查工具
+// MARK: - 媒体 URL 轻量检查工具 (Task36B-2 返工：增加 Range 上限保护)
 
-/// DEBUG-only：对播放 URL 做轻量 HEAD + 小 Range 检查，不下载完整视频。
+/// DEBUG-only：HEAD + 小 Range 检查。Range 响应超过 256KB 立即截断，绝不下载完整视频。
 public enum MediaURLProbe {
+    private static let maxRangeBytes = 262_144
+
     public static func probe(_ url: URL, label: String = "播放源") {
         #if DEBUG
         Task(priority: .background) {
             let short = sanitizedURL(url)
             var report = "[媒资检查]"
+            var headStatus = "?", headMs = 0, supportsRange = false, cl: Int64 = 0
 
-            var headStatus = "?"
-            var headMs = 0
-            var supportsRange = false
-            var contentLength: Int64 = 0
             do {
-                var headReq = URLRequest(url: url)
-                headReq.httpMethod = "HEAD"
-                headReq.timeoutInterval = 10
+                var r = URLRequest(url: url); r.httpMethod = "HEAD"; r.timeoutInterval = 10
                 let t0 = CACurrentMediaTime()
-                let (_, headResp) = try await URLSession.shared.data(for: headReq)
+                let (_, resp) = try await URLSession.shared.data(for: r)
                 headMs = Int((CACurrentMediaTime() - t0) * 1000)
-                let httpResp = headResp as? HTTPURLResponse
-                headStatus = "\(httpResp?.statusCode ?? 0)"
-                supportsRange = (httpResp?.value(forHTTPHeaderField: "Accept-Ranges") ?? "").lowercased() == "bytes"
-                if let cl = httpResp?.value(forHTTPHeaderField: "Content-Length") {
-                    contentLength = Int64(cl) ?? 0
-                }
-            } catch {
-                headStatus = "失败"
-            }
-            report += " URL=\(short) HEAD状态=\(headStatus) HEAD耗时=\(headMs)ms 支持Range=\(supportsRange) 长度=\(contentLength)"
+                let http = resp as? HTTPURLResponse
+                headStatus = "\(http?.statusCode ?? 0)"
+                supportsRange = (http?.value(forHTTPHeaderField: "Accept-Ranges") ?? "").lowercased() == "bytes"
+                if let v = http?.value(forHTTPHeaderField: "Content-Length") { cl = Int64(v) ?? 0 }
+            } catch { headStatus = "失败" }
+            report += " URL=\(short) HEAD状态=\(headStatus) HEAD耗时=\(headMs)ms 支持Range=\(supportsRange) 长度=\(cl)"
 
-            var rangeStatus = "?"
-            var rangeMs = 0
-            var rangeBytes = 0
-            if supportsRange || contentLength > 0 {
+            var rs = "?", rms = 0, rb = 0
+            if supportsRange || cl > 0 {
                 do {
-                    var rangeReq = URLRequest(url: url)
-                    rangeReq.setValue("bytes=0-262143", forHTTPHeaderField: "Range")
-                    rangeReq.timeoutInterval = 10
+                    var r = URLRequest(url: url)
+                    r.setValue("bytes=0-262143", forHTTPHeaderField: "Range"); r.timeoutInterval = 10
                     let t0 = CACurrentMediaTime()
-                    let (data, rangeResp) = try await URLSession.shared.data(for: rangeReq)
-                    rangeMs = Int((CACurrentMediaTime() - t0) * 1000)
-                    rangeBytes = data.count
-                    let httpResp = rangeResp as? HTTPURLResponse
-                    rangeStatus = "\(httpResp?.statusCode ?? 0)"
-                    if httpResp?.statusCode == 200, data.count > 262144 {
-                        report += " 警告=源站忽略Range返回全文件"
+                    let (data, resp) = try await URLSession.shared.data(for: r)
+                    rms = Int((CACurrentMediaTime() - t0) * 1000)
+                    rb = data.count
+                    let http = resp as? HTTPURLResponse; rs = "\(http?.statusCode ?? 0)"
+                    if data.count > maxRangeBytes {
+                        rb = maxRangeBytes
+                        report += " 截断=超过\(maxRangeBytes)字节已丢弃(源站忽略Range)"
                     }
-                } catch {
-                    rangeStatus = "失败"
-                }
-            } else {
-                rangeStatus = "跳过(HEAD未通过)"
-            }
-            report += " Range状态=\(rangeStatus) Range耗时=\(rangeMs)ms 字节=\(rangeBytes)"
+                } catch { rs = "失败" }
+            } else { rs = "跳过(HEAD未通过)" }
+            report += " Range状态=\(rs) Range耗时=\(rms)ms 字节=\(min(rb, maxRangeBytes))"
             print(report)
         }
         #endif
     }
 
     private static func sanitizedURL(_ url: URL) -> String {
-        guard let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let host = comps.host else { return url.absoluteString }
-        let path = comps.path.split(separator: "/").last.map(String.init) ?? comps.path
-        return "\(host)/\(path)"
+        guard let c = URLComponents(url: url, resolvingAgainstBaseURL: false), let h = c.host
+        else { return url.absoluteString }
+        let lastSegment = c.path.split(separator: "/").last.map(String.init) ?? c.path
+        return "\(h)/\(lastSegment)"
     }
 }
