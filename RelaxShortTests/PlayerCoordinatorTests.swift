@@ -203,10 +203,95 @@ struct PlayerCoordinatorTests {
         )
 
         coordinator.claimSeries(drama: drama, items: [preview], startIndex: 0, handoff: nil)
+        let previewPlayer = coordinator.engine.currentPlayer
+        coordinator.engine.progress = PlayerProgress(currentTime: 12, duration: 60, bufferProgress: 0.4)
         coordinator.claimSeries(drama: drama, items: [official], startIndex: 0, handoff: nil)
 
+        #expect(coordinator.engine.currentPlayer === previewPlayer)
         #expect(coordinator.engine.currentItem?.source == preview.source)
+        #expect(coordinator.engine.progress.currentTime == 12)
         #expect(coordinator.engine.wantsPlayback == true)
+    }
+
+    @Test
+    func differentSeriesCannotReusePlayerOnlyBecauseMediaIDMatches() throws {
+        let coordinator = PlayerCoordinator()
+        let firstDrama = drama(id: "series-a")
+        let secondDrama = drama(id: "series-b")
+        let sharedIDItem = mediaItem(id: "episode-1")
+
+        coordinator.claimSeries(
+            drama: firstDrama,
+            items: [sharedIDItem],
+            startIndex: 0,
+            handoff: nil
+        )
+        let firstPlayer = try #require(coordinator.engine.currentPlayer)
+
+        coordinator.claimSeries(
+            drama: secondDrama,
+            items: [sharedIDItem],
+            startIndex: 0,
+            handoff: nil
+        )
+
+        #expect(coordinator.owner == .series(dramaID: "series-b"))
+        #expect(coordinator.engine.currentPlayer !== firstPlayer)
+    }
+
+    @Test
+    func pageSessionRejectsOldPageAndOldEpisodeTokens() {
+        var firstPage = SeriesPlaybackSessionGate(
+            dramaID: "series-a",
+            episodeNumber: 1,
+            mediaID: "series-a-1"
+        )
+        let firstEpisodeToken = firstPage.currentToken
+
+        let secondEpisodeToken = firstPage.retarget(
+            episodeNumber: 2,
+            mediaID: "series-a-2"
+        )
+        let secondPage = SeriesPlaybackSessionGate(
+            dramaID: "series-a",
+            episodeNumber: 2,
+            mediaID: "series-a-2"
+        )
+
+        #expect(!firstPage.accepts(firstEpisodeToken))
+        #expect(firstPage.accepts(secondEpisodeToken))
+        #expect(!secondPage.accepts(secondEpisodeToken))
+    }
+
+    @Test
+    func playbackStateUsesActualPlayerStatusInsteadOfPlayIntent() {
+        #expect(
+            ShortVideoPlayerEngine.resolvePlaybackState(
+                wantsPlayback: true,
+                itemStatus: .unknown,
+                timeControlStatus: .paused,
+                isPlaybackLikelyToKeepUp: false,
+                pausedState: .pausedBySystem
+            ) == .preparing
+        )
+        #expect(
+            ShortVideoPlayerEngine.resolvePlaybackState(
+                wantsPlayback: true,
+                itemStatus: .readyToPlay,
+                timeControlStatus: .waitingToPlayAtSpecifiedRate,
+                isPlaybackLikelyToKeepUp: false,
+                pausedState: .pausedBySystem
+            ) == .waitingNetwork
+        )
+        #expect(
+            ShortVideoPlayerEngine.resolvePlaybackState(
+                wantsPlayback: true,
+                itemStatus: .readyToPlay,
+                timeControlStatus: .playing,
+                isPlaybackLikelyToKeepUp: true,
+                pausedState: .pausedBySystem
+            ) == .playing
+        )
     }
 
     private func mediaItem(id: String) -> PlayerMediaItem {
@@ -217,6 +302,24 @@ struct PlayerCoordinatorTests {
             coverURL: "",
             source: .mp4(URL(string: "https://example.com/video.mp4")!),
             resumeTime: nil
+        )
+    }
+
+    private func drama(id: String) -> DramaItem {
+        DramaItem(
+            id: id,
+            title: id,
+            coverURL: "https://example.com/cover.jpg",
+            videoURL: "https://example.com/\(id).mp4",
+            category: "Drama",
+            tags: [],
+            viewCount: 1,
+            episodeCount: 2,
+            currentEpisode: 1,
+            synopsis: "",
+            isHot: false,
+            isTrending: false,
+            rating: 0
         )
     }
 }

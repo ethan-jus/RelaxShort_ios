@@ -21,6 +21,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
     @Published private(set) var hasVisiblePlaybackStarted: Bool = false
     @Published private(set) var diagnostics = PlayerDiagnostics()
 
+    /// Coordinator 只用它判断同一稳定媒体是否允许失败后重建，不暴露具体错误文案。
+    var isPlaybackFailed: Bool {
+        if case .failed = state { return true }
+        return false
+    }
+
     var metrics = PlayerMetricsLogger()
     var onPlaybackFinished: (() -> Void)?
 
@@ -50,6 +56,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var warmCacheTasks: [String: Task<Void, Never>] = [:]
     // item status KVO
     private var itemStatusObs: NSKeyValueObservation?
+    // 播放状态只能由 AVPlayer 实际状态驱动，不能由 play() 调用直接推断。
+    private var timeControlStatusObs: NSKeyValueObservation?
+    private var likelyToKeepUpObs: NSKeyValueObservation?
     // 预加载升 current 的超时检测
     private var readinessTimeoutTask: Task<Void, Never>?
     // 单个媒体只做一次直连降级，避免坏缓存和坏网络之间反复重建
@@ -96,6 +105,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     func prepare(items: [PlayerMediaItem], index: Int) {
         guard !items.isEmpty, items.indices.contains(index) else { return }
         cancelAllPreloadTasks()
+        detachPlaybackStateObservers()
 
         self.items = items
         currentIndex = index
@@ -180,7 +190,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
         if let player = currentPlayer {
             player.play()
-            state = .playing
+            synchronizePlaybackState(with: player)
             log("play: player.play() called rate=\(player.rate) status=\(statusString(player.currentItem?.status))")
         }
         // else: 等 attach 后由 wantsPlayback 驱动自动播放
@@ -194,7 +204,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         wantsPlayback = true
         if let player = currentPlayer {
             player.play()
-            state = .playing
+            synchronizePlaybackState(with: player)
             log("playFromSystemResume: 恢复播放")
         }
     }
@@ -214,6 +224,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
         cancelAllPreloadTasks()
         subtitleTask?.cancel()
         recoveryController.cancelPendingRecovery()
+        recoveryController.detachObservers()
+        detachPlaybackStateObservers()
         currentPlayer?.pause()
         if wasPreparing { currentItem = nil }
         state = .pausedBySystem
@@ -354,7 +366,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
         if autoplay, wantsPlayback {
             player.play()
-            state = .playing
+            synchronizePlaybackState(with: player)
             log("rebuildItem: 恢复播放")
         }
     }
@@ -391,6 +403,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     func cleanup() {
         wantsPlayback = false
         itemStatusObs?.invalidate(); itemStatusObs = nil
+        detachPlaybackStateObservers()
         cancelAllPreloadTasks()
         subtitleTask?.cancel()
         removeObservers()
@@ -440,6 +453,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         resetReadyState()
         currentPlayer = player
         setupItemStatusKVO(player)
+        setupPlaybackStateObservers(player)
         startObserving()
         recoveryController.attachObservers(to: player)
 
@@ -464,24 +478,91 @@ final class ShortVideoPlayerEngine: ObservableObject {
             }
         }
 
-        state = .ready
+        state = player.currentItem?.status == .readyToPlay ? .ready : .preparing
         log("attach: status=\(statusString(player.currentItem?.status)) timeControl=\(tcsString(player.timeControlStatus))")
 
         // 如果有播放意图，attach 后立即播放
         if wantsPlayback {
             player.play()
-            state = .playing
+            synchronizePlaybackState(with: player)
             log("attach: 自动播放（wantsPlayback=true）")
+        }
+    }
+
+    /// 将“播放意图”和 AVPlayer 的实际状态分开。只有底层已真正进入 playing，
+    /// Engine 才发布 `.playing`；否则保持 preparing/ready/waiting。
+    static func resolvePlaybackState(
+        wantsPlayback: Bool,
+        itemStatus: AVPlayerItem.Status,
+        timeControlStatus: AVPlayer.TimeControlStatus,
+        isPlaybackLikelyToKeepUp: Bool,
+        pausedState: PlayerPlaybackState
+    ) -> PlayerPlaybackState {
+        if itemStatus == .failed { return .failed(message: "播放失败") }
+        if itemStatus == .unknown { return .preparing }
+        guard wantsPlayback else { return pausedState }
+
+        switch timeControlStatus {
+        case .playing:
+            return .playing
+        case .waitingToPlayAtSpecifiedRate:
+            return isPlaybackLikelyToKeepUp ? .ready : .waitingNetwork
+        case .paused:
+            return .ready
+        @unknown default:
+            return .ready
+        }
+    }
+
+    private func setupPlaybackStateObservers(_ player: AVPlayer) {
+        detachPlaybackStateObservers()
+        timeControlStatusObs = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] player, _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.currentPlayer === player else { return }
+                self.synchronizePlaybackState(with: player)
+            }
+        }
+        likelyToKeepUpObs = player.currentItem?.observe(\.isPlaybackLikelyToKeepUp, options: [.initial, .new]) { [weak self, weak player] _, _ in
+            Task { @MainActor [weak self, weak player] in
+                guard let self, let player, self.currentPlayer === player else { return }
+                self.synchronizePlaybackState(with: player)
+            }
+        }
+    }
+
+    private func detachPlaybackStateObservers() {
+        timeControlStatusObs?.invalidate()
+        timeControlStatusObs = nil
+        likelyToKeepUpObs?.invalidate()
+        likelyToKeepUpObs = nil
+    }
+
+    private func synchronizePlaybackState(with player: AVPlayer) {
+        guard currentPlayer === player, let item = player.currentItem else { return }
+        let pausedState: PlayerPlaybackState = state == .pausedByUser ? .pausedByUser : .pausedBySystem
+        let nextState = Self.resolvePlaybackState(
+            wantsPlayback: wantsPlayback,
+            itemStatus: item.status,
+            timeControlStatus: player.timeControlStatus,
+            isPlaybackLikelyToKeepUp: item.isPlaybackLikelyToKeepUp,
+            pausedState: pausedState
+        )
+        if state != nextState {
+            state = nextState
+            log("同步真实播放状态: \(nextState)")
         }
     }
 
     /// 监听 AVPlayerItem.status，failed 时触发 fallback
     private func setupItemStatusKVO(_ player: AVPlayer) {
         itemStatusObs?.invalidate()
-        itemStatusObs = player.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
-            guard item.status == .failed else { return }
+        itemStatusObs = player.currentItem?.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             Task { @MainActor [weak self] in
                 guard let self, self.currentPlayer === player else { return }
+                guard item.status == .failed else {
+                    self.synchronizePlaybackState(with: player)
+                    return
+                }
                 let err = item.error?.localizedDescription ?? "未知错误"
                 self.log("itemStatusKVO: failed err=\(err)")
                 guard let cur = self.currentItem else { return }
@@ -496,7 +577,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
                     self.recoveryController.detachObservers()
                     self.recoveryController.attachObservers(to: player)
                     self.setupItemStatusKVO(player)
-                    if self.wantsPlayback { player.play(); self.state = .playing }
+                    if self.wantsPlayback {
+                        player.play()
+                        self.synchronizePlaybackState(with: player)
+                    }
                 } else {
                     if !self.directFallbackMediaIDs.contains(cur.id) {
                         self.directFallbackMediaIDs.insert(cur.id)
@@ -615,7 +699,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
             self.slotPool.rebuildCurrent(item: item, generation: gen) { result in
                 guard case .success(let player) = result else { return }
                 self.attach(player: player)
-                if self.wantsPlayback { player.play(); self.state = .playing }
+                if self.wantsPlayback {
+                    player.play()
+                    self.synchronizePlaybackState(with: player)
+                }
             }
         }
     }
@@ -883,8 +970,9 @@ public enum StreamedRangeFetcher {
         case notRange(statusCode: Int, data: Data?)
         case failed(Error)
     }
-    /// 测试可注入 session（nil 使用 ephemeral）
-    public static var testSession: URLSession?
+    /// 测试可注入 session 工厂，但工厂必须把传入的 delegate 绑定到新 session。
+    /// URLSession 创建后不能替换 delegate，直接注入已创建的 session 会让 continuation 永远等待。
+    public static var testSessionFactory: ((URLSessionDelegate) -> URLSession)?
 
     public static func fetch(url: URL, requestedRange: ClosedRange<Int64>, maxBytes: Int) async -> FetchResult {
         await withCheckedContinuation { cc in
@@ -892,7 +980,8 @@ public enum StreamedRangeFetcher {
             var req = URLRequest(url: url)
             req.setValue("bytes=\(requestedRange.lowerBound)-\(requestedRange.upperBound)", forHTTPHeaderField: "Range")
             req.timeoutInterval = 10
-            let s = testSession ?? URLSession(configuration: .ephemeral, delegate: d, delegateQueue: nil)
+            let s = testSessionFactory?(d)
+                ?? URLSession(configuration: .ephemeral, delegate: d, delegateQueue: nil)
             d.session = s; d.task = s.dataTask(with: req); d.task?.resume()
         }
     }
@@ -903,19 +992,33 @@ public enum StreamedRangeFetcher {
         init(reqRange: ClosedRange<Int64>, maxB: Int, cb: @escaping (FetchResult) -> Void) {
             self.reqRange = reqRange; self.maxB = maxB; self.cb = cb
         }
-        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive r: URLResponse,
-                        ch: @escaping (URLSession.ResponseDisposition) -> Void) {
-            if let h = r as? HTTPURLResponse { code = h.statusCode; crHeader = h.value(forHTTPHeaderField: "Content-Range") }
-            if code != 206 { task?.cancel(); ch(.cancel); return }
-            ch(.allow)
+        func urlSession(
+            _ session: URLSession,
+            dataTask: URLSessionDataTask,
+            didReceive response: URLResponse,
+            completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+        ) {
+            if let httpResponse = response as? HTTPURLResponse {
+                code = httpResponse.statusCode
+                crHeader = httpResponse.value(forHTTPHeaderField: "Content-Range")
+            }
+            if code != 206 {
+                task?.cancel()
+                completionHandler(.cancel)
+                return
+            }
+            completionHandler(.allow)
         }
-        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive d: Data) {
-            total += d.count
-            if total > maxB { session?.invalidateAndCancel(); task?.cancel(); return }
-            chunks.append(d)
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+            total += data.count
+            if total > maxB { session.invalidateAndCancel(); task?.cancel(); return }
+            chunks.append(data)
         }
         func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError e: Error?) {
             let data = chunks.reduce(into: Data()) { $0.append($1) }
+            if code == 0, let e {
+                s.invalidateAndCancel(); cb(.failed(e)); return
+            }
             if code != 206 { s.invalidateAndCancel(); cb(.notRange(statusCode: code, data: data.isEmpty ? nil : data)); return }
             if total > maxB {
                 let tl = crHeader?.components(separatedBy: "/").last.flatMap { Int64($0) }
@@ -932,7 +1035,9 @@ public enum StreamedRangeFetcher {
             }
             let loS = String(br[..<di]); let hiS = String(br[br.index(after: di)...])
             guard let lo = Int64(loS), let hi = Int64(hiS),
-                  lo == reqRange.lowerBound, hi - lo + 1 == Int64(data.count) else {
+                  lo == reqRange.lowerBound,
+                  hi <= reqRange.upperBound,
+                  hi - lo + 1 == Int64(data.count) else {
                 s.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -2, userInfo: [NSLocalizedDescriptionKey: "Content-Range不匹配: \(br)"]))); return
             }
             let tl = cr.components(separatedBy: "/").last.flatMap { Int64($0) }

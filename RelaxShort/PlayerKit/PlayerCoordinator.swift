@@ -6,6 +6,13 @@ import SwiftUI
 @MainActor
 final class PlayerCoordinator: ObservableObject {
 
+    /// Series 播放申请使用稳定业务身份，不能只比较可能跨剧重复的 mediaID。
+    private struct SeriesMediaIdentity: Equatable {
+        let dramaID: String
+        let episodeNumber: Int
+        let mediaID: String
+    }
+
     enum Owner: Hashable {
         case forYou
         case series(dramaID: String)
@@ -18,6 +25,7 @@ final class PlayerCoordinator: ObservableObject {
     private var forYouPlaybackFinishedHandler: (@MainActor () -> Void)?
     private var seriesPlaybackFinishedHandler: (dramaID: String, action: @MainActor () -> Void)?
     private var claimGeneration: Int = 0
+    private var currentSeriesIdentity: SeriesMediaIdentity?
 
     init() {
         self.engine = ShortVideoPlayerEngine()
@@ -38,6 +46,7 @@ final class PlayerCoordinator: ObservableObject {
     /// Series 在任何网络请求前先取得唯一播放权，阻止旧 For You 媒体继续播放。
     func beginSeries(dramaID: String) {
         invalidateCurrentClaim()
+        currentSeriesIdentity = nil
         seriesPlaybackFinishedHandler = nil
         owner = .series(dramaID: dramaID)
         engine.deactivate()
@@ -70,6 +79,12 @@ final class PlayerCoordinator: ObservableObject {
         engine.playFromSystemResume()
     }
 
+    /// Series 切集等待播放合同时只暂停当前媒体，不允许页面直接重置 Engine。
+    func pauseSeriesForTransition(dramaID: String) {
+        guard owner == .series(dramaID: dramaID) else { return }
+        engine.pause(reason: .system)
+    }
+
     /// For You 声明播放权 — 同 item 不重建
     func claimForYou(items: [PlayerMediaItem], index: Int) {
         let targetID = items[safe: index]?.id ?? ""
@@ -77,6 +92,7 @@ final class PlayerCoordinator: ObservableObject {
             engine.play(); return
         }
         invalidateCurrentClaim()
+        currentSeriesIdentity = nil
         seriesPlaybackFinishedHandler = nil
         owner = .forYou
         engine.prepare(items: items, index: index)
@@ -119,24 +135,38 @@ final class PlayerCoordinator: ObservableObject {
         handoff: PlayerHandoffContext?,
         backendResumeTime: TimeInterval? = nil
     ) {
+        guard let targetItem = items[safe: startIndex] else { return }
         let seriesOwner = Owner.series(dramaID: drama.id)
+        let targetIdentity = SeriesMediaIdentity(
+            dramaID: drama.id,
+            episodeNumber: targetItem.episodeNumber ?? max(1, drama.currentEpisode),
+            mediaID: targetItem.id
+        )
+
+        // 同剧、同集、同媒体的重复申请必须幂等。即使 AVPlayer 尚未 attach，
+        // Engine 已记录 currentItem 时也不能再次 deactivate/prepare。
+        let isSameStableMedia = owner == seriesOwner
+            && currentSeriesIdentity == targetIdentity
+            && engine.currentItem?.id == targetItem.id
+            && !engine.isPlaybackFailed
+        if isSameStableMedia {
+            Logger.player.debug("Series 同一稳定媒体重复申请，保留现有播放器")
+            engine.play()
+            return
+        }
+
         if owner == seriesOwner {
             invalidateCurrentClaim()
+            engine.deactivate()
         } else {
             beginSeries(dramaID: drama.id)
         }
-        let targetItemID = items[safe: startIndex]?.id ?? ""
-        let targetItem = items[safe: startIndex]
-        let currentMediaIDMatches = engine.currentItem?.id == targetItemID
+
+        currentSeriesIdentity = targetIdentity
+        let targetItemID = targetItem.id
         let token = claimGeneration
 
-        if currentMediaIDMatches, engine.currentPlayer != nil {
-            Logger.player.debug("Series keeps current media item for same episode")
-            engine.play(); return
-        }
-
-        Logger.player.debug("Series prepares a new media item")
-        engine.deactivate()
+        Logger.player.debug("Series 准备新的稳定媒体")
         engine.prepare(items: items, index: startIndex)
         // Series 进入播放页必须立即产生播放意图，不能因为等待 resume/seek 而表现为默认暂停。
         // 如果需要续播，后续在 item ready 后再 seek；首屏体验优先保证快速开始播放。
@@ -203,6 +233,7 @@ final class PlayerCoordinator: ObservableObject {
         if case .series = owner {
             seriesPlaybackFinishedHandler = nil
         }
+        currentSeriesIdentity = nil
         engine.deactivate()
         self.owner = nil
         Logger.player.debug("Player ownership released")

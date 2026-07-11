@@ -1,6 +1,68 @@
 import SwiftUI
 import AVKit
 
+// MARK: - 页面播放会话门禁
+
+struct SeriesPlaybackSessionToken: Equatable {
+    let pageID: UUID
+    let generation: Int
+    let dramaID: String
+    let episodeNumber: Int
+    let mediaID: String
+}
+
+/// 每个 Series 页面实例持有独立 pageID；切集或页面退出都会推进 generation，
+/// 使无法取消的旧网络请求即使返回，也不能再提交播放器或覆盖页面状态。
+struct SeriesPlaybackSessionGate {
+    let pageID: UUID
+    let dramaID: String
+    private(set) var generation: Int
+    private(set) var episodeNumber: Int
+    private(set) var mediaID: String
+    private(set) var isActive: Bool
+
+    init(
+        pageID: UUID = UUID(),
+        dramaID: String,
+        episodeNumber: Int,
+        mediaID: String
+    ) {
+        self.pageID = pageID
+        self.dramaID = dramaID
+        self.generation = 0
+        self.episodeNumber = episodeNumber
+        self.mediaID = mediaID
+        self.isActive = true
+    }
+
+    var currentToken: SeriesPlaybackSessionToken {
+        SeriesPlaybackSessionToken(
+            pageID: pageID,
+            generation: generation,
+            dramaID: dramaID,
+            episodeNumber: episodeNumber,
+            mediaID: mediaID
+        )
+    }
+
+    mutating func retarget(episodeNumber: Int, mediaID: String) -> SeriesPlaybackSessionToken {
+        generation &+= 1
+        self.episodeNumber = episodeNumber
+        self.mediaID = mediaID
+        isActive = true
+        return currentToken
+    }
+
+    mutating func invalidate() {
+        generation &+= 1
+        isActive = false
+    }
+
+    func accepts(_ token: SeriesPlaybackSessionToken) -> Bool {
+        isActive && token == currentToken
+    }
+}
+
 // MARK: - Series Player View (接入 ShortVideoPlayerEngine)
 
 struct SeriesPlayerView: View {
@@ -30,7 +92,8 @@ struct SeriesPlayerView: View {
     /// 单一 sheet router，避免多 .sheet 互抢。
     @State private var activeSheet: PlayerSheet?
     @State private var isSpeeding = false
-    @State private var isSwitchingEpisode = false
+    @State private var episodeSwitchTask: Task<Void, Never>?
+    @State private var playbackSession: SeriesPlaybackSessionGate
     @State private var playbackState: PlayerPlaybackState = .idle
     @State private var playbackProgress = PlayerProgress()
     @State private var selectedPlaybackRate: Float = 1.0
@@ -86,6 +149,16 @@ struct SeriesPlayerView: View {
         self.handoff = handoff
         self.sourceScene = sourceScene
         self._currentEpisode = State(initialValue: self.startEpisode)
+        self._playbackSession = State(
+            initialValue: SeriesPlaybackSessionGate(
+                dramaID: drama.id,
+                episodeNumber: self.startEpisode,
+                mediaID: PlayerMediaItem.stableID(
+                    dramaID: drama.id,
+                    episodeNumber: self.startEpisode
+                )
+            )
+        )
     }
 
     // MARK: - Body
@@ -222,7 +295,9 @@ struct SeriesPlayerView: View {
         }
         .onDisappear {
             autoHideTask?.cancel()
+            episodeSwitchTask?.cancel()
             episodePrefetchTask?.cancel()
+            playbackSession.invalidate()
             Task { await dependencies.watchProgressReporter.finalize(completed: false) }
             playerCoordinator.release(.series(dramaID: drama.id))
         }
@@ -246,7 +321,7 @@ struct SeriesPlayerView: View {
     private func startPlaybackSession() async {
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "open"
-        var trace = PlaybackDiagnosticsTrace(scene: "series", seriesID: drama.id, episodeNumber: currentEpisode)
+        let trace = PlaybackDiagnosticsTrace(scene: "series", seriesID: drama.id, episodeNumber: currentEpisode)
         playerCoordinator.engine.startPlaybackTrace(trace)
         Logger.player.info("SeriesTrace 打开播放页开始 剧ID=\(drama.id) 起始集=\(currentEpisode) 来源=\(sourceScene)")
         playerCoordinator.beginSeries(dramaID: drama.id)
@@ -261,19 +336,29 @@ struct SeriesPlayerView: View {
             )
         }
 
-        // 卡片已携带预览媒资时立即播放点击的短剧，正式剧集/鉴权接口并行补全。
-        if let previewItem = drama.toPlayerMediaItem() {
+        let initialMediaID = PlayerMediaItem.stableID(
+            dramaID: drama.id,
+            episodeNumber: currentEpisode
+        )
+        let sessionToken = playbackSession.retarget(
+            episodeNumber: currentEpisode,
+            mediaID: initialMediaID
+        )
+
+        // 卡片预览源与正式源都只能经过 submitInitialPlaybackCandidate 提交。
+        if let previewItem = drama.toPlayerMediaItem(), previewItem.id == sessionToken.mediaID {
             Logger.player.info("SeriesTrace 使用卡片预览源先播 剧ID=\(drama.id) 集数=\(previewItem.episodeNumber ?? -1)")
             playerCoordinator.engine.markTrace("卡片预览源")
-            playerCoordinator.claimSeries(
-                drama: drama,
-                items: [previewItem],
+            submitInitialPlaybackCandidate(
+                previewItem,
+                allItems: [previewItem],
                 startIndex: 0,
-                handoff: handoff
+                sessionToken: sessionToken,
+                backendResumeTime: nil
             )
         }
 
-        await loadEpisodes()
+        await loadEpisodes(sessionToken: sessionToken)
     }
 
     /// Series 播放完成后优先切换下一集；最后一集回到首帧并等待用户重播。
@@ -292,18 +377,21 @@ struct SeriesPlayerView: View {
         }
     }
 
-    private func loadEpisodes() async {
+    private func loadEpisodes(sessionToken initialToken: SeriesPlaybackSessionToken) async {
         let repo = dependencies.detailRepository
         let startedAt = CACurrentMediaTime()
+        let loadedEpisodes: [Episode]
         do {
-            episodes = try await repo.fetchEpisodes(dramaId: drama.id)
+            loadedEpisodes = try await repo.fetchEpisodes(dramaId: drama.id)
+            guard isSessionCurrent(initialToken) else { return }
+            episodes = loadedEpisodes
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.info("SeriesTrace 剧集列表加载完成 剧ID=\(drama.id) 数量=\(episodes.count) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("剧集列表")
         } catch is CancellationError {
             return
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, isSessionCurrent(initialToken) else { return }
             Logger.viewModel.error("SeriesPlayerView: fetchEpisodes failed: \(error)")
             if playerCoordinator.engine.currentItem?.id != PlayerMediaItem.stableID(
                 dramaID: drama.id,
@@ -314,7 +402,7 @@ struct SeriesPlayerView: View {
             return
         }
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, isSessionCurrent(initialToken) else { return }
         // 必须在请求播放资源和初始化播放器之前匹配 My List 指定剧集，
         // 避免先加载默认集、随后再切集造成错误续播和重复请求。
         if let eid = initialEpisodeID,
@@ -323,13 +411,29 @@ struct SeriesPlayerView: View {
            }) {
             currentEpisode = matched.episodeNumber
         }
+        let targetToken: SeriesPlaybackSessionToken
+        if currentEpisode == initialToken.episodeNumber {
+            targetToken = initialToken
+        } else {
+            targetToken = playbackSession.retarget(
+                episodeNumber: currentEpisode,
+                mediaID: PlayerMediaItem.stableID(
+                    dramaID: drama.id,
+                    episodeNumber: currentEpisode
+                )
+            )
+        }
         // Task36B-2 返工：播放源标记移到 ensurePlayAsset 内部，成功/锁集/失败分别标记
-        _ = await ensurePlayAsset(for: currentEpisode, presentUnlockOnDenied: true)
-        guard !Task.isCancelled else { return }
-        initializeEpisodePlayer()
+        _ = await ensurePlayAsset(
+            for: currentEpisode,
+            presentUnlockOnDenied: true,
+            sessionToken: targetToken
+        )
+        guard !Task.isCancelled, isSessionCurrent(targetToken) else { return }
+        initializeEpisodePlayer(sessionToken: targetToken)
     }
 
-    private func initializeEpisodePlayer() {
+    private func initializeEpisodePlayer(sessionToken: SeriesPlaybackSessionToken) {
         let playable = buildPlayableItems(from: episodes)
         guard !playable.isEmpty else {
             // 正式播放接口失败时保留已启动的卡片预览，不得回落到其他剧或 Mock。
@@ -355,15 +459,13 @@ struct SeriesPlayerView: View {
         }()
         let effectiveResume = handoff?.resumeTime ?? myListResume ?? backendResume
 
-        if playerCoordinator.engine.currentItem != playerItems[safe: startIndex] {
-            playerCoordinator.claimSeries(
-                drama: drama,
-                items: playerItems,
-                startIndex: startIndex,
-                handoff: handoff,
-                backendResumeTime: handoff == nil ? effectiveResume : backendResume
-            )
-        }
+        submitInitialPlaybackCandidate(
+            playerItems[startIndex],
+            allItems: playerItems,
+            startIndex: startIndex,
+            sessionToken: sessionToken,
+            backendResumeTime: handoff == nil ? effectiveResume : backendResume
+        )
 
         // 绑定 reporter session
         if let epID = currentEpisodeID {
@@ -377,6 +479,37 @@ struct SeriesPlayerView: View {
 
         prefetchNextEpisode(after: currentEpisode)
         resetAutoHide()
+    }
+
+    /// 首播唯一播放器提交入口。预览源和正式源都先经过页面会话、播放权和稳定媒体身份校验，
+    /// 最终幂等行为由 PlayerCoordinator.claimSeries 统一决定。
+    private func submitInitialPlaybackCandidate(
+        _ item: PlayerMediaItem,
+        allItems: [PlayerMediaItem],
+        startIndex: Int,
+        sessionToken: SeriesPlaybackSessionToken,
+        backendResumeTime: TimeInterval?
+    ) {
+        guard isSessionCurrent(sessionToken),
+              item.id == sessionToken.mediaID,
+              item.episodeNumber == sessionToken.episodeNumber else {
+            Logger.player.debug("忽略过期的 Series 首播候选 媒体ID=\(item.id)")
+            return
+        }
+        playerCoordinator.claimSeries(
+            drama: drama,
+            items: allItems,
+            startIndex: startIndex,
+            handoff: handoff,
+            backendResumeTime: backendResumeTime
+        )
+    }
+
+    /// 页面令牌只是第一层；还要确认全局播放权仍属于当前剧，防止旧页面回调污染新页面。
+    private func isSessionCurrent(_ token: SeriesPlaybackSessionToken) -> Bool {
+        playbackSession.accepts(token)
+            && token.dramaID == drama.id
+            && playerCoordinator.owner == .series(dramaID: drama.id)
     }
 
     private func episodeID(for episodeNumber: Int) -> String? {
@@ -624,7 +757,7 @@ struct SeriesPlayerView: View {
         Logger.player.info("SeriesGesture 接受切集手势 原集=\(previous) 目标集=\(target)")
 
         // 先切 UI 页码，保证手势像 For You 一样停在目标页；播放源随后异步补齐。
-        playerCoordinator.engine.deactivate()
+        playerCoordinator.pauseSeriesForTransition(dramaID: drama.id)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
             currentEpisode = target
             dragOffset = 0
@@ -635,21 +768,33 @@ struct SeriesPlayerView: View {
     /// 切集入口：先拉播放源，再重建 playable items，最后 prepare/play。
     /// 禁止在无 source 时用 episodeNumber - 1 做 engine.move。
     private func switchToEpisode(_ episodeNumber: Int, previousEpisode: Int? = nil) {
-        guard !isSwitchingEpisode else { return }
-        isSwitchingEpisode = true
+        episodeSwitchTask?.cancel()
+        let sessionToken = playbackSession.retarget(
+            episodeNumber: episodeNumber,
+            mediaID: PlayerMediaItem.stableID(
+                dramaID: drama.id,
+                episodeNumber: episodeNumber
+            )
+        )
         // Task36B-2 返工 v3: trace 下沉到 switchToEpisode 统一入口，
         // 覆盖手势切集、选集面板、播放结束自动下一集三种路径
         playerCoordinator.engine.startPlaybackTrace(
             PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: drama.id, episodeNumber: episodeNumber)
         )
-        Task { @MainActor in
-            defer { isSwitchingEpisode = false }
+        episodeSwitchTask = Task { @MainActor in
             // 先 finalize 旧 session
             await dependencies.watchProgressReporter.finalize(completed: false)
-            guard await ensurePlayAsset(for: episodeNumber, presentUnlockOnDenied: true) else {
+            guard !Task.isCancelled, isSessionCurrent(sessionToken) else { return }
+            guard await ensurePlayAsset(
+                for: episodeNumber,
+                presentUnlockOnDenied: true,
+                sessionToken: sessionToken
+            ) else {
+                guard isSessionCurrent(sessionToken) else { return }
                 Logger.player.warning("SeriesTrace 切集被阻断 目标集=\(episodeNumber) 原集=\(previousEpisode ?? -1) 原因=播放源缺失或剧集锁定")
                 return
             }
+            guard !Task.isCancelled, isSessionCurrent(sessionToken) else { return }
             let playable = buildPlayableItems(from: episodes)
             guard let playableIndex = playable.firstIndex(where: { $0.episodeNumber == episodeNumber }) else {
                 Logger.player.warning("SeriesTrace 切集失败 目标集=\(episodeNumber) 原因=没有可播放索引")
@@ -657,8 +802,13 @@ struct SeriesPlayerView: View {
             }
             if currentEpisode != episodeNumber { currentEpisode = episodeNumber }
             Logger.player.info("SeriesTrace 切集准备播放器 目标集=\(episodeNumber) 播放索引=\(playableIndex)")
-            playerCoordinator.engine.prepare(items: playable.map(\.item), index: playableIndex)
-            playerCoordinator.engine.play()
+            playerCoordinator.claimSeries(
+                drama: drama,
+                items: playable.map(\.item),
+                startIndex: playableIndex,
+                handoff: nil,
+                backendResumeTime: episodeID(for: episodeNumber).flatMap { episodeResumeTimes[$0] }
+            )
             prefetchNextEpisode(after: episodeNumber)
             Logger.player.info("SeriesTrace 切集已调用播放 目标集=\(episodeNumber)")
         }
@@ -698,7 +848,9 @@ struct SeriesPlayerView: View {
     /// recordTrace: 是否记录 trace 标记。当前播放目标集为 true，预取为 false。
     @MainActor
     private func ensurePlayAsset(for episodeNumber: Int, presentUnlockOnDenied: Bool = false,
-                                 recordTrace: Bool = true) async -> Bool {
+                                 recordTrace: Bool = true,
+                                 sessionToken: SeriesPlaybackSessionToken? = nil) async -> Bool {
+        if let sessionToken, !isSessionCurrent(sessionToken) { return false }
         guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == episodeNumber }) else { return false }
         let ep = episodes[epIndex]
         let episodeId = ep.id
@@ -724,6 +876,7 @@ struct SeriesPlayerView: View {
         Logger.player.info("SeriesTrace 请求播放源 集数=\(episodeNumber) 剧集ID=\(episodeId)")
         do {
             let dto = try await dependencies.detailRepository.fetchPlayAsset(episodeId: episodeId)
+            if let sessionToken, !isSessionCurrent(sessionToken) { return false }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             if let url = dto.preferredPlaybackURL {
                 episodes[epIndex].videoURL = url
@@ -745,6 +898,7 @@ struct SeriesPlayerView: View {
             }
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
+            if let sessionToken, !isSessionCurrent(sessionToken) { return false }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 解锁UI暂未接入")
             if recordTrace {
@@ -753,6 +907,7 @@ struct SeriesPlayerView: View {
             }
             return false
         } catch {
+            if let sessionToken, !isSessionCurrent(sessionToken) { return false }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
             if recordTrace {

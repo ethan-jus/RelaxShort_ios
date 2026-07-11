@@ -3,18 +3,18 @@ import XCTest
 
 /// Task36B-2 返工 v4：StreamedRangeFetcher 流式取消 + recordTrace 隔离 + trace 标记
 final class PlaybackDiagnosticsTests: XCTestCase {
-    private var mockSession: URLSession!
-
     override func setUp() {
         super.setUp()
-        let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockRangeProtocol.self]
-        mockSession = URLSession(configuration: config)
-        StreamedRangeFetcher.testSession = mockSession
+        StreamedRangeFetcher.testSessionFactory = { delegate in
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [MockRangeProtocol.self]
+            return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        }
     }
     override func tearDown() {
-        StreamedRangeFetcher.testSession = nil
-        mockSession = nil
+        StreamedRangeFetcher.testSessionFactory = nil
+        MockRangeProtocol.response = nil
+        MockRangeProtocol.chunks = []
         super.tearDown()
     }
 
@@ -113,20 +113,22 @@ final class PlaybackDiagnosticsTests: XCTestCase {
 
 // MARK: - URLProtocol Mock
 
-private class MockRangeProtocol: URLProtocol {
+final class MockRangeProtocol: URLProtocol {
     static var response: ((URLRequest) -> HTTPURLResponse)?
     static var chunks: [Data] = []
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        guard let resp = Self.response?(request) else {
+        // Foundation 可能为 URLProtocol 生成运行时子类；这里必须显式访问基类静态桩，
+        // 使用 Self 会读到子类独立的空状态，导致状态码错误地变成 0。
+        guard let resp = MockRangeProtocol.response?(request) else {
             client?.urlProtocol(self, didFailWithError: NSError(domain: "Mock", code: -1))
             return
         }
         client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)
         // 分块发送模拟流式，超过 256KB 的块可触发截断
-        for chunk in Self.chunks {
+        for chunk in MockRangeProtocol.chunks {
             client?.urlProtocol(self, didLoad: chunk)
         }
         client?.urlProtocolDidFinishLoading(self)
