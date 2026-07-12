@@ -70,14 +70,83 @@ final class PlayerCoordinator: ObservableObject {
         engine.playFromSystemResume()
     }
 
+    /// For You 分页只能在其持有播放权时追加到共享引擎。
+    /// Series 播放期间页面仍可能收到分页回调，此时只更新页面模型，不得污染 Series 队列。
+    func appendForYouItems(_ items: [PlayerMediaItem]) {
+        guard owner == .forYou else { return }
+        engine.appendItems(items)
+    }
+
+    /// For You 翻页的唯一入口。所有权校验保证 Series 当前媒体不会被后台页面替换。
+    func moveForYou(to index: Int, autoplay: Bool) {
+        guard owner == .forYou else { return }
+        engine.move(to: index, autoplay: autoplay)
+    }
+
+    /// Series 切集的统一起点。先让旧媒体彻底失效，再返回本次请求令牌。
+    /// 手势、选集和自动下一集都必须使用该入口。
+    func beginSeriesEpisodeTransition(dramaID: String) -> Int? {
+        let seriesOwner = Owner.series(dramaID: dramaID)
+        guard owner == seriesOwner else { return nil }
+        invalidateCurrentClaim()
+        engine.beginContentTransition(autoplay: true)
+        return claimGeneration
+    }
+
+    /// 异步播放源返回前校验请求令牌，防止旧请求覆盖用户后来选择的剧集。
+    func isCurrentSeriesEpisodeTransition(dramaID: String, token: Int?) -> Bool {
+        guard let token else { return false }
+        return isCurrentSeriesClaim(owner: .series(dramaID: dramaID), token: token)
+    }
+
+    /// 只有当前最新切集请求可以提交播放器，迟到请求不得覆盖新目标。
+    @discardableResult
+    func commitSeriesEpisodeTransition(
+        drama: DramaItem,
+        items: [PlayerMediaItem],
+        startIndex: Int,
+        handoff: PlayerHandoffContext?,
+        backendResumeTime: TimeInterval? = nil,
+        token: Int
+    ) -> Bool {
+        guard isCurrentSeriesEpisodeTransition(dramaID: drama.id, token: token) else {
+            Logger.player.debug("忽略迟到的 Series 切集提交 剧ID=\(drama.id)")
+            return false
+        }
+        guard let targetItem = items[safe: startIndex] else { return false }
+        engine.commitContentTransition(
+            items: items,
+            index: startIndex,
+            autoplay: true
+        )
+        scheduleSeriesResume(
+            owner: .series(dramaID: drama.id),
+            token: token,
+            targetID: targetItem.id,
+            handoff: handoff,
+            backendResumeTime: backendResumeTime
+        )
+        return true
+    }
+
+    /// Series 页面只负责提前取得播放合同；媒体预加载统一交给共享 Engine/SlotPool。
+    func updateSeriesPlaylist(dramaID: String, items: [PlayerMediaItem]) {
+        guard owner == .series(dramaID: dramaID) else { return }
+        engine.updatePlaylistKeepingCurrent(items)
+    }
+
     /// For You 声明播放权 — 同 item 不重建
     func claimForYou(items: [PlayerMediaItem], index: Int) {
-        let targetID = items[safe: index]?.id ?? ""
+        guard let targetItem = items[safe: index] else { return }
+        let targetID = targetItem.id
         if owner == .forYou, engine.currentItem?.id == targetID {
             engine.play(); return
         }
         invalidateCurrentClaim()
         seriesPlaybackFinishedHandler = nil
+        if owner != .forYou {
+            engine.deactivate()
+        }
         owner = .forYou
         engine.prepare(items: items, index: index)
         engine.play()
@@ -119,42 +188,50 @@ final class PlayerCoordinator: ObservableObject {
         handoff: PlayerHandoffContext?,
         backendResumeTime: TimeInterval? = nil
     ) {
+        guard let targetItem = items[safe: startIndex] else { return }
         let seriesOwner = Owner.series(dramaID: drama.id)
-        if owner == seriesOwner {
+        let alreadyOwnedSeries = owner == seriesOwner
+        if alreadyOwnedSeries {
             invalidateCurrentClaim()
         } else {
             beginSeries(dramaID: drama.id)
         }
-        let targetItemID = items[safe: startIndex]?.id ?? ""
-        let targetItem = items[safe: startIndex]
+        let targetItemID = targetItem.id
         let currentMediaIDMatches = engine.currentItem?.id == targetItemID
         let token = claimGeneration
 
         if currentMediaIDMatches, engine.currentPlayer != nil {
-            Logger.player.debug("Series keeps current media item for same episode")
+            Logger.player.debug("Series 同一集继续复用当前播放器")
             engine.play(); return
         }
 
-        Logger.player.debug("Series prepares a new media item")
-        engine.deactivate()
+        Logger.player.debug("Series 准备新的播放媒体")
+        if alreadyOwnedSeries {
+            engine.deactivate()
+        }
         engine.prepare(items: items, index: startIndex)
         // Series 进入播放页必须立即产生播放意图，不能因为等待 resume/seek 而表现为默认暂停。
         // 如果需要续播，后续在 item ready 后再 seek；首屏体验优先保证快速开始播放。
         engine.play()
 
-        // 确定 resume time：handoff 优先，否则使用后端 resumeTime
-        let resolvedResume: TimeInterval?
-        if let handoff, handoff.resumeTime > 0 {
-            resolvedResume = handoff.resumeTime
-        } else if let backend = backendResumeTime, backend > 0 {
-            resolvedResume = backend
-        } else {
-            resolvedResume = nil
-        }
+        scheduleSeriesResume(
+            owner: seriesOwner,
+            token: token,
+            targetID: targetItemID,
+            handoff: handoff,
+            backendResumeTime: backendResumeTime
+        )
+    }
 
-        guard let resumeTime = resolvedResume, resumeTime > 0 else { return }
-
-        let targetID = targetItemID
+    private func scheduleSeriesResume(
+        owner seriesOwner: Owner,
+        token: Int,
+        targetID: String,
+        handoff: PlayerHandoffContext?,
+        backendResumeTime: TimeInterval?
+    ) {
+        let hasResumeTime = (handoff?.resumeTime ?? 0) > 0 || (backendResumeTime ?? 0) > 0
+        guard hasResumeTime else { return }
         let eng = engine
 
         seriesResumeTask = Task { @MainActor [weak self] in
@@ -205,7 +282,7 @@ final class PlayerCoordinator: ObservableObject {
         }
         engine.deactivate()
         self.owner = nil
-        Logger.player.debug("Player ownership released")
+        Logger.player.debug("播放器所有权已释放")
     }
 
     private func invalidateCurrentClaim() {

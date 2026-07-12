@@ -69,8 +69,12 @@ struct RecommendView: View {
                 isScrubbing = false; scrubFraction = 0
                 isSpeeding = false; showSpeedHUD = false
                 // engine handles reset internally
-                session.handleTransition(from: oldValue, to: newValue, dramas: viewModel.dramas)
-                if isPlaybackVisible { session.engine.play() }
+                session.handleTransition(
+                    from: oldValue,
+                    to: newValue,
+                    dramas: viewModel.dramas,
+                    autoplay: isPlaybackVisible
+                )
                 // Task36A: 接近末尾时自动加载下一页
                 Task { await viewModel.loadNextPageIfNeeded(currentIndex: newValue) }
             }
@@ -214,8 +218,9 @@ struct RecommendView: View {
         let horizontalPadding: CGFloat = 16
         let actionRailWidth: CGFloat = 50
         let actionRailGap = max(18, geo.size.width * 0.055)
-        let maxContentWidth = geo.size.width - horizontalPadding * 2 - actionRailWidth - actionRailGap
-        let contentWidth = min(maxContentWidth, geo.size.width * 0.74)
+        let availableWidth = max(0, geo.size.width - horizontalPadding * 2)
+        let maxContentWidth = max(0, availableWidth - actionRailWidth - actionRailGap)
+        let contentWidth = max(0, min(maxContentWidth, geo.size.width * 0.74))
         let bottomSafeArea = UIApplication.safeAreaInsets.bottom
         let tabBarAvoidance = bottomSafeArea + DramaBoxBottomTabBar.totalHeight
 
@@ -300,13 +305,13 @@ struct RecommendView: View {
                 }
 
                 if isCurrent {
-                    progressBar(totalWidth: geo.size.width - horizontalPadding * 2)
-                        .frame(width: geo.size.width - horizontalPadding * 2)
+                    progressBar(totalWidth: availableWidth)
+                        .frame(width: availableWidth)
                         .zIndex(30)
                 } else {
                     Capsule()
                         .fill(Color.white.opacity(0.22))
-                        .frame(width: geo.size.width - horizontalPadding * 2, height: 3)
+                        .frame(width: availableWidth, height: 3)
                         .frame(height: 14, alignment: .bottom)
                 }
             }
@@ -390,8 +395,6 @@ struct RecommendView: View {
     }
 
     private func loadAndInit() async {
-        // 连线：session.engine 指向共享 coordinator.engine
-        session.bind(to: playerCoordinator)
         await viewModel.loadData()
         if isPlaybackVisible {
             initializePlaybackIfNeeded()
@@ -420,7 +423,6 @@ struct RecommendView: View {
     // MARK: - 自动播放配置
 
     private func setupAutoPlay() {
-        session.bind(to: playerCoordinator)
         playerCoordinator.setForYouPlaybackFinishedHandler {
             guard viewModel.dramas.indices.contains(session.currentIndex) else { return }
             let drama = viewModel.dramas[session.currentIndex]
@@ -1027,7 +1029,7 @@ private struct DramaAboutSheet: View {
 #if DEBUG
 #Preview("Recommend View") {
     let coordinator = PlayerCoordinator()
-    RecommendView(session: RecommendSession(engine: coordinator.engine))
+    RecommendView(session: RecommendSession(coordinator: coordinator))
         .environmentObject(AppStore())
         .environmentObject(coordinator)
 }

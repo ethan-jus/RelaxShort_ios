@@ -244,6 +244,7 @@ enum FeedCardDTOMapper {
             title: card.localizedTitle ?? "",
             coverURL: card.coverUrl ?? "",
             videoURL: resolvedVideoURL,
+            previewEpisodeID: card.previewEpisodeId.map(String.init),
             category: card.category ?? card.tags?.first ?? "",
             tags: card.tags ?? [],
             viewCount: Int(card.viewCount ?? 0),
@@ -262,6 +263,8 @@ enum FeedCardDTOMapper {
             isFollowed: false,
             isBookmarked: false,
             isVIPOnly: card.monetization?.vipRequired ?? false,
+            isPublicPreview: card.monetization?.isFree == true
+                && card.monetization?.vipRequired != true,
             isComingSoon: false,
             coinPrice: card.monetization?.unlockCoinCost.flatMap { Int(truncating: $0 as NSNumber) },
             freeEpisodeRange: freeRange,

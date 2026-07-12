@@ -24,8 +24,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
     var metrics = PlayerMetricsLogger()
     var onPlaybackFinished: (() -> Void)?
 
-    /// 强持有当前 ManagedItem（含 resourceLoaderDelegate），防止 delegate 被释放
-    private var currentManagedItem: PlayerManagedItem?
+    /// 仅供协调器和定向测试核对当前播放列表；页面不得据此直接修改引擎。
+    var playlistItemIDs: [String] { items.map(\.id) }
 
     /// 播放意图：即使 player 还没准备好，我们也记住了用户想播放
     internal var wantsPlayback = false
@@ -46,16 +46,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var ttffStart: Double = 0
     // move TTFF 计时
     private var moveTTFFStart: Double = 0
-    // cache warm tasks：按 URL 维度并发预热，避免 next+1 预热取消 next 的首段缓存
-    private var warmCacheTasks: [String: Task<Void, Never>] = [:]
     // item status KVO
     private var itemStatusObs: NSKeyValueObservation?
     // 预加载升 current 的超时检测
     private var readinessTimeoutTask: Task<Void, Never>?
     // 单个媒体只做一次直连降级，避免坏缓存和坏网络之间反复重建
     private var directFallbackMediaIDs = Set<String>()
-    /// 后台预热只缓存较小首段，避免弱网下与当前视频首帧抢带宽。
-    private let preloadLeadBytes: Int64 = 262_144
     /// Task36B-2: 当前会话播放诊断追踪
     private var playbackTrace: PlaybackDiagnosticsTrace?
     /// 记录当前 prepare/move 对应的 index，供首帧和 Move 区分
@@ -93,9 +89,84 @@ final class ShortVideoPlayerEngine: ObservableObject {
         log("appendItems: \(before) → \(items.count)")
     }
 
+    /// Series 获取到下一集播放合同后，只更新共享引擎的同一条播放列表。
+    /// 当前 AVPlayer 不重建；若首帧已出现，则由唯一槽位池开始预加载新的 next。
+    func updatePlaylistKeepingCurrent(_ newItems: [PlayerMediaItem]) {
+        guard let currentID = currentItem?.id,
+              let newIndex = newItems.firstIndex(where: { $0.id == currentID }) else { return }
+        cancelAllPreloadTasks()
+        slotPool.cancelAdjacent()
+        items = newItems
+        currentIndex = newIndex
+        log("播放列表已同步: 当前=\(currentID) 数量=\(newItems.count)")
+        if hasVisiblePlaybackStarted {
+            schedulePreloadAdjacent(gen: generation, delayMs: 0)
+        }
+    }
+
+    /// 提交已经开始的异步内容切换。优先提升共享池中按媒体 ID 匹配的 preroll 槽，
+    /// 未命中时才在同一个槽位池中创建当前播放器。
+    func commitContentTransition(
+        items newItems: [PlayerMediaItem],
+        index: Int,
+        autoplay: Bool
+    ) {
+        guard newItems.indices.contains(index) else {
+            endContentTransitionWithoutMedia()
+            return
+        }
+        if currentPlayer != nil {
+            beginContentTransition(autoplay: autoplay)
+        }
+        cancelAllPreloadTasks()
+        items = newItems
+        currentIndex = index
+        currentItem = newItems[index]
+        wantsPlayback = autoplay
+        state = .preparing
+        resetProgress()
+        resetReadyState()
+        updateDiagnostics(for: newItems[index], stateText: "commit-transition")
+        generation &+= 1
+        let gen = generation
+        ttffStart = CACurrentMediaTime()
+        markTrace("AVPlayer准备")
+
+        let attachResult: (Result<AVPlayer, Error>) -> Void = { [weak self] result in
+            guard let self, self.generation == gen else { return }
+            switch result {
+            case .success(let player):
+                self.attach(player: player)
+                self.markTrace("attach播放器")
+                self.logTTFF()
+            case .failure(let error):
+                self.log("内容切换提交失败: \(error.localizedDescription)")
+                self.endContentTransitionWithoutMedia()
+            }
+        }
+
+        if slotPool.promotePrepared(
+            item: newItems[index],
+            generation: gen,
+            completion: attachResult
+        ) {
+            log("内容切换命中相邻 preroll: id=\(newItems[index].id)")
+        } else {
+            log("内容切换未命中相邻 preroll，使用共享 current 槽: id=\(newItems[index].id)")
+            slotPool.prepare(
+                item: newItems[index],
+                slot: .current,
+                generation: gen,
+                completion: attachResult
+            )
+        }
+    }
+
     func prepare(items: [PlayerMediaItem], index: Int) {
         guard !items.isEmpty, items.indices.contains(index) else { return }
         cancelAllPreloadTasks()
+        // 全量 prepare 代表新播放列表，旧相邻槽不得跨 owner 或跨剧残留。
+        slotPool.cleanup()
 
         self.items = items
         currentIndex = index
@@ -126,25 +197,21 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 self.logTTFF()
             case .failure(let err):
                 self.log("prepare: 失败 err=\(err.localizedDescription)")
-                self.tryDirectFallback(for: items[index], gen: gen)
+                self.rebuildCurrentThroughPool(for: items[index], gen: gen)
             }
         }
     }
 
-    func move(to index: Int) {
+    func move(to index: Int, autoplay: Bool = true) {
         guard items.indices.contains(index), index != currentIndex else { return }
         // Task36B-2 返工：每次 move 启动新的诊断 trace，记录本次滑动的完整链路
         startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you_move", targetIndex: index))
-        cancelAllPreloadTasks()
-
         let oldIndex = currentIndex
+        beginContentTransition(autoplay: autoplay)
         currentIndex = index
         currentItem = items[index]
 
-        state = .preparing
         updateDiagnostics(for: items[index], stateText: "move")
-        resetProgress()
-        resetReadyState()
         generation &+= 1
         let gen = generation
         ttffStart = CACurrentMediaTime()
@@ -169,7 +236,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 self.startReadinessTimeout(gen: gen, index: index)
             case .failure(let err):
                 self.log("move: 失败 err=\(err.localizedDescription)")
-                self.tryDirectFallback(for: items[index], gen: gen)
+                self.rebuildCurrentThroughPool(for: items[index], gen: gen)
             }
         }
     }
@@ -206,18 +273,51 @@ final class ShortVideoPlayerEngine: ObservableObject {
         log("pause: reason=\(reason) wantsPlayback=\(wantsPlayback)")
     }
 
-    /// 释放播放所有权：撤销播放意图，取消所有异步任务，使进行中的 prepare 失效
-    func deactivate() {
-        let wasPreparing = state == .preparing
-        wantsPlayback = false
+    /// 开始切换到另一条内容时，原子撤销旧媒体的可见与可听状态。
+    /// 页面在等待下一条播放源期间只能看到封面，不能继续持有或恢复旧 AVPlayer。
+    func beginContentTransition(autoplay: Bool) {
         generation &+= 1
         cancelAllPreloadTasks()
         subtitleTask?.cancel()
+        subtitleTask = nil
         recoveryController.cancelPendingRecovery()
+        recoveryController.detachObservers()
+
         currentPlayer?.pause()
-        if wasPreparing { currentItem = nil }
+        removeObservers()
+        itemStatusObs?.invalidate()
+        itemStatusObs = nil
+
+        currentPlayer = nil
+        currentItem = nil
+        subtitleText = nil
+        subtitleCues.removeAll()
+        availableSubtitles = []
+        resetProgress()
+        resetReadyState()
+
+        wantsPlayback = autoplay
+        state = .preparing
+        log("内容切换开始: 旧媒体已静音并解绑 autoplay=\(autoplay) gen=\(generation)")
+    }
+
+    /// 新内容暂不可播放（锁集、网络失败或空源）时结束加载态。
+    /// 保持 currentPlayer 为空，避免任何 UI 操作重新启动旧媒体。
+    func endContentTransitionWithoutMedia() {
+        guard currentPlayer == nil else { return }
+        wantsPlayback = false
         state = .pausedBySystem
-        log("deactivate: wantsPlayback=false gen=\(generation) wasPreparing=\(wasPreparing)")
+        log("内容切换结束: 当前无可播放媒体")
+    }
+
+    /// 释放播放所有权：撤销播放意图，取消所有异步任务，使进行中的 prepare 失效
+    func deactivate() {
+        beginContentTransition(autoplay: false)
+        slotPool.cleanup()
+        items.removeAll()
+        currentIndex = 0
+        state = .pausedBySystem
+        log("deactivate: 已释放全部播放器槽位和播放列表 gen=\(generation)")
     }
 
     func setRate(_ rate: Float) {
@@ -308,10 +408,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
         diagnostics.stateText = "first-frame"
         markTrace("首帧可见")
         finishTrace()
-        /// DEBUG-only: 首帧后异步检查媒体 URL 响应质量，帮助诊断 CDN/源站性能
-        if let url = currentPlayer?.currentItem?.asset as? AVURLAsset {
-            MediaURLProbe.probe(url.url, label: "当前播放")
-        }
+        // 首帧一旦真正可见就立即准备 next；不再额外等待时间观察器和 100ms 延迟。
+        schedulePreloadAdjacent(gen: generation, delayMs: 0)
+        // 媒资探测只能由开发者显式触发；首帧热路径不再自动发送 HEAD/Range 请求抢占带宽。
         if moveTTFFStart > 0 {
             let ms = (CACurrentMediaTime() - moveTTFFStart) * 1000
             diagnostics.moveTTFFMs = ms
@@ -330,17 +429,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
         resetReadyState()
         log("rebuildItem: id=\(item.id)")
 
-        let managed = PlayerItemFactory.makeDirectItem(from: item.source)
-        currentManagedItem = managed
-
-        player.replaceCurrentItem(with: managed.item)
+        let replacementItem = PlayerItemFactory.makeDirectItem(from: item.source)
+        player.replaceCurrentItem(with: replacementItem)
 
         if let o = itemEndObserver {
             NotificationCenter.default.removeObserver(o); itemEndObserver = nil
         }
         itemEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: managed.item, queue: .main
+            object: replacementItem, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
                 self?.state = .pausedBySystem
@@ -396,40 +493,26 @@ final class ShortVideoPlayerEngine: ObservableObject {
         removeObservers()
         recoveryController.detachObservers()
         slotPool.cleanup()
-        currentManagedItem = nil
         currentPlayer = nil
         state = .idle
         generation &+= 1
         log("cleanup")
     }
 
-    // MARK: - 直连兜底
+    // MARK: - 统一槽位兜底
 
-    private func tryDirectFallback(for item: PlayerMediaItem, gen: Int) {
-        guard let url = directURL(from: item.source) else {
-            state = .failed(message: "缓存和直连均失败")
-            return
-        }
-        log("fallback: 直连播放 url=\(url)")
-        let player = AVPlayer(url: url)
-        currentManagedItem = nil // 直连不需要 cache delegate
-        // 强持有到 local
-        let _player = player
-        self.attach(player: _player)
-    }
-
-    private func directURL(from source: PlayerMediaSource) -> URL? {
-        switch source {
-        case .mp4(let url), .mp4WithEmbeddedSubtitles(let url):
-            return url
-        case .mp4WithExternalSubtitles(let videoURL, _):
-            return videoURL
-        case .hls(let masterURL):
-            return masterURL
-        case .hlsWithFallback(_, let fallbackMP4URL):
-            // HLS 失败 → 回退到 MP4
-            log("fallback: HLS→MP4 url=\(fallbackMP4URL)")
-            return fallbackMP4URL
+    /// 失败重建仍由唯一 PlayerSlotPool 创建 AVPlayer，禁止出现池外播放器实例。
+    private func rebuildCurrentThroughPool(for item: PlayerMediaItem, gen: Int) {
+        guard generation == gen else { return }
+        slotPool.rebuildCurrent(item: item, generation: gen) { [weak self] result in
+            guard let self, self.generation == gen else { return }
+            switch result {
+            case .success(let player):
+                self.log("统一槽位重建成功 id=\(item.id)")
+                self.attach(player: player)
+            case .failure(let error):
+                self.state = .failed(message: error.localizedDescription)
+            }
         }
     }
 
@@ -487,12 +570,11 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 guard let cur = self.currentItem else { return }
                 if case .hlsWithFallback(_, let mp4URL) = cur.source {
                     self.log("itemStatusKVO: HLS→MP4 fallback url=\(mp4URL)")
-                    let fallback = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL))
-                    self.currentManagedItem = fallback
-                    player.replaceCurrentItem(with: fallback.item)
+                    let fallbackItem = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL))
+                    player.replaceCurrentItem(with: fallbackItem)
                     // 重建观察者：end observer + recovery observer + status KVO
                     if let o = self.itemEndObserver { NotificationCenter.default.removeObserver(o); self.itemEndObserver = nil }
-                    self.itemEndObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: fallback.item, queue: .main) { [weak self] _ in Task { @MainActor in self?.state = .pausedBySystem; self?.onPlaybackFinished?() } }
+                    self.itemEndObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: fallbackItem, queue: .main) { [weak self] _ in Task { @MainActor in self?.state = .pausedBySystem; self?.onPlaybackFinished?() } }
                     self.recoveryController.detachObservers()
                     self.recoveryController.attachObservers(to: player)
                     self.setupItemStatusKVO(player)
@@ -528,52 +610,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 }
             }
             preloadTasks.append(task)
-            startWarmCache(for: items[nextIdx], byteCount: preloadLeadBytes, reason: "next")
-            startHLSWarmIfNeeded(for: items[nextIdx], reason: "next")
-            // Task36B-1: 轻量预热 next+1 的 metadata，不创建 AVPlayer
-            warmUpcomingItem(at: nextIdx + 1, gen: gen)
-        }
-        let prevIdx = currentIndex - 1
-        if prevIdx >= 0 {
-            log("preload: start prev=\(prevIdx)")
-            let task = Task { [weak self] in
-                guard let self else { return }
-                self.slotPool.prepare(item: self.items[prevIdx], slot: .previous, generation: gen) { result in
-                    let item = self.items[prevIdx]
-                    if case .success = result {
-                        Task { @MainActor in self.diagnostics.preloadState = "hit:prev:\(item.id)" }
-                    } else {
-                        Task { @MainActor in self.diagnostics.preloadState = "miss:prev:\(item.id)" }
-                    }
-                }
-            }
-            preloadTasks.append(task)
-        }
-    }
-
-    /// Task36B-1: 轻量预热 upcoming 条目（next+1 及之后）。
-    /// 只做 URL 层 warm（mp4 Range 请求首段或 HLS metadata），不分配 AVPlayer 槽位。
-    /// 适用于 For You 连续快速下滑场景：下次 move 到该索引时大概率已命中缓存。
-    func warmUpcomingItem(at index: Int, gen: Int) {
-        guard index >= 0, index < items.count else { return }
-        let item = items[index]
-        log("preload: warm metadata idx=\(index) id=\(item.id)")
-        startWarmCache(for: item, byteCount: preloadLeadBytes, reason: "upcoming:\(index)")
-        startHLSWarmIfNeeded(for: item, reason: "upcoming:\(index)")
-        // 对于 mp4 直链，额外触发 URLSession 临时连接以避免冷 DNS
-        if PlayerItemFactory.mp4URL(from: item.source) != nil {
-            let task = Task(priority: .background) { [weak self] in
-                guard let mp4 = PlayerItemFactory.mp4URL(from: item.source) else { return }
-                var req = URLRequest(url: mp4)
-                req.httpMethod = "HEAD"
-                _ = try? await URLSession.shared.data(for: req)
-                guard !Task.isCancelled else { return }
-                await MainActor.run {
-                    guard self?.generation == gen else { return }
-                    self?.diagnostics.preloadState = "warm:metadata:ready idx=\(index)"
-                }
-            }
-            preloadTasks.append(task)
         }
     }
 
@@ -597,7 +633,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
         progress = PlayerProgress()
     }
 
-    /// 预加载升 current 的 readiness 超时检测
+    /// 预加载升 current 的慢启动诊断。慢 CDN 不能因为固定 800ms 阈值被强制重建，
+    /// 否则会丢弃即将成功的请求并从零开始，实际等待反而更长。
     private func startReadinessTimeout(gen: Int, index: Int) {
         readinessTimeoutTask?.cancel()
         readinessTimeoutTask = Task { [weak self] in
@@ -610,80 +647,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
             let isPlayingReadyItem = item?.status == .readyToPlay
                 && self.currentPlayer?.timeControlStatus == .playing
             guard !self.isReadyForDisplay, !isPlayingReadyItem else { return }
-            print("[PlayerKit] current rebuild reason=timeout idx=\(index) gen=\(gen)")
-            guard let item = self.currentItem else { return }
-            self.slotPool.rebuildCurrent(item: item, generation: gen) { result in
-                guard case .success(let player) = result else { return }
-                self.attach(player: player)
-                if self.wantsPlayback { player.play(); self.state = .playing }
-            }
+            print("[PlayerKit] 当前媒体启动较慢 idx=\(index) gen=\(gen)，继续等待原请求，不重复建链")
         }
-    }
-
-    /// 后台 warm cache：使用流式 Range 请求，非 206 立刻取消，累计达到 byteCount 立刻取消。
-    /// 任何路径都不先下载完整视频再丢弃。
-    private func startWarmCache(for item: PlayerMediaItem, byteCount: Int64, reason: String) {
-        guard let url = PlayerItemFactory.mp4URL(from: item.source) else { return }
-        if HTTPRangeMediaCache.shared.hasPlayableLeadCache(for: url, minimumBytes: byteCount) {
-            log("warmCache skipped reason=\(reason) already-ready leading=\(HTTPRangeMediaCache.shared.leadingCachedBytes(for: url))")
-            diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url)
-            return
-        }
-        let taskKey = url.absoluteString
-        warmCacheTasks[taskKey]?.cancel()
-        let task = Task(priority: .background) { [weak self] in
-            let result = await StreamedRangeFetcher.fetch(
-                url: url, requestedRange: 0...(byteCount - 1), maxBytes: Int(byteCount)
-            )
-            guard !Task.isCancelled else { return }
-            switch result {
-            case .success(let data, let totalLength):
-                let writeRange: ClosedRange<Int64> = 0...Int64(data.count - 1)
-                HTTPRangeMediaCache.shared.write(data: data, for: url, range: writeRange,
-                                                  len: totalLength ?? Int64(data.count), mime: "video/mp4")
-                await MainActor.run { self?.diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url) }
-                self?.log("warmCache reason=\(reason) wrote 0-\(data.count-1) total=\(totalLength?.description ?? "?")")
-            case .notRange(let statusCode, let data):
-                if let d = data, d.count <= byteCount {
-                    let wr: ClosedRange<Int64> = 0...Int64(d.count - 1)
-                    HTTPRangeMediaCache.shared.write(data: d, for: url, range: wr, len: Int64(d.count), mime: "video/mp4")
-                    self?.log("warmCache reason=\(reason) wrote 0-\(d.count-1) status=\(statusCode)")
-                } else {
-                    self?.log("warmCache skipped reason=\(reason) 非206-\(statusCode) body=\(data?.count ?? 0)")
-                }
-            case .truncated(let data, let totalLength):
-                let wr: ClosedRange<Int64> = 0...Int64(data.count - 1)
-                HTTPRangeMediaCache.shared.write(data: data, for: url, range: wr,
-                                                  len: totalLength ?? Int64(data.count), mime: "video/mp4")
-                self?.log("warmCache reason=\(reason) truncated wrote 0-\(data.count-1)")
-            case .failed(let error):
-                self?.log("warmCache skipped reason=\(reason) error=\(error.localizedDescription.prefix(50))")
-            }
-        }
-        warmCacheTasks[taskKey] = task
-    }
-
-    /// HLS 不走自研 Range 缓存，先用 AVFoundation 异步预热 master/媒体选择信息
-    private func startHLSWarmIfNeeded(for item: PlayerMediaItem, reason: String) {
-        guard case .hls(let url) = item.source else { return }
-        let task = Task(priority: .utility) { [weak self] in
-            let asset = AVURLAsset(url: url)
-            let playable = (try? await asset.load(.isPlayable)) == true
-            _ = try? await asset.load(.duration)
-            _ = try? await asset.loadMediaSelectionGroup(for: .legible)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                self?.diagnostics.preloadState = playable ? "hls \(reason):ready" : "hls \(reason):not-playable"
-                self?.log("hlsWarm reason=\(reason) playable=\(playable) url=\(url.lastPathComponent)")
-            }
-        }
-        preloadTasks.append(task)
     }
 
     private func cancelAllPreloadTasks() {
         readinessTimeoutTask?.cancel(); readinessTimeoutTask = nil
-        for task in warmCacheTasks.values { task.cancel() }
-        warmCacheTasks.removeAll()
         for task in preloadTasks { task.cancel() }
         preloadTasks.removeAll()
     }
@@ -699,11 +668,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         diagnostics.sourceKind = PlayerItemFactory.sourceKind(item.source)
         diagnostics.playbackStrategy = PlayerItemFactory.playbackStrategyDescription(for: item.source)
         diagnostics.stateText = stateText
-        if let url = PlayerItemFactory.mp4URL(from: item.source) {
-            diagnostics.cacheSummary = HTTPRangeMediaCache.shared.debugSummary(for: url)
-        } else {
-            diagnostics.cacheSummary = "HLS: system streaming cache"
-        }
+        diagnostics.cacheSummary = "AVFoundation 原生流缓存"
     }
 
     // MARK: - 时间观察者
@@ -737,7 +702,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
                     self.diagnostics.stateText = "visible-playback"
                     let totalMs = (CACurrentMediaTime() - self.ttffStart) * 1000
                     self.log("首帧可见: 播放进度=\(String(format: "%.2f", time.seconds))s 总耗时=\(String(format: "%.0f", totalMs))ms")
-                    self.schedulePreloadAdjacent(gen: self.generation, delayMs: 100)
                 }
             }
         }
@@ -883,8 +847,8 @@ public enum StreamedRangeFetcher {
         case notRange(statusCode: Int, data: Data?)
         case failed(Error)
     }
-    /// 测试可注入 session（nil 使用 ephemeral）
-    public static var testSession: URLSession?
+    /// 测试可注入 URLProtocol 配置；真实请求始终由本次 fetch 专属 delegate 管理。
+    static var testConfiguration: URLSessionConfiguration?
 
     public static func fetch(url: URL, requestedRange: ClosedRange<Int64>, maxBytes: Int) async -> FetchResult {
         await withCheckedContinuation { cc in
@@ -892,7 +856,8 @@ public enum StreamedRangeFetcher {
             var req = URLRequest(url: url)
             req.setValue("bytes=\(requestedRange.lowerBound)-\(requestedRange.upperBound)", forHTTPHeaderField: "Range")
             req.timeoutInterval = 10
-            let s = testSession ?? URLSession(configuration: .ephemeral, delegate: d, delegateQueue: nil)
+            let configuration = testConfiguration ?? .ephemeral
+            let s = URLSession(configuration: configuration, delegate: d, delegateQueue: nil)
             d.session = s; d.task = s.dataTask(with: req); d.task?.resume()
         }
     }
@@ -903,40 +868,55 @@ public enum StreamedRangeFetcher {
         init(reqRange: ClosedRange<Int64>, maxB: Int, cb: @escaping (FetchResult) -> Void) {
             self.reqRange = reqRange; self.maxB = maxB; self.cb = cb
         }
-        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive r: URLResponse,
-                        ch: @escaping (URLSession.ResponseDisposition) -> Void) {
-            if let h = r as? HTTPURLResponse { code = h.statusCode; crHeader = h.value(forHTTPHeaderField: "Content-Range") }
-            if code != 206 { task?.cancel(); ch(.cancel); return }
-            ch(.allow)
+        func urlSession(
+            _ session: URLSession,
+            dataTask: URLSessionDataTask,
+            didReceive response: URLResponse,
+            completionHandler: @escaping (URLSession.ResponseDisposition) -> Void
+        ) {
+            if let http = response as? HTTPURLResponse {
+                code = http.statusCode
+                crHeader = http.value(forHTTPHeaderField: "Content-Range")
+            }
+            if code != 206 {
+                task?.cancel()
+                completionHandler(.cancel)
+                return
+            }
+            completionHandler(.allow)
         }
-        func urlSession(_ s: URLSession, dt: URLSessionDataTask, didReceive d: Data) {
-            total += d.count
-            if total > maxB { session?.invalidateAndCancel(); task?.cancel(); return }
-            chunks.append(d)
+        func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+            total += data.count
+            if total > maxB {
+                session.invalidateAndCancel()
+                task?.cancel()
+                return
+            }
+            chunks.append(data)
         }
-        func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError e: Error?) {
+        func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
             let data = chunks.reduce(into: Data()) { $0.append($1) }
-            if code != 206 { s.invalidateAndCancel(); cb(.notRange(statusCode: code, data: data.isEmpty ? nil : data)); return }
+            if code != 206 { session.invalidateAndCancel(); cb(.notRange(statusCode: code, data: data.isEmpty ? nil : data)); return }
             if total > maxB {
                 let tl = crHeader?.components(separatedBy: "/").last.flatMap { Int64($0) }
-                s.invalidateAndCancel(); cb(.truncated(data: data, totalLength: tl)); return
+                session.invalidateAndCancel(); cb(.truncated(data: data, totalLength: tl)); return
             }
-            if let err = e, (err as NSError).code != NSURLErrorCancelled {
-                s.invalidateAndCancel(); cb(.failed(err)); return
+            if let error, (error as NSError).code != NSURLErrorCancelled {
+                session.invalidateAndCancel(); cb(.failed(error)); return
             }
             // 校验 Content-Range 与请求范围一致
             guard let cr = crHeader,
                   let br = cr.components(separatedBy: "/").first?.replacingOccurrences(of: "bytes ", with: ""),
                   let di = br.firstIndex(of: "-") else {
-                s.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -1, userInfo: [NSLocalizedDescriptionKey: "Content-Range缺失"]))); return
+                session.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -1, userInfo: [NSLocalizedDescriptionKey: "Content-Range缺失"]))); return
             }
             let loS = String(br[..<di]); let hiS = String(br[br.index(after: di)...])
             guard let lo = Int64(loS), let hi = Int64(hiS),
                   lo == reqRange.lowerBound, hi - lo + 1 == Int64(data.count) else {
-                s.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -2, userInfo: [NSLocalizedDescriptionKey: "Content-Range不匹配: \(br)"]))); return
+                session.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -2, userInfo: [NSLocalizedDescriptionKey: "Content-Range不匹配: \(br)"]))); return
             }
             let tl = cr.components(separatedBy: "/").last.flatMap { Int64($0) }
-            s.invalidateAndCancel(); cb(.success(data: data, totalLength: tl))
+            session.invalidateAndCancel(); cb(.success(data: data, totalLength: tl))
         }
     }
 }

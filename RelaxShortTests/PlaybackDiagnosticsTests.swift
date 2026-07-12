@@ -3,18 +3,14 @@ import XCTest
 
 /// Task36B-2 返工 v4：StreamedRangeFetcher 流式取消 + recordTrace 隔离 + trace 标记
 final class PlaybackDiagnosticsTests: XCTestCase {
-    private var mockSession: URLSession!
-
     override func setUp() {
         super.setUp()
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [MockRangeProtocol.self]
-        mockSession = URLSession(configuration: config)
-        StreamedRangeFetcher.testSession = mockSession
+        StreamedRangeFetcher.testConfiguration = config
     }
     override func tearDown() {
-        StreamedRangeFetcher.testSession = nil
-        mockSession = nil
+        StreamedRangeFetcher.testConfiguration = nil
         super.tearDown()
     }
 
@@ -73,7 +69,7 @@ final class PlaybackDiagnosticsTests: XCTestCase {
     @MainActor func testRecordTraceFalseNeverMarksEngine() {
         // recordTrace=false 时 engine 完全不受影响
         let engine = ShortVideoPlayerEngine()
-        var t = PlaybackDiagnosticsTrace(scene: "series", seriesID: "d1", episodeNumber: 1)
+        let t = PlaybackDiagnosticsTrace(scene: "series", seriesID: "d1", episodeNumber: 1)
         engine.startPlaybackTrace(t)
         engine.markTrace("开始加载")
         // 当前集 trace 有 1 个 mark
@@ -82,7 +78,7 @@ final class PlaybackDiagnosticsTests: XCTestCase {
 
     @MainActor func testRecordTraceTrueMarksAllStages() {
         let engine = ShortVideoPlayerEngine()
-        var t = PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: "d1", episodeNumber: 3)
+        let t = PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: "d1", episodeNumber: 3)
         engine.startPlaybackTrace(t)
         engine.markTrace("缓存命中")
         engine.markTrace("播放源")
