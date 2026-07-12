@@ -55,6 +55,8 @@
 		760FA93B30ED6372731C4B9F /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27BBDB51E8C0B12ADF735809 /* ProfileViewModel.swift */; };
 		76CE474B83AAE6620BA0C2EB /* DiscoveryEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96DD43518DDDC1E3D0CCED7E /* DiscoveryEvent.swift */; };
 		77E72D93B7DE00FD5CC03556 /* PlayerItemFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F346D49AC21BBB76750BDC4 /* PlayerItemFactory.swift */; };
+		D00100000000000000000001 /* HTTPRangeMediaCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00100000000000000000011 /* HTTPRangeMediaCache.swift */; };
+		D00100000000000000000002 /* PlayerResourceLoaderDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00100000000000000000012 /* PlayerResourceLoaderDelegate.swift */; };
 		780220A30CA17D36AC00BCA2 /* VideoPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 369DBB3ED6B5D26D448FA5A9 /* VideoPlayerView.swift */; };
 		787FEE0511E957E8A50AE0CE /* API/PlayerMediaSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = D20FD7A3399158EFA990DE36 /* API/PlayerMediaSource.swift */; };
 		7CB8EC8C5350FC8F379062DF /* NetworkError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59DE53B2962106BFD119821C /* NetworkError.swift */; };
@@ -211,6 +213,8 @@
 		7BC0029E1B4A5E50A277A299 /* AppInitService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInitService.swift; sourceTree = "<group>"; };
 		7E6FBCCA53315987A7ADE8A3 /* DTO/APIResponseEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DTO/APIResponseEnvelope.swift; sourceTree = "<group>"; };
 		7F346D49AC21BBB76750BDC4 /* PlayerItemFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerItemFactory.swift; sourceTree = "<group>"; };
+		D00100000000000000000011 /* HTTPRangeMediaCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCache/HTTPRangeMediaCache.swift; sourceTree = "<group>"; };
+		D00100000000000000000012 /* PlayerResourceLoaderDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaCache/PlayerResourceLoaderDelegate.swift; sourceTree = "<group>"; };
 		816C2A833938C5A1359FED73 /* RepositoryProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RepositoryProtocols.swift; sourceTree = "<group>"; };
 		83FB8814D1C728B6ACFF446E /* MockAPIRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockAPIRepository.swift; sourceTree = "<group>"; };
 		84A18DCB4AC5C2EA9ACBB0D8 /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
@@ -630,6 +634,8 @@
 			children = (
 				89D0D2E9DBA64EE1932616C6 /* PlayerCoordinator.swift */,
 				7F346D49AC21BBB76750BDC4 /* PlayerItemFactory.swift */,
+				D00100000000000000000011 /* HTTPRangeMediaCache.swift */,
+				D00100000000000000000012 /* PlayerResourceLoaderDelegate.swift */,
 				185258248DA764936F58AAB2 /* PlayerMediaModels.swift */,
 				33FF53CF2CD4F740B93648B2 /* PlayerRecoveryController.swift */,
 				168FB1E2BB472B3B8D7E7253 /* PlayerSlotPool.swift */,
@@ -920,6 +926,8 @@
 				7CB8EC8C5350FC8F379062DF /* NetworkError.swift in Sources */,
 				813920C7CB353C5DFF9EDFC0 /* PlayerComponents.swift in Sources */,
 				77E72D93B7DE00FD5CC03556 /* PlayerItemFactory.swift in Sources */,
+				D00100000000000000000001 /* HTTPRangeMediaCache.swift in Sources */,
+				D00100000000000000000002 /* PlayerResourceLoaderDelegate.swift in Sources */,
 				54675ED85DFD792FC62BF4DC /* PlayerMediaModels.swift in Sources */,
 				5B19C5C83C1B02D7226E4728 /* PlayerMetricsLogger.swift in Sources */,
 				534A609A4BC181567823C605 /* PlayerRecoveryController.swift in Sources */,

@@ -11,6 +11,10 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authStore: AuthStore
     @State private var showLogoutAlert = false
+    @State private var cachedVideoBytes: Int64 = 0
+    @State private var showClearCacheAlert = false
+    @AppStorage("playerMediaCacheEnabled") private var videoCacheEnabled = true
+    @AppStorage("playerMediaCacheMaximumBytes") private var videoCacheMaximumBytes = Int(PlayerMediaCacheSettings.defaultMaximumBytes)
 #if DEBUG
     @State private var showDebugPanel = false
 #endif
@@ -30,12 +34,28 @@ struct SettingsView: View {
                     )
                 }
                 settingRow(title: "Appearance", systemImage: "paintpalette.fill", color: .blue)
-                settingRowWithValue(title: "Clear Cache", systemImage: "trash", color: .gray, value: "128 MB")
+                Button {
+                    showClearCacheAlert = true
+                } label: {
+                    settingRowWithValue(
+                        title: "Clear Video Cache",
+                        systemImage: "trash",
+                        color: .gray,
+                        value: ByteCountFormatter.string(fromByteCount: cachedVideoBytes, countStyle: .file)
+                    )
+                }
                 settingRow(title: "Account Deletion", systemImage: "person.crop.circle.badge.minus", color: .red)
             }
 
             Section {
                 toggleRow(title: "Download with mobile data allowed", isOn: $downloadWithMobileData)
+                toggleRow(title: "Video cache", isOn: $videoCacheEnabled)
+                Picker("Video cache limit", selection: $videoCacheMaximumBytes) {
+                    Text("1 GB").tag(1 * 1024 * 1024 * 1024)
+                    Text("2 GB").tag(2 * 1024 * 1024 * 1024)
+                    Text("4 GB").tag(4 * 1024 * 1024 * 1024)
+                }
+                .disabled(!videoCacheEnabled)
                 settingRow(title: "About", systemImage: "info.circle", color: .gray)
             }
 
@@ -84,6 +104,10 @@ struct SettingsView: View {
         .background(DB.black)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { refreshCachedVideoBytes() }
+        .onChange(of: videoCacheMaximumBytes) { _, _ in
+            HTTPRangeMediaCache.shared.pruneIfNeeded()
+        }
 #if DEBUG
         .sheet(isPresented: $showDebugPanel) {
             DebugSettingsView()
@@ -98,6 +122,19 @@ struct SettingsView: View {
         } message: {
             Text(L10n.logoutConfirmMessage)
         }
+        .alert("Clear video cache?", isPresented: $showClearCacheAlert) {
+            Button(L10n.cancel, role: .cancel) {}
+            Button("Clear", role: .destructive) {
+                HTTPRangeMediaCache.shared.clear()
+                refreshCachedVideoBytes()
+            }
+        } message: {
+            Text("Cached public videos will be removed. VIP downloads are not affected.")
+        }
+    }
+
+    private func refreshCachedVideoBytes() {
+        cachedVideoBytes = HTTPRangeMediaCache.shared.totalCachedBytes()
     }
 
     private func settingRow(title: String, systemImage: String, color: Color) -> some View {

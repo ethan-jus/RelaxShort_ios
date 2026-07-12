@@ -311,7 +311,8 @@ extension DramaItem {
         return PlayerMediaItem(
             id: PlayerMediaItem.stableID(dramaID: id, episodeNumber: episodeNumber),
             title: title, episodeNumber: episodeNumber,
-            coverURL: coverURL, source: .mp4(url), resumeTime: nil
+            coverURL: coverURL, source: .mp4(url), resumeTime: nil,
+            allowsPersistentCache: true
         )
     }
 }

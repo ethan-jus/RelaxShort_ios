@@ -83,6 +83,26 @@ struct PlayerMediaItem: Identifiable, Hashable {
     let coverURL: String
     let source: PlayerMediaSource
     let resumeTime: TimeInterval?
+    /// 只有公开且已授权的媒体允许写入普通磁盘缓存。VIP 离线下载使用独立 DRM 流程。
+    let allowsPersistentCache: Bool
+
+    init(
+        id: String,
+        title: String,
+        episodeNumber: Int?,
+        coverURL: String,
+        source: PlayerMediaSource,
+        resumeTime: TimeInterval?,
+        allowsPersistentCache: Bool = false
+    ) {
+        self.id = id
+        self.title = title
+        self.episodeNumber = episodeNumber
+        self.coverURL = coverURL
+        self.source = source
+        self.resumeTime = resumeTime
+        self.allowsPersistentCache = allowsPersistentCache
+    }
 }
 
 // MARK: - 播放进度

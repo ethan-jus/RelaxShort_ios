@@ -6,6 +6,7 @@ import AVFoundation
 struct PlayerSlotContext {
     let player: AVPlayer
     let item: AVPlayerItem
+    let resourceLoaderDelegate: PlayerResourceLoaderDelegate?
     let mediaID: String
     let source: PlayerMediaSource
     let preparedAt: Date
@@ -41,9 +42,10 @@ final class PlayerSlotPool {
     ) {
         cancel(slot)
         let idx = slot.rawValue
-        let playerItem = slot == .current
-            ? PlayerItemFactory.makePlaybackItem(from: item.source)
-            : PlayerItemFactory.makeDirectItem(from: item.source)
+        let managedItem = slot == .current
+            ? PlayerItemFactory.makePlaybackItem(from: item)
+            : PlayerItemFactory.makePlaybackItem(from: item)
+        let playerItem = managedItem.item
         let player = AVPlayer(playerItem: playerItem)
         player.isMuted = slot != .current
         if slot == .current {
@@ -56,6 +58,7 @@ final class PlayerSlotPool {
         }
         slots[idx] = PlayerSlotContext(
             player: player, item: playerItem,
+            resourceLoaderDelegate: managedItem.resourceLoaderDelegate,
             mediaID: item.id, source: item.source,
             preparedAt: Date(), generation: generation
         )

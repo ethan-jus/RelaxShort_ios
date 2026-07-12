@@ -1,16 +1,29 @@
 import AVFoundation
 
+/// 强持有 resourceLoaderDelegate，保证缓存请求在 AVPlayerItem 生命周期内有效。
+struct PlayerManagedItem {
+    let item: AVPlayerItem
+    let resourceLoaderDelegate: PlayerResourceLoaderDelegate?
+}
+
 // MARK: - 播放器 Item 工厂
 
 enum PlayerItemFactory {
-    /// 当前项和预加载项都使用 AVFoundation 原生直连条目。
-    /// 相邻项的真实缓冲由共享 PlayerSlotPool 的 preroll 完成，不再维护一套播放器无法读取的旁路 Range 缓存。
-    static func makePlaybackItem(from source: PlayerMediaSource) -> AVPlayerItem {
-        return makeDirectItem(from: source)
+    /// 公开 MP4 使用资源加载代理，已读取的 Range 会被写入 2GB LRU 磁盘缓存。
+    /// HLS 与受保护内容不走普通文件缓存。
+    static func makePlaybackItem(from item: PlayerMediaItem) -> PlayerManagedItem {
+        guard item.allowsPersistentCache,
+              PlayerMediaCacheSettings.isEnabled,
+              let url = mp4URL(from: item.source) else {
+            return makeDirectItem(from: item.source)
+        }
+        let delegate = PlayerResourceLoaderDelegate(originalURL: url)
+        let asset = AVURLAsset(url: url.withPlayerCacheScheme())
+        asset.resourceLoader.setDelegate(delegate, queue: .global(qos: .utility))
+        return PlayerManagedItem(item: AVPlayerItem(asset: asset), resourceLoaderDelegate: delegate)
     }
 
-    /// 创建直连播放条目：当前视频优先保证出画，缓存代理不能阻塞主播放链路
-    static func makeDirectItem(from source: PlayerMediaSource) -> AVPlayerItem {
+    static func makeDirectItem(from source: PlayerMediaSource) -> PlayerManagedItem {
         let url: URL
         switch source {
         case .mp4(let value), .mp4WithEmbeddedSubtitles(let value):
@@ -24,7 +37,7 @@ enum PlayerItemFactory {
             // 这样可以少一次 HLS master/segment 探测，提升短剧首帧速度。
             url = fallbackMP4URL
         }
-        return AVPlayerItem(url: url)
+        return PlayerManagedItem(item: AVPlayerItem(url: url), resourceLoaderDelegate: nil)
     }
 
     static func mp4URL(from source: PlayerMediaSource) -> URL? {
@@ -76,5 +89,13 @@ enum PlayerItemFactory {
         return group.options.map {
             PlayerSubtitleOption(id: $0.displayName, displayName: $0.displayName, languageCode: $0.locale?.identifier ?? "")
         }
+    }
+}
+
+private extension URL {
+    func withPlayerCacheScheme() -> URL {
+        guard var components = URLComponents(url: self, resolvingAgainstBaseURL: false) else { return self }
+        components.scheme = "relaxshort-cache"
+        return components.url ?? self
     }
 }

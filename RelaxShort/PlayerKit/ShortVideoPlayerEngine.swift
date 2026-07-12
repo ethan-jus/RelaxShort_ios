@@ -61,6 +61,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var pendingCurrentSourceUpgrade: PlayerMediaItem?
     private var isCurrentSourceUpgradePending = false
     private var sourceUpgradeResumeTime: TimeInterval = 0
+    /// replaceCurrentItem 不经过 SlotPool，需由引擎强持有缓存代理。
+    private var replacementResourceLoaderDelegate: PlayerResourceLoaderDelegate?
 
     init() {
         recoveryController.engine = self
@@ -462,7 +464,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
         resetReadyState()
         log("rebuildItem: id=\(item.id)")
 
-        let replacementItem = PlayerItemFactory.makeDirectItem(from: item.source)
+        let managedItem = PlayerItemFactory.makePlaybackItem(from: item)
+        replacementResourceLoaderDelegate = managedItem.resourceLoaderDelegate
+        let replacementItem = managedItem.item
         player.replaceCurrentItem(with: replacementItem)
 
         if let o = itemEndObserver {
@@ -609,7 +613,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
         itemStatusObs = nil
         recoveryController.detachObservers()
 
-        let replacementItem = PlayerItemFactory.makeDirectItem(from: item.source)
+        let managedItem = PlayerItemFactory.makePlaybackItem(from: item)
+        replacementResourceLoaderDelegate = managedItem.resourceLoaderDelegate
+        let replacementItem = managedItem.item
         player.replaceCurrentItem(with: replacementItem)
         recoveryController.attachObservers(to: player)
         setupItemStatusKVO(player)
@@ -669,7 +675,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 guard let cur = self.currentItem else { return }
                 if case .hlsWithFallback(_, let mp4URL) = cur.source {
                     self.log("itemStatusKVO: HLS→MP4 fallback url=\(mp4URL)")
-                    let fallbackItem = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL))
+                    replacementResourceLoaderDelegate = nil
+                    let fallbackItem = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL)).item
                     player.replaceCurrentItem(with: fallbackItem)
                     // 重建观察者：end observer + recovery observer + status KVO
                     if let o = self.itemEndObserver { NotificationCenter.default.removeObserver(o); self.itemEndObserver = nil }
