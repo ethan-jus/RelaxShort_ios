@@ -26,7 +26,6 @@ struct RelaxShortApp: App {
     // MARK: - Init
 
     init() {
-        print("BuildCommit=de3cfea")
         configureAudioSession()
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(
             clientID: "1003872687588-5fij4u8cr2dr9plm6tbg0gfq19gj68r7.apps.googleusercontent.com",
