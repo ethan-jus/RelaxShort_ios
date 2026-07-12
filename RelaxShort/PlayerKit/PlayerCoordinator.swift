@@ -14,10 +14,18 @@ final class PlayerCoordinator: ObservableObject {
     @Published private(set) var owner: Owner?
     @Published private(set) var engine: ShortVideoPlayerEngine
 
+    /// Series 同集复用不仅要比较 mediaID；跨剧 ID 冲突或切集后的迟到回调都不能接管当前播放器。
+    private struct SeriesMediaIdentity: Equatable {
+        let dramaID: String
+        let episodeNumber: Int?
+        let mediaID: String
+    }
+
     private var seriesResumeTask: Task<Void, Never>?
     private var forYouPlaybackFinishedHandler: (@MainActor () -> Void)?
     private var seriesPlaybackFinishedHandler: (dramaID: String, action: @MainActor () -> Void)?
     private var claimGeneration: Int = 0
+    private var currentSeriesIdentity: SeriesMediaIdentity?
 
     init() {
         self.engine = ShortVideoPlayerEngine()
@@ -39,6 +47,7 @@ final class PlayerCoordinator: ObservableObject {
     func beginSeries(dramaID: String) {
         invalidateCurrentClaim()
         seriesPlaybackFinishedHandler = nil
+        currentSeriesIdentity = nil
         owner = .series(dramaID: dramaID)
         engine.deactivate()
     }
@@ -89,6 +98,7 @@ final class PlayerCoordinator: ObservableObject {
         let seriesOwner = Owner.series(dramaID: dramaID)
         guard owner == seriesOwner else { return nil }
         invalidateCurrentClaim()
+        currentSeriesIdentity = nil
         engine.beginContentTransition(autoplay: true)
         return claimGeneration
     }
@@ -114,6 +124,11 @@ final class PlayerCoordinator: ObservableObject {
             return false
         }
         guard let targetItem = items[safe: startIndex] else { return false }
+        currentSeriesIdentity = SeriesMediaIdentity(
+            dramaID: drama.id,
+            episodeNumber: targetItem.episodeNumber,
+            mediaID: targetItem.id
+        )
         engine.commitContentTransition(
             items: items,
             index: startIndex,
@@ -191,24 +206,38 @@ final class PlayerCoordinator: ObservableObject {
         guard let targetItem = items[safe: startIndex] else { return }
         let seriesOwner = Owner.series(dramaID: drama.id)
         let alreadyOwnedSeries = owner == seriesOwner
-        if alreadyOwnedSeries {
-            invalidateCurrentClaim()
-        } else {
-            beginSeries(dramaID: drama.id)
-        }
-        let targetItemID = targetItem.id
-        let currentMediaIDMatches = engine.currentItem?.id == targetItemID
-        let token = claimGeneration
+        let targetIdentity = SeriesMediaIdentity(
+            dramaID: drama.id,
+            episodeNumber: targetItem.episodeNumber,
+            mediaID: targetItem.id
+        )
 
-        if currentMediaIDMatches, engine.currentPlayer != nil {
-            Logger.player.debug("Series 同一集继续复用当前播放器")
-            engine.play(); return
+        // 同一剧、同一集、同一媒体可以复用 AVPlayer；若随后拿到正式 /play 源，
+        // 引擎只替换 AVPlayerItem，不重建 player、不清空首帧和进度状态。
+        if alreadyOwnedSeries,
+           currentSeriesIdentity == targetIdentity,
+           engine.currentItem?.id == targetItem.id {
+            let upgraded = engine.upgradeCurrentSource(to: targetItem)
+            engine.updatePlaylistKeepingCurrent(items)
+            if upgraded {
+                Logger.player.debug("Series 同集已升级为正式播放源，保留当前播放器与续播进度")
+            } else {
+                Logger.player.debug("Series 同一集继续复用当前播放器")
+            }
+            engine.play()
+            return
         }
 
         Logger.player.debug("Series 准备新的播放媒体")
         if alreadyOwnedSeries {
+            invalidateCurrentClaim()
             engine.deactivate()
         }
+        if !alreadyOwnedSeries {
+            beginSeries(dramaID: drama.id)
+        }
+        currentSeriesIdentity = targetIdentity
+        let token = claimGeneration
         engine.prepare(items: items, index: startIndex)
         // Series 进入播放页必须立即产生播放意图，不能因为等待 resume/seek 而表现为默认暂停。
         // 如果需要续播，后续在 item ready 后再 seek；首屏体验优先保证快速开始播放。
@@ -217,7 +246,7 @@ final class PlayerCoordinator: ObservableObject {
         scheduleSeriesResume(
             owner: seriesOwner,
             token: token,
-            targetID: targetItemID,
+            targetID: targetItem.id,
             handoff: handoff,
             backendResumeTime: backendResumeTime
         )
@@ -279,6 +308,7 @@ final class PlayerCoordinator: ObservableObject {
         invalidateCurrentClaim()
         if case .series = owner {
             seriesPlaybackFinishedHandler = nil
+            currentSeriesIdentity = nil
         }
         engine.deactivate()
         self.owner = nil

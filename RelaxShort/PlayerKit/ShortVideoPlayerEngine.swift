@@ -56,6 +56,11 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var playbackTrace: PlaybackDiagnosticsTrace?
     /// 记录当前 prepare/move 对应的 index，供首帧和 Move 区分
     private var traceCurrentIndex: Int = -1
+    /// 同一集先使用预览源、后拿到正式 /play 源时的待升级条目。
+    /// 仅替换 AVPlayerItem，绝不能销毁当前 AVPlayer 或重置已展示的首帧状态。
+    private var pendingCurrentSourceUpgrade: PlayerMediaItem?
+    private var isCurrentSourceUpgradePending = false
+    private var sourceUpgradeResumeTime: TimeInterval = 0
 
     init() {
         recoveryController.engine = self
@@ -104,6 +109,31 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
     }
 
+    /// 将同一媒体从预览源原地升级为正式播放源。
+    /// 这里有意不调用 prepare / deactivate / beginContentTransition：它们会清空进度和首帧可见状态，
+    /// 导致 Series 首播在正式播放源返回后重新出现封面或黑屏。
+    @discardableResult
+    func upgradeCurrentSource(to item: PlayerMediaItem) -> Bool {
+        guard let currentItem, currentItem.id == item.id, currentItem.source != item.source else {
+            return false
+        }
+
+        self.currentItem = item
+        if items.indices.contains(currentIndex), items[currentIndex].id == item.id {
+            items[currentIndex] = item
+        }
+        updateDiagnostics(for: item, stateText: "official-source-upgrade")
+
+        guard let player = currentPlayer else {
+            pendingCurrentSourceUpgrade = item
+            log("正式播放源升级已排队: 当前播放器尚未挂载 id=\(item.id)")
+            return true
+        }
+
+        replaceCurrentItemForSourceUpgrade(item, on: player)
+        return true
+    }
+
     /// 提交已经开始的异步内容切换。优先提升共享池中按媒体 ID 匹配的 preroll 槽，
     /// 未命中时才在同一个槽位池中创建当前播放器。
     func commitContentTransition(
@@ -118,6 +148,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         if currentPlayer != nil {
             beginContentTransition(autoplay: autoplay)
         }
+        clearCurrentSourceUpgrade()
         cancelAllPreloadTasks()
         items = newItems
         currentIndex = index
@@ -165,6 +196,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     func prepare(items: [PlayerMediaItem], index: Int) {
         guard !items.isEmpty, items.indices.contains(index) else { return }
         cancelAllPreloadTasks()
+        clearCurrentSourceUpgrade()
         // 全量 prepare 代表新播放列表，旧相邻槽不得跨 owner 或跨剧残留。
         slotPool.cleanup()
 
@@ -282,6 +314,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         subtitleTask = nil
         recoveryController.cancelPendingRecovery()
         recoveryController.detachObservers()
+        clearCurrentSourceUpgrade()
 
         currentPlayer?.pause()
         removeObservers()
@@ -550,21 +583,87 @@ final class ShortVideoPlayerEngine: ObservableObject {
         state = .ready
         log("attach: status=\(statusString(player.currentItem?.status)) timeControl=\(tcsString(player.timeControlStatus))")
 
-        // 如果有播放意图，attach 后立即播放
-        if wantsPlayback {
+        // 若同一集在挂载前已拿到正式播放源，原地替换 item；没有旧首帧时才允许 attach 的常规重置。
+        if let pendingItem = pendingCurrentSourceUpgrade {
+            replaceCurrentItemForSourceUpgrade(pendingItem, on: player)
+        } else if wantsPlayback {
             player.play()
             state = .playing
             log("attach: 自动播放（wantsPlayback=true）")
         }
     }
 
+    /// 同一 AVPlayer 内替换播放源。保留播放意图、进度、播放器实例与已展示首帧，避免 UI 退回封面。
+    private func replaceCurrentItemForSourceUpgrade(_ item: PlayerMediaItem, on player: AVPlayer) {
+        guard currentPlayer === player else {
+            pendingCurrentSourceUpgrade = item
+            return
+        }
+
+        pendingCurrentSourceUpgrade = nil
+        isCurrentSourceUpgradePending = true
+        sourceUpgradeResumeTime = max(0, progress.currentTime)
+
+        removeObservers()
+        itemStatusObs?.invalidate()
+        itemStatusObs = nil
+        recoveryController.detachObservers()
+
+        let replacementItem = PlayerItemFactory.makeDirectItem(from: item.source)
+        player.replaceCurrentItem(with: replacementItem)
+        recoveryController.attachObservers(to: player)
+        setupItemStatusKVO(player)
+        startObserving()
+
+        state = .preparing
+        markTrace("正式播放源升级")
+        log("正式播放源升级: id=\(item.id) 保留进度=\(String(format: "%.2f", sourceUpgradeResumeTime))s")
+        if wantsPlayback {
+            player.play()
+        }
+    }
+
+    private func restoreSourceUpgradeProgressIfNeeded(on player: AVPlayer) {
+        guard isCurrentSourceUpgradePending, currentPlayer === player else { return }
+        isCurrentSourceUpgradePending = false
+        let resumeTime = sourceUpgradeResumeTime
+        sourceUpgradeResumeTime = 0
+
+        let resume = CMTime(seconds: resumeTime, preferredTimescale: 600)
+        player.seek(to: resume, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak player] finished in
+            Task { @MainActor in
+                guard let self, let player, self.currentPlayer === player else { return }
+                if finished {
+                    var nextProgress = self.progress
+                    nextProgress.currentTime = resumeTime
+                    self.progress = nextProgress
+                }
+                if self.wantsPlayback {
+                    player.play()
+                    self.state = .playing
+                }
+                self.log("正式播放源升级完成: 续播=\(String(format: "%.2f", resumeTime))s 成功=\(finished)")
+            }
+        }
+    }
+
+    private func clearCurrentSourceUpgrade() {
+        pendingCurrentSourceUpgrade = nil
+        isCurrentSourceUpgradePending = false
+        sourceUpgradeResumeTime = 0
+    }
+
     /// 监听 AVPlayerItem.status，failed 时触发 fallback
     private func setupItemStatusKVO(_ player: AVPlayer) {
         itemStatusObs?.invalidate()
         itemStatusObs = player.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
-            guard item.status == .failed else { return }
             Task { @MainActor [weak self] in
                 guard let self, self.currentPlayer === player else { return }
+                if item.status == .readyToPlay {
+                    self.restoreSourceUpgradeProgressIfNeeded(on: player)
+                    return
+                }
+                guard item.status == .failed else { return }
                 let err = item.error?.localizedDescription ?? "未知错误"
                 self.log("itemStatusKVO: failed err=\(err)")
                 guard let cur = self.currentItem else { return }
@@ -682,6 +781,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
         ) { [weak self] time in
             Task { @MainActor in
                 guard let self, let player = self.currentPlayer else { return }
+                // 正式源替换尚未完成 seek 时，不能让新 item 的 0 秒回调覆盖页面上的续播进度。
+                guard !self.isCurrentSourceUpgradePending else { return }
                 var nextProgress = self.progress
                 nextProgress.currentTime = time.seconds
                 if let item = player.currentItem, item.duration.isNumeric {

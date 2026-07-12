@@ -717,6 +717,7 @@
 				C7F899F8CC33C6965A7525A2 /* Sources */,
 				6A0AB54A86AB8C6D645148FD /* Resources */,
 				AAPI00000000000000000001 /* Inject Debug API Host */,
+				AAPI00000000000000000002 /* Inject Build Commit */,
 				614BFD0D6EE453BA328CC9B1 /* Frameworks */,
 			);
 			buildRules = (
@@ -773,6 +774,19 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "\"${SRCROOT}/scripts/inject-debug-api-host.sh\"\n";
+		};
+		AAPI00000000000000000002 /* Inject Build Commit */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Inject Build Commit";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/inject-build-commit.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

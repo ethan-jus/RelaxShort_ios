@@ -26,6 +26,9 @@ struct RelaxShortApp: App {
     // MARK: - Init
 
     init() {
+        if let commit = Bundle.main.object(forInfoDictionaryKey: "BuildCommit") as? String {
+            print("BuildCommit=\(commit)")
+        }
         configureAudioSession()
         GIDSignIn.sharedInstance.configuration = GIDConfiguration(
             clientID: "1003872687588-5fij4u8cr2dr9plm6tbg0gfq19gj68r7.apps.googleusercontent.com",
