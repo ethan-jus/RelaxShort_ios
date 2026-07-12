@@ -4,6 +4,7 @@ import SwiftUI
 
 /// 推荐页沉浸式视频流 ViewModel — DramaBox 标准
 /// Task36A: 支持 seed 扰动 + 游标分页，避免每次进入第一屏固定同一批视频。
+/// TASK-0001-D: 增加 feed generation 机制，区分 replace/append，丢弃过期分页回调。
 @MainActor
 final class RecommendViewModel: ObservableObject {
     @Published var dramas: [DramaItem] = []
@@ -24,11 +25,20 @@ final class RecommendViewModel: ObservableObject {
     /// 当前页面会话已经展示过的 seriesId，用于 seed 耗尽后换 seed 续流时去重。
     private var displayedSeriesIDs = Set<String>()
 
+    /// TASK-0001-D: 关联的 RecommendSession，用于 generation 同步
+    weak var session: RecommendSession?
+
+    /// TASK-0001-D: feed mutation 回调 — replace 完成后通知 View 层
+    var onReplaceCompleted: (@MainActor ([DramaItem]) -> Void)?
+    /// TASK-0001-D: append 完成后通知 View 层
+    var onAppendCompleted: (@MainActor ([DramaItem], Int) -> Void)?
+
     init(repository: HomeRepositoryProtocol) {
         self.repository = repository
     }
 
     /// 首次加载（或下拉刷新）→ 生成新种子，清空旧数据。
+    /// TASK-0001-D: replace 创建新 generation，旧分页回调被 generation 门禁丢弃。
     func loadData() async {
         isLoading = true
         errorMessage = nil
@@ -42,7 +52,9 @@ final class RecommendViewModel: ObservableObject {
 
         do {
             let result = try await loadFirstPage()
-            dramas = rememberUnique(result)
+            let unique = rememberUnique(result)
+            dramas = unique
+            onReplaceCompleted?(unique)
         } catch {
             errorMessage = L10n.recommendLoadFailed
             #if DEBUG
@@ -54,6 +66,7 @@ final class RecommendViewModel: ObservableObject {
 
     /// 加载下一页（接近末尾时自动触发）。
     /// 当前 seed 耗尽后自动生成新 seed 续流，并过滤已展示剧集，避免用户滑到末尾卡死。
+    /// TASK-0001-D: append 绑定发起时 generation，过期自动丢弃。
     func loadNextPageIfNeeded(currentIndex: Int) async {
         guard !isLoadingMore, !dramas.isEmpty else { return }
         // 当距离末尾剩余 3 个以内时触发预加载
@@ -63,10 +76,23 @@ final class RecommendViewModel: ObservableObject {
         isLoadingMore = true
         defer { isLoadingMore = false }
 
+        let appendGen = session?.feedGeneration
+        let appendStartIndex = dramas.count
+
         do {
             let newItems = try await loadNextPage()
             guard !newItems.isEmpty else { return }
+
+            // generation 门禁：请求期间若发生 replace，丢弃结果
+            if let ag = appendGen, let currentGen = session?.feedGeneration, ag != currentGen {
+                #if DEBUG
+                print("[RecommendVM] loadNextPage 被丢弃 gen=\(ag) 当前gen=\(currentGen) — feed 已被 replace")
+                #endif
+                return
+            }
+
             dramas.append(contentsOf: newItems)
+            onAppendCompleted?(newItems, appendStartIndex)
         } catch {
             #if DEBUG
             Logger.viewModel.error("RecommendViewModel.loadNextPage failed: \(error)")

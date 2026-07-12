@@ -36,9 +36,19 @@ struct RecommendView: View {
     @State private var scrubThumbnail: UIImage?
 
     init(viewModel: RecommendViewModel? = nil, session: RecommendSession, isVisible: Bool = true) {
-        self.viewModel = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
+        let vm = viewModel ?? RecommendViewModel(repository: MockHomeRepository())
+        self.viewModel = vm
         self.session = session
         self.isVisible = isVisible
+        // TASK-0001-D: 双向绑定 — ViewModel 通知 Session 做 replace/append，
+        // Session 的 feedGeneration 门禁丢弃过期分页回调。
+        vm.session = session
+        vm.onReplaceCompleted = { [weak session] dramas in
+            session?.replacePlaylist(dramas: dramas)
+        }
+        vm.onAppendCompleted = { [weak session] newDramas, startIndex in
+            _ = session?.appendPlaylist(newDramas: newDramas, startDramaIndex: startIndex, generation: session?.feedGeneration ?? 0)
+        }
     }
 
     // MARK: - 路由遮挡状态
@@ -68,14 +78,8 @@ struct RecommendView: View {
                 isExpanded = false
                 isScrubbing = false; scrubFraction = 0
                 isSpeeding = false; showSpeedHUD = false
-                // engine handles reset internally
-                session.handleTransition(
-                    from: oldValue,
-                    to: newValue,
-                    dramas: viewModel.dramas,
-                    autoplay: isPlaybackVisible
-                )
-                // Task36A: 接近末尾时自动加载下一页
+                // TASK-0001-D: transition 已由 attemptTransition 提交，
+                // 此处仅做 UI 状态重置和分页预加载。
                 Task { await viewModel.loadNextPageIfNeeded(currentIndex: newValue) }
             }
             .onChange(of: isPlaybackVisible) { _, vis in
@@ -88,17 +92,10 @@ struct RecommendView: View {
             }
             .onChange(of: viewModel.dramas.count) { oldCount, count in
                 guard count > 0 else { return }
-                if isPlaybackVisible {
-                    initializePlaybackIfNeeded()
-                }
-                // 批量查询当前页收藏状态
+                // TASK-0001-D: replace/append 已由 ViewModel 回调驱动，
+                // 此处仅处理副作用。
                 let ids = viewModel.dramas.map(\.id)
                 Task { await dependencies.bookmarkStore.loadStatus(seriesIDs: ids) }
-                // Task36A: 分页追加后同步播放器池，让新增条目可播放
-                if oldCount > 0, count > oldCount, session.hasInitializedPool {
-                    let newDramas = Array(viewModel.dramas[oldCount..<count])
-                    session.syncDramas(newDramas, startingAt: oldCount)
-                }
             }
             .onChange(of: showAbout) { _, isShowing in
                 withAnimation(.easeOut(duration: 0.18)) {
@@ -396,14 +393,13 @@ struct RecommendView: View {
 
     private func loadAndInit() async {
         await viewModel.loadData()
-        if isPlaybackVisible {
-            initializePlaybackIfNeeded()
-        }
+        // replacePlaylist 已在 viewModel.onReplaceCompleted 回调中调用
     }
 
     private func initializePlaybackIfNeeded() {
         guard !session.hasInitializedPool, !viewModel.dramas.isEmpty else { return }
-        session.initializePool(dramas: viewModel.dramas)
+        // replacePlaylist 内部处理 hasInitializedPool
+        session.replacePlaylist(dramas: viewModel.dramas)
     }
 
     // MARK: - 计算属性
@@ -476,7 +472,8 @@ struct RecommendView: View {
 
     private func visibleIndices(for current: Int, count: Int) -> [Int] {
         guard count > 0 else { return [] }
-        return Array(max(0, current - 1)...min(count - 1, current + 1))
+        let safeCurrent = max(0, min(current, count - 1))
+        return Array(max(0, safeCurrent - 1)...min(count - 1, safeCurrent + 1))
     }
 
     // MARK: - 拖拽手势
@@ -492,13 +489,21 @@ struct RecommendView: View {
             }
             .onEnded { value in
                 let velocity = value.predictedEndTranslation.height - value.translation.height
+                let oldIndex = session.currentIndex
+                var targetIndex = oldIndex
+                if value.translation.height < -80 || velocity < -300 {
+                    targetIndex = min(oldIndex + 1, count - 1)
+                } else if value.translation.height > 80 || velocity > 300 {
+                    targetIndex = max(oldIndex - 1, 0)
+                }
+
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                    if value.translation.height < -80 || velocity < -300 {
-                        session.currentIndex = min(session.currentIndex + 1, count - 1)
-                    } else if value.translation.height > 80 || velocity > 300 {
-                        session.currentIndex = max(session.currentIndex - 1, 0)
-                    }
                     dragOffset = 0
+                }
+
+                // TASK-0001-D: 受控 transition — 无可播放映射时拒绝切换
+                if targetIndex != oldIndex {
+                    _ = session.attemptTransition(from: oldIndex, to: targetIndex, autoplay: isPlaybackVisible)
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { isDraggingPage = false }
             }

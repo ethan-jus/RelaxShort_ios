@@ -167,6 +167,24 @@ final class PlayerCoordinator: ObservableObject {
         engine.play()
     }
 
+    /// For You feed 整体替换的唯一入口。
+    /// 即使当前媒体 ID 未变化，也必须替换 Engine 的完整 playlist，避免新 UI feed
+    /// 与旧 Engine items 混用。该语义不同于 resume 场景的 claimForYou 同媒体复用。
+    func replaceForYouPlaylist(items: [PlayerMediaItem], index: Int, autoplay: Bool) {
+        guard items.indices.contains(index) else { return }
+
+        invalidateCurrentClaim()
+        seriesPlaybackFinishedHandler = nil
+        if owner != .forYou {
+            engine.deactivate()
+        }
+        owner = .forYou
+        engine.prepare(items: items, index: index)
+        if autoplay {
+            engine.play()
+        }
+    }
+
     /// 纯函数：解析续播时间。
     /// - handoff > 0 优先。
     /// - 无 handoff 使用 backend。
