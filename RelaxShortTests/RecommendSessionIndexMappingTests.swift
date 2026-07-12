@@ -289,6 +289,57 @@ struct RecommendSessionIndexMappingTests {
         #expect(playableItem.item.id.hasPrefix("test-2"))
     }
 
+    @Test("保留当前媒体但重排 feed 时，Engine playlist 必须替换为新顺序")
+    func replaceReordersEnginePlaylistWhenCurrentMediaSurvives() {
+        let coordinator = PlayerCoordinator()
+        let session = RecommendSession(coordinator: coordinator)
+
+        session.replacePlaylist(dramas: [
+            makeDrama(id: "a"),
+            makeDrama(id: "b"),
+            makeDrama(id: "c")
+        ])
+
+        session.replacePlaylist(dramas: [
+            makeDrama(id: "a"),
+            makeDrama(id: "c"),
+            makeDrama(id: "b")
+        ])
+
+        #expect(coordinator.engine.playlistItemIDs == ["a-1", "c-1", "b-1"])
+        #expect(coordinator.engine.currentItem?.id == "a-1")
+        #expect(coordinator.engine.currentIndex == 0)
+    }
+
+    @Test("replace 的首张卡不可播放时，UI 与 Engine 都定位到首个可播放卡")
+    func replaceStartsAtFirstPlayableDrama() {
+        let coordinator = PlayerCoordinator()
+        let session = RecommendSession(coordinator: coordinator)
+
+        session.replacePlaylist(dramas: [
+            makeProtectedDrama(id: "locked"),
+            makeDrama(id: "playable")
+        ])
+
+        #expect(session.currentIndex == 1)
+        #expect(session.playableIndex(for: session.currentIndex) == 0)
+        #expect(coordinator.engine.currentItem?.id == "playable-1")
+    }
+
+    @Test("replace 成空 feed 时，For You 不得继续持有旧媒体")
+    func emptyReplaceReleasesForYouMedia() {
+        let coordinator = PlayerCoordinator()
+        let session = RecommendSession(coordinator: coordinator)
+
+        session.replacePlaylist(dramas: [makeDrama(id: "old")])
+        session.replacePlaylist(dramas: [])
+
+        #expect(session.playableItems.isEmpty)
+        #expect(coordinator.owner == nil)
+        #expect(coordinator.engine.currentItem == nil)
+        #expect(coordinator.engine.playlistItemIDs.isEmpty)
+    }
+
     @Test("同 URL 不同 dramaID 不得错误复用 — stableID 唯一")
     func sameURLDifferentDramaIDNotReused() {
         let sharedURL = "https://vod.example.com/shared.mp4"

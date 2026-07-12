@@ -68,29 +68,40 @@ import Combine
             targetDramaIndex = 0
         }
 
-        // 安全钳制 targetDramaIndex 到合法范围
-        let safeTarget = newD2P.isEmpty ? 0 : min(targetDramaIndex, dramas.count - 1)
+        if newPlayable.isEmpty {
+            playableItems = []
+            dramaToPlayable = [:]
+            currentIndex = 0
+            nextAppendDramaIndex = 0
+            hasInitializedPool = false
+            if coordinator.owner == .forYou {
+                coordinator.release(.forYou)
+            }
+            poolVersion &+= 1
+            log("replacePlaylist gen=\(gen) 无可用播放条目 count=\(dramas.count)")
+            return
+        }
 
-        // 原子提交
+        // 目标必须是实际可播放的 feed 卡片；不允许 UI 停在锁集卡、Engine 却播放别的媒体。
+        let safeTarget = newD2P[targetDramaIndex] == nil
+            ? newPlayable[0].dramaIndex
+            : targetDramaIndex
+        guard let playableIdx = newD2P[safeTarget] else { return }
+
+        // 原子提交 Session 映射。随后由 Coordinator 同步替换 Engine 的完整 playlist。
         playableItems = newPlayable
         dramaToPlayable = newD2P
         currentIndex = safeTarget
         let playerItems = newPlayable.map(\.item)
-        let playableIdx = newD2P[safeTarget] ?? 0
-
-        if newPlayable.isEmpty {
-            log("replacePlaylist gen=\(gen) 无可用播放条目 count=\(dramas.count)")
-            return
-        }
 
         log("replacePlaylist gen=\(gen) feedCount=\(dramas.count) playableCount=\(newPlayable.count) targetDrama=\(safeTarget) targetPlayable=\(playableIdx)")
 
         if !hasInitializedPool {
             engine.startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you", targetIndex: 0))
-            coordinator.claimForYou(items: playerItems, index: playableIdx)
+            coordinator.replaceForYouPlaylist(items: playerItems, index: playableIdx, autoplay: true)
             hasInitializedPool = true
         } else if coordinator.owner == .forYou {
-            coordinator.claimForYou(items: playerItems, index: playableIdx)
+            coordinator.replaceForYouPlaylist(items: playerItems, index: playableIdx, autoplay: true)
         }
         // Series 持有播放权时不提交引擎，只更新 session 快照
 

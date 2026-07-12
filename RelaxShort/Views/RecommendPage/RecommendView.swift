@@ -472,7 +472,8 @@ struct RecommendView: View {
 
     private func visibleIndices(for current: Int, count: Int) -> [Int] {
         guard count > 0 else { return [] }
-        return Array(max(0, current - 1)...min(count - 1, current + 1))
+        let safeCurrent = max(0, min(current, count - 1))
+        return Array(max(0, safeCurrent - 1)...min(count - 1, safeCurrent + 1))
     }
 
     // MARK: - 拖拽手势
