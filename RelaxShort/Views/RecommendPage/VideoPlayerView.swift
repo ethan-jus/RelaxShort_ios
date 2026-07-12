@@ -14,10 +14,15 @@ import Combine
     @Published var poolVersion = 0
     private var engineSink: AnyCancellable?
 
-    /// Task26: 可播放条目列表，保存 dramaIndex → playableIndex 映射
+    /// 可播放条目列表，保存 dramaIndex → playableIndex 映射
     private(set) var playableItems: [RecommendPlayableItem] = []
     /// dramaIndex → playableIndex 快速查找
     private var dramaToPlayable: [Int: Int] = [:]
+
+    /// TASK-0001-D: feed generation — replace 递增，append 绑定发起时 generation
+    private(set) var feedGeneration: Int = 0
+    /// 下次 append 合法的起始 dramaIndex
+    private var nextAppendDramaIndex: Int = 0
 
     init(coordinator: PlayerCoordinator) {
         self.coordinator = coordinator
@@ -32,11 +37,81 @@ import Combine
         }
     }
 
-    /// Task36A: 追加新剧集到播放器池，不中断当前播放。
-    /// 只映射尚未在 dramaToPlayable 中的新 DramaItem，并同步 engine 内部 items。
-    /// startingAt 必须使用追加数据在完整 dramas 数组中的真实起始下标，避免首屏或不可播放条目导致索引错位。
-    func syncDramas(_ newDramas: [DramaItem], startingAt startDramaIndex: Int) {
-        guard !newDramas.isEmpty else { return }
+    // MARK: - 整体替换（feed 重载、刷新、首次加载）
+
+    /// 原子替换全部播放列表。优先按当前 dramaID 在新 feed 中恢复到对应索引，
+    /// 找不到则回到 index 0。只在 For You 持有播放权或未初始化时提交引擎；
+    /// Series 持有播放权时仅更新 session 快照。
+    func replacePlaylist(dramas: [DramaItem]) {
+        feedGeneration &+= 1
+        let gen = feedGeneration
+        nextAppendDramaIndex = dramas.count
+
+        // 在局部变量中完整构建，验证后再提交
+        var newPlayable: [RecommendPlayableItem] = []
+        var newD2P: [Int: Int] = [:]
+
+        for (dIdx, drama) in dramas.enumerated() {
+            guard let mediaItem = drama.toPlayerMediaItem() else { continue }
+            let pIdx = newPlayable.count
+            newPlayable.append(RecommendPlayableItem(id: mediaItem.id, dramaIndex: dIdx, item: mediaItem))
+            newD2P[dIdx] = pIdx
+        }
+
+        // 优先按当前 dramaID 精确恢复索引
+        let previousDramaID = currentDramaID()
+        let targetDramaIndex: Int
+        if let prevID = previousDramaID,
+           let matched = newPlayable.first(where: { $0.item.id == prevID || $0.item.id.hasPrefix("\(prevID)-") }) {
+            targetDramaIndex = matched.dramaIndex
+        } else {
+            targetDramaIndex = 0
+        }
+
+        // 安全钳制 targetDramaIndex 到合法范围
+        let safeTarget = newD2P.isEmpty ? 0 : min(targetDramaIndex, dramas.count - 1)
+
+        // 原子提交
+        playableItems = newPlayable
+        dramaToPlayable = newD2P
+        currentIndex = safeTarget
+        let playerItems = newPlayable.map(\.item)
+        let playableIdx = newD2P[safeTarget] ?? 0
+
+        if newPlayable.isEmpty {
+            log("replacePlaylist gen=\(gen) 无可用播放条目 count=\(dramas.count)")
+            return
+        }
+
+        log("replacePlaylist gen=\(gen) feedCount=\(dramas.count) playableCount=\(newPlayable.count) targetDrama=\(safeTarget) targetPlayable=\(playableIdx)")
+
+        if !hasInitializedPool {
+            engine.startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you", targetIndex: 0))
+            coordinator.claimForYou(items: playerItems, index: playableIdx)
+            hasInitializedPool = true
+        } else if coordinator.owner == .forYou {
+            coordinator.claimForYou(items: playerItems, index: playableIdx)
+        }
+        // Series 持有播放权时不提交引擎，只更新 session 快照
+
+        poolVersion &+= 1
+    }
+
+    // MARK: - 分页追加
+
+    /// 分页追加新剧集。校验 generation 匹配 + startIndex 连续。
+    /// 旧 generation 或非连续 startIndex 的请求直接丢弃。
+    func appendPlaylist(newDramas: [DramaItem], startDramaIndex: Int, generation: Int) -> Bool {
+        guard generation == feedGeneration else {
+            log("appendPlaylist 被拒绝 gen不匹配 请求gen=\(generation) 当前gen=\(feedGeneration)")
+            return false
+        }
+        guard startDramaIndex == nextAppendDramaIndex else {
+            log("appendPlaylist 被拒绝 startIndex不连续 请求start=\(startDramaIndex) 期望start=\(nextAppendDramaIndex)")
+            return false
+        }
+        guard !newDramas.isEmpty else { return false }
+
         var newItems: [PlayerMediaItem] = []
         for (offset, drama) in newDramas.enumerated() {
             let dIdx = startDramaIndex + offset
@@ -47,75 +122,123 @@ import Combine
             dramaToPlayable[dIdx] = pIdx
             newItems.append(mediaItem)
         }
-        guard !newItems.isEmpty else { return }
+
+        nextAppendDramaIndex = startDramaIndex + newDramas.count
+        guard !newItems.isEmpty else {
+            log("appendPlaylist gen=\(generation) start=\(startDramaIndex) 无可播放新条目")
+            return false
+        }
+
+        log("appendPlaylist gen=\(generation) start=\(startDramaIndex) newPlayable=\(newItems.count) totalPlayable=\(playableItems.count)")
+
         coordinator.appendForYouItems(newItems)
         poolVersion &+= 1
+        return true
     }
+
+    // MARK: - 严格 playableIndex（无 fallback）
+
+    /// 严格映射：dramaIndex → playableIndex。找不到返回 nil，禁止 fallback。
+    func playableIndex(for dramaIndex: Int) -> Int? {
+        return dramaToPlayable[dramaIndex]
+    }
+
+    /// 根据 dramaIndex 查询对应的 mediaID（供诊断日志使用）。
+    func mediaID(for dramaIndex: Int) -> String? {
+        guard let pIdx = dramaToPlayable[dramaIndex],
+              playableItems.indices.contains(pIdx) else { return nil }
+        return playableItems[pIdx].item.id
+    }
+
+    /// 当前 dramaIndex 对应的 dramaID（供 replace 时精确恢复）。
+    private func currentDramaID() -> String? {
+        guard let pIdx = dramaToPlayable[currentIndex],
+              playableItems.indices.contains(pIdx) else { return nil }
+        let id = playableItems[pIdx].item.id
+        // stableID 格式为 "dramaID-episodeNumber"，提取 dramaID 部分
+        if let dashIdx = id.lastIndex(of: "-") {
+            return String(id[..<dashIdx])
+        }
+        return id
+    }
+
+    // MARK: - 受控 transition
+
+    /// 受控切页：先校验目标 dramaIndex 可播放，再提交 Engine。
+    /// 成功返回 true，无可播放映射返回 false（不修改 currentIndex，不提交 Engine）。
+    func attemptTransition(from old: Int, to new: Int, autoplay: Bool) -> Bool {
+        guard old != new else { return true }
+
+        guard let pIdx = playableIndex(for: new) else {
+            log("attemptTransition 拒绝 目标drama=\(new) 无可播放映射 dramaToPlayable.keys=\(dramaToPlayable.keys.sorted())")
+            return false
+        }
+
+        let oldMediaID = mediaID(for: old) ?? "nil"
+        let newMediaID = mediaID(for: new) ?? "nil"
+
+        currentIndex = new
+        coordinator.moveForYou(to: pIdx, autoplay: autoplay)
+        poolVersion &+= 1
+
+        log("attemptTransition from=\(old)→\(new) fromID=\(oldMediaID) toID=\(newMediaID) playableIdx=\(pIdx)")
+        return true
+    }
+
+    // MARK: - 生命周期
 
     func initializePool(dramas: [DramaItem]) {
-        guard !dramas.isEmpty else { return }
-        var items: [RecommendPlayableItem] = []
-        var d2p: [Int: Int] = [:]
-        for (dIdx, drama) in dramas.enumerated() {
-            guard let mediaItem = drama.toPlayerMediaItem() else { continue }
-            let pIdx = items.count
-            items.append(RecommendPlayableItem(id: mediaItem.id, dramaIndex: dIdx, item: mediaItem))
-            d2p[dIdx] = pIdx
-        }
-        guard !items.isEmpty else {
-            print("[PlayerKit] 跳过初始化播放池 原因=没有可播放条目 剧集数=\(dramas.count)")
-            return
-        }
-        playableItems = items
-        dramaToPlayable = d2p
-        let playerItems = items.map(\.item)
-        // Task36B-2: 开始 For You 播放诊断追踪
-        engine.startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you", targetIndex: 0))
-        coordinator.claimForYou(items: playerItems, index: 0)
-        hasInitializedPool = true; poolVersion &+= 1
+        replacePlaylist(dramas: dramas)
     }
 
-    /// 将 drama index 映射为 playable index，供 engine.move 使用。
-    /// 如果目标 drama 不可播放，返回最近的合法 playable index 或 nil。
-    func playableIndex(for dramaIndex: Int) -> Int? {
-        if let direct = dramaToPlayable[dramaIndex] { return direct }
-        // 不可播放时找最近的合法索引
-        let sorted = dramaToPlayable.keys.sorted()
-        guard let first = sorted.first, let last = sorted.last else { return nil }
-        if dramaIndex < first { return 0 }
-        if dramaIndex > last { return playableItems.count - 1 }
-        // 二分查找最近
-        var best = first
-        for k in sorted { if k <= dramaIndex { best = k } else { break } }
-        return dramaToPlayable[best]
-    }
-
+    /// 列表为空时重建（用于 loadData 全量刷新后的首次 init）
+    /// 已替换为 replacePlaylist 调用。保留以兼容原有调用方。
     func handleTransition(from old: Int, to new: Int, dramas: [DramaItem], autoplay: Bool) {
-        guard old != new else { return }
-        currentIndex = new
-        // Task26: 使用 playable index 安全移动
-        if let pIdx = playableIndex(for: new) {
-            coordinator.moveForYou(to: pIdx, autoplay: autoplay)
-        } else {
-            print("[PlayerKit] 跳过推荐流切换 剧集索引=\(new) 原因=没有可播放索引")
-        }
-        poolVersion &+= 1
+        _ = attemptTransition(from: old, to: new, autoplay: autoplay)
     }
 
     func resumePlayback() {
         guard hasInitializedPool,
               !playableItems.isEmpty,
-              let playableIndex = playableIndex(for: currentIndex) else { return }
+              let playableIdx = playableIndex(for: currentIndex) else { return }
+
+        let playerItems = playableItems.map(\.item)
 
         if coordinator.owner == .forYou {
             coordinator.resumeForYou()
         } else {
-            coordinator.claimForYou(items: playableItems.map(\.item), index: playableIndex)
+            coordinator.claimForYou(items: playerItems, index: playableIdx)
         }
     }
 
     func pausePlayback() {
         coordinator.pauseForYou()
+    }
+
+    // MARK: - 同步旧 drama 到新 session（move 本地复用的轻量版本）
+
+    /// 已弃用：由 replacePlaylist + appendPlaylist 替代。
+    /// 保留以兼容 RecommendView 中现有的 onChange(dramas.count) → syncDramas 调用。
+    /// TASK-0001-D 中 RecommendView 不再直接调此方法。
+    @available(*, deprecated, message: "使用 appendPlaylist(newDramas:startDramaIndex:generation:) 替代")
+    func syncDramas(_ newDramas: [DramaItem], startingAt startDramaIndex: Int) {
+        _ = appendPlaylist(newDramas: newDramas, startDramaIndex: startDramaIndex, generation: feedGeneration)
+    }
+
+    // MARK: - 诊断
+
+    /// 输出完整诊断信息（供日志使用）
+    func diagnostics() -> String {
+        let uiDramaID = mediaID(for: currentIndex) ?? "nil"
+        let engMediaID = engine.currentItem?.id ?? "nil"
+        let pIdx = playableIndex(for: currentIndex)
+        return "gen=\(feedGeneration) currentIndex=\(currentIndex) uiDramaID=\(uiDramaID) playableIdx=\(pIdx.map(String.init) ?? "nil") engMediaID=\(engMediaID) feedCount=\(playableItems.count) nextAppend=\(nextAppendDramaIndex)"
+    }
+
+    private func log(_ msg: String) {
+        #if DEBUG
+        print("[RecommendSession] \(msg)")
+        #endif
     }
 }
 
