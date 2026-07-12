@@ -479,15 +479,14 @@ struct RecommendView: View {
 
     // 旧分页器已移除，统一使用当前信息流浮层
 
-    /// 可见页索引窗口。在 feed 重载等 current 可能暂时超过 count 的场景下，
-    /// lowerBound > upperBound 会触发 Range 致命错误，因此先校验边界。
+    /// 可见页索引窗口。基于安全钳制后的当前索引计算，同时防御负数、越界和空数组。
     private func visibleIndices(for current: Int, count: Int) -> [Int] {
-        guard count > 0 else { return [0] }
-        let lo = max(0, current - 1)
-        let hi = min(count - 1, current + 1)
-        guard lo <= hi else {
-            return [min(current, count - 1)]
-        }
+        guard count > 0 else { return [] }
+
+        let safeCurrent = max(0, min(current, count - 1))
+        let lo = max(0, safeCurrent - 1)
+        let hi = min(count - 1, safeCurrent + 1)
+
         return Array(lo...hi)
     }
 
