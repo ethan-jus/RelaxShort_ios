@@ -25,7 +25,7 @@
 - ViewModel 不直接解析后端 DTO。
 - 网络错误不要吞掉；ViewModel 可降级为空态或 Mock fallback，但必须记录日志。
 - Mock/Real 切换通过 `DependencyContainer` + `UserDefaults.standard.bool("use_real_api")` 控制。
-- 当前本机 `xcodebuild` 已可用；涉及 Swift/Xcode 工程改动必须跑 `xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort -destination 'platform=iOS Simulator,name=iPhone 17' build` 或说明无法运行的真实原因。
+- 当前本机 `xcodebuild` 已可用；普通 Swift/Xcode 改动完成后只跑一次 `xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort -destination 'platform=iOS Simulator,name=iPhone 17' build`。不默认跑测试、模拟器交互、网络 smoke 或截图；仅在用户要求或支付、鉴权、并发、播放状态机等高风险改动时增加定向验证。
 
 ## 禁止事项
 
