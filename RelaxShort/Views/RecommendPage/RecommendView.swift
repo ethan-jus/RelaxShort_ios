@@ -88,11 +88,6 @@ struct RecommendView: View {
             }
             .onChange(of: viewModel.dramas.count) { oldCount, count in
                 guard count > 0 else { return }
-                // TASK-0001-A: feed 重载后数据量可能缩小，
-                // currentIndex 必须约束到合法范围，防止后续 visibleIndices 崩溃。
-                if session.currentIndex >= count {
-                    session.currentIndex = max(0, count - 1)
-                }
                 if isPlaybackVisible {
                     initializePlaybackIfNeeded()
                 }
@@ -479,15 +474,9 @@ struct RecommendView: View {
 
     // 旧分页器已移除，统一使用当前信息流浮层
 
-    /// 可见页索引窗口。基于安全钳制后的当前索引计算，同时防御负数、越界和空数组。
     private func visibleIndices(for current: Int, count: Int) -> [Int] {
         guard count > 0 else { return [] }
-
-        let safeCurrent = max(0, min(current, count - 1))
-        let lo = max(0, safeCurrent - 1)
-        let hi = min(count - 1, safeCurrent + 1)
-
-        return Array(lo...hi)
+        return Array(max(0, current - 1)...min(count - 1, current + 1))
     }
 
     // MARK: - 拖拽手势
