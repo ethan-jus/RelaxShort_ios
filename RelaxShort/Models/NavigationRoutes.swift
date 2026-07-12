@@ -21,7 +21,8 @@ struct SeriesPlayerNav: Hashable {
     ) {
         self.drama = drama
         self.startEpisode = startEpisode
-        self.episodeID = episodeID
+        // 普通卡片导航默认保留后端 preview_episode_id；历史/收藏显式指定时仍以显式值优先。
+        self.episodeID = episodeID ?? drama.previewEpisodeID
         self.resumeTime = resumeTime
         self.handoff = handoff
         self.sourceScene = sourceScene

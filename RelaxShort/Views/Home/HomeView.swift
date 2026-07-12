@@ -55,9 +55,18 @@ private struct CategoryScrollOffsetReader: UIViewRepresentable {
         func attach(to scrollView: UIScrollView?) {
             guard let scrollView, self.scrollView !== scrollView else { return }
             self.scrollView = scrollView
-            offsetY.wrappedValue = scrollView.contentOffset.y
+            publishOffset(scrollView.contentOffset.y)
             observation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
-                self?.offsetY.wrappedValue = scrollView.contentOffset.y
+                self?.publishOffset(scrollView.contentOffset.y)
+            }
+        }
+
+        /// UIViewRepresentable 的 update/layout 周期内同步写 SwiftUI Binding 会触发未定义行为警告。
+        /// 延迟到下一轮主队列，并过滤无变化值，避免重复刷新。
+        private func publishOffset(_ value: CGFloat) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, abs(self.offsetY.wrappedValue - value) > 0.5 else { return }
+                self.offsetY.wrappedValue = value
             }
         }
     }

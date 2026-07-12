@@ -3,14 +3,12 @@ import AVKit
 import Network
 import Combine
 
-// MARK: - 推荐页播放会话（迁移壳 — 委托给 ShortVideoPlayerEngine）
-
-// MARK: - 推荐页播放会话（唯一 engine，无旧 pool/controller）
+// MARK: - 推荐页播放会话（唯一 Coordinator / Engine）
 
 @MainActor final class RecommendSession: ObservableObject {
-    /// 共享 engine — 由 PlayerCoordinator 提供，不再自己创建
-    private weak var coordinator: PlayerCoordinator?
-    private(set) var engine: ShortVideoPlayerEngine
+    /// Coordinator 是播放权唯一入口；会话不允许脱离它直接管理播放列表。
+    private let coordinator: PlayerCoordinator
+    let engine: ShortVideoPlayerEngine
     @Published var currentIndex = 0
     @Published var hasInitializedPool = false
     @Published var poolVersion = 0
@@ -21,16 +19,9 @@ import Combine
     /// dramaIndex → playableIndex 快速查找
     private var dramaToPlayable: [Int: Int] = [:]
 
-    init(engine: ShortVideoPlayerEngine) {
-        self.engine = engine
-        subscribe(to: engine)
-    }
-
-    func bind(to coordinator: PlayerCoordinator) {
-        guard self.coordinator !== coordinator else { return }
+    init(coordinator: PlayerCoordinator) {
         self.coordinator = coordinator
-        guard engine !== coordinator.engine else { return }
-        engine = coordinator.engine
+        self.engine = coordinator.engine
         subscribe(to: coordinator.engine)
     }
 
@@ -57,8 +48,7 @@ import Combine
             newItems.append(mediaItem)
         }
         guard !newItems.isEmpty else { return }
-        // 同步 engine 内部 items 列表，使后续 move(to:) 能索引新条目
-        engine.appendItems(newItems)
+        coordinator.appendForYouItems(newItems)
         poolVersion &+= 1
     }
 
@@ -73,7 +63,7 @@ import Combine
             d2p[dIdx] = pIdx
         }
         guard !items.isEmpty else {
-            print("[PlayerKit] initializePool skipped reason=no-playable-items dramas=\(dramas.count)")
+            print("[PlayerKit] 跳过初始化播放池 原因=没有可播放条目 剧集数=\(dramas.count)")
             return
         }
         playableItems = items
@@ -81,12 +71,7 @@ import Combine
         let playerItems = items.map(\.item)
         // Task36B-2: 开始 For You 播放诊断追踪
         engine.startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you", targetIndex: 0))
-        if let coordinator {
-            coordinator.claimForYou(items: playerItems, index: 0)
-        } else {
-            engine.prepare(items: playerItems, index: 0)
-            engine.play()
-        }
+        coordinator.claimForYou(items: playerItems, index: 0)
         hasInitializedPool = true; poolVersion &+= 1
     }
 
@@ -105,23 +90,19 @@ import Combine
         return dramaToPlayable[best]
     }
 
-    func handleTransition(from old: Int, to new: Int, dramas: [DramaItem]) {
+    func handleTransition(from old: Int, to new: Int, dramas: [DramaItem], autoplay: Bool) {
         guard old != new else { return }
         currentIndex = new
         // Task26: 使用 playable index 安全移动
         if let pIdx = playableIndex(for: new) {
-            engine.move(to: pIdx)
+            coordinator.moveForYou(to: pIdx, autoplay: autoplay)
         } else {
-            print("[PlayerKit] handleTransition skipped dramaIndex=\(new) reason=no-playable-index")
+            print("[PlayerKit] 跳过推荐流切换 剧集索引=\(new) 原因=没有可播放索引")
         }
         poolVersion &+= 1
     }
 
     func resumePlayback() {
-        guard let coordinator else {
-            engine.playFromSystemResume()
-            return
-        }
         guard hasInitializedPool,
               !playableItems.isEmpty,
               let playableIndex = playableIndex(for: currentIndex) else { return }
@@ -134,22 +115,7 @@ import Combine
     }
 
     func pausePlayback() {
-        if let coordinator {
-            coordinator.pauseForYou()
-        } else {
-            engine.pause(reason: .system)
-        }
-    }
-
-    func cleanup() {}
-}
-
-// MARK: - 视频播放视图（engine 壳 — 不允许内部 new engine）
-
-struct VideoPlayerView: View {
-    let coverURL: String; let engine: ShortVideoPlayerEngine; let isCurrent: Bool
-    var body: some View {
-        ShortVideoPlayerView(player: isCurrent ? engine.currentPlayer : nil, coverURL: coverURL, engine: engine)
+        coordinator.pauseForYou()
     }
 }
 
@@ -174,13 +140,21 @@ extension DramaItem {
     /// 仅当 videoURL 为 http/https scheme 时才创建 PlayerMediaItem，
     /// 否则打印诊断日志返回 nil，由调用方 compactMap 过滤。
     func toPlayerMediaItem() -> PlayerMediaItem? {
+        let episodeNumber = max(1, currentEpisode)
+        let publicPreviewAllowed = isPublicPreview
+            && !isVIPOnly
+            && !isMemberOnly
+            && (freeEpisodeRange?.contains(episodeNumber) ?? true)
+        guard publicPreviewAllowed else {
+            print("[PlayerKit] 跳过受保护卡片直链 id=\(id) 集数=\(episodeNumber)，等待 /play 权益校验")
+            return nil
+        }
         guard let raw = videoURL,
               let url = URL(string: raw),
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else {
-            print("[PlayerKit] skip playable item id=\(id) reason=missing-video-url title=\(title) videoURL=\(videoURL ?? "nil")")
+            print("[PlayerKit] 跳过可播放条目 ID=\(id) 原因=缺少有效视频地址 标题=\(title) 视频地址=\(videoURL ?? "无")")
             return nil
         }
-        let episodeNumber = max(1, currentEpisode)
         return PlayerMediaItem(
             id: PlayerMediaItem.stableID(dramaID: id, episodeNumber: episodeNumber),
             title: title, episodeNumber: episodeNumber,

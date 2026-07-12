@@ -24,7 +24,7 @@ struct MainTabView: View {
         self.playerCoordinator = playerCoordinator
         _homeVM = StateObject(wrappedValue: HomeViewModel(repository: dependencies.homeRepository))
         _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: dependencies.homeRepository))
-        _recommendSession = StateObject(wrappedValue: RecommendSession(engine: playerCoordinator.engine))
+        _recommendSession = StateObject(wrappedValue: RecommendSession(coordinator: playerCoordinator))
     }
 
     var body: some View {

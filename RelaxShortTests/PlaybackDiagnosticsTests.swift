@@ -5,16 +5,12 @@ import XCTest
 final class PlaybackDiagnosticsTests: XCTestCase {
     override func setUp() {
         super.setUp()
-        StreamedRangeFetcher.testSessionFactory = { delegate in
-            let configuration = URLSessionConfiguration.ephemeral
-            configuration.protocolClasses = [MockRangeProtocol.self]
-            return URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
-        }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockRangeProtocol.self]
+        StreamedRangeFetcher.testConfiguration = config
     }
     override func tearDown() {
-        StreamedRangeFetcher.testSessionFactory = nil
-        MockRangeProtocol.response = nil
-        MockRangeProtocol.chunks = []
+        StreamedRangeFetcher.testConfiguration = nil
         super.tearDown()
     }
 
@@ -73,7 +69,7 @@ final class PlaybackDiagnosticsTests: XCTestCase {
     @MainActor func testRecordTraceFalseNeverMarksEngine() {
         // recordTrace=false 时 engine 完全不受影响
         let engine = ShortVideoPlayerEngine()
-        var t = PlaybackDiagnosticsTrace(scene: "series", seriesID: "d1", episodeNumber: 1)
+        let t = PlaybackDiagnosticsTrace(scene: "series", seriesID: "d1", episodeNumber: 1)
         engine.startPlaybackTrace(t)
         engine.markTrace("开始加载")
         // 当前集 trace 有 1 个 mark
@@ -82,7 +78,7 @@ final class PlaybackDiagnosticsTests: XCTestCase {
 
     @MainActor func testRecordTraceTrueMarksAllStages() {
         let engine = ShortVideoPlayerEngine()
-        var t = PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: "d1", episodeNumber: 3)
+        let t = PlaybackDiagnosticsTrace(scene: "series_switch", seriesID: "d1", episodeNumber: 3)
         engine.startPlaybackTrace(t)
         engine.markTrace("缓存命中")
         engine.markTrace("播放源")
@@ -113,22 +109,20 @@ final class PlaybackDiagnosticsTests: XCTestCase {
 
 // MARK: - URLProtocol Mock
 
-final class MockRangeProtocol: URLProtocol {
+private class MockRangeProtocol: URLProtocol {
     static var response: ((URLRequest) -> HTTPURLResponse)?
     static var chunks: [Data] = []
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        // Foundation 可能为 URLProtocol 生成运行时子类；这里必须显式访问基类静态桩，
-        // 使用 Self 会读到子类独立的空状态，导致状态码错误地变成 0。
-        guard let resp = MockRangeProtocol.response?(request) else {
+        guard let resp = Self.response?(request) else {
             client?.urlProtocol(self, didFailWithError: NSError(domain: "Mock", code: -1))
             return
         }
         client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)
         // 分块发送模拟流式，超过 256KB 的块可触发截断
-        for chunk in MockRangeProtocol.chunks {
+        for chunk in Self.chunks {
             client?.urlProtocol(self, didLoad: chunk)
         }
         client?.urlProtocolDidFinishLoading(self)

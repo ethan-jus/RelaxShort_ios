@@ -17,7 +17,6 @@
 		157EA7612F5F55209BB9DF3A /* APIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAB9B1695F125A9D9EB7B5A1 /* APIConfig.swift */; };
 		1C871B6F33AB54D0D59AA2AC /* SeriesPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC6168F0CDBC3B3FE810F657 /* SeriesPlayerView.swift */; };
 		1FF3E1A102BEF7AA8D4F9D2A /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA45403A687DDCFEC0BFB2 /* ImageLoader.swift */; };
-		22DD7B8ED502B83B8DA519EC /* HTTPRangeMediaCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BD817497A3D172F4436C753 /* HTTPRangeMediaCache.swift */; };
 		2C154A54BD9F2FF30E9D0E37 /* RankingResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ACE4BF9A6467F42C0968C1D /* RankingResponseDTO.swift */; };
 		2E4AAF0C01CE42B2A39F4D43 /* RealMemberRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCCCF0A8A63420F846E6A38 /* RealMemberRepository.swift */; };
 		2E9BFA93C65881A7FF34909B /* DesignToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8EDBD506501279A0BBE11E /* DesignToken.swift */; };
@@ -102,7 +101,6 @@
 		AF577A0A561BC8893C579778 /* AdCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7EBAB6170EDA73DEF1AB939 /* AdCardView.swift */; };
 		B2971FB6D19A7C6D5E972521 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A106541F2F7ED6FD93A122F4 /* LoginView.swift */; };
 		B2B7763C3F01AC8F8B1FECE8 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A473A2297B9A58E144BAFECD /* Extensions.swift */; };
-		B336F51F917B972D2E94488D /* PlayerResourceLoaderDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE171218A2C10E4C0D56A9F5 /* PlayerResourceLoaderDelegate.swift */; };
 		BB2E3EA9A9D00C60F41D13CD /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0FD5F1BB5A7F6098060F58C /* ThemeManager.swift */; };
 		BB620C8D87AB1D3DCD9E9469 /* RulePopupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 614217FBE8E7FD906F0E7F17 /* RulePopupView.swift */; };
 		BBB34C8BA2205B2AF5B4DBFD /* DiscoveryAnalyticsReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 277346538B6648A759C70FD9 /* DiscoveryAnalyticsReporter.swift */; };
@@ -186,7 +184,6 @@
 		369DBB3ED6B5D26D448FA5A9 /* VideoPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerView.swift; sourceTree = "<group>"; };
 		3A3CC604DBFCEE5E5B9E077C /* RankView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RankView.swift; sourceTree = "<group>"; };
 		3ACE4BF9A6467F42C0968C1D /* RankingResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RankingResponseDTO.swift; path = RelaxShort/Models/API/RankingResponseDTO.swift; sourceTree = SOURCE_ROOT; };
-		3BD817497A3D172F4436C753 /* HTTPRangeMediaCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRangeMediaCache.swift; sourceTree = "<group>"; };
 		3C29B2906A8A40C19941B29F /* HomeSectionComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSectionComponents.swift; sourceTree = "<group>"; };
 		3E062C5AE506CB3FC932836A /* SharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedComponents.swift; sourceTree = "<group>"; };
 		3E07DF14795E56458A576B7D /* RealSearchRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealSearchRepository.swift; sourceTree = "<group>"; };
@@ -263,7 +260,6 @@
 		C15E0ECC75DBFD47BDC8BF48 /* CoinRewardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoinRewardView.swift; sourceTree = "<group>"; };
 		C2ECC6D89B539AE9E9C77C64 /* SearchDefaultViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchDefaultViewModel.swift; sourceTree = "<group>"; };
 		C9E72EDFAD26B4E491CBF588 /* Bookmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bookmark.swift; sourceTree = "<group>"; };
-		CE171218A2C10E4C0D56A9F5 /* PlayerResourceLoaderDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerResourceLoaderDelegate.swift; sourceTree = "<group>"; };
 		CE297A7165A55E68BFCB9FA6 /* API/ForYouFeedResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API/ForYouFeedResponseDTO.swift; sourceTree = "<group>"; };
 		CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealAPISmokeRunner.swift; sourceTree = "<group>"; };
 		D20FD7A3399158EFA990DE36 /* API/PlayerMediaSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API/PlayerMediaSource.swift; sourceTree = "<group>"; };
@@ -639,7 +635,6 @@
 				168FB1E2BB472B3B8D7E7253 /* PlayerSlotPool.swift */,
 				162A3AA839324704A0A1F73C /* ShortVideoPlayerEngine.swift */,
 				5E638B042AF7EB7EEEB410B2 /* ShortVideoPlayerView.swift */,
-				FDDD0125FCCEEBDBA339C1C0 /* MediaCache */,
 				41244E4C36F73B2C6731E06C /* Metrics */,
 				39FD02C5903A5D5357897C31 /* Subtitles */,
 			);
@@ -704,15 +699,6 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		FDDD0125FCCEEBDBA339C1C0 /* MediaCache */ = {
-			isa = PBXGroup;
-			children = (
-				3BD817497A3D172F4436C753 /* HTTPRangeMediaCache.swift */,
-				CE171218A2C10E4C0D56A9F5 /* PlayerResourceLoaderDelegate.swift */,
-			);
-			path = MediaCache;
-			sourceTree = "<group>";
-		};
 		T31A01100000000000000011 /* Playback */ = {
 			isa = PBXGroup;
 			children = (
@@ -730,6 +716,7 @@
 			buildPhases = (
 				C7F899F8CC33C6965A7525A2 /* Sources */,
 				6A0AB54A86AB8C6D645148FD /* Resources */,
+				AAPI00000000000000000001 /* Inject Debug API Host */,
 				614BFD0D6EE453BA328CC9B1 /* Frameworks */,
 			);
 			buildRules = (
@@ -772,6 +759,22 @@
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AAPI00000000000000000001 /* Inject Debug API Host */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Inject Debug API Host";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/inject-debug-api-host.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXProject section */
 		CE0A440451637C12944B16AC /* Project object */ = {
@@ -883,7 +886,6 @@
 				B2B7763C3F01AC8F8B1FECE8 /* Extensions.swift in Sources */,
 				FD1C40888BB779A0CA0078DF /* FavoritesView.swift in Sources */,
 				ADA87D600B71591BC2FD8B39 /* FavoritesViewModel.swift in Sources */,
-				22DD7B8ED502B83B8DA519EC /* HTTPRangeMediaCache.swift in Sources */,
 				018255F83848D18F615B66FC /* HomeView.swift in Sources */,
 				3C29B2916A8A40C19941B29F /* HomeSectionComponents.swift in Sources */,
 				C1D76D631694C10F3B7D91D8 /* HomeViewModel.swift in Sources */,
@@ -907,7 +909,6 @@
 				54675ED85DFD792FC62BF4DC /* PlayerMediaModels.swift in Sources */,
 				5B19C5C83C1B02D7226E4728 /* PlayerMetricsLogger.swift in Sources */,
 				534A609A4BC181567823C605 /* PlayerRecoveryController.swift in Sources */,
-				B336F51F917B972D2E94488D /* PlayerResourceLoaderDelegate.swift in Sources */,
 				D443C19FB03F5FAC37C37AC9 /* PlayerSlotPool.swift in Sources */,
 				A904D3F3D117CE6F5C9FE9C4 /* ProfileView.swift in Sources */,
 				760FA93B30ED6372731C4B9F /* ProfileViewModel.swift in Sources */,

@@ -18,6 +18,8 @@ struct DramaItem: Identifiable, Codable, Hashable {
     let title: String
     let coverURL: String
     var videoURL: String? = nil
+    /// Feed/Home 卡片对应的真实预览剧集 ID。缺卡片直链时可直接并行请求播放合同，避免先等剧集列表。
+    var previewEpisodeID: String? = nil
     /// 横版 Banner（后端 horizontal_cover_url），nil 时 fallback coverURL
     var bannerCoverURL: String? = nil
     /// 运营角标（后端 display_flags）
@@ -56,6 +58,8 @@ struct DramaItem: Identifiable, Codable, Hashable {
     var isBookmarked: Bool = false
     /// 是否会员专属
     var isVIPOnly: Bool = false
+    /// 卡片预览是否明确允许匿名/普通用户直播；真实 Feed 映射以 monetization 为准。
+    var isPublicPreview: Bool = true
     /// Legacy release-state flag, not shown in v1 UI
     var isComingSoon: Bool = false
     /// 金币解锁价格 (nil = 不能金币解锁)

@@ -7,6 +7,7 @@ import SwiftUI
 /// 仅 DEBUG 构建可用，Release 不包含此文件。
 struct DebugSettingsView: View {
     @State private var apiBaseURL = UserDefaults.standard.string(forKey: "api_base_url") ?? ""
+    @State private var manualOverrideEnabled = UserDefaults.standard.bool(forKey: APIConfig.manualOverrideEnabledKey)
     @State private var effectiveBaseURL = APIConfig.baseURL
     @State private var uiLanguage = UserDefaults.standard.string(forKey: "app_ui_language") ?? "-"
     @State private var contentLanguage = UserDefaults.standard.string(forKey: "app_content_language") ?? "-"
@@ -20,16 +21,28 @@ struct DebugSettingsView: View {
         NavigationView {
             Form {
                 Section("API Config") {
+                    Toggle("手动覆盖 Base URL", isOn: $manualOverrideEnabled)
+                        .onChange(of: manualOverrideEnabled) { _, enabled in
+                            UserDefaults.standard.set(enabled, forKey: APIConfig.manualOverrideEnabledKey)
+                            effectiveBaseURL = APIConfig.baseURL
+                        }
                     HStack {
                         Text("Base URL")
                         TextField("http://127.0.0.1:8080", text: $apiBaseURL)
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
+                            .disabled(!manualOverrideEnabled)
                             .onSubmit {
                                 UserDefaults.standard.set(apiBaseURL, forKey: "api_base_url")
+                                UserDefaults.standard.set(true, forKey: APIConfig.manualOverrideEnabledKey)
+                                manualOverrideEnabled = true
                                 effectiveBaseURL = APIConfig.baseURL
                             }
                     }
+                    Text("自动地址: \(APIConfig.automaticBaseURL)")
+                        .font(.caption).foregroundColor(.secondary)
+                    Text("关闭手动覆盖后，Debug 每次构建会自动使用 Mac 当前局域网地址。")
+                        .font(.caption2).foregroundColor(.secondary)
                     Text("Effective: \(effectiveBaseURL)")
                         .font(.caption).foregroundColor(.secondary)
                 }
@@ -44,10 +57,13 @@ struct DebugSettingsView: View {
 
                 Section("Actions") {
                     Button("Save Base URL") {
-                        if !apiBaseURL.isEmpty {
+                        if manualOverrideEnabled && !apiBaseURL.isEmpty {
                             UserDefaults.standard.set(apiBaseURL, forKey: "api_base_url")
+                            UserDefaults.standard.set(true, forKey: APIConfig.manualOverrideEnabledKey)
                         } else {
                             UserDefaults.standard.removeObject(forKey: "api_base_url")
+                            UserDefaults.standard.set(false, forKey: APIConfig.manualOverrideEnabledKey)
+                            manualOverrideEnabled = false
                         }
                         effectiveBaseURL = APIConfig.baseURL
                         refreshContext()
