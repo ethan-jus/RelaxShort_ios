@@ -481,11 +481,19 @@ struct RecommendView: View {
 
     /// 可见页索引窗口。基于安全钳制后的当前索引计算，同时防御负数、越界和空数组。
     private func visibleIndices(for current: Int, count: Int) -> [Int] {
-        guard count > 0 else { return [] }
+        guard count > 0 else {
+            print("[ForYouRange] count=0 → returning []")
+            return []
+        }
 
         let safeCurrent = max(0, min(current, count - 1))
         let lo = max(0, safeCurrent - 1)
         let hi = min(count - 1, safeCurrent + 1)
+
+        print(
+            "[ForYouRange] current=\(current) count=\(count) " +
+            "safeCurrent=\(safeCurrent) lo=\(lo) hi=\(hi)"
+        )
 
         return Array(lo...hi)
     }
