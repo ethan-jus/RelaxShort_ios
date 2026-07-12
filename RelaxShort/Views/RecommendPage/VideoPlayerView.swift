@@ -54,15 +54,22 @@ import Combine
         for (dIdx, drama) in dramas.enumerated() {
             guard let mediaItem = drama.toPlayerMediaItem() else { continue }
             let pIdx = newPlayable.count
-            newPlayable.append(RecommendPlayableItem(id: mediaItem.id, dramaIndex: dIdx, item: mediaItem))
+            newPlayable.append(
+                RecommendPlayableItem(
+                    id: mediaItem.id,
+                    dramaID: drama.id,
+                    dramaIndex: dIdx,
+                    item: mediaItem
+                )
+            )
             newD2P[dIdx] = pIdx
         }
 
         // 优先按当前 dramaID 精确恢复索引
         let previousDramaID = currentDramaID()
         let targetDramaIndex: Int
-        if let prevID = previousDramaID,
-           let matched = newPlayable.first(where: { $0.item.id == prevID || $0.item.id.hasPrefix("\(prevID)-") }) {
+        if let previousDramaID,
+           let matched = newPlayable.first(where: { $0.dramaID == previousDramaID }) {
             targetDramaIndex = matched.dramaIndex
         } else {
             targetDramaIndex = 0
@@ -129,7 +136,14 @@ import Combine
             guard dramaToPlayable[dIdx] == nil else { continue }
             guard let mediaItem = drama.toPlayerMediaItem() else { continue }
             let pIdx = playableItems.count + newItems.count
-            playableItems.append(RecommendPlayableItem(id: mediaItem.id, dramaIndex: dIdx, item: mediaItem))
+            playableItems.append(
+                RecommendPlayableItem(
+                    id: mediaItem.id,
+                    dramaID: drama.id,
+                    dramaIndex: dIdx,
+                    item: mediaItem
+                )
+            )
             dramaToPlayable[dIdx] = pIdx
             newItems.append(mediaItem)
         }
@@ -165,12 +179,7 @@ import Combine
     private func currentDramaID() -> String? {
         guard let pIdx = dramaToPlayable[currentIndex],
               playableItems.indices.contains(pIdx) else { return nil }
-        let id = playableItems[pIdx].item.id
-        // stableID 格式为 "dramaID-episodeNumber"，提取 dramaID 部分
-        if let dashIdx = id.lastIndex(of: "-") {
-            return String(id[..<dashIdx])
-        }
-        return id
+        return playableItems[pIdx].dramaID
     }
 
     // MARK: - 受控 transition
@@ -188,8 +197,16 @@ import Combine
         let oldMediaID = mediaID(for: old) ?? "nil"
         let newMediaID = mediaID(for: new) ?? "nil"
 
+        guard coordinator.moveForYou(
+            to: pIdx,
+            expectedMediaID: newMediaID,
+            autoplay: autoplay
+        ) else {
+            log("attemptTransition 拒绝：Engine playlist 与 UI 映射不一致")
+            return false
+        }
+
         currentIndex = new
-        coordinator.moveForYou(to: pIdx, autoplay: autoplay)
         poolVersion &+= 1
 
         log("attemptTransition from=\(old)→\(new) fromID=\(oldMediaID) toID=\(newMediaID) playableIdx=\(pIdx)")
@@ -258,6 +275,8 @@ import Combine
 /// Task26: 可播放条目与原始 drama index 的映射，避免 compactMap 跳过无 URL 卡片后索引错位。
 struct RecommendPlayableItem: Identifiable, Hashable {
     let id: String
+    /// UI drama 的稳定业务身份；不从 PlayerMediaItem.id 的字符串格式反推。
+    let dramaID: String
     let dramaIndex: Int
     let item: PlayerMediaItem
 }

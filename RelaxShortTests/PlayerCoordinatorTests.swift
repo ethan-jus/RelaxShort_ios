@@ -143,7 +143,7 @@ struct PlayerCoordinatorTests {
             handoff: nil
         )
 
-        coordinator.moveForYou(to: 1, autoplay: true)
+        coordinator.moveForYou(to: 1, expectedMediaID: "for-you-2", autoplay: true)
 
         #expect(coordinator.owner == .series(dramaID: "series-2"))
         #expect(coordinator.engine.currentItem?.id == "series-2-1")
@@ -172,7 +172,7 @@ struct PlayerCoordinatorTests {
             index: 0
         )
 
-        coordinator.moveForYou(to: 1, autoplay: false)
+        coordinator.moveForYou(to: 1, expectedMediaID: "for-you-2", autoplay: false)
 
         #expect(coordinator.engine.currentItem?.id == "for-you-2")
         #expect(coordinator.engine.wantsPlayback == false)

@@ -86,10 +86,19 @@ final class PlayerCoordinator: ObservableObject {
         engine.appendItems(items)
     }
 
-    /// For You 翻页的唯一入口。所有权校验保证 Series 当前媒体不会被后台页面替换。
-    func moveForYou(to index: Int, autoplay: Bool) {
-        guard owner == .forYou else { return }
+    /// For You 翻页的唯一入口。
+    /// 先校验 Engine 的目标媒体与 UI 映射一致，再允许切换，防止旧 playlist
+    /// 在后台残留时出现“卡片变了、视频没变”。
+    @discardableResult
+    func moveForYou(to index: Int, expectedMediaID: String, autoplay: Bool) -> Bool {
+        guard owner == .forYou,
+              engine.playlistItemIDs.indices.contains(index),
+              engine.playlistItemIDs[index] == expectedMediaID else {
+            Logger.player.warning("拒绝 For You 切换：播放权或媒体映射不一致")
+            return false
+        }
         engine.move(to: index, autoplay: autoplay)
+        return true
     }
 
     /// Series 切集的统一起点。先让旧媒体彻底失效，再返回本次请求令牌。
