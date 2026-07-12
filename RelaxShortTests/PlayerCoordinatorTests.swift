@@ -306,7 +306,7 @@ struct PlayerCoordinatorTests {
     }
 
     @Test
-    func seriesKeepsCurrentPlayerWhenSameEpisodeReceivesOfficialAsset() {
+    func seriesUpgradesCurrentSourceWhenSameEpisodeReceivesOfficialAsset() throws {
         let coordinator = PlayerCoordinator()
         let drama = DramaItem(
             id: "series-3",
@@ -344,9 +344,17 @@ struct PlayerCoordinatorTests {
         )
 
         coordinator.claimSeries(drama: drama, items: [preview], startIndex: 0, handoff: nil)
+        let previewPlayer = try #require(coordinator.engine.currentPlayer)
+        coordinator.engine.progress = PlayerProgress(currentTime: 12, duration: 60, bufferProgress: 0.4)
+        coordinator.engine.markReadyForDisplay(from: previewPlayer)
+        #expect(coordinator.engine.isReadyForDisplay == true)
+
         coordinator.claimSeries(drama: drama, items: [official], startIndex: 0, handoff: nil)
 
-        #expect(coordinator.engine.currentItem?.source == preview.source)
+        #expect(coordinator.engine.currentPlayer === previewPlayer)
+        #expect(coordinator.engine.currentItem?.source == official.source)
+        #expect(coordinator.engine.progress.currentTime == 12)
+        #expect(coordinator.engine.isReadyForDisplay == true)
         #expect(coordinator.engine.wantsPlayback == true)
     }
 
