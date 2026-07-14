@@ -332,6 +332,8 @@ struct MockDetailRepository: DetailRepositoryProtocol {
         }
         return PlaybackMediaSourceDTO(sourceType: "mp4", masterUrl: nil, fallbackMp4Url: url.absoluteString)
     }
+
+    func unlockEpisode(episodeId: String, method: String) async throws {}
     func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem] {
         try await Task.sleep(nanoseconds: MC.delay); return Array(MockData.dramas.shuffled().prefix(6))
     }

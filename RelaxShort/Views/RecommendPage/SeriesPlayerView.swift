@@ -44,6 +44,8 @@ struct SeriesPlayerView: View {
     /// 播放链路耗时追踪：open/switch 开始时间，用于定位接口、播放器、首帧慢点。
     @State private var playbackTraceStartedAt = CACurrentMediaTime()
     @State private var playbackTraceReason = "open"
+    @State private var lockedEpisodeNumber: Int?
+    @State private var isUnlocking = false
 
     private enum ChromeMetrics {
         static let horizontalPadding: CGFloat = 16
@@ -154,6 +156,11 @@ struct SeriesPlayerView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
+                if let lockedEpisodeNumber {
+                    lockedEpisodeOverlay(episodeNumber: lockedEpisodeNumber)
+                        .zIndex(300)
+                }
+
             }
             .contentShape(Rectangle())
             // 上下切集挂在页面根层，避免底部信息区、右侧按钮或中心按钮吃掉拖拽事件。
@@ -242,6 +249,52 @@ struct SeriesPlayerView: View {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             guard !Task.isCancelled else { return }
             withAnimation(.easeOut(duration: 0.3)) { isUIVisible = false }
+        }
+    }
+
+    private func lockedEpisodeOverlay(episodeNumber: Int) -> some View {
+        let cost = episodes.first(where: { $0.episodeNumber == episodeNumber })?.unlockCoinPrice ?? 0
+        return ZStack {
+            Color.black.opacity(0.58).ignoresSafeArea()
+            VStack(spacing: 16) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("第 \(episodeNumber) 集需要解锁").font(.title3.bold())
+                        Text(cost > 0 ? "本集需要 \(cost) 金币" : "选择解锁方式，继续观看")
+                            .foregroundColor(.white.opacity(0.7))
+                    }
+                    Spacer()
+                    Button { lockedEpisodeNumber = nil } label: { Image(systemName: "xmark.circle.fill").font(.title2) }
+                }
+                Button { unlockCurrentEpisode(method: "coins") } label: {
+                    Text(cost > 0 ? "使用 \(cost) 金币解锁" : "立即解锁").frame(maxWidth: .infinity)
+                }.buttonStyle(.borderedProminent).tint(.yellow).disabled(isUnlocking)
+                Button { unlockCurrentEpisode(method: "ads") } label: {
+                    Text("看广告免费解锁").frame(maxWidth: .infinity)
+                }.buttonStyle(.bordered).disabled(isUnlocking)
+                Button { NotificationCenter.default.post(name: .showMembership, object: nil) } label: {
+                    Text("开通 VIP 免费观看 ›").foregroundColor(.yellow)
+                }
+            }
+            .padding(24).background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 28))
+            .padding(24)
+        }
+    }
+
+    private func unlockCurrentEpisode(method: String) {
+        guard let ep = episodes.first(where: { $0.episodeNumber == currentEpisode }) else { return }
+        isUnlocking = true
+        Task {
+            defer { isUnlocking = false }
+            do {
+                try await dependencies.detailRepository.unlockEpisode(episodeId: ep.id, method: method)
+                lockedEpisodeNumber = nil
+                episodeMediaSources.removeValue(forKey: ep.id)
+                _ = await ensurePlayAsset(for: currentEpisode)
+                initializeEpisodePlayer()
+            } catch {
+                Logger.player.error("SeriesTrace 解锁失败 集数=\(currentEpisode) 错误=\(error.localizedDescription)")
+            }
         }
     }
 
@@ -386,6 +439,7 @@ struct SeriesPlayerView: View {
             Logger.player.warning("SeriesTrace 首屏剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
             playerCoordinator.engine.finishTrace(termination: "锁集阻断")
+            lockedEpisodeNumber = episodeNumber
             return false
         } catch {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
@@ -843,6 +897,7 @@ struct SeriesPlayerView: View {
                 playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "锁集阻断")
             }
+            lockedEpisodeNumber = episodeNumber
             return false
         } catch {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000

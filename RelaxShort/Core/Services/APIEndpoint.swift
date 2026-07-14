@@ -27,6 +27,7 @@ enum APIEndpoint {
     case seriesEpisodes(seriesId: String)
     /// 剧集播放地址
     case episodePlay(episodeId: String)
+    case episodeUnlock(episodeId: String, method: String, idempotencyKey: String)
 
     // MARK: - Task15 第二批 v2 端点
 
@@ -87,7 +88,7 @@ extension APIEndpoint {
     /// 真实后端 baseURL
     var baseURL: String {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences,
              .discoveryEvents,
@@ -107,6 +108,7 @@ extension APIEndpoint {
         case .forYou:                       return "/api/v2/feed/for-you"
         case .seriesEpisodes(let id):       return "/api/v2/series/\(id)/episodes"
         case .episodePlay(let id):          return "/api/v2/episodes/\(id)/play"
+        case .episodeUnlock(let id, let method, _): return "/api/v2/episodes/\(id)/unlock/\(method)"
         // ── Task15 v2 ──
         case .home:                         return "/api/v2/home"
         case .searchDefault:                return "/api/v2/search/default"
@@ -164,6 +166,7 @@ extension APIEndpoint {
         case .deleteWatchHistory: return .delete
         case .watchProgress: return .post
         case .setBookmark(_, let bookmarked): return bookmarked ? .post : .delete
+        case .episodeUnlock: return .post
         case .homeFeed, .banners, .dramaDetail, .episodes,
              .watchHistory, .userProfile, .subscriptionStatus,
              .bookmarks, .coinTransactions, .search: return .get
@@ -177,7 +180,7 @@ extension APIEndpoint {
     /// 真实 v2 端点标记（用于 X-Device-Id）
     private var requiresRealV2Header: Bool {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
@@ -190,7 +193,7 @@ extension APIEndpoint {
     /// 后端必须从 Bearer 会话解析用户的端点；匿名账户也属于有效会话。
     var requiresAuthenticatedSession: Bool {
         switch self {
-        case .episodePlay, .userMe, .userWallet, .updateUserPreferences,
+        case .episodePlay, .episodeUnlock, .userMe, .userWallet, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
@@ -224,6 +227,9 @@ extension APIEndpoint {
         // Task30 R4B-1：所有真实 v2 请求发送安装标识
         if requiresRealV2Header {
             base["X-Device-Id"] = InstallIdentityProvider.shared.installID()
+        }
+        if case .episodeUnlock(_, _, let idempotencyKey) = self {
+            base["X-Idempotency-Key"] = idempotencyKey
         }
 
         return base
