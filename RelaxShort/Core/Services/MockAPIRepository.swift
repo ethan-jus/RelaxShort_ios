@@ -332,6 +332,15 @@ struct MockDetailRepository: DetailRepositoryProtocol {
         }
         return PlaybackMediaSourceDTO(sourceType: "mp4", masterUrl: nil, fallbackMp4Url: url.absoluteString)
     }
+    func fetchUnlockAccount() async throws -> EpisodeUnlockAccount {
+        EpisodeUnlockAccount(balance: 100, isVIP: false)
+    }
+    func unlockEpisode(episodeId: String, method: EpisodeUnlockMethod) async throws -> EpisodeUnlockResult {
+        EpisodeUnlockResult(unlocked: true, balanceAfter: method == .coins ? 70 : nil)
+    }
+    func verifyCoinPurchase(_ receipt: ApplePurchaseReceipt) async throws -> Int {
+        100 + receipt.coins
+    }
     func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem] {
         try await Task.sleep(nanoseconds: MC.delay); return Array(MockData.dramas.shuffled().prefix(6))
     }

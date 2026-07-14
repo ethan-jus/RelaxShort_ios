@@ -27,6 +27,10 @@ enum APIEndpoint {
     case seriesEpisodes(seriesId: String)
     /// 剧集播放地址
     case episodePlay(episodeId: String)
+    /// 金币或广告解锁剧集
+    case episodeUnlock(episodeId: String, method: EpisodeUnlockMethod, idempotencyKey: String)
+    /// Apple StoreKit 验单并由服务端发放权益
+    case applePaymentVerify(receipt: ApplePurchaseReceipt, idempotencyKey: String)
 
     // MARK: - Task15 第二批 v2 端点
 
@@ -87,7 +91,7 @@ extension APIEndpoint {
     /// 真实后端 baseURL
     var baseURL: String {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences,
              .discoveryEvents,
@@ -107,6 +111,8 @@ extension APIEndpoint {
         case .forYou:                       return "/api/v2/feed/for-you"
         case .seriesEpisodes(let id):       return "/api/v2/series/\(id)/episodes"
         case .episodePlay(let id):          return "/api/v2/episodes/\(id)/play"
+        case .episodeUnlock(let id, let method, _): return "/api/v2/episodes/\(id)/unlock/\(method.rawValue)"
+        case .applePaymentVerify:           return "/api/v2/payments/apple/verify"
         // ── Task15 v2 ──
         case .home:                         return "/api/v2/home"
         case .searchDefault:                return "/api/v2/search/default"
@@ -158,6 +164,7 @@ extension APIEndpoint {
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet: return .get
         case .updateUserPreferences: return .patch
+        case .episodeUnlock, .applePaymentVerify: return .post
         case .discoveryEvents:     return .post
         case .member:              return .get
         case .watchHistoryV2, .bookmarksV2, .bookmarkStatus: return .get
@@ -177,7 +184,7 @@ extension APIEndpoint {
     /// 真实 v2 端点标记（用于 X-Device-Id）
     private var requiresRealV2Header: Bool {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
@@ -190,7 +197,7 @@ extension APIEndpoint {
     /// 后端必须从 Bearer 会话解析用户的端点；匿名账户也属于有效会话。
     var requiresAuthenticatedSession: Bool {
         switch self {
-        case .episodePlay, .userMe, .userWallet, .updateUserPreferences,
+        case .episodePlay, .episodeUnlock, .applePaymentVerify, .userMe, .userWallet, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
@@ -224,6 +231,13 @@ extension APIEndpoint {
         // Task30 R4B-1：所有真实 v2 请求发送安装标识
         if requiresRealV2Header {
             base["X-Device-Id"] = InstallIdentityProvider.shared.installID()
+        }
+
+        switch self {
+        case .episodeUnlock(_, _, let key), .applePaymentVerify(_, let key):
+            base["X-Idempotency-Key"] = key
+        default:
+            break
         }
 
         return base
@@ -276,6 +290,14 @@ extension APIEndpoint {
             let encoder = JSONEncoder()
             encoder.keyEncodingStrategy = .convertToSnakeCase
             return try? encoder.encode(report)
+        case .applePaymentVerify(let receipt, _):
+            var dict: [String: String] = [
+                "transaction_id": receipt.transactionID,
+                "store_product_id": receipt.productID,
+                "environment": receipt.environment
+            ]
+            if let token = receipt.appAccountToken { dict["app_account_token"] = token }
+            params = dict
         default:
             params = [:]
         }
@@ -304,7 +326,7 @@ extension APIEndpoint {
             ]
         case .seriesEpisodes:
             break
-        case .episodePlay:
+        case .episodePlay, .episodeUnlock, .applePaymentVerify:
             break
         // ── Task15 v2 query params ──
         case .home(let cl, let cc):

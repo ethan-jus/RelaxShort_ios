@@ -18,6 +18,8 @@ struct Episode: Codable, Identifiable {
     let isLocked: Bool
     /// 解锁所需金币数 (v1 DramaBox 复刻)
     var unlockCoinPrice: Int? = nil
+    /// VIP 专享集不能通过金币或广告绕过。
+    var requiresVIP: Bool = false
 
     // MARK: - Computed Properties
     
@@ -32,5 +34,69 @@ struct Episode: Codable, Identifiable {
     /// 解锁条件描述
     var lockDescription: String {
         isLocked ? "需解锁观看" : "免费观看"
+    }
+}
+
+enum EpisodeUnlockMethod: String, Codable {
+    case coins
+    case ads
+}
+
+struct EpisodeUnlockAccount: Equatable {
+    let balance: Int
+    let isVIP: Bool
+}
+
+struct EpisodeUnlockResult: Equatable {
+    let unlocked: Bool
+    let balanceAfter: Int?
+}
+
+struct ApplePurchaseReceipt: Equatable {
+    let transactionID: String
+    let productID: String
+    let environment: String
+    let appAccountToken: String?
+    let coins: Int
+}
+
+struct EpisodeUnlockFlowState: Equatable {
+    enum Selection: Equatable { case coins, vip }
+    enum Presentation: Equatable { case primary, recovery, lockedFrame }
+
+    let episodeNumber: Int
+    let coinCost: Int
+    var balance: Int
+    let vipOnly: Bool
+    var selection: Selection
+    var presentation: Presentation = .primary
+    var isProcessing = false
+    var errorMessage: String?
+
+    init(episodeNumber: Int, coinCost: Int, balance: Int, vipOnly: Bool) {
+        self.episodeNumber = episodeNumber
+        self.coinCost = coinCost
+        self.balance = balance
+        self.vipOnly = vipOnly
+        self.selection = vipOnly ? .vip : .coins
+    }
+
+    var canUnlockWithCoins: Bool { !vipOnly }
+    var canUnlockWithAd: Bool { !vipOnly }
+    var coinShortfall: Int { max(0, coinCost - balance) }
+    var hasEnoughCoins: Bool { balance >= coinCost }
+    var blocksPlaybackInteraction: Bool { true }
+
+    var primaryButtonTitle: String {
+        if selection == .vip { return "开通 VIP 并解锁" }
+        return hasEnoughCoins ? "使用 \(coinCost) 金币解锁" : "充值并解锁"
+    }
+
+    mutating func close() {
+        switch presentation {
+        case .primary: presentation = vipOnly ? .lockedFrame : .recovery
+        case .recovery: presentation = .lockedFrame
+        case .lockedFrame: break
+        }
     }
 }

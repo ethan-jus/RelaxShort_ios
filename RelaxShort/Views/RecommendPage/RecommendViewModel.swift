@@ -172,7 +172,9 @@ final class RecommendViewModel: ObservableObject {
     /// 记录并返回本页面会话尚未展示过的剧集。
     private func rememberUnique(_ items: [DramaItem]) -> [DramaItem] {
         var result: [DramaItem] = []
-        for item in items where !displayedSeriesIDs.contains(item.id) {
+        // For You 只保留拥有预览播放源的卡片。锁集权益只属于 Series，
+        // 不可播放卡片若留在 UI 数组中会与 RecommendSession 的播放索引错位并锁住上滑。
+        for item in items where item.toPlayerMediaItem() != nil && !displayedSeriesIDs.contains(item.id) {
             displayedSeriesIDs.insert(item.id)
             result.append(item)
         }

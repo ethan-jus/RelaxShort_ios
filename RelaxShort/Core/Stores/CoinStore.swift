@@ -44,6 +44,11 @@ final class CoinStore: ObservableObject {
         addCoins(amount, source: "purchase")
     }
 
+    /// 服务端钱包是解锁余额的唯一事实来源。
+    func synchronize(balance: Int) {
+        coinBalance = max(0, balance)
+    }
+
     /// 消费金币 — 返回 true 表示扣款成功
     /// - Parameter amount: 要消费的金币数量
     /// - Returns: 余额充足返回 `true`，不足返回 `false`

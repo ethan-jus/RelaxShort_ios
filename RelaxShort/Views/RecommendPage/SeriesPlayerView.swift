@@ -10,6 +10,9 @@ struct SeriesPlayerView: View {
     let initialEpisodeID: String?
     let initialResumeTime: TimeInterval?
     @EnvironmentObject var dependencies: DependencyContainer
+    @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject var coinStore: CoinStore
+    @EnvironmentObject var storeKitManager: StoreKitManager
     let handoff: PlayerHandoffContext?
     let sourceScene: String
     /// 标记 My List 初始 resume 是否已被消费
@@ -44,6 +47,8 @@ struct SeriesPlayerView: View {
     /// 播放链路耗时追踪：open/switch 开始时间，用于定位接口、播放器、首帧慢点。
     @State private var playbackTraceStartedAt = CACurrentMediaTime()
     @State private var playbackTraceReason = "open"
+    /// 锁集状态独占 Series 页面交互；出现后不得继续切集或触发播放器手势。
+    @State private var unlockState: EpisodeUnlockFlowState?
 
     private enum ChromeMetrics {
         static let horizontalPadding: CGFloat = 16
@@ -57,12 +62,13 @@ struct SeriesPlayerView: View {
     }
 
     private enum PlayerSheet: Identifiable {
-        case share, speed, quality
+        case share, speed, quality, coinPurchase
         var id: String {
             switch self {
             case .share: "share"
             case .speed: "speed"
             case .quality: "quality"
+            case .coinPurchase: "coinPurchase"
             }
         }
     }
@@ -138,7 +144,7 @@ struct SeriesPlayerView: View {
                         .transition(.opacity)
                 }
 
-                if showEpisodeList {
+                if showEpisodeList, unlockState == nil {
                     EpisodePickerSheet(
                         drama: drama,
                         episodes: episodes,
@@ -152,6 +158,11 @@ struct SeriesPlayerView: View {
                     )
                     .zIndex(200)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                if let unlockState {
+                    episodeUnlockOverlay(unlockState, in: geo)
+                        .zIndex(250)
                 }
 
             }
@@ -186,6 +197,25 @@ struct SeriesPlayerView: View {
                     }
                 )
                 .presentationDetents([.fraction(0.4)])
+                .presentationDragIndicator(.hidden)
+            case .coinPurchase:
+                CoinPurchaseSheet(
+                    coinStore: coinStore,
+                    storeKit: storeKitManager,
+                    onDismiss: { activeSheet = nil },
+                    verifyPurchase: { receipt in
+                        try await dependencies.detailRepository.verifyCoinPurchase(receipt)
+                    },
+                    onPurchaseCompleted: { balance in
+                        activeSheet = nil
+                        if var state = unlockState {
+                            state.balance = balance
+                            unlockState = state
+                        }
+                        Task { await performUnlock(method: .coins) }
+                    }
+                )
+                .presentationDetents([.fraction(0.72)])
                 .presentationDragIndicator(.hidden)
             }
         }
@@ -222,6 +252,10 @@ struct SeriesPlayerView: View {
                 }
             }
         }
+        .onChange(of: appStore.isShowingMembership) { _, isShowing in
+            guard !isShowing, unlockState != nil else { return }
+            Task { await refreshEntitlementAfterMembership() }
+        }
         .onDisappear {
             autoHideTask?.cancel()
             episodeSwitchTask?.cancel()
@@ -229,6 +263,365 @@ struct SeriesPlayerView: View {
             initialPlayAssetTask?.cancel()
             Task { await dependencies.watchProgressReporter.finalize(completed: false) }
             playerCoordinator.release(.series(dramaID: drama.id))
+        }
+    }
+
+    // MARK: - Episode Unlock
+
+    @ViewBuilder
+    private func episodeUnlockOverlay(_ state: EpisodeUnlockFlowState, in geo: GeometryProxy) -> some View {
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.72)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+
+            switch state.presentation {
+            case .primary:
+                unlockPrimaryPanel(state)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, max(12, geo.safeAreaInsets.bottom))
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            case .recovery:
+                unlockRecoveryPanel(state)
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, max(64, geo.safeAreaInsets.bottom + 32))
+            case .lockedFrame:
+                unlockLockedFrame(state)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .allowsHitTesting(true)
+    }
+
+    private func unlockPrimaryPanel(_ state: EpisodeUnlockFlowState) -> some View {
+        VStack(spacing: 18) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("第 \(state.episodeNumber) 集需要解锁")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(state.vipOnly ? "本集为 VIP 专享内容" : "选择一种方式继续观看")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.58))
+                }
+                Spacer()
+                Button(action: closeUnlockPanel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .frame(width: 34, height: 34)
+                        .background(.white.opacity(0.09), in: Circle())
+                }
+            }
+
+            if !state.vipOnly {
+                HStack(spacing: 0) {
+                    unlockMetric(title: "本集", value: "\(state.coinCost)", suffix: "金币")
+                    Divider().overlay(.white.opacity(0.1)).frame(height: 34)
+                    unlockMetric(title: "当前余额", value: "\(state.balance)", suffix: "金币")
+                    if state.coinShortfall > 0 {
+                        Divider().overlay(.white.opacity(0.1)).frame(height: 34)
+                        unlockMetric(title: "还差", value: "\(state.coinShortfall)", suffix: "金币", warning: true)
+                    }
+                }
+                .padding(.vertical, 13)
+                .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
+            }
+
+            VStack(spacing: 10) {
+                if state.canUnlockWithCoins {
+                    unlockChoice(
+                        title: "金币解锁",
+                        subtitle: state.hasEnoughCoins ? "一次解锁，永久观看本集" : "充值后自动解锁并继续播放",
+                        icon: "bitcoinsign.circle.fill",
+                        selected: state.selection == .coins
+                    ) { selectUnlockMethod(.coins) }
+                }
+                unlockChoice(
+                    title: "VIP 畅看",
+                    subtitle: "全站付费剧集无限观看",
+                    icon: "crown.fill",
+                    selected: state.selection == .vip
+                ) { selectUnlockMethod(.vip) }
+            }
+
+            if let message = state.errorMessage {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(red: 1, green: 0.43, blue: 0.38))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button(action: handlePrimaryUnlockAction) {
+                HStack(spacing: 8) {
+                    if state.isProcessing {
+                        ProgressView().tint(.black)
+                    }
+                    Text(state.primaryButtonTitle)
+                        .font(.system(size: 17, weight: .bold))
+                }
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(
+                    LinearGradient(
+                        colors: [Color(red: 1.0, green: 0.86, blue: 0.47), Color(red: 0.91, green: 0.66, blue: 0.23)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 15)
+                )
+            }
+            .disabled(state.isProcessing)
+
+            if state.canUnlockWithAd {
+                Button { Task { await performUnlock(method: .ads) } } label: {
+                    Label("看广告免费解锁", systemImage: "play.rectangle.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.72))
+                }
+                .disabled(state.isProcessing)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 22)
+        .padding(.bottom, 20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .environment(\.colorScheme, .dark)
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private func unlockMetric(title: String, value: String, suffix: String, warning: Bool = false) -> some View {
+        VStack(spacing: 3) {
+            Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.46))
+            HStack(spacing: 3) {
+                Text(value).font(.system(size: 17, weight: .bold))
+                Text(suffix).font(.system(size: 11, weight: .medium))
+            }
+            .foregroundStyle(warning ? Color(red: 1, green: 0.45, blue: 0.35) : .white)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func unlockChoice(
+        title: String,
+        subtitle: String,
+        icon: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(selected ? Color(red: 0.96, green: 0.75, blue: 0.32) : .white.opacity(0.55))
+                    .frame(width: 36, height: 36)
+                    .background(.white.opacity(0.06), in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(.white)
+                    Text(subtitle).font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.5))
+                }
+                Spacer()
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 21, weight: .semibold))
+                    .foregroundStyle(selected ? Color(red: 0.96, green: 0.75, blue: 0.32) : .white.opacity(0.22))
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 70)
+            .background(selected ? Color(red: 0.96, green: 0.75, blue: 0.32).opacity(0.1) : .white.opacity(0.035))
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(selected ? Color(red: 0.96, green: 0.75, blue: 0.32) : .white.opacity(0.08), lineWidth: selected ? 1.5 : 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+        }
+    }
+
+    private func unlockRecoveryPanel(_ state: EpisodeUnlockFlowState) -> some View {
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("还差一步即可继续")
+                        .font(.system(size: 20, weight: .bold)).foregroundStyle(.white)
+                    Text("第 \(state.episodeNumber) 集已暂停")
+                        .font(.system(size: 13, weight: .medium)).foregroundStyle(.white.opacity(0.52))
+                }
+                Spacer()
+                Button(action: closeUnlockPanel) {
+                    Image(systemName: "xmark").foregroundStyle(.white.opacity(0.65)).frame(width: 34, height: 34)
+                }
+            }
+            Button(action: openPrimaryUnlockPanel) {
+                Text("立即解锁")
+                    .font(.system(size: 17, weight: .bold)).foregroundStyle(.black)
+                    .frame(maxWidth: .infinity).frame(height: 52)
+                    .background(Color(red: 0.96, green: 0.75, blue: 0.32), in: RoundedRectangle(cornerRadius: 14))
+            }
+            Button { Task { await performUnlock(method: .ads) } } label: {
+                Text("看广告免费解锁")
+                    .font(.system(size: 16, weight: .semibold)).foregroundStyle(.white)
+                    .frame(maxWidth: .infinity).frame(height: 52)
+                    .background(.white.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+            }
+        }
+        .padding(20)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
+        .environment(\.colorScheme, .dark)
+    }
+
+    private func unlockLockedFrame(_ state: EpisodeUnlockFlowState) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(Color(red: 0.96, green: 0.75, blue: 0.32))
+            Text("第 \(state.episodeNumber) 集已锁定")
+                .font(.system(size: 17, weight: .bold)).foregroundStyle(.white)
+            Button(action: openPrimaryUnlockPanel) {
+                Text("解锁观看")
+                    .font(.system(size: 14, weight: .semibold)).foregroundStyle(.white.opacity(0.78))
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(.white.opacity(0.1), in: Capsule())
+            }
+        }
+    }
+
+    private func selectUnlockMethod(_ selection: EpisodeUnlockFlowState.Selection) {
+        guard var state = unlockState, !state.vipOnly || selection == .vip else { return }
+        state.selection = selection
+        state.errorMessage = nil
+        unlockState = state
+    }
+
+    private func closeUnlockPanel() {
+        guard var state = unlockState else { return }
+        state.close()
+        unlockState = state
+    }
+
+    private func openPrimaryUnlockPanel() {
+        guard var state = unlockState else { return }
+        state.presentation = .primary
+        state.errorMessage = nil
+        unlockState = state
+    }
+
+    private func handlePrimaryUnlockAction() {
+        guard let state = unlockState else { return }
+        if state.selection == .vip {
+            appStore.isShowingMembership = true
+        } else if state.hasEnoughCoins {
+            Task { await performUnlock(method: .coins) }
+        } else {
+            activeSheet = .coinPurchase
+        }
+    }
+
+    @MainActor
+    private func presentEpisodeUnlock(_ episodeNumber: Int) {
+        guard unlockState?.episodeNumber != episodeNumber else { return }
+        let episode = episodes.first(where: { $0.episodeNumber == episodeNumber })
+        unlockState = EpisodeUnlockFlowState(
+            episodeNumber: episodeNumber,
+            coinCost: max(0, episode?.unlockCoinPrice ?? 30),
+            balance: coinStore.coinBalance,
+            vipOnly: episode?.requiresVIP ?? false
+        )
+        showEpisodeList = false
+        isUIVisible = true
+        autoHideTask?.cancel()
+        playerCoordinator.engine.endContentTransitionWithoutMedia()
+
+        Task { @MainActor in
+            do {
+                let account = try await dependencies.detailRepository.fetchUnlockAccount()
+                guard var state = unlockState, state.episodeNumber == episodeNumber else { return }
+                coinStore.synchronize(balance: account.balance)
+                if account.isVIP {
+                    await resumeCurrentEpisodeAfterUnlock()
+                    return
+                }
+                state.balance = account.balance
+                unlockState = state
+            } catch {
+                guard var state = unlockState, state.episodeNumber == episodeNumber else { return }
+                state.errorMessage = "余额加载失败，请稍后重试"
+                unlockState = state
+            }
+        }
+    }
+
+    @MainActor
+    private func performUnlock(method: EpisodeUnlockMethod) async {
+        guard var state = unlockState,
+              !state.isProcessing,
+              let episodeID = episodeID(for: state.episodeNumber),
+              method != .ads || state.canUnlockWithAd else { return }
+        state.isProcessing = true
+        state.errorMessage = nil
+        unlockState = state
+        do {
+            let result = try await dependencies.detailRepository.unlockEpisode(episodeId: episodeID, method: method)
+            guard result.unlocked else {
+                throw APIError(code: "UNLOCK_FAILED", message: "解锁失败，请重试")
+            }
+            if let balance = result.balanceAfter {
+                coinStore.synchronize(balance: balance)
+            }
+            await resumeCurrentEpisodeAfterUnlock()
+        } catch let error as APIError {
+            guard var latest = unlockState else { return }
+            latest.isProcessing = false
+            latest.errorMessage = error.code == "INSUFFICIENT_COINS" ? "金币余额不足，请先充值" : error.localizedDescription
+            unlockState = latest
+        } catch {
+            guard var latest = unlockState else { return }
+            latest.isProcessing = false
+            latest.errorMessage = "解锁失败，请检查网络后重试"
+            unlockState = latest
+        }
+    }
+
+    @MainActor
+    private func resumeCurrentEpisodeAfterUnlock() async {
+        let episodeNumber = currentEpisode
+        initialPlayAssetTask?.cancel()
+        initialPlayAssetTask = nil
+        if let id = episodeID(for: episodeNumber) {
+            episodeMediaSources.removeValue(forKey: id)
+        }
+        guard await ensurePlayAsset(for: episodeNumber) else {
+            guard var state = unlockState else { return }
+            state.isProcessing = false
+            state.errorMessage = "权益已更新，但播放地址加载失败，请重试"
+            unlockState = state
+            return
+        }
+        unlockedEpisodes.insert(episodeNumber)
+        unlockState = nil
+        activeSheet = nil
+        initializeEpisodePlayer()
+        playerCoordinator.engine.play()
+    }
+
+    @MainActor
+    private func refreshEntitlementAfterMembership() async {
+        guard var state = unlockState else { return }
+        do {
+            let account = try await dependencies.detailRepository.fetchUnlockAccount()
+            coinStore.synchronize(balance: account.balance)
+            if account.isVIP {
+                await resumeCurrentEpisodeAfterUnlock()
+            } else {
+                state.balance = account.balance
+                unlockState = state
+            }
+        } catch {
+            state.errorMessage = "会员状态刷新失败，请重试"
+            unlockState = state
         }
     }
 
@@ -386,6 +779,7 @@ struct SeriesPlayerView: View {
             Logger.player.warning("SeriesTrace 首屏剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
             playerCoordinator.engine.finishTrace(termination: "锁集阻断")
+            presentEpisodeUnlock(episodeNumber)
             return false
         } catch {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
@@ -838,10 +1232,13 @@ struct SeriesPlayerView: View {
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 解锁UI暂未接入")
+            Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 已进入解锁流程")
             if recordTrace {
                 playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "锁集阻断")
+            }
+            if recordTrace {
+                presentEpisodeUnlock(episodeNumber)
             }
             return false
         } catch {
@@ -1101,7 +1498,7 @@ struct SeriesPlayerView: View {
     /// Series 全屏切集必须像 For You 一样从页面大部分区域可触发，
     /// 但要避开左边缘返回、进度条拖动、弹层和明显横滑。
     private func canHandleEpisodeDrag(_ value: DragGesture.Value) -> Bool {
-        guard !seriesIsScrubbing, !showEpisodeList, activeSheet == nil else { return false }
+        guard unlockState == nil, !seriesIsScrubbing, !showEpisodeList, activeSheet == nil else { return false }
         guard value.startLocation.x > 24 else { return false }
         guard abs(value.translation.height) > abs(value.translation.width) * 1.2 else { return false }
         return true
@@ -1111,6 +1508,7 @@ struct SeriesPlayerView: View {
         LongPressGesture(minimumDuration: 0.3)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
+                guard unlockState == nil else { return }
                 switch value {
                 case .second(true, _):
                     if !showSpeedHUD, playerCoordinator.engine.progress.duration > 0 {
@@ -1125,6 +1523,7 @@ struct SeriesPlayerView: View {
                 }
             }
             .onEnded { _ in
+                guard unlockState == nil else { return }
                 playerCoordinator.engine.setRate(selectedPlaybackRate)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
                 if isUIVisible, playerCoordinator.engine.state == .playing {
@@ -1151,6 +1550,7 @@ struct SeriesPlayerView: View {
     private func tapPauseGesture(in geo: GeometryProxy) -> some Gesture {
         SpatialTapGesture()
             .onEnded { value in
+                guard unlockState == nil else { return }
                 guard !isTapInsideVisibleChrome(value.location, in: geo) else { return }
                 withAnimation(.easeOut(duration: 0.25)) {
                     isUIVisible.toggle()

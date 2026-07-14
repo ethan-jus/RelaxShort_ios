@@ -109,7 +109,7 @@ enum StoreKitPurchaseError: Error, LocalizedError {
 /// 用法：
 /// ```swift
 /// @EnvironmentObject var storeKit: StoreKitManager
-/// let coins = try await storeKit.purchaseCoinPackage(pkg)
+/// let receipt = try await storeKit.purchaseCoinPackage(pkg)
 /// try await storeKit.restorePurchases()
 /// ```
 @MainActor
@@ -193,9 +193,9 @@ final class StoreKitManager: ObservableObject {
 
     /// 购买金币包
     /// - Parameter package: 要购买的金币包
-    /// - Returns: 购买成功后返回获取的金币数（含 bonus）
+    /// - Returns: 购买成功后的 Apple 交易凭证；必须交给服务端验单后才能发币。
     /// - Throws: `StoreKitPurchaseError` 或 StoreKit 原生错误
-    func purchaseCoinPackage(_ package: CoinPackage) async throws -> Int {
+    func purchaseCoinPackage(_ package: CoinPackage) async throws -> ApplePurchaseReceipt {
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
@@ -210,7 +210,13 @@ final class StoreKitManager: ObservableObject {
                 let transaction = try checkVerified(verification)
                 await transaction.finish()
                 Logger.store.info("StoreKit: purchased \(product.id) → \(totalCoins) coins")
-                return totalCoins
+                return ApplePurchaseReceipt(
+                    transactionID: String(transaction.id),
+                    productID: transaction.productID,
+                    environment: String(describing: transaction.environment).uppercased(),
+                    appAccountToken: transaction.appAccountToken?.uuidString,
+                    coins: totalCoins
+                )
 
             case .userCancelled:
                 Logger.store.info("StoreKit: user cancelled purchase")
@@ -228,7 +234,13 @@ final class StoreKitManager: ObservableObject {
         // ── Mock 回退 ──
         try await Task.sleep(nanoseconds: 800_000_000)
         Logger.store.info("StoreKit(mock): purchased \(package.productID.rawValue) → \(totalCoins) coins")
-        return totalCoins
+        return ApplePurchaseReceipt(
+            transactionID: "mock-\(UUID().uuidString)",
+            productID: package.productID.rawValue,
+            environment: "SANDBOX",
+            appAccountToken: nil,
+            coins: totalCoins
+        )
     }
 
     // MARK: - Public API — Purchase VIP

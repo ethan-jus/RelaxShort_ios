@@ -67,4 +67,17 @@ struct APIEndpointTests {
         #expect(remove.method == .delete)
         #expect(remove.body == nil)
     }
+
+    @Test
+    func episodeUnlockEndpointUsesMethodAndIdempotencyHeader() {
+        let endpoint = APIEndpoint.episodeUnlock(
+            episodeId: "2025031200000904",
+            method: .coins,
+            idempotencyKey: "unlock-key"
+        )
+        #expect(endpoint.path == "/api/v2/episodes/2025031200000904/unlock/coins")
+        #expect(endpoint.method == .post)
+        #expect(endpoint.headers["X-Idempotency-Key"] == "unlock-key")
+        #expect(endpoint.requiresAuthenticatedSession)
+    }
 }

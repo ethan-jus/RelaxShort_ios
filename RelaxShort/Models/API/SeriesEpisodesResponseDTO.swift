@@ -73,3 +73,17 @@ struct ThumbnailDTO: Decodable {
     let rows: Int?
     let intervalSeconds: Int?
 }
+
+struct EpisodeUnlockResponseDTO: Decodable {
+    let unlocked: Bool
+    let balanceAfter: Decimal?
+}
+
+struct ApplePaymentVerifyResponseDTO: Decodable {
+    struct WalletSummaryDTO: Decodable {
+        let balance: Decimal?
+    }
+
+    let status: String?
+    let wallet: WalletSummaryDTO?
+}

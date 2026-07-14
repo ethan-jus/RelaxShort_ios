@@ -18,6 +18,9 @@ struct CoinPurchaseSheet: View {
     // MARK: - Callbacks
 
     var onDismiss: (() -> Void)?
+    /// Series 解锁场景传入：先服务端验单发币，成功后才能展示购买成功。
+    var verifyPurchase: ((ApplePurchaseReceipt) async throws -> Int)?
+    var onPurchaseCompleted: ((Int) -> Void)?
 
     // MARK: - State
 
@@ -248,9 +251,16 @@ struct CoinPurchaseSheet: View {
 
         Task {
             do {
-                let coins = try await storeKit.purchaseCoinPackage(pkg)
+                let receipt = try await storeKit.purchaseCoinPackage(pkg)
+                let verifiedBalance: Int
+                if let verifyPurchase {
+                    verifiedBalance = try await verifyPurchase(receipt)
+                } else {
+                    verifiedBalance = coinStore.coinBalance + receipt.coins
+                }
                 await MainActor.run {
-                    coinStore.purchaseCoins(amount: coins)
+                    coinStore.synchronize(balance: verifiedBalance)
+                    onPurchaseCompleted?(verifiedBalance)
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isPurchasing = false
                         purchaseSuccess = true

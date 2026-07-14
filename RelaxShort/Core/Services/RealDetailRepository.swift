@@ -49,7 +49,8 @@ final class RealDetailRepository: DetailRepositoryProtocol {
                 videoURL: "",   // 播放页需单独调 episodePlay 填充
                 duration: TimeInterval(item.durationSeconds ?? 0),
                 isLocked: !(item.isFree ?? true) || (item.vipRequired ?? false),
-                unlockCoinPrice: item.unlockCoinCost.flatMap { Int(truncating: $0 as NSNumber) }
+                unlockCoinPrice: item.unlockCoinCost.flatMap { Int(truncating: $0 as NSNumber) },
+                requiresVIP: item.vipRequired ?? false
             )
         }
     }
@@ -67,6 +68,41 @@ final class RealDetailRepository: DetailRepositoryProtocol {
             .episodePlay(episodeId: episodeId)
         )
         return PlaybackMediaSourceDTO(from: dto)
+    }
+
+    func fetchUnlockAccount() async throws -> EpisodeUnlockAccount {
+        let wallet: WalletResponseDTO = try await client.requestData(.userWallet)
+        return EpisodeUnlockAccount(
+            balance: wallet.balance.map { Int(truncating: $0 as NSNumber) } ?? 0,
+            isVIP: wallet.vip?.active ?? false
+        )
+    }
+
+    func unlockEpisode(episodeId: String, method: EpisodeUnlockMethod) async throws -> EpisodeUnlockResult {
+        let response: EpisodeUnlockResponseDTO = try await client.requestData(
+            .episodeUnlock(
+                episodeId: episodeId,
+                method: method,
+                idempotencyKey: "ios-unlock-\(episodeId)-\(method.rawValue)-\(UUID().uuidString)"
+            )
+        )
+        return EpisodeUnlockResult(
+            unlocked: response.unlocked,
+            balanceAfter: response.balanceAfter.map { Int(truncating: $0 as NSNumber) }
+        )
+    }
+
+    func verifyCoinPurchase(_ receipt: ApplePurchaseReceipt) async throws -> Int {
+        let response: ApplePaymentVerifyResponseDTO = try await client.requestData(
+            .applePaymentVerify(
+                receipt: receipt,
+                idempotencyKey: "ios-apple-\(receipt.transactionID)"
+            )
+        )
+        guard response.status == "completed", let balance = response.wallet?.balance else {
+            throw APIError(code: "PAYMENT_DELIVERY_FAILED", message: "金币尚未到账，请稍后重试")
+        }
+        return Int(truncating: balance as NSNumber)
     }
 
     /// 获取播放地址并按兼容方式更新 episode.videoURL
