@@ -105,6 +105,23 @@ final class RealDetailRepository: DetailRepositoryProtocol {
         return Int(truncating: balance as NSNumber)
     }
 
+    func verifyVIPPurchase(_ receipt: ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount {
+        let response: ApplePaymentVerifyResponseDTO = try await client.requestData(
+            .applePaymentVerify(
+                receipt: receipt,
+                idempotencyKey: "ios-apple-\(receipt.transactionID)"
+            )
+        )
+        guard response.status == "completed" else {
+            throw APIError(code: "PAYMENT_DELIVERY_FAILED", message: "会员权益尚未生效，请稍后重试")
+        }
+        let account = try await fetchUnlockAccount()
+        guard account.isVIP else {
+            throw APIError(code: "VIP_NOT_ACTIVE", message: "会员权益尚未生效，请稍后重试")
+        }
+        return account
+    }
+
     /// 获取播放地址并按兼容方式更新 episode.videoURL
     func fetchPlaybackURL(episodeId: String) async throws -> String? {
         let source = try await fetchPlayAsset(episodeId: episodeId)

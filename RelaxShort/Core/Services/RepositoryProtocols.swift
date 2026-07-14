@@ -75,6 +75,8 @@ protocol DetailRepositoryProtocol {
     func unlockEpisode(episodeId: String, method: EpisodeUnlockMethod) async throws -> EpisodeUnlockResult
     /// Apple 验单发币，返回服务端最终钱包余额。
     func verifyCoinPurchase(_ receipt: ApplePurchaseReceipt) async throws -> Int
+    /// Apple 验单开通 VIP，只有服务端权益已生效才返回账户状态。
+    func verifyVIPPurchase(_ receipt: ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount
     /// 获取相关推荐短剧
     func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem]
 }

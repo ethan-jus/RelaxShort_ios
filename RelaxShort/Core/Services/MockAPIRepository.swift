@@ -341,6 +341,9 @@ struct MockDetailRepository: DetailRepositoryProtocol {
     func verifyCoinPurchase(_ receipt: ApplePurchaseReceipt) async throws -> Int {
         100 + receipt.coins
     }
+    func verifyVIPPurchase(_ receipt: ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount {
+        EpisodeUnlockAccount(balance: 100, isVIP: true)
+    }
     func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem] {
         try await Task.sleep(nanoseconds: MC.delay); return Array(MockData.dramas.shuffled().prefix(6))
     }

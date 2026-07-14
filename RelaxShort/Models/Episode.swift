@@ -62,7 +62,7 @@ struct ApplePurchaseReceipt: Equatable {
 
 struct EpisodeUnlockFlowState: Equatable {
     enum Selection: Equatable { case coins, vip }
-    enum Presentation: Equatable { case primary, recovery, lockedFrame }
+    enum Presentation: Equatable { case primary, lockedFrame }
 
     let episodeNumber: Int
     let coinCost: Int
@@ -78,7 +78,7 @@ struct EpisodeUnlockFlowState: Equatable {
         self.coinCost = coinCost
         self.balance = balance
         self.vipOnly = vipOnly
-        self.selection = vipOnly ? .vip : .coins
+        self.selection = vipOnly || balance < coinCost ? .vip : .coins
     }
 
     var canUnlockWithCoins: Bool { !vipOnly }
@@ -93,10 +93,6 @@ struct EpisodeUnlockFlowState: Equatable {
     }
 
     mutating func close() {
-        switch presentation {
-        case .primary: presentation = vipOnly ? .lockedFrame : .recovery
-        case .recovery: presentation = .lockedFrame
-        case .lockedFrame: break
-        }
+        presentation = .lockedFrame
     }
 }

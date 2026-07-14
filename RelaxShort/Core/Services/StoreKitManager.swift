@@ -247,9 +247,9 @@ final class StoreKitManager: ObservableObject {
 
     /// 购买 VIP 订阅
     /// - Parameter subscription: 要购买的订阅
-    /// - Returns: 购买成功返回 `true`
+    /// - Returns: 购买成功后的 Apple 交易凭证；必须由服务端验单后才能授予 VIP。
     /// - Throws: `StoreKitPurchaseError` 或 StoreKit 原生错误
-    func purchaseVIP(_ subscription: VIPSubscription) async throws -> Bool {
+    func purchaseVIP(_ subscription: VIPSubscription) async throws -> ApplePurchaseReceipt {
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
@@ -262,7 +262,13 @@ final class StoreKitManager: ObservableObject {
                 let transaction = try checkVerified(verification)
                 await transaction.finish()
                 Logger.store.info("StoreKit: purchased VIP \(product.id)")
-                return true
+                return ApplePurchaseReceipt(
+                    transactionID: String(transaction.id),
+                    productID: transaction.productID,
+                    environment: String(describing: transaction.environment).uppercased(),
+                    appAccountToken: transaction.appAccountToken?.uuidString,
+                    coins: 0
+                )
 
             case .userCancelled:
                 Logger.store.info("StoreKit: user cancelled VIP purchase")
@@ -280,7 +286,13 @@ final class StoreKitManager: ObservableObject {
         // ── Mock 回退 ──
         try await Task.sleep(nanoseconds: 800_000_000)
         Logger.store.info("StoreKit(mock): purchased VIP \(subscription.productID.rawValue)")
-        return true
+        return ApplePurchaseReceipt(
+            transactionID: "mock-\(UUID().uuidString)",
+            productID: subscription.productID.rawValue,
+            environment: "SANDBOX",
+            appAccountToken: nil,
+            coins: 0
+        )
     }
 
     // MARK: - Public API — Restore Purchases

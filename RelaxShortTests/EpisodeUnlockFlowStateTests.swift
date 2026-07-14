@@ -20,6 +20,15 @@ struct EpisodeUnlockFlowStateTests {
     }
 
     @Test
+    func defaultSelectionAdaptsToTheVerifiedBalance() {
+        let sufficient = EpisodeUnlockFlowState(episodeNumber: 4, coinCost: 30, balance: 30, vipOnly: false)
+        let insufficient = EpisodeUnlockFlowState(episodeNumber: 4, coinCost: 30, balance: 18, vipOnly: false)
+
+        #expect(sufficient.selection == .coins)
+        #expect(insufficient.selection == .vip)
+    }
+
+    @Test
     func vipOnlyContentCannotUseCoinsOrAds() {
         let state = EpisodeUnlockFlowState(episodeNumber: 4, coinCost: 30, balance: 100, vipOnly: true)
         #expect(state.selection == .vip)
@@ -29,12 +38,9 @@ struct EpisodeUnlockFlowStateTests {
     }
 
     @Test
-    func closingPrimaryShowsRecoveryOnceThenLeavesLockedFrame() {
+    func closingPrimaryLeavesTheVideoInPassiveLockedState() {
         var state = EpisodeUnlockFlowState(episodeNumber: 4, coinCost: 30, balance: 18, vipOnly: false)
         #expect(state.presentation == .primary)
-        state.close()
-        #expect(state.presentation == .recovery)
-        #expect(state.blocksPlaybackInteraction)
         state.close()
         #expect(state.presentation == .lockedFrame)
         #expect(state.blocksPlaybackInteraction)
