@@ -65,11 +65,6 @@ struct EpisodePlayResponseDTO: Decodable {
     let assetVersion: Int?
 }
 
-struct CoinUnlockResponseDTO: Decodable {
-    let episodeId: Int64
-    let unlocked: Bool
-}
-
 struct ThumbnailDTO: Decodable {
     let spriteUrl: String?
     let width: Int?

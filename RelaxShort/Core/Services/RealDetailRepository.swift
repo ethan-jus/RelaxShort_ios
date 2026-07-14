@@ -69,12 +69,6 @@ final class RealDetailRepository: DetailRepositoryProtocol {
         return PlaybackMediaSourceDTO(from: dto)
     }
 
-    func unlockEpisode(episodeId: String, method: String) async throws {
-        let _: CoinUnlockResponseDTO = try await client.requestData(
-            .episodeUnlock(episodeId: episodeId, method: method, idempotencyKey: UUID().uuidString)
-        )
-    }
-
     /// 获取播放地址并按兼容方式更新 episode.videoURL
     func fetchPlaybackURL(episodeId: String) async throws -> String? {
         let source = try await fetchPlayAsset(episodeId: episodeId)
