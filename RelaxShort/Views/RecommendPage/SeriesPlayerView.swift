@@ -291,6 +291,15 @@ struct SeriesPlayerView: View {
 
     @ViewBuilder
     private func episodeUnlockOverlay(_ state: EpisodeUnlockFlowState, in geo: GeometryProxy) -> some View {
+        // 以普通锁集挽留层的标准高度为基准统一顶部位置；VIP 内容更少时只缩短底部，不改变起点。
+        let standardRetentionHeight: CGFloat = 206
+        let upwardAdjustment: CGFloat = 32
+        let retentionBottomInset = max(geo.safeAreaInsets.bottom + 44, geo.size.height * 0.1)
+        let retentionTopInset = max(
+            geo.safeAreaInsets.top + 24,
+            geo.size.height - retentionBottomInset - standardRetentionHeight - upwardAdjustment
+        )
+
         ZStack {
             Color.black.opacity(0.76)
                 .ignoresSafeArea()
@@ -311,9 +320,8 @@ struct SeriesPlayerView: View {
             case .retention:
                 unlockRetentionDialog(state)
                     .frame(width: min(geo.size.width - 40, 420))
-                    // 挽留层落在下半屏的拇指热区，同时避开 Home Indicator。
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                    .padding(.bottom, max(geo.safeAreaInsets.bottom + 44, geo.size.height * 0.1))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, retentionTopInset)
                     .transition(.scale(scale: 0.94).combined(with: .opacity))
             case .lockedFrame:
                 unlockFinalLockedFrame()
