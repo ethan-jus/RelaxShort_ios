@@ -311,6 +311,9 @@ struct SeriesPlayerView: View {
             case .retention:
                 unlockRetentionDialog(state)
                     .frame(width: min(geo.size.width - 40, 420))
+                    // 挽留层落在下半屏的拇指热区，同时避开 Home Indicator。
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    .padding(.bottom, max(geo.safeAreaInsets.bottom + 44, geo.size.height * 0.1))
                     .transition(.scale(scale: 0.94).combined(with: .opacity))
             case .lockedFrame:
                 unlockFinalLockedFrame()
@@ -1071,7 +1074,7 @@ struct SeriesPlayerView: View {
                         onEpisodes: { showEpisodeList = true }
                     )
                     .frame(width: actionRailWidth)
-                    .offset(x: 8)
+                    .offset(x: 16)
                 }
 
                 if isCurrent {

@@ -352,8 +352,8 @@ struct RecommendView: View {
                             onShare: { showShare = true }
                         )
                         .frame(width: actionRailWidth)
-                        // RightActionBar 内部按钮还有 6pt 视觉留白，整体右移后图标视觉边距约 8–14pt。
-                        .offset(x: 8)
+                        // 在原有位置基础上累计右移 16pt，收紧右侧操作栏与屏幕边缘的视觉距离。
+                        .offset(x: 16)
                     }
 
                     // 使用按钮显式跳转，避免手势层抢占点击
