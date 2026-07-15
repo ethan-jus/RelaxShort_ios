@@ -38,11 +38,29 @@ struct EpisodeUnlockFlowStateTests {
     }
 
     @Test
-    func closingPrimaryLeavesTheVideoInPassiveLockedState() {
+    func closingFlowHasOneRetentionChanceThenEnds() {
         var state = EpisodeUnlockFlowState(episodeNumber: 4, coinCost: 30, balance: 18, vipOnly: false)
         #expect(state.presentation == .primary)
+
+        state.close()
+        #expect(state.presentation == .retention)
+        #expect(state.blocksPlaybackInteraction)
+
+        state.reopenFromRetention()
+        #expect(state.presentation == .primary)
+
         state.close()
         #expect(state.presentation == .lockedFrame)
         #expect(state.blocksPlaybackInteraction)
+    }
+
+    @Test
+    func closingRetentionDirectlyEndsTheFlow() {
+        var state = EpisodeUnlockFlowState(episodeNumber: 4, coinCost: 30, balance: 18, vipOnly: false)
+        state.close()
+        #expect(state.presentation == .retention)
+
+        state.close()
+        #expect(state.presentation == .lockedFrame)
     }
 }

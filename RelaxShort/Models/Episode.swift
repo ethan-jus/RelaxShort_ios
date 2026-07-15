@@ -62,7 +62,7 @@ struct ApplePurchaseReceipt: Equatable {
 
 struct EpisodeUnlockFlowState: Equatable {
     enum Selection: Equatable { case coins, vip }
-    enum Presentation: Equatable { case primary, lockedFrame }
+    enum Presentation: Equatable { case primary, retention, lockedFrame }
 
     let episodeNumber: Int
     let coinCost: Int
@@ -72,6 +72,7 @@ struct EpisodeUnlockFlowState: Equatable {
     var presentation: Presentation = .primary
     var isProcessing = false
     var errorMessage: String?
+    private(set) var hasShownRetention = false
 
     init(episodeNumber: Int, coinCost: Int, balance: Int, vipOnly: Bool) {
         self.episodeNumber = episodeNumber
@@ -93,6 +94,19 @@ struct EpisodeUnlockFlowState: Equatable {
     }
 
     mutating func close() {
-        presentation = .lockedFrame
+        switch presentation {
+        case .primary where !hasShownRetention:
+            hasShownRetention = true
+            presentation = .retention
+        case .primary, .retention:
+            presentation = .lockedFrame
+        case .lockedFrame:
+            break
+        }
+    }
+
+    mutating func reopenFromRetention() {
+        guard presentation == .retention else { return }
+        presentation = .primary
     }
 }
