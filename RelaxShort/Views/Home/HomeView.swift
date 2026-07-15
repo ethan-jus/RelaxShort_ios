@@ -96,7 +96,6 @@ struct HomeView: View {
     @EnvironmentObject private var dependencies: DependencyContainer
     @ObservedObject private var viewModel: HomeViewModel
     private let rankingRepository: HomeRepositoryProtocol
-    @State private var playerDrama: DramaItem?
     @State private var showVIP = false
     @State private var showReward = false
     /// Categories 三行筛选状态。
@@ -150,15 +149,6 @@ struct HomeView: View {
                 else if !viewModel.hasContent, !viewModel.isLoading { emptyView }
             }
         }
-        .onChange(of: playerDrama) { _, drama in
-            guard let drama else { return }
-            appStore.navigationTarget = SeriesPlayerNav(
-                drama: drama,
-                startEpisode: max(1, drama.currentEpisode),
-                sourceScene: viewModel.selectedTab == 2 ? "rankings" : "home"
-            )
-            playerDrama = nil
-        }
         .navigationDestination(isPresented: $showVIP) {
             MemberView(
                 mode: .push,
@@ -169,6 +159,26 @@ struct HomeView: View {
             CoinRewardView(mode: .pushed)
         }
         .task { await viewModel.loadData() }
+    }
+
+    /// Home 卡片直接发起全局播放页路由，避免中转 State 的写入和清空在 push 动画期间重复重建首页。
+    private var seriesNavigationBinding: Binding<DramaItem?> {
+        Binding(
+            get: { nil },
+            set: { drama in
+                guard let drama else { return }
+                openSeries(drama)
+            }
+        )
+    }
+
+    private func openSeries(_ drama: DramaItem) {
+        guard appStore.navigationTarget == nil else { return }
+        appStore.navigationTarget = SeriesPlayerNav(
+            drama: drama,
+            startEpisode: max(1, drama.currentEpisode),
+            sourceScene: viewModel.selectedTab == 2 ? "rankings" : "home"
+        )
     }
 
     @ViewBuilder
@@ -232,8 +242,8 @@ struct HomeView: View {
     private func popularContent(containerW: CGFloat) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                if !viewModel.fixedDramas.isEmpty { MarketingGrid(dramas: viewModel.fixedDramas, playerDrama: $playerDrama, containerW: containerW) }
-                if !viewModel.featuredDramas.isEmpty { YouMightLikeSection(dramas: viewModel.featuredDramas, playerDrama: $playerDrama, containerW: containerW).padding(.top, 28) }
+                if !viewModel.fixedDramas.isEmpty { MarketingGrid(dramas: viewModel.fixedDramas, playerDrama: seriesNavigationBinding, containerW: containerW) }
+                if !viewModel.featuredDramas.isEmpty { YouMightLikeSection(dramas: viewModel.featuredDramas, playerDrama: seriesNavigationBinding, containerW: containerW).padding(.top, 28) }
             }
             .padding(.bottom, 64)
         }
@@ -252,7 +262,7 @@ struct HomeView: View {
                             drama: drama,
                             dateBadge: newDateBadge(for: index),
                             containerWidth: containerW,
-                            onTap: { playerDrama = drama }
+                            onTap: { openSeries(drama) }
                         )
                     }
                 }
@@ -273,7 +283,7 @@ struct HomeView: View {
 
     private var rankingsTabContent: some View {
         RankView(
-            playerDrama: $playerDrama,
+            playerDrama: seriesNavigationBinding,
             repository: rankingRepository,
             onCategoryChange: { selectedRankCategory = $0 }
         )
@@ -472,7 +482,7 @@ struct HomeView: View {
             let dramas = selectedGenre == "All" ? viewModel.featuredDramas : viewModel.categoryDramas
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3), spacing: DT.Space.md) {
                 ForEach(dramas) { drama in
-                    Button { playerDrama = drama } label: {
+                    Button { openSeries(drama) } label: {
                         VStack(alignment: .leading, spacing: 4) {
                             CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
                             Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
@@ -521,7 +531,7 @@ struct HomeView: View {
         if dramas.isEmpty { return AnyView(animeEmptyState) }
         return AnyView(ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                HomeHeroCarouselSection(dramas: heroItems, playerDrama: $playerDrama, containerW: containerW)
+                HomeHeroCarouselSection(dramas: heroItems, playerDrama: seriesNavigationBinding, containerW: containerW)
                     .padding(.bottom, 24)
                 animeWeeklyFeatured(Array(dramas.prefix(8)), containerW: containerW)
                 animeMoreRecommended(Array(dramas.dropFirst(1)), containerW: containerW)
@@ -544,7 +554,7 @@ struct HomeView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(dramas) { drama in
-                        Button { playerDrama = drama } label: {
+                        Button { openSeries(drama) } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: cardW, height: cardW * 1.5)
                                 Text(drama.title).font(.system(size: 13, weight: .medium)).foregroundColor(.white).lineLimit(1).frame(width: cardW)
@@ -564,7 +574,7 @@ struct HomeView: View {
             Text(L10n.recommended).font(.system(size: 18, weight: .semibold)).foregroundColor(.white).padding(.horizontal, 16)
             LazyVStack(spacing: 18) {
                 ForEach(dramas) { drama in
-                    Button { playerDrama = drama } label: {
+                    Button { openSeries(drama) } label: {
                         HStack(alignment: .top, spacing: 14) {
                             ZStack(alignment: .topTrailing) {
                                 CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: coverW, height: coverH)
@@ -622,7 +632,7 @@ struct HomeView: View {
                         HomePosterRailSection(
                             title: weeklySection?.titleKey ?? "Weekly Featured",
                             dramas: weeklyItems,
-                            playerDrama: $playerDrama,
+                            playerDrama: seriesNavigationBinding,
                             containerW: containerW
                         )
                     }
@@ -630,7 +640,7 @@ struct HomeView: View {
                         HomeDramaListSection(
                             title: classicsSection?.titleKey ?? "VIP Classics",
                             dramas: classicsItems,
-                            playerDrama: $playerDrama,
+                            playerDrama: seriesNavigationBinding,
                             containerW: containerW
                         )
                     }
@@ -667,7 +677,7 @@ struct HomeView: View {
                     if !heroItems.isEmpty {
                         HomeHeroCarouselSection(
                             dramas: heroItems,
-                            playerDrama: $playerDrama,
+                            playerDrama: seriesNavigationBinding,
                             containerW: containerW
                         )
                     }
@@ -675,7 +685,7 @@ struct HomeView: View {
                         HomePosterRailSection(
                             title: section.0,
                             dramas: section.1,
-                            playerDrama: $playerDrama,
+                            playerDrama: seriesNavigationBinding,
                             containerW: containerW
                         )
                     }
@@ -683,7 +693,7 @@ struct HomeView: View {
                         HomeDramaListSection(
                             title: "Top Charts",
                             dramas: topCharts,
-                            playerDrama: $playerDrama,
+                            playerDrama: seriesNavigationBinding,
                             containerW: containerW
                         )
                     }
