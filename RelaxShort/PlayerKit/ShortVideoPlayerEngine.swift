@@ -102,11 +102,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
         guard let currentID = currentItem?.id,
               let newIndex = newItems.firstIndex(where: { $0.id == currentID }) else { return }
         cancelAllPreloadTasks()
-        slotPool.cancelAdjacent()
+        let nextItem = newItems[safe: newIndex + 1]
+        let keepsPreparedNext = nextItem.map { slotPool.contains(item: $0, in: .next) } ?? false
+        if !keepsPreparedNext {
+            slotPool.cancelAdjacent()
+        }
         items = newItems
         currentIndex = newIndex
         log("播放列表已同步: 当前=\(currentID) 数量=\(newItems.count)")
-        if hasVisiblePlaybackStarted {
+        if hasVisiblePlaybackStarted, !keepsPreparedNext {
             schedulePreloadAdjacent(gen: generation, delayMs: 0)
         }
     }
@@ -178,12 +182,13 @@ final class ShortVideoPlayerEngine: ObservableObject {
             }
         }
 
-        if slotPool.promotePrepared(
+        if let preloadState = slotPool.promotePrepared(
             item: newItems[index],
             generation: gen,
             completion: attachResult
         ) {
-            log("内容切换命中相邻 preroll: id=\(newItems[index].id)")
+            diagnostics.preloadState = "promoted:\(preloadState.rawValue):\(newItems[index].id)"
+            log("内容切换复用相邻播放器: id=\(newItems[index].id) 状态=\(preloadState.rawValue)")
         } else {
             log("内容切换未命中相邻 preroll，使用共享 current 槽: id=\(newItems[index].id)")
             slotPool.prepare(
@@ -456,6 +461,17 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     func updateState(_ newState: PlayerPlaybackState) {
         state = newState
+        switch newState {
+        case .waitingNetwork, .stalled, .recovering:
+            // 当前播放一旦发生网络压力，立即释放相邻预加载带宽。
+            cancelAllPreloadTasks()
+            slotPool.cancelAdjacent()
+            diagnostics.preloadState = "paused-for-current"
+        case .playing where hasVisiblePlaybackStarted:
+            schedulePreloadAdjacent(gen: generation, delayMs: 0)
+        default:
+            break
+        }
         log("updateState: \(newState)")
     }
 
@@ -703,15 +719,21 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private func preloadAdjacent(gen: Int) {
         let nextIdx = currentIndex + 1
         if nextIdx < items.count {
+            let nextItem = items[nextIdx]
+            guard !slotPool.contains(item: nextItem, in: .next) else { return }
             log("preload: start next=\(nextIdx)")
+            diagnostics.preloadState = "preparing:next:\(nextItem.id)"
             let task = Task { [weak self] in
                 guard let self else { return }
-                self.slotPool.prepare(item: self.items[nextIdx], slot: .next, generation: gen) { result in
-                    let item = self.items[nextIdx]
+                self.slotPool.prepare(item: nextItem, slot: .next, generation: gen) { result in
                     if case .success = result {
-                        Task { @MainActor in self.diagnostics.preloadState = "hit:next:\(item.id)" }
+                        Task { @MainActor in
+                            self.diagnostics.preloadState = "ready:next:\(nextItem.id)"
+                        }
                     } else {
-                        Task { @MainActor in self.diagnostics.preloadState = "miss:next:\(item.id)" }
+                        Task { @MainActor in
+                            self.diagnostics.preloadState = "failed:next:\(nextItem.id)"
+                        }
                     }
                 }
             }

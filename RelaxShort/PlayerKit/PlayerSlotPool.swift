@@ -1,5 +1,12 @@
 import AVFoundation
 
+enum PlayerPreloadState: String, Equatable {
+    case idle
+    case preparing
+    case ready
+    case failed
+}
+
 // MARK: - 槽位上下文
 
 /// 每个槽位持有的强引用上下文：player + item + 预加载任务
@@ -14,6 +21,7 @@ struct PlayerSlotContext {
     var firstFrameAt: Date?
     var tasks: [Task<Void, Never>] = []
     var generation: Int = 0
+    var preloadState: PlayerPreloadState = .idle
 }
 
 // MARK: - 播放槽位
@@ -28,6 +36,7 @@ enum PlayerSlot: Int, Sendable {
 
 /// 固定三槽 AVPlayer 池。App 只有一套池；current 可见可听，previous/next 永远静音暂停。
 /// 相邻项通过 AVPlayer.preroll 做原生缓冲，升为 current 时直接复用同一个 AVPlayer。
+@MainActor
 final class PlayerSlotPool {
 
     private var slots: [PlayerSlotContext?] = [nil, nil, nil]
@@ -42,9 +51,8 @@ final class PlayerSlotPool {
     ) {
         cancel(slot)
         let idx = slot.rawValue
-        let managedItem = slot == .current
-            ? PlayerItemFactory.makePlaybackItem(from: item)
-            : PlayerItemFactory.makePlaybackItem(from: item)
+        let intent: PlayerItemLoadIntent = slot == .current ? .playback : .preload
+        let managedItem = PlayerItemFactory.makePlaybackItem(from: item, intent: intent)
         let playerItem = managedItem.item
         let player = AVPlayer(playerItem: playerItem)
         player.isMuted = slot != .current
@@ -53,27 +61,44 @@ final class PlayerSlotPool {
             player.currentItem?.preferredForwardBufferDuration = 0
             player.automaticallyWaitsToMinimizeStalling = false
         } else {
-            player.currentItem?.preferredForwardBufferDuration = 1.0
+            player.currentItem?.preferredForwardBufferDuration = PlayerPreloadPolicy.preferredForwardBufferDuration
             player.automaticallyWaitsToMinimizeStalling = false
         }
         slots[idx] = PlayerSlotContext(
             player: player, item: playerItem,
             resourceLoaderDelegate: managedItem.resourceLoaderDelegate,
             mediaID: item.id, source: item.source,
-            preparedAt: Date(), generation: generation
+            preparedAt: Date(), generation: generation,
+            preloadState: slot == .current ? .idle : .preparing
         )
-        // 相邻槽只由共享池预加载：先确认可播，再 preroll 到系统认为可立即起播的状态。
+        // 相邻槽只由共享池预加载：只有 readyToPlay + preroll 完成后才报告 ready。
         if slot != .current {
-            let loadTask = Task(priority: .utility) { [weak player, asset = playerItem.asset] in
-                guard let player else { return }
+            let loadTask = Task(priority: .utility) { [weak self, weak player, asset = playerItem.asset] in
+                guard let self, let player else { return }
                 guard !Task.isCancelled else { return }
                 let isPlayable = (try? await asset.load(.isPlayable)) == true
                 guard !Task.isCancelled, isPlayable else {
+                    self.finishPreload(
+                        slot: slot,
+                        mediaID: item.id,
+                        state: .failed,
+                        player: player,
+                        completion: completion
+                    )
                     print("[PlayerKit] 相邻预加载失败 mediaID=\(item.id) slot=\(slot) 可播放=\(isPlayable)")
                     return
                 }
                 let playerReady = await Self.waitUntilReadyToPlay(player)
                 guard !Task.isCancelled, playerReady, player.status == .readyToPlay else {
+                    if !Task.isCancelled {
+                        self.finishPreload(
+                            slot: slot,
+                            mediaID: item.id,
+                            state: .failed,
+                            player: player,
+                            completion: completion
+                        )
+                    }
                     print("[PlayerKit] 相邻预加载跳过 preroll mediaID=\(item.id) slot=\(slot) playerStatus=\(player.status.rawValue)")
                     return
                 }
@@ -83,10 +108,17 @@ final class PlayerSlotPool {
                     }
                 }
                 guard !Task.isCancelled else { return }
-                player.pause()
+                self.finishPreload(
+                    slot: slot,
+                    mediaID: item.id,
+                    state: prerollReady ? .ready : .failed,
+                    player: player,
+                    completion: completion
+                )
                 print("[PlayerKit] 相邻预加载完成 mediaID=\(item.id) slot=\(slot) preroll=\(prerollReady)")
             }
             slots[idx]?.tasks.append(loadTask)
+            return
         }
         guard generation > 0 else { player.pause(); return }
         completion(.success(player))
@@ -102,8 +134,12 @@ final class PlayerSlotPool {
         completion: @escaping (Result<AVPlayer, Error>) -> Void
     ) {
         guard items.indices.contains(newIndex) else { return }
-        if promotePrepared(item: items[newIndex], generation: generation, completion: completion) {
-            print("[PlayerKit] 相邻预加载命中 idx=\(newIndex) 复用=true")
+        if let preloadState = promotePrepared(
+            item: items[newIndex],
+            generation: generation,
+            completion: completion
+        ) {
+            print("[PlayerKit] 相邻预加载命中 idx=\(newIndex) 状态=\(preloadState.rawValue) 复用=true")
             return
         }
         print("[PlayerKit] 相邻预加载未命中 idx=\(newIndex) 方向=\(newIndex > oldIndex ? "next" : "previous")")
@@ -117,39 +153,59 @@ final class PlayerSlotPool {
         item: PlayerMediaItem,
         generation: Int,
         completion: @escaping (Result<AVPlayer, Error>) -> Void
-    ) -> Bool {
+    ) -> PlayerPreloadState? {
         let current = slots[PlayerSlot.current.rawValue]?.player
         current?.pause()
         current?.isMuted = true
 
+        let sourceSlot: PlayerSlot
         if slots[PlayerSlot.next.rawValue]?.mediaID == item.id {
+            sourceSlot = .next
+        } else if slots[PlayerSlot.previous.rawValue]?.mediaID == item.id {
+            sourceSlot = .previous
+        } else {
+            return nil
+        }
+
+        guard let source = slots[sourceSlot.rawValue], source.preloadState != .failed else {
+            cancel(sourceSlot)
+            return nil
+        }
+        let preloadState = source.preloadState
+
+        if sourceSlot == .next {
             cancelPreparation(.next)
             cancel(.previous)
             slots[0] = slots[1]
             slots[1] = slots[2]
             slots[2] = nil
-        } else if slots[PlayerSlot.previous.rawValue]?.mediaID == item.id {
+        } else {
             cancelPreparation(.previous)
             cancel(.next)
             slots[2] = slots[1]
             slots[1] = slots[0]
             slots[0] = nil
-        } else {
-            return false
         }
 
         guard let promoted = slots[PlayerSlot.current.rawValue],
               promoted.player.currentItem?.status != .failed else {
             cancel(.current)
-            return false
+            return nil
         }
+        promoted.resourceLoaderDelegate?.promoteToPlaybackPriority()
         if promoted.player.status == .readyToPlay {
             promoted.player.cancelPendingPrerolls()
         }
         promoted.player.pause()
         promoted.player.isMuted = false
         completion(.success(promoted.player))
-        return true
+        return preloadState
+    }
+
+    /// 防止首帧回调和播放列表更新同时重复创建同一个 next。
+    func contains(item: PlayerMediaItem, in slot: PlayerSlot) -> Bool {
+        guard let context = slots[slot.rawValue] else { return false }
+        return context.mediaID == item.id && context.source == item.source
     }
 
     // MARK: - 当前页强制重建（超时/failed/fallback 时 engine 调用）
@@ -202,6 +258,35 @@ final class PlayerSlotPool {
         return false
     }
 
+    private func finishPreload(
+        slot: PlayerSlot,
+        mediaID: String,
+        state: PlayerPreloadState,
+        player: AVPlayer,
+        completion: @escaping (Result<AVPlayer, Error>) -> Void
+    ) {
+        guard var context = slots[slot.rawValue], context.mediaID == mediaID else { return }
+        context.preloadState = state
+        context.tasks.removeAll()
+        context.readyToPlayAt = state == .ready ? Date() : nil
+        slots[slot.rawValue] = context
+        player.pause()
+
+        if state == .ready {
+            completion(.success(player))
+        } else {
+            completion(
+                .failure(
+                    NSError(
+                        domain: "PlayerSlotPool.Preload",
+                        code: -1,
+                        userInfo: [NSLocalizedDescriptionKey: "相邻媒体预加载失败"]
+                    )
+                )
+            )
+        }
+    }
+
     func cancelAdjacent() {
         cancel(.previous)
         cancel(.next)
@@ -211,5 +296,12 @@ final class PlayerSlotPool {
         for i in 0..<3 { cancel(PlayerSlot(rawValue: i)!) }
     }
 
-    deinit { cleanup() }
+    deinit {
+        // deinit 不继承 MainActor 隔离，直接释放槽位，避免跨隔离调用 cleanup()。
+        for context in slots.compactMap({ $0 }) {
+            for task in context.tasks { task.cancel() }
+            context.player.cancelPendingPrerolls()
+            context.player.pause()
+        }
+    }
 }

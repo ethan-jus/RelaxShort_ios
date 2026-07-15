@@ -305,6 +305,7 @@ struct EpisodeUnlockPurchaseSheet: View {
     let storeKit: StoreKitManager
     let coinCost: Int
     let balance: Int
+    let safeAreaBottom: CGFloat
     let onDismiss: () -> Void
     let verifyCoinPurchase: (ApplePurchaseReceipt) async throws -> Int
     let verifyVIPPurchase: (ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount
@@ -328,6 +329,7 @@ struct EpisodeUnlockPurchaseSheet: View {
         coinCost: Int,
         balance: Int,
         initialTab: EpisodeUnlockPurchaseTab,
+        safeAreaBottom: CGFloat,
         onDismiss: @escaping () -> Void,
         verifyCoinPurchase: @escaping (ApplePurchaseReceipt) async throws -> Int,
         verifyVIPPurchase: @escaping (ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount,
@@ -339,6 +341,7 @@ struct EpisodeUnlockPurchaseSheet: View {
         self.storeKit = storeKit
         self.coinCost = coinCost
         self.balance = balance
+        self.safeAreaBottom = safeAreaBottom
         self.onDismiss = onDismiss
         self.verifyCoinPurchase = verifyCoinPurchase
         self.verifyVIPPurchase = verifyVIPPurchase
@@ -378,8 +381,21 @@ struct EpisodeUnlockPurchaseSheet: View {
                 colors: [Color(red: 0.12, green: 0.10, blue: 0.075), panel, .black],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
-            )
+            ),
+            in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
         )
+        .overlay(
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                .stroke(
+                    LinearGradient(
+                        colors: [gold.opacity(0.72), .white.opacity(0.08)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: 1.2
+                )
+        )
+        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
         .preferredColorScheme(.dark)
     }
 
@@ -599,7 +615,7 @@ struct EpisodeUnlockPurchaseSheet: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 14)
-        .padding(.bottom, 14)
+        .padding(.bottom, max(14, safeAreaBottom + 12))
         .background(.black.opacity(0.32))
     }
 

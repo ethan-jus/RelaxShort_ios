@@ -6,18 +6,40 @@ struct PlayerManagedItem {
     let resourceLoaderDelegate: PlayerResourceLoaderDelegate?
 }
 
+/// 页面只提供媒体列表；当前播放和相邻预加载都由 PlayerKit 使用同一策略创建 Item。
+enum PlayerItemLoadIntent: Equatable {
+    case playback
+    case preload
+}
+
+enum PlayerPreloadPolicy {
+    /// 以短视频首帧为目标，不做长视频式的大缓冲。常见码率下约对应 256–512KB。
+    static let preferredForwardBufferDuration: TimeInterval = 0.75
+    static let preloadNetworkPriority: Float = URLSessionTask.lowPriority
+    static let playbackNetworkPriority: Float = URLSessionTask.highPriority
+}
+
 // MARK: - 播放器 Item 工厂
 
 enum PlayerItemFactory {
     /// 公开 MP4 使用资源加载代理，已读取的 Range 会被写入 2GB LRU 磁盘缓存。
     /// HLS 与受保护内容不走普通文件缓存。
-    static func makePlaybackItem(from item: PlayerMediaItem) -> PlayerManagedItem {
+    static func makePlaybackItem(
+        from item: PlayerMediaItem,
+        intent: PlayerItemLoadIntent = .playback
+    ) -> PlayerManagedItem {
         guard item.allowsPersistentCache,
               PlayerMediaCacheSettings.isEnabled,
               let url = mp4URL(from: item.source) else {
             return makeDirectItem(from: item.source)
         }
-        let delegate = PlayerResourceLoaderDelegate(originalURL: url)
+        let priority = intent == .playback
+            ? PlayerPreloadPolicy.playbackNetworkPriority
+            : PlayerPreloadPolicy.preloadNetworkPriority
+        let delegate = PlayerResourceLoaderDelegate(
+            originalURL: url,
+            requestPriority: priority
+        )
         let asset = AVURLAsset(url: url.withPlayerCacheScheme())
         asset.resourceLoader.setDelegate(delegate, queue: .global(qos: .utility))
         return PlayerManagedItem(item: AVPlayerItem(asset: asset), resourceLoaderDelegate: delegate)
@@ -46,8 +68,10 @@ enum PlayerItemFactory {
             return url
         case .mp4WithExternalSubtitles(let videoURL, _):
             return videoURL
-        case .hls, .hlsWithFallback:
+        case .hls:
             return nil
+        case .hlsWithFallback(_, let fallbackMP4URL):
+            return fallbackMP4URL
         }
     }
 

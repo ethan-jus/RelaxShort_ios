@@ -44,6 +44,8 @@ struct SeriesPlayerView: View {
     @State private var episodeMediaSources: [String: PlayerMediaSource] = [:]
     /// 单一 sheet router，避免多 .sheet 互抢。
     @State private var activeSheet: PlayerSheet?
+    /// 购买中心使用播放器内全宽 Overlay，避免系统 Sheet 在新 iOS 上自动产生两侧留白。
+    @State private var unlockPurchaseTab: EpisodeUnlockPurchaseTab?
     @State private var isSpeeding = false
     @State private var episodeSwitchTask: Task<Void, Never>?
     @State private var playbackState: PlayerPlaybackState = .idle
@@ -75,20 +77,17 @@ struct SeriesPlayerView: View {
         static let topGapBelowSafeArea: CGFloat = 8
         static let topBarHeight: CGFloat = 44
         static let membershipRowHeight: CGFloat = 30
-        // 购买中心信息量高于首层解锁卡，但也不应占据接近全屏的 82%。
-        static let unlockPurchaseSheetFraction: CGFloat = 0.62
+        static let unlockPurchasePanelFraction: CGFloat = 0.62
     }
 
     private enum PlayerSheet: Identifiable {
         case share, speed, quality
-        case unlockPurchase(EpisodeUnlockPurchaseTab)
 
         var id: String {
             switch self {
             case .share: "share"
             case .speed: "speed"
             case .quality: "quality"
-            case .unlockPurchase(let tab): "unlockPurchase-\(tab.rawValue)"
             }
         }
     }
@@ -181,8 +180,17 @@ struct SeriesPlayerView: View {
                 }
 
                 if let unlockState {
-                    episodeUnlockOverlay(unlockState, in: geo)
-                        .zIndex(250)
+                    if let unlockPurchaseTab {
+                        unlockPurchaseOverlay(
+                            unlockState,
+                            initialTab: unlockPurchaseTab,
+                            in: geo
+                        )
+                        .zIndex(300)
+                    } else {
+                        episodeUnlockOverlay(unlockState, in: geo)
+                            .zIndex(250)
+                    }
                 } else if let episodeLoadError {
                     episodeLoadFailureOverlay(episodeLoadError)
                         .zIndex(240)
@@ -228,44 +236,6 @@ struct SeriesPlayerView: View {
                 )
                 .presentationDetents([.fraction(0.4)])
                 .presentationDragIndicator(.hidden)
-            case .unlockPurchase(let initialTab):
-                if let state = unlockState {
-                    EpisodeUnlockPurchaseSheet(
-                        coinStore: coinStore,
-                        storeKit: storeKitManager,
-                        coinCost: state.coinCost,
-                        balance: state.balance,
-                        initialTab: initialTab,
-                        onDismiss: dismissUnlockPurchaseCenter,
-                        verifyCoinPurchase: { receipt in
-                            try await dependencies.detailRepository.verifyCoinPurchase(receipt)
-                        },
-                        verifyVIPPurchase: { receipt in
-                            try await dependencies.detailRepository.verifyVIPPurchase(receipt)
-                        },
-                        refreshAccount: {
-                            try await dependencies.detailRepository.fetchUnlockAccount()
-                        },
-                        onCoinPurchaseCompleted: { balance in
-                            if var latest = unlockState {
-                                latest.balance = balance
-                                latest.selection = .coins
-                                unlockState = latest
-                            }
-                            activeSheet = nil
-                            Task { await performUnlock(method: .coins) }
-                        },
-                        onVIPPurchaseCompleted: { account in
-                            coinStore.synchronize(balance: account.balance)
-                            activeSheet = nil
-                            Task { await resumeCurrentEpisodeAfterUnlock() }
-                        }
-                    )
-                    .presentationDetents([.fraction(ChromeMetrics.unlockPurchaseSheetFraction)])
-                    .presentationDragIndicator(.hidden)
-                    .presentationCornerRadius(28)
-                    .interactiveDismissDisabled()
-                }
             }
         }
         .task(id: drama.id) {
@@ -364,6 +334,64 @@ struct SeriesPlayerView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .allowsHitTesting(true)
+    }
+
+    /// 金币与 VIP 购买中心共用播放器内的全宽底部面板，不再依赖系统浮动 Sheet。
+    private func unlockPurchaseOverlay(
+        _ state: EpisodeUnlockFlowState,
+        initialTab: EpisodeUnlockPurchaseTab,
+        in geo: GeometryProxy
+    ) -> some View {
+        let panelHeight = min(
+            620,
+            geo.size.height * ChromeMetrics.unlockPurchasePanelFraction
+        )
+
+        return ZStack {
+            Color.black.opacity(0.82)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                EpisodeUnlockPurchaseSheet(
+                    coinStore: coinStore,
+                    storeKit: storeKitManager,
+                    coinCost: state.coinCost,
+                    balance: state.balance,
+                    initialTab: initialTab,
+                    safeAreaBottom: geo.safeAreaInsets.bottom,
+                    onDismiss: dismissUnlockPurchaseCenter,
+                    verifyCoinPurchase: { receipt in
+                        try await dependencies.detailRepository.verifyCoinPurchase(receipt)
+                    },
+                    verifyVIPPurchase: { receipt in
+                        try await dependencies.detailRepository.verifyVIPPurchase(receipt)
+                    },
+                    refreshAccount: {
+                        try await dependencies.detailRepository.fetchUnlockAccount()
+                    },
+                    onCoinPurchaseCompleted: { balance in
+                        if var latest = unlockState {
+                            latest.balance = balance
+                            latest.selection = .coins
+                            unlockState = latest
+                        }
+                        unlockPurchaseTab = nil
+                        Task { await performUnlock(method: .coins) }
+                    },
+                    onVIPPurchaseCompleted: { account in
+                        coinStore.synchronize(balance: account.balance)
+                        unlockPurchaseTab = nil
+                        Task { await resumeCurrentEpisodeAfterUnlock() }
+                    }
+                )
+                .id(initialTab)
+                .frame(width: geo.size.width, height: panelHeight)
+            }
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
         .allowsHitTesting(true)
     }
 
@@ -677,16 +705,16 @@ struct SeriesPlayerView: View {
     private func handlePrimaryUnlockAction() {
         guard let state = unlockState else { return }
         if state.selection == .vip {
-            activeSheet = .unlockPurchase(.vip)
+            unlockPurchaseTab = .vip
         } else if state.hasEnoughCoins {
             Task { await performUnlock(method: .coins) }
         } else {
-            activeSheet = .unlockPurchase(.coins)
+            unlockPurchaseTab = .coins
         }
     }
 
     private func dismissUnlockPurchaseCenter() {
-        activeSheet = nil
+        unlockPurchaseTab = nil
         guard var state = unlockState else { return }
         state.close()
         state.errorMessage = nil
@@ -776,7 +804,7 @@ struct SeriesPlayerView: View {
         }
         unlockedEpisodes.insert(episodeNumber)
         unlockState = nil
-        activeSheet = nil
+        unlockPurchaseTab = nil
         initializeEpisodePlayer()
         playerCoordinator.engine.play()
     }
@@ -1540,7 +1568,9 @@ struct SeriesPlayerView: View {
                     episodeNumber: ep.episodeNumber,
                     coverURL: drama.coverURL,
                     source: source,
-                    resumeTime: resume
+                    resumeTime: resume,
+                    // 普通免费集与 For You 共用公开 MP4 Range 缓存；付费/VIP 内容不落普通缓存。
+                    allowsPersistentCache: !ep.isLocked && !ep.requiresVIP
                 )
             )
         }

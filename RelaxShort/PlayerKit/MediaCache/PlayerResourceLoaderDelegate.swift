@@ -10,12 +10,23 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
     private let cache = HTTPRangeMediaCache.shared
     private var session: URLSession?
     private var tasks: [ObjectIdentifier: URLSessionDataTask] = [:]
+    private var requestPriority: Float
     private let lock = NSLock()
 
-    init(originalURL: URL) {
+    init(originalURL: URL, requestPriority: Float = URLSessionTask.defaultPriority) {
         self.originalURL = originalURL
+        self.requestPriority = requestPriority
         super.init()
         session = URLSession(configuration: .default)
+    }
+
+    /// 相邻预加载升为当前播放时，正在进行的 Range 请求同步提升优先级。
+    func promoteToPlaybackPriority() {
+        lock.lock()
+        requestPriority = PlayerPreloadPolicy.playbackNetworkPriority
+        let currentTasks = Array(tasks.values)
+        lock.unlock()
+        currentTasks.forEach { $0.priority = PlayerPreloadPolicy.playbackNetworkPriority }
     }
 
     deinit {
@@ -147,6 +158,7 @@ final class PlayerResourceLoaderDelegate: NSObject, AVAssetResourceLoaderDelegat
 
         if let task {
             lock.lock()
+            task.priority = requestPriority
             tasks[key] = task
             lock.unlock()
             task.resume()
