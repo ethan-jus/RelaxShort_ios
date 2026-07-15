@@ -12,6 +12,7 @@ import Combine
     @Published var currentIndex = 0
     @Published var hasInitializedPool = false
     @Published var poolVersion = 0
+    private(set) var playbackEnabled: Bool
     private var engineSink: AnyCancellable?
 
     /// 可播放条目列表，保存 dramaIndex → playableIndex 映射
@@ -24,9 +25,10 @@ import Combine
     /// 下次 append 合法的起始 dramaIndex
     private var nextAppendDramaIndex: Int = 0
 
-    init(coordinator: PlayerCoordinator) {
+    init(coordinator: PlayerCoordinator, playbackEnabled: Bool = true) {
         self.coordinator = coordinator
         self.engine = coordinator.engine
+        self.playbackEnabled = playbackEnabled
         subscribe(to: coordinator.engine)
     }
 
@@ -103,12 +105,14 @@ import Combine
 
         log("replacePlaylist gen=\(gen) feedCount=\(dramas.count) playableCount=\(newPlayable.count) targetDrama=\(safeTarget) targetPlayable=\(playableIdx)")
 
-        if !hasInitializedPool {
+        if !hasInitializedPool, playbackEnabled {
             engine.startPlaybackTrace(PlaybackDiagnosticsTrace(scene: "for_you", targetIndex: 0))
             coordinator.replaceForYouPlaylist(items: playerItems, index: playableIdx, autoplay: true)
             hasInitializedPool = true
-        } else if coordinator.owner == .forYou {
+        } else if hasInitializedPool, playbackEnabled, coordinator.owner == .forYou {
             coordinator.replaceForYouPlaylist(items: playerItems, index: playableIdx, autoplay: true)
+        } else if !playbackEnabled {
+            log("replacePlaylist 已更新快照，For You 不可见，延迟取得播放权")
         }
         // Series 持有播放权时不提交引擎，只更新 session 快照
 
@@ -219,6 +223,15 @@ import Combine
         replacePlaylist(dramas: dramas)
     }
 
+    /// For You 只有在标签页真正可见时才允许取得或恢复播放权。
+    /// 常驻视图可以继续预加载 feed，但不能在 Home 等其他标签后台出声。
+    func setPlaybackEnabled(_ enabled: Bool) {
+        playbackEnabled = enabled
+        if !enabled {
+            pausePlayback()
+        }
+    }
+
     /// 列表为空时重建（用于 loadData 全量刷新后的首次 init）
     /// 已替换为 replacePlaylist 调用。保留以兼容原有调用方。
     func handleTransition(from old: Int, to new: Int, dramas: [DramaItem], autoplay: Bool) {
@@ -226,7 +239,8 @@ import Combine
     }
 
     func resumePlayback() {
-        guard hasInitializedPool,
+        guard playbackEnabled,
+              hasInitializedPool,
               !playableItems.isEmpty,
               let playableIdx = playableIndex(for: currentIndex) else { return }
 

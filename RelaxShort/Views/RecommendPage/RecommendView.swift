@@ -83,11 +83,10 @@ struct RecommendView: View {
                 Task { await viewModel.loadNextPageIfNeeded(currentIndex: newValue) }
             }
             .onChange(of: isPlaybackVisible) { _, vis in
+                session.setPlaybackEnabled(vis)
                 if vis {
                     initializePlaybackIfNeeded()
                     session.resumePlayback()
-                } else {
-                    session.pausePlayback()
                 }
             }
             .onChange(of: viewModel.dramas.count) { oldCount, count in
@@ -105,7 +104,14 @@ struct RecommendView: View {
             .onDisappear {
                 appStore.isBottomTabBarHidden = false
             }
-            .onAppear { setupAutoPlay() }
+            .onAppear {
+                setupAutoPlay()
+                session.setPlaybackEnabled(isPlaybackVisible)
+                if isPlaybackVisible {
+                    initializePlaybackIfNeeded()
+                    session.resumePlayback()
+                }
+            }
             .modifier(TabLifecycleModifier(appStore: appStore, session: session, viewModel: viewModel))
     }
 

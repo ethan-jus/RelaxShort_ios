@@ -60,8 +60,8 @@ struct SeriesPlayerView: View {
         static let topGapBelowSafeArea: CGFloat = 8
         static let topBarHeight: CGFloat = 44
         static let membershipRowHeight: CGFloat = 30
-        static let unlockSheetFraction: CGFloat = 0.82
-        static var unlockSheetHeight: CGFloat { UIScreen.main.bounds.height * unlockSheetFraction }
+        // 购买中心信息量高于首层解锁卡，但也不应占据接近全屏的 82%。
+        static let unlockPurchaseSheetFraction: CGFloat = 0.62
     }
 
     private enum PlayerSheet: Identifiable {
@@ -234,7 +234,7 @@ struct SeriesPlayerView: View {
                             Task { await resumeCurrentEpisodeAfterUnlock() }
                         }
                     )
-                    .presentationDetents([.height(ChromeMetrics.unlockSheetHeight)])
+                    .presentationDetents([.fraction(ChromeMetrics.unlockPurchaseSheetFraction)])
                     .presentationDragIndicator(.hidden)
                     .presentationCornerRadius(28)
                     .interactiveDismissDisabled()
@@ -288,28 +288,23 @@ struct SeriesPlayerView: View {
 
     @ViewBuilder
     private func episodeUnlockOverlay(_ state: EpisodeUnlockFlowState, in geo: GeometryProxy) -> some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             Color.black.opacity(0.76)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
 
             switch state.presentation {
             case .primary:
-                unlockPrimaryPanel(
-                    state,
-                    height: ChromeMetrics.unlockSheetHeight,
-                    safeBottom: geo.safeAreaInsets.bottom
-                )
-                    .frame(maxWidth: .infinity)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            case .retention:
-                unlockRetentionPanel(
-                    state,
-                    height: ChromeMetrics.unlockSheetHeight,
-                    safeBottom: geo.safeAreaInsets.bottom
-                )
-                .frame(maxWidth: .infinity)
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    unlockPrimaryPanel(state, safeBottom: geo.safeAreaInsets.bottom)
+                        .frame(width: geo.size.width)
+                }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            case .retention:
+                unlockRetentionDialog(state)
+                    .frame(width: min(geo.size.width - 40, 420))
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
             case .lockedFrame:
                 unlockFinalLockedFrame()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -329,7 +324,7 @@ struct SeriesPlayerView: View {
         )
     }
 
-    private func unlockPrimaryPanel(_ state: EpisodeUnlockFlowState, height: CGFloat, safeBottom: CGFloat) -> some View {
+    private func unlockPrimaryPanel(_ state: EpisodeUnlockFlowState, safeBottom: CGFloat) -> some View {
         VStack(spacing: 16) {
             HStack {
                 if !state.vipOnly {
@@ -402,18 +397,16 @@ struct SeriesPlayerView: View {
                 Button { Task { await performUnlock(method: .ads) } } label: {
                     Text("看广告免费解锁")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.48))
-                        .underline(color: .white.opacity(0.18))
+                        .foregroundStyle(.white.opacity(0.62))
+                        .underline(color: .white.opacity(0.28))
                 }
                 .disabled(state.isProcessing)
             }
-
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 22)
         .padding(.top, 18)
         .padding(.bottom, max(18, safeBottom + 10))
-        .frame(height: height, alignment: .top)
+        .fixedSize(horizontal: false, vertical: true)
         .background(
             unlockSheetGradient,
             in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
@@ -479,9 +472,12 @@ struct SeriesPlayerView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func unlockRetentionPanel(_ state: EpisodeUnlockFlowState, height: CGFloat, safeBottom: CGFloat) -> some View {
-        VStack(spacing: 14) {
+    private func unlockRetentionDialog(_ state: EpisodeUnlockFlowState) -> some View {
+        VStack(spacing: 12) {
             HStack {
+                Text(state.vipOnly ? "继续观看" : "选择解锁方式")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(unlockPaleGold)
                 Spacer()
                 Button(action: closeUnlockPanel) {
                     Image(systemName: "xmark")
@@ -492,8 +488,6 @@ struct SeriesPlayerView: View {
                 }
                 .accessibilityLabel("关闭")
             }
-
-            Spacer()
 
             retentionActionButton(
                 title: "继续解锁",
@@ -520,18 +514,14 @@ struct SeriesPlayerView: View {
                     .foregroundStyle(Color(red: 1, green: 0.43, blue: 0.38))
             }
 
-            Spacer()
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 18)
-        .padding(.bottom, max(18, safeBottom + 10))
-        .frame(height: height)
+        .padding(18)
         .background(
             unlockSheetGradient,
-            in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
         .overlay(
-            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .stroke(
                     LinearGradient(colors: [unlockGold.opacity(0.5), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom),
                     lineWidth: 1

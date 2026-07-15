@@ -24,7 +24,10 @@ struct MainTabView: View {
         self.playerCoordinator = playerCoordinator
         _homeVM = StateObject(wrappedValue: HomeViewModel(repository: dependencies.homeRepository))
         _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: dependencies.homeRepository))
-        _recommendSession = StateObject(wrappedValue: RecommendSession(coordinator: playerCoordinator))
+        // For You 常驻预加载，但 App 默认进入 Home，必须等用户切入后才取得播放权。
+        _recommendSession = StateObject(
+            wrappedValue: RecommendSession(coordinator: playerCoordinator, playbackEnabled: false)
+        )
     }
 
     var body: some View {

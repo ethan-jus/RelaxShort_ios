@@ -49,6 +49,36 @@ private func makeProtectedDrama(id: String) -> DramaItem {
 @MainActor
 struct RecommendSessionIndexMappingTests {
 
+    // MARK: - Visibility Gate
+
+    @Test("For You 不可见时首次加载只建立快照，不取得播放权")
+    func hiddenInitialLoadDoesNotAutoplay() {
+        let coordinator = PlayerCoordinator()
+        let session = RecommendSession(coordinator: coordinator, playbackEnabled: false)
+
+        session.replacePlaylist(dramas: [makeDrama(id: "hidden")])
+
+        #expect(session.playableItems.count == 1)
+        #expect(session.hasInitializedPool == false)
+        #expect(coordinator.owner == nil)
+        #expect(coordinator.engine.currentItem == nil)
+    }
+
+    @Test("切到 For You 后才初始化并开始播放")
+    func becomingVisibleStartsPlayback() {
+        let coordinator = PlayerCoordinator()
+        let session = RecommendSession(coordinator: coordinator, playbackEnabled: false)
+        let dramas = [makeDrama(id: "visible")]
+
+        session.replacePlaylist(dramas: dramas)
+        session.setPlaybackEnabled(true)
+        session.initializePool(dramas: dramas)
+
+        #expect(session.hasInitializedPool)
+        #expect(coordinator.owner == .forYou)
+        #expect(coordinator.engine.currentItem?.id == "visible-1")
+    }
+
     // MARK: - Replace Tests
 
     @Test("同 count 整体 replace — playableItems/dramaToPlayable 完整重建")
