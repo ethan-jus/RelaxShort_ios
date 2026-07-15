@@ -40,6 +40,11 @@ final class AuthSessionCoordinator: ObservableObject {
     var hasSession: Bool { session != nil }
     var isRegistered: Bool { state.account?.isRegistered == true }
     var account: AuthAccount? { state.account }
+    var accessTokenIfAvailable: String? {
+        guard let session,
+              session.accessTokenExpiresAt.timeIntervalSinceNow > 60 else { return nil }
+        return session.accessToken
+    }
 
     func clearError() {
         errorMessage = nil
@@ -65,10 +70,23 @@ final class AuthSessionCoordinator: ObservableObject {
                 try install(try await repository.refresh(refreshToken))
                 return
             } catch {
+                guard Self.requiresNewAnonymousSession(after: error) else {
+                    state = .failed(error.localizedDescription)
+                    errorMessage = error.localizedDescription
+                    return
+                }
                 try? tokenStore.deleteRefreshToken()
             }
         }
         await createAnonymous()
+    }
+
+    /// 只有后端明确判定 refresh token 永久失效时，才允许创建新的匿名账户。
+    private static func requiresNewAnonymousSession(after error: Error) -> Bool {
+        if case NetworkError.unauthorized = error { return true }
+        guard let apiError = error as? APIError else { return false }
+        return apiError.code == "AUTH_REFRESH_TOKEN_INVALID"
+            || apiError.code == "AUTH_REFRESH_TOKEN_REUSED"
     }
 
     func validAccessToken(forceRefresh: Bool = false) async throws -> String {
@@ -208,9 +226,12 @@ final class AuthSessionCoordinator: ObservableObject {
             try install(renewed)
             return renewed
         } catch {
-            session = nil
-            try? tokenStore.deleteRefreshToken()
+            if Self.requiresNewAnonymousSession(after: error) {
+                session = nil
+                try? tokenStore.deleteRefreshToken()
+            }
             state = .failed(error.localizedDescription)
+            errorMessage = error.localizedDescription
             throw error
         }
     }

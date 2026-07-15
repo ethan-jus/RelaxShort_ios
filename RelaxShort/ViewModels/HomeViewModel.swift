@@ -68,42 +68,36 @@ final class HomeViewModel: ObservableObject {
     }
 
     func loadData() async {
+        guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
-        async let bannersTask = repository.fetchBanners()
-        async let categoriesTask = repository.fetchHomeCategories()
-        async let homeTabsTask = repository.fetchHomeTabs(contentLang: nil, country: nil)
-
         do {
-            let tabs = try await homeTabsTask
-            homeTabsByCode = Dictionary(tabs.map { ($0.code, $0) }, uniquingKeysWith: { _, latest in latest })
-        } catch {
-            homeTabsByCode = [:]
-            logError("HomeViewModel.loadHomeTabs failed: \(error)")
-        }
-
-        do {
-            let configuredDramas = homeTabsByCode["popular"]?.sections
+            // Home 是首页关键请求；明确失败后立即结束，不再自动请求其他 feed。
+            let tabs = try await repository.fetchHomeTabs(contentLang: nil, country: nil)
+            let loadedTabs = Dictionary(tabs.map { ($0.code, $0) }, uniquingKeysWith: { _, latest in latest })
+            let configuredDramas = loadedTabs["popular"]?.sections
                 .first(where: { !$0.items.isEmpty })?.items ?? []
             let dramas = configuredDramas.isEmpty
                 ? try await repository.fetchDramas(category: DramaCategory.all)
                 : configuredDramas
-            let banners = try await bannersTask
+            let banners = try await repository.fetchBanners()
+            homeTabsByCode = loadedTabs
             self.featuredDramas = dramas
             self.fixedDramas = Array(dramas.prefix(9))
             self.masonryDramas = Array(dramas.dropFirst(9))
             self.rankingDramas = dramas.sorted { $0.viewCount > $1.viewCount }
             self.banners = banners
         } catch {
-            errorMessage = "加载失败，请检查网络后重试"
+            errorMessage = Self.userFacingLoadError(error)
             logError("HomeViewModel.loadData failed: \(error)")
+            return
         }
 
         // 分类独立加载；失败时回退本地枚举，再加载默认分类内容。
         do {
-            let cats = try await categoriesTask
+            let cats = try await repository.fetchHomeCategories()
             self.categories = cats
         } catch {
             logError("HomeViewModel.loadCategories failed: \(error)")
@@ -115,6 +109,14 @@ final class HomeViewModel: ObservableObject {
             selectedCategoryIndex = 0
             await loadCategoryDramas(for: categories[0])
         }
+    }
+
+    private static func userFacingLoadError(_ error: Error) -> String {
+        if let description = (error as? LocalizedError)?.errorDescription,
+           !description.isEmpty {
+            return description
+        }
+        return "加载失败，请检查网络后重试"
     }
 
     // MARK: - Category Drama Loading

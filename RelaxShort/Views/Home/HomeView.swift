@@ -701,6 +701,7 @@ struct HomeView: View {
     private var loadingView: some View {
         VStack(spacing: DT.Space.lg) { ProgressView().tint(DT.brandPink).scaleEffect(1.2); Text(L10n.loading).font(DT.Font.caption).foregroundColor(DT.Color.textSecondary) }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .allowsHitTesting(false)
     }
 
     private func errorView(message: String) -> some View {

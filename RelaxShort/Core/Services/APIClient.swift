@@ -28,16 +28,22 @@ final class APIClient {
     // MARK: - Init
 
     private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 30
-        config.timeoutIntervalForResource = 60
-        config.waitsForConnectivity = true
-        config.httpMaximumConnectionsPerHost = 6
-        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        let config = Self.makeSessionConfiguration()
 
         self.session = URLSession(configuration: config)
         self.decoder = JSONDecoder()
         self.decoder.keyDecodingStrategy = .convertFromSnakeCase
+    }
+
+    /// JSON API 统一采用有限时、断网立即失败的请求策略。
+    static func makeSessionConfiguration() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 12
+        config.timeoutIntervalForResource = 15
+        config.waitsForConnectivity = false
+        config.httpMaximumConnectionsPerHost = 6
+        config.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return config
     }
 
     // MARK: - Public API
@@ -100,7 +106,8 @@ final class APIClient {
         if endpoint.requiresAuthenticatedSession || forceRefresh {
             token = try await AuthSessionCoordinator.shared.validAccessToken(forceRefresh: forceRefresh)
         } else {
-            token = try? await AuthSessionCoordinator.shared.validAccessToken(forceRefresh: false)
+            // 首页等公开接口不能等待认证 bootstrap；有现成 token 才附加。
+            token = await AuthSessionCoordinator.shared.accessTokenIfAvailable
         }
         if let token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

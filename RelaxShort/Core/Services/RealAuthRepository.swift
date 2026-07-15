@@ -33,8 +33,10 @@ final class RealAuthRepository: RealAuthRepositoryProtocol {
     private let session: URLSession
     private let decoder: JSONDecoder
 
-    init(session: URLSession = .shared) {
-        self.session = session
+    init(session: URLSession? = nil) {
+        self.session = session ?? URLSession(
+            configuration: APIClient.makeSessionConfiguration()
+        )
         self.decoder = JSONDecoder()
         self.decoder.keyDecodingStrategy = .convertFromSnakeCase
     }
