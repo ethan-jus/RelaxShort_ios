@@ -392,7 +392,7 @@ struct EpisodeUnlockPurchaseSheet: View {
                     Text("VIP 全剧畅看")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundStyle(paleGold)
-                    Text("付费剧集无限观看")
+                    Text("无限畅看 · 1080P · 离线下载")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                 }

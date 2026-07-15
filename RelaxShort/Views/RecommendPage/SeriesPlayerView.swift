@@ -2,6 +2,12 @@ import SwiftUI
 import AVKit
 
 enum EpisodeUnlockPanelLayout {
+    /// 首层解锁面板统一使用同一高度，VIP 专享与普通付费集不再随内容多少伸缩。
+    /// 小屏压缩到约半屏以内；大屏保留足够留白，但不超过 430pt。
+    static func primaryHeight(containerHeight: CGFloat) -> CGFloat {
+        min(430, max(320, containerHeight * 0.46))
+    }
+
     static func bottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
         max(34, safeAreaBottom + 18)
     }
@@ -49,7 +55,9 @@ struct SeriesPlayerView: View {
     @State private var hasTrackedImpression = false
     @State private var qualifiedEpisodeIDs: Set<String> = []
     @State private var completedEpisodeIDs: Set<String> = []
-    @State private var episodePrefetchTask: Task<Void, Never>?
+    @State private var episodePrefetchTask: Task<Bool, Never>?
+    /// 与预取 Task 对应的目标集。切到该集时直接等待同一任务，禁止重复请求 /play。
+    @State private var episodePrefetchTarget: Int?
     /// 卡片缺直链时，与剧集列表并行请求目标集播放合同，避免固定的两段串行等待。
     @State private var initialPlayAssetTask: Task<Bool, Never>?
     /// 播放链路耗时追踪：open/switch 开始时间，用于定位接口、播放器、首帧慢点。
@@ -57,7 +65,6 @@ struct SeriesPlayerView: View {
     @State private var playbackTraceReason = "open"
     /// 锁集状态独占 Series 页面交互；出现后不得继续切集或触发播放器手势。
     @State private var unlockState: EpisodeUnlockFlowState?
-    @State private var unlockPurchaseInitialTab: EpisodeUnlockPurchaseTab = .coins
 
     private enum ChromeMetrics {
         static let horizontalPadding: CGFloat = 16
@@ -73,13 +80,15 @@ struct SeriesPlayerView: View {
     }
 
     private enum PlayerSheet: Identifiable {
-        case share, speed, quality, unlockPurchase
+        case share, speed, quality
+        case unlockPurchase(EpisodeUnlockPurchaseTab)
+
         var id: String {
             switch self {
             case .share: "share"
             case .speed: "speed"
             case .quality: "quality"
-            case .unlockPurchase: "unlockPurchase"
+            case .unlockPurchase(let tab): "unlockPurchase-\(tab.rawValue)"
             }
         }
     }
@@ -219,14 +228,14 @@ struct SeriesPlayerView: View {
                 )
                 .presentationDetents([.fraction(0.4)])
                 .presentationDragIndicator(.hidden)
-            case .unlockPurchase:
+            case .unlockPurchase(let initialTab):
                 if let state = unlockState {
                     EpisodeUnlockPurchaseSheet(
                         coinStore: coinStore,
                         storeKit: storeKitManager,
                         coinCost: state.coinCost,
                         balance: state.balance,
-                        initialTab: unlockPurchaseInitialTab,
+                        initialTab: initialTab,
                         onDismiss: dismissUnlockPurchaseCenter,
                         verifyCoinPurchase: { receipt in
                             try await dependencies.detailRepository.verifyCoinPurchase(receipt)
@@ -338,7 +347,11 @@ struct SeriesPlayerView: View {
             case .primary:
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
-                    unlockPrimaryPanel(state, safeBottom: geo.safeAreaInsets.bottom)
+                    unlockPrimaryPanel(
+                        state,
+                        containerHeight: geo.size.height,
+                        safeBottom: geo.safeAreaInsets.bottom
+                    )
                         .frame(width: geo.size.width)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -365,8 +378,16 @@ struct SeriesPlayerView: View {
         )
     }
 
-    private func unlockPrimaryPanel(_ state: EpisodeUnlockFlowState, safeBottom: CGFloat) -> some View {
-        VStack(spacing: 18) {
+    private func unlockPrimaryPanel(
+        _ state: EpisodeUnlockFlowState,
+        containerHeight: CGFloat,
+        safeBottom: CGFloat
+    ) -> some View {
+        let panelHeight = EpisodeUnlockPanelLayout.primaryHeight(containerHeight: containerHeight)
+        let isCompact = panelHeight < 370
+        let choiceHeight: CGFloat = isCompact ? 62 : 76
+
+        return VStack(spacing: 0) {
             HStack {
                 if !state.vipOnly {
                     unlockMetadata(state)
@@ -386,12 +407,13 @@ struct SeriesPlayerView: View {
                 .accessibilityLabel("关闭")
             }
 
-            VStack(spacing: 10) {
+            VStack(spacing: isCompact ? 8 : 10) {
                 unlockChoice(
                     title: "VIP 全剧畅看",
-                    subtitle: "付费剧集无限观看",
+                    subtitle: "无限畅看 · 1080P · 离线下载",
                     icon: "crown.fill",
-                    selected: state.selection == .vip
+                    selected: state.selection == .vip,
+                    height: choiceHeight
                 ) { selectUnlockMethod(.vip) }
 
                 if state.canUnlockWithCoins {
@@ -399,16 +421,22 @@ struct SeriesPlayerView: View {
                         title: "金币解锁",
                         subtitle: "按集解锁 · 永久观看",
                         icon: "bitcoinsign.circle.fill",
-                        selected: state.selection == .coins
+                        selected: state.selection == .coins,
+                        height: choiceHeight
                     ) { selectUnlockMethod(.coins) }
                 }
             }
+            .padding(.top, isCompact ? 10 : 18)
+
+            // VIP 专享只有一个选项；保留统一的内容区高度，让 CTA 与普通锁集对齐。
+            Spacer(minLength: isCompact ? 8 : 14)
 
             if let message = state.errorMessage {
                 Text(message)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color(red: 1, green: 0.43, blue: 0.38))
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 10)
             }
 
             Button(action: handlePrimaryUnlockAction) {
@@ -421,7 +449,7 @@ struct SeriesPlayerView: View {
                 }
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)
-                .frame(height: 58)
+                .frame(height: isCompact ? 52 : 58)
                 .background(
                     LinearGradient(
                         colors: [.white, unlockPaleGold, unlockGold],
@@ -434,20 +462,27 @@ struct SeriesPlayerView: View {
             }
             .disabled(state.isProcessing)
 
-            if state.canUnlockWithAd {
-                Button { Task { await performUnlock(method: .ads) } } label: {
-                    Text("看广告免费解锁")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.62))
-                        .underline(color: .white.opacity(0.28))
+            Group {
+                if state.canUnlockWithAd {
+                    Button { Task { await performUnlock(method: .ads) } } label: {
+                        Text("看广告免费解锁")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .underline(color: .white.opacity(0.28))
+                    }
+                    .disabled(state.isProcessing)
+                } else {
+                    // VIP 专享没有广告路径，但保留同高占位，避免首层面板按钮上下跳动。
+                    Color.clear.accessibilityHidden(true)
                 }
-                .disabled(state.isProcessing)
             }
+            .frame(height: 18)
+            .padding(.top, isCompact ? 8 : 12)
         }
         .padding(.horizontal, 22)
-        .padding(.top, 22)
+        .padding(.top, isCompact ? 14 : 22)
         .padding(.bottom, EpisodeUnlockPanelLayout.bottomPadding(safeAreaBottom: safeBottom))
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(height: panelHeight, alignment: .top)
         .background(
             unlockSheetGradient,
             in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
@@ -486,6 +521,7 @@ struct SeriesPlayerView: View {
         subtitle: String,
         icon: String,
         selected: Bool,
+        height: CGFloat,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -502,7 +538,7 @@ struct SeriesPlayerView: View {
                 Spacer()
             }
             .padding(.horizontal, 14)
-            .frame(height: 76)
+            .frame(height: height)
             .background(selected ? unlockGold.opacity(0.12) : .white.opacity(0.035))
             .overlay(
                 RoundedRectangle(cornerRadius: 15)
@@ -531,8 +567,8 @@ struct SeriesPlayerView: View {
             }
 
             retentionActionButton(
-                title: "继续解锁",
-                icon: "lock.open.fill",
+                title: state.vipOnly ? "开通 VIP 继续观看" : "继续解锁",
+                icon: state.vipOnly ? "crown.fill" : "lock.fill",
                 selected: true,
                 disabled: state.isProcessing,
                 action: openPrimaryUnlockPanel
@@ -641,13 +677,11 @@ struct SeriesPlayerView: View {
     private func handlePrimaryUnlockAction() {
         guard let state = unlockState else { return }
         if state.selection == .vip {
-            unlockPurchaseInitialTab = .vip
-            activeSheet = .unlockPurchase
+            activeSheet = .unlockPurchase(.vip)
         } else if state.hasEnoughCoins {
             Task { await performUnlock(method: .coins) }
         } else {
-            unlockPurchaseInitialTab = .coins
-            activeSheet = .unlockPurchase
+            activeSheet = .unlockPurchase(.coins)
         }
     }
 
@@ -1228,10 +1262,6 @@ struct SeriesPlayerView: View {
         episodeLoadError = nil
         let previous = currentEpisode
         episodeSwitchTask?.cancel()
-        episodePrefetchTask?.cancel()
-        guard let transitionToken = playerCoordinator.beginSeriesEpisodeTransition(
-            dramaID: drama.id
-        ) else { return false }
 
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "switch"
@@ -1254,14 +1284,36 @@ struct SeriesPlayerView: View {
         }
 
         episodeSwitchTask = Task { @MainActor in
-            await dependencies.watchProgressReporter.finalize(completed: previousCompleted)
+            guard !Task.isCancelled,
+                  let transitionToken = playerCoordinator.beginSeriesEpisodeTransition(
+                    dramaID: drama.id
+                  ) else { return }
+
+            // 进度收尾可以等待网络，但绝不能阻塞已预加载目标集的播放器接管。
+            async let finalizePreviousProgress: Void = dependencies.watchProgressReporter.finalize(
+                completed: previousCompleted
+            )
+
             guard !Task.isCancelled,
                   playerCoordinator.isCurrentSeriesEpisodeTransition(
                     dramaID: drama.id,
                     token: transitionToken
                   ) else { return }
 
-            guard await ensurePlayAsset(for: target) else {
+            let reusedPrefetch: Bool
+            if episodePrefetchTarget == target, let episodePrefetchTask {
+                reusedPrefetch = await episodePrefetchTask.value
+                if reusedPrefetch {
+                    playerCoordinator.engine.markTrace("预取命中")
+                    Logger.player.info("SeriesTrace 复用预取播放源 目标集=\(target)")
+                }
+            } else {
+                reusedPrefetch = false
+            }
+
+            // 预取失败时重新走一次前台解析，以便准确呈现锁集或网络错误。
+            let hasPlayAsset = reusedPrefetch ? true : await ensurePlayAsset(for: target)
+            guard hasPlayAsset else {
                 guard playerCoordinator.isCurrentSeriesEpisodeTransition(
                     dramaID: drama.id,
                     token: transitionToken
@@ -1295,6 +1347,19 @@ struct SeriesPlayerView: View {
             guard committed else { return }
             prefetchNextEpisode(after: target)
             Logger.player.info("SeriesTrace 切集已提交播放器 目标集=\(target) 播放索引=\(playableIndex)")
+
+            // 播放已经开始后再等待上一集 final report，并建立新一集的上报会话。
+            await finalizePreviousProgress
+            guard !Task.isCancelled,
+                  playerCoordinator.isCurrentSeriesEpisodeTransition(
+                    dramaID: drama.id,
+                    token: transitionToken
+                  ),
+                  let targetEpisodeID = episodeID(for: target) else { return }
+            await dependencies.watchProgressReporter.begin(
+                seriesID: drama.id,
+                episodeID: targetEpisodeID
+            )
         }
         return true
     }
@@ -1327,23 +1392,29 @@ struct SeriesPlayerView: View {
     /// 页面只提前获取下一集播放合同；真正的媒体预加载统一交给共享 PlayerSlotPool。
     /// 这样 For You 与 Series 使用完全相同的静音 next + 原生 preroll 规则。
     private func prefetchNextEpisode(after episodeNumber: Int) {
-        episodePrefetchTask?.cancel()
         guard let nextEpisode = episodes.first(where: { $0.episodeNumber == episodeNumber + 1 }) else { return }
+        if episodePrefetchTarget == nextEpisode.episodeNumber, episodePrefetchTask != nil {
+            return
+        }
+
+        episodePrefetchTask?.cancel()
+        episodePrefetchTarget = nextEpisode.episodeNumber
 
         episodePrefetchTask = Task { @MainActor in
             if episodeMediaSources[nextEpisode.id] == nil {
                 guard await ensurePlayAsset(
                     for: nextEpisode.episodeNumber,
                     recordTrace: false
-                ) else { return }
+                ) else { return false }
             }
             guard !Task.isCancelled,
-                  episodeMediaSources[nextEpisode.id] != nil else { return }
+                  episodeMediaSources[nextEpisode.id] != nil else { return false }
             let playableItems = buildPlayableItems(from: episodes).map(\.item)
             playerCoordinator.updateSeriesPlaylist(
                 dramaID: drama.id,
                 items: playableItems
             )
+            return true
         }
     }
 
