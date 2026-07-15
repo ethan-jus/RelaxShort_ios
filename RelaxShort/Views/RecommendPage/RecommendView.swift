@@ -352,6 +352,8 @@ struct RecommendView: View {
                             onShare: { showShare = true }
                         )
                         .frame(width: actionRailWidth)
+                        // RightActionBar 内部按钮还有 6pt 视觉留白，整体右移后图标视觉边距约 8–14pt。
+                        .offset(x: 8)
                     }
 
                     // 使用按钮显式跳转，避免手势层抢占点击
@@ -460,6 +462,11 @@ struct RecommendView: View {
     }
 
     private func loadAndInit() async {
+        // NavigationStack 返回不能重新生成推荐 seed；同一 For You 会话必须保留原短剧和索引。
+        guard viewModel.dramas.isEmpty else {
+            initializePlaybackIfNeeded()
+            return
+        }
         await viewModel.loadData()
         // replacePlaylist 已在 viewModel.onReplaceCompleted 回调中调用
     }

@@ -291,11 +291,7 @@ import Combine
 
         let playerItems = playableItems.map(\.item)
 
-        if coordinator.owner == .forYou {
-            coordinator.resumeForYou()
-        } else {
-            coordinator.claimForYou(items: playerItems, index: playableIdx)
-        }
+        coordinator.restoreForYou(items: playerItems, index: playableIdx)
     }
 
     func pausePlayback() {

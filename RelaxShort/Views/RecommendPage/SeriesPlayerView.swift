@@ -67,6 +67,8 @@ struct SeriesPlayerView: View {
     @State private var playbackTraceReason = "open"
     /// 锁集状态独占 Series 页面交互；出现后不得继续切集或触发播放器手势。
     @State private var unlockState: EpisodeUnlockFlowState?
+    /// 顶部返回动作已提前完成 Series → For You 所有权交接，onDisappear 不再重复释放。
+    @State private var hasPreparedReturn = false
 
     private enum ChromeMetrics {
         static let horizontalPadding: CGFloat = 16
@@ -121,41 +123,19 @@ struct SeriesPlayerView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                episodePager(in: geo)
-
-                // 全屏手势层（视频上面，UI 下面 — 点击切换 UI 显隐）
+                // 底层全屏手势层：空白视频区域点击切换 UI 显隐。
                 Color.clear
                     .contentShape(Rectangle())
                     .simultaneousGesture(longPressGesture)
                     .simultaneousGesture(tapPauseGesture(in: geo))
                     .simultaneousGesture(edgeBackGesture(in: geo))
 
-                // UI 叠层（可隐藏）
-                if isUIVisible, !showSpeedHUD {
-                    topControlBar
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding(.top, topChromeTopInset(in: geo))
-                        .zIndex(60)
-
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.8)],
-                        startPoint: .top, endPoint: .bottom
-                    )
-                    .frame(height: 280)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-                    .allowsHitTesting(false)
-
-                    seriesChromeOverlay(in: geo)
-                }
+                // 视频和常规播放 UI 必须位于同一个分页页面内，拖动时整体同步移动。
+                episodePager(in: geo)
 
                 if showSpeedHUD {
                     speedProgressOverlay(in: geo)
                         .zIndex(45)
-                }
-
-                if isUIVisible, !showSpeedHUD, playerCoordinator.engine.currentPlayer != nil {
-                    centerPlaybackButton
-                        .zIndex(40)
                 }
 
                 if showSpeedHUD {
@@ -278,7 +258,9 @@ struct SeriesPlayerView: View {
             episodePrefetchTask?.cancel()
             initialPlayAssetTask?.cancel()
             Task { await dependencies.watchProgressReporter.finalize(completed: false) }
-            playerCoordinator.release(.series(dramaID: drama.id))
+            if !hasPreparedReturn {
+                playerCoordinator.release(.series(dramaID: drama.id))
+            }
         }
     }
 
@@ -1051,7 +1033,7 @@ struct SeriesPlayerView: View {
 
     // MARK: - Bottom Chrome
 
-    private func seriesChromeOverlay(in geo: GeometryProxy) -> some View {
+    private func seriesChromeOverlay(in geo: GeometryProxy, isCurrent: Bool) -> some View {
         let horizontalPadding = ChromeMetrics.horizontalPadding
         let actionRailWidth = ChromeMetrics.actionRailWidth
         let actionRailGap = max(18, geo.size.width * 0.055)
@@ -1089,11 +1071,20 @@ struct SeriesPlayerView: View {
                         onEpisodes: { showEpisodeList = true }
                     )
                     .frame(width: actionRailWidth)
+                    .offset(x: 8)
                 }
 
-                seriesProgressBar(totalWidth: progressWidth, engine: playerCoordinator.engine)
-                    .frame(width: progressWidth, height: seriesIsScrubbing ? ChromeMetrics.progressScrubbingHeight : ChromeMetrics.progressIdleHeight)
-                    .padding(.top, 2)
+                if isCurrent {
+                    seriesProgressBar(totalWidth: progressWidth, engine: playerCoordinator.engine)
+                        .frame(width: progressWidth, height: seriesIsScrubbing ? ChromeMetrics.progressScrubbingHeight : ChromeMetrics.progressIdleHeight)
+                        .padding(.top, 2)
+                } else {
+                    Capsule()
+                        .fill(Color.white.opacity(0.22))
+                        .frame(width: progressWidth, height: 2)
+                        .frame(height: ChromeMetrics.progressIdleHeight, alignment: .bottom)
+                        .padding(.top, 2)
+                }
 
                 membershipDownloadRow
                     .frame(width: progressWidth)
@@ -1613,10 +1604,10 @@ struct SeriesPlayerView: View {
         return topInset + ChromeMetrics.topGapBelowSafeArea
     }
 
-    private var topControlBar: some View {
+    private func topControlBar(episodeNumber: Int) -> some View {
         HStack(spacing: 10) {
             Button {
-                dismiss()
+                dismissSeries()
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 22, weight: .semibold))
@@ -1627,7 +1618,7 @@ struct SeriesPlayerView: View {
             }
             .buttonStyle(.plain)
 
-            Text("EP.\(currentEpisode)")
+            Text("EP.\(episodeNumber)")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(.white)
                 .shadow(color: .black.opacity(0.4), radius: 2, x: 0, y: 1)
@@ -1722,13 +1713,39 @@ struct SeriesPlayerView: View {
             }
         ) { index, isCurrent in
             let episodeNumber = index + 1
-            ShortVideoPlayerView(
-                player: isCurrent ? playerForEpisode(episodeNumber) : nil,
-                coverURL: drama.coverURL,
-                engine: playerCoordinator.engine,
-                showsSystemPlaybackButton: false
-            )
-            .allowsHitTesting(false)
+            ZStack {
+                ShortVideoPlayerView(
+                    player: isCurrent ? playerForEpisode(episodeNumber) : nil,
+                    coverURL: drama.coverURL,
+                    engine: playerCoordinator.engine,
+                    showsSystemPlaybackButton: false
+                )
+                .allowsHitTesting(false)
+
+                if isUIVisible, !showSpeedHUD {
+                    topControlBar(episodeNumber: episodeNumber)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .padding(.top, topChromeTopInset(in: geo))
+                        .zIndex(60)
+
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.8)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: 280)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                    .allowsHitTesting(false)
+
+                    seriesChromeOverlay(in: geo, isCurrent: isCurrent)
+
+                    if isCurrent, playerCoordinator.engine.currentPlayer != nil {
+                        centerPlaybackButton
+                            .zIndex(40)
+                    }
+                }
+            }
+            .allowsHitTesting(isCurrent)
         }
         .frame(width: geo.size.width, height: geo.size.height)
     }
@@ -1747,7 +1764,8 @@ struct SeriesPlayerView: View {
     /// Series 全屏切集必须像 For You 一样从页面大部分区域可触发，
     /// 但要避开左边缘返回、进度条拖动、弹层和明显横滑。
     private func canHandleEpisodeDrag(_ value: DragGesture.Value) -> Bool {
-        guard unlockState == nil, !seriesIsScrubbing, !showEpisodeList, activeSheet == nil else { return false }
+        guard unlockState == nil, !seriesIsScrubbing, !showEpisodeList,
+              activeSheet == nil, !showSpeedHUD else { return false }
         guard value.startLocation.x > 24 else { return false }
         guard abs(value.translation.height) > abs(value.translation.width) * 1.2 else { return false }
         return true
@@ -1792,8 +1810,23 @@ struct SeriesPlayerView: View {
                 // 水平位移足够且主导（横向 > 80pt，横向 > 纵向 × 1.5）
                 guard value.translation.width > 80,
                       abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
-                dismiss()
+                dismissSeries()
             }
+    }
+
+    /// 从 For You 进入且仍停留同一集时交还同一个播放器；切到其他集时返回原短剧卡片。
+    private func dismissSeries() {
+        guard !hasPreparedReturn else {
+            dismiss()
+            return
+        }
+        if sourceScene == "for_you", let mediaID = handoff?.mediaID {
+            _ = playerCoordinator.prepareSeriesReturnToForYou(expectedMediaID: mediaID)
+        } else {
+            playerCoordinator.release(.series(dramaID: drama.id))
+        }
+        hasPreparedReturn = true
+        dismiss()
     }
 
     private func tapPauseGesture(in geo: GeometryProxy) -> some Gesture {

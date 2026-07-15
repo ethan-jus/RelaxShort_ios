@@ -119,6 +119,39 @@ final class PlayerCoordinator: ObservableObject {
         engine.playFromSystemResume()
     }
 
+    /// 返回 For You 时恢复完整推荐播放列表；当前媒体一致则保留同一个 AVPlayer。
+    func restoreForYou(items: [PlayerMediaItem], index: Int) {
+        guard let targetItem = items[safe: index] else { return }
+        if owner == .forYou, engine.currentItem?.id == targetItem.id {
+            engine.updatePlaylistKeepingCurrent(items)
+            engine.playFromSystemResume()
+            return
+        }
+        claimForYou(items: items, index: index)
+    }
+
+    /// Series 返回 For You 前先完成所有权切换，避免导航生命周期抢先销毁播放器。
+    /// 仍是进入时的同一集则无缝交还；已经切集时仅释放所有权，For You 按原卡片重建预览。
+    @discardableResult
+    func prepareSeriesReturnToForYou(expectedMediaID: String) -> Bool {
+        guard case .series = owner else { return owner == .forYou }
+        invalidateCurrentClaim()
+        seriesPlaybackFinishedHandler = nil
+        currentSeriesIdentity = nil
+        pendingSeamlessHandoff = nil
+
+        if engine.currentItem?.id == expectedMediaID {
+            owner = .forYou
+            Logger.player.debug("Series → For You 已交还同一播放器 mediaID=\(expectedMediaID)")
+            return true
+        }
+
+        // 暂不销毁画面，让返回动画保持连续；For You 恢复时会安全重建原卡片媒体。
+        owner = nil
+        Logger.player.debug("Series → For You 集数已变化，返回原短剧卡片 mediaID=\(expectedMediaID)")
+        return false
+    }
+
     /// For You 分页只能在其持有播放权时追加到共享引擎。
     /// Series 播放期间页面仍可能收到分页回调，此时只更新页面模型，不得污染 Series 队列。
     func appendForYouItems(_ items: [PlayerMediaItem]) {
