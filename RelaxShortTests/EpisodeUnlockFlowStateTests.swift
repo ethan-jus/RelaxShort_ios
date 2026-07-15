@@ -1,7 +1,14 @@
 import Testing
+import CoreGraphics
 @testable import RelaxShort
 
 struct EpisodeUnlockFlowStateTests {
+    @Test
+    func unlockPanelKeepsComfortableBottomBreathingRoom() {
+        #expect(EpisodeUnlockPanelLayout.bottomPadding(safeAreaBottom: 0) == 34)
+        #expect(EpisodeUnlockPanelLayout.bottomPadding(safeAreaBottom: 34) == 52)
+    }
+
     @Test
     func coinCTAUsesBalanceAndCost() {
         var sufficient = EpisodeUnlockFlowState(episodeNumber: 4, coinCost: 30, balance: 40, vipOnly: false)

@@ -1,6 +1,12 @@
 import SwiftUI
 import AVKit
 
+enum EpisodeUnlockPanelLayout {
+    static func bottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
+        max(34, safeAreaBottom + 18)
+    }
+}
+
 // MARK: - Series Player View (接入 ShortVideoPlayerEngine)
 
 struct SeriesPlayerView: View {
@@ -325,7 +331,7 @@ struct SeriesPlayerView: View {
     }
 
     private func unlockPrimaryPanel(_ state: EpisodeUnlockFlowState, safeBottom: CGFloat) -> some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
             HStack {
                 if !state.vipOnly {
                     unlockMetadata(state)
@@ -380,7 +386,7 @@ struct SeriesPlayerView: View {
                 }
                 .foregroundStyle(.black)
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(height: 58)
                 .background(
                     LinearGradient(
                         colors: [.white, unlockPaleGold, unlockGold],
@@ -404,8 +410,8 @@ struct SeriesPlayerView: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.top, 18)
-        .padding(.bottom, max(18, safeBottom + 10))
+        .padding(.top, 22)
+        .padding(.bottom, EpisodeUnlockPanelLayout.bottomPadding(safeAreaBottom: safeBottom))
         .fixedSize(horizontal: false, vertical: true)
         .background(
             unlockSheetGradient,
@@ -461,7 +467,7 @@ struct SeriesPlayerView: View {
                 Spacer()
             }
             .padding(.horizontal, 14)
-            .frame(height: 70)
+            .frame(height: 76)
             .background(selected ? unlockGold.opacity(0.12) : .white.opacity(0.035))
             .overlay(
                 RoundedRectangle(cornerRadius: 15)
