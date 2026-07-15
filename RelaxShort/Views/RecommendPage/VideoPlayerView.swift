@@ -188,26 +188,51 @@ import Combine
 
     // MARK: - 受控 transition
 
-    /// 受控切页：先校验目标 dramaIndex 可播放，再提交 Engine。
-    /// 成功返回 true，无可播放映射返回 false（不修改 currentIndex，不提交 Engine）。
+    /// 受控切页：优先提交播放器；内部索引漂移时自动修复，不能把技术异常表现成用户滑不动。
     func attemptTransition(from old: Int, to new: Int, autoplay: Bool) -> Bool {
         guard old != new else { return true }
 
+        // 正常 Feed 已在 ViewModel 入口过滤无预览源内容。若映射表意外漂移，
+        // 先依据唯一的 playableItems 重建，避免一次缓存问题永久卡住分页。
+        if playableIndex(for: new) == nil {
+            dramaToPlayable = Dictionary(
+                uniqueKeysWithValues: playableItems.enumerated().map { index, entry in
+                    (entry.dramaIndex, index)
+                }
+            )
+            log("attemptTransition 已重建 drama→playable 映射 目标drama=\(new)")
+        }
+
         guard let pIdx = playableIndex(for: new) else {
-            log("attemptTransition 拒绝 目标drama=\(new) 无可播放映射 dramaToPlayable.keys=\(dramaToPlayable.keys.sorted())")
-            return false
+            // 极端情况下仍允许进入封面占位页并暂停旧音频，用户可以继续滑动；
+            // For You 不展示付费解锁，也不能被一条坏数据困住。
+            coordinator.pauseForYou()
+            currentIndex = new
+            poolVersion &+= 1
+            log("attemptTransition 目标无预览源，进入封面占位页 drama=\(new)")
+            return true
         }
 
         let oldMediaID = mediaID(for: old) ?? "nil"
         let newMediaID = mediaID(for: new) ?? "nil"
 
-        guard coordinator.moveForYou(
+        let moved = coordinator.moveForYou(
             to: pIdx,
             expectedMediaID: newMediaID,
             autoplay: autoplay
-        ) else {
-            log("attemptTransition 拒绝：Engine playlist 与 UI 映射不一致")
-            return false
+        )
+        if !moved {
+            // 播放权或 Engine 队列与页面快照短暂不一致时，用 Session 的唯一播放列表
+            // 原地重建到目标页；不回弹、不播放旧卡片媒体。
+            let playerItems = playableItems.map(\.item)
+            guard playerItems.indices.contains(pIdx) else { return false }
+            coordinator.replaceForYouPlaylist(
+                items: playerItems,
+                index: pIdx,
+                autoplay: autoplay
+            )
+            hasInitializedPool = true
+            log("attemptTransition 已自愈 Engine 队列 目标drama=\(new) playableIdx=\(pIdx)")
         }
 
         currentIndex = new
@@ -215,6 +240,26 @@ import Combine
 
         log("attemptTransition from=\(old)→\(new) fromID=\(oldMediaID) toID=\(newMediaID) playableIdx=\(pIdx)")
         return true
+    }
+
+    /// For You 播放失败后的手动重试。重新提交当前 Session 快照，避免绕过 Coordinator
+    /// 直接操作 Engine，也不会改变用户正在浏览的卡片索引。
+    func retryCurrentPlayback() {
+        guard playbackEnabled,
+              let playableIdx = playableIndex(for: currentIndex) else { return }
+        let playerItems = playableItems.map(\.item)
+        guard playerItems.indices.contains(playableIdx) else { return }
+
+        engine.startPlaybackTrace(
+            PlaybackDiagnosticsTrace(scene: "for_you_retry", targetIndex: playableIdx)
+        )
+        coordinator.replaceForYouPlaylist(
+            items: playerItems,
+            index: playableIdx,
+            autoplay: true
+        )
+        hasInitializedPool = true
+        log("retryCurrentPlayback drama=\(currentIndex) playableIdx=\(playableIdx)")
     }
 
     // MARK: - 生命周期

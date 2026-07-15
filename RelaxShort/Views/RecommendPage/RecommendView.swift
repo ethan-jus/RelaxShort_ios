@@ -22,7 +22,7 @@ struct RecommendView: View {
     @ObservedObject private var session: RecommendSession
     let isVisible: Bool
 
-    @State private var dragOffset: CGFloat = 0
+    @StateObject private var pagerState = VerticalVideoPagerState()
     @State private var isExpanded = false
     @State private var showShare = false
     @State private var isSpeeding = false
@@ -32,7 +32,6 @@ struct RecommendView: View {
     @State private var scrubFraction: CGFloat = 0
     @State private var showAbout = false
     @State private var wasPlayingBeforeScrub = false
-    @State private var isDraggingPage = false
     @State private var scrubThumbnail: UIImage?
 
     init(viewModel: RecommendViewModel? = nil, session: RecommendSession, isVisible: Bool = true) {
@@ -175,22 +174,26 @@ struct RecommendView: View {
     @ViewBuilder
     private func feedOverlayContent(in geo: GeometryProxy) -> some View {
         let dramas = viewModel.dramas
-        let pageHeight = geo.size.height
-        let yOffset = -CGFloat(session.currentIndex) * pageHeight + dragOffset
 
         ZStack {
             Color.clear
                 .contentShape(Rectangle())
-                .gesture(verticalDrag(count: dramas.count))
                 .simultaneousGesture(longPressGesture)
                 .simultaneousGesture(tapGesture)
                 .zIndex(-1)
 
-            ForEach(Array(visibleIndices(for: session.currentIndex, count: dramas.count)), id: \.self) { idx in
-                let isCurrent = idx == session.currentIndex
+            VerticalVideoPager(
+                state: pagerState,
+                pageCount: dramas.count,
+                currentIndex: session.currentIndex
+            ) { idx, isCurrent in
                 ZStack {
                     ShortVideoPlayerView(
-                        player: isCurrent ? session.engine.currentPlayer : nil,
+                        // 播放器媒体必须与当前卡片严格一致；队列自愈期间只显示封面，
+                        // 不允许出现“卡片 B 仍播放卡片 A”的错位画面。
+                        player: isCurrent && session.mediaID(for: idx) == session.engine.currentItem?.id
+                            ? session.engine.currentPlayer
+                            : nil,
                         coverURL: dramas[idx].coverURL,
                         engine: session.engine,
                         isActive: isCurrent
@@ -207,13 +210,80 @@ struct RecommendView: View {
                     if !isSpeeding, !showAbout {
                         pageBottomOverlay(drama: dramas[idx], isCurrent: isCurrent, geo: geo)
                     }
+
+                    if isCurrent, session.mediaID(for: idx) == nil {
+                        unavailablePreviewOverlay
+                    } else if isCurrent, isCurrentPlaybackFailed {
+                        playbackFailureOverlay
+                    }
                 }
-                .frame(width: geo.size.width, height: pageHeight)
-                .position(x: geo.size.width / 2, y: CGFloat(idx) * pageHeight + pageHeight / 2 + yOffset)
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .frame(width: geo.size.width, height: pageHeight)
+        .frame(width: geo.size.width, height: geo.size.height)
         .clipped()
+        .verticalVideoPaging(
+            state: pagerState,
+            pageCount: dramas.count,
+            currentIndex: session.currentIndex,
+            canHandle: { _ in
+                isPlaybackVisible && !isScrubbing && !showAbout
+            },
+            onPageCommit: { oldIndex, targetIndex in
+                session.attemptTransition(
+                    from: oldIndex,
+                    to: targetIndex,
+                    autoplay: isPlaybackVisible
+                )
+            }
+        )
+    }
+
+    private var unavailablePreviewOverlay: some View {
+        VStack(spacing: 12) {
+            Text("Preview unavailable")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+            Button("Refresh feed") {
+                Task { await viewModel.loadData() }
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 20)
+            .frame(height: 42)
+            .background(.white, in: Capsule())
+            Text("Swipe to keep browsing")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.62))
+        }
+        .padding(20)
+        .background(.black.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var playbackFailureOverlay: some View {
+        VStack(spacing: 12) {
+            Text("Video failed to load")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+            Button("Retry") {
+                session.retryCurrentPlayback()
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 24)
+            .frame(height: 42)
+            .background(.white, in: Capsule())
+            Text("You can also swipe to the next video")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.62))
+        }
+        .padding(20)
+        .background(.black.opacity(0.48), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var isCurrentPlaybackFailed: Bool {
+        if case .failed = session.engine.state { return true }
+        return false
     }
 
     private func pageBottomOverlay(drama: DramaItem, isCurrent: Bool, geo: GeometryProxy) -> some View {
@@ -476,49 +546,6 @@ struct RecommendView: View {
 
     // 旧分页器已移除，统一使用当前信息流浮层
 
-    private func visibleIndices(for current: Int, count: Int) -> [Int] {
-        guard count > 0 else { return [] }
-        let safeCurrent = max(0, min(current, count - 1))
-        return Array(max(0, safeCurrent - 1)...min(count - 1, safeCurrent + 1))
-    }
-
-    // MARK: - 拖拽手势
-
-    private func verticalDrag(count: Int) -> some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in
-                isDraggingPage = true
-                let t = value.translation.height
-                if session.currentIndex == 0 && t > 0 { dragOffset = t * 0.4 }
-                else if session.currentIndex == count - 1 && t < 0 { dragOffset = t * 0.4 }
-                else { dragOffset = t }
-            }
-            .onEnded { value in
-                let velocity = value.predictedEndTranslation.height - value.translation.height
-                let oldIndex = session.currentIndex
-                var targetIndex = oldIndex
-                if value.translation.height < -80 || velocity < -300 {
-                    targetIndex = min(oldIndex + 1, count - 1)
-                } else if value.translation.height > 80 || velocity > 300 {
-                    targetIndex = max(oldIndex - 1, 0)
-                }
-
-                // 索引切换与拖拽归零必须属于同一个动画事务：旧页完成剩余滑出距离，
-                // 新页同步滑入；目标不可播放时 currentIndex 不变，仅自然回弹。
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
-                    if targetIndex != oldIndex {
-                        _ = session.attemptTransition(
-                            from: oldIndex,
-                            to: targetIndex,
-                            autoplay: isPlaybackVisible
-                        )
-                    }
-                    dragOffset = 0
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { isDraggingPage = false }
-            }
-    }
-
     // MARK: - 点击手势
 
     private var tapGesture: some Gesture {
@@ -543,7 +570,7 @@ struct RecommendView: View {
         LongPressGesture(minimumDuration: 0.35)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
-                guard !isScrubbing, !isDraggingPage else { return }
+                guard !isScrubbing, !pagerState.isDragging else { return }
                 switch value {
                 case .second(true, _):
                     if !isSpeeding {

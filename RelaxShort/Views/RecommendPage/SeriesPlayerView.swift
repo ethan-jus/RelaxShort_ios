@@ -25,7 +25,7 @@ struct SeriesPlayerView: View {
     @State private var hasConsumedInitialResume = false
 
     @State private var currentEpisode: Int
-    @State private var dragOffset: CGFloat = 0
+    @StateObject private var pagerState = VerticalVideoPagerState()
     @State private var showSpeedHUD = false
     @State private var showEpisodeList = false
     @State private var episodes: [Episode] = []
@@ -41,6 +41,8 @@ struct SeriesPlayerView: View {
     @State private var isSpeeding = false
     @State private var episodeSwitchTask: Task<Void, Never>?
     @State private var playbackState: PlayerPlaybackState = .idle
+    /// 当前目标集的非权益类加载错误。锁集由 unlockState 独立呈现。
+    @State private var episodeLoadError: String?
     @State private var playbackProgress = PlayerProgress()
     @State private var selectedPlaybackRate: Float = 1.0
     @State private var selectedQualityID = "auto"
@@ -172,13 +174,23 @@ struct SeriesPlayerView: View {
                 if let unlockState {
                     episodeUnlockOverlay(unlockState, in: geo)
                         .zIndex(250)
+                } else if let episodeLoadError {
+                    episodeLoadFailureOverlay(episodeLoadError)
+                        .zIndex(240)
                 }
 
             }
             .contentShape(Rectangle())
-            // 上下切集挂在页面根层，避免底部信息区、右侧按钮或中心按钮吃掉拖拽事件。
-            // 具体冲突保护在 episodeDragGesture 内处理。
-            .simultaneousGesture(episodeDragGesture)
+            // 与 For You 共用同一套分页手势；挂在页面根层，避免控制层吃掉拖拽事件。
+            .verticalVideoPaging(
+                state: pagerState,
+                pageCount: totalEpisodes,
+                currentIndex: currentEpisode - 1,
+                canHandle: canHandleEpisodeDrag,
+                onPageCommit: { _, targetIndex in
+                    requestEpisodeSwitch(targetIndex + 1, animatePage: false)
+                }
+            )
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
@@ -288,6 +300,29 @@ struct SeriesPlayerView: View {
             Task { await dependencies.watchProgressReporter.finalize(completed: false) }
             playerCoordinator.release(.series(dramaID: drama.id))
         }
+    }
+
+    /// 网络或媒体失败不阻断上下滑动；用户可以重试当前集，也可以继续浏览其他集。
+    private func episodeLoadFailureOverlay(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Text(message)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+            Button("Retry") {
+                retryCurrentEpisodePlayback()
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 24)
+            .frame(height: 42)
+            .background(.white, in: Capsule())
+            Text("You can also swipe to another episode")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.62))
+        }
+        .padding(20)
+        .background(.black.opacity(0.52), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
     // MARK: - Episode Unlock
@@ -821,6 +856,7 @@ struct SeriesPlayerView: View {
                 dramaID: drama.id,
                 episodeNumber: currentEpisode
             ) {
+                episodeLoadError = "Unable to load episodes. Please try again."
                 playerCoordinator.engine.deactivate()
             }
             return
@@ -853,6 +889,7 @@ struct SeriesPlayerView: View {
             guard !Task.isCancelled,
                   let source = dto.toPlayerMediaSource() else { return false }
             episodeMediaSources[episodeID] = source
+            episodeLoadError = nil
             if let resume = dto.resumeTime, resume > 0 {
                 episodeResumeTimes[episodeID] = TimeInterval(resume)
             }
@@ -884,6 +921,7 @@ struct SeriesPlayerView: View {
             Logger.player.warning("SeriesTrace 首屏剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
             playerCoordinator.engine.finishTrace(termination: "锁集阻断")
+            episodeLoadError = nil
             presentEpisodeUnlock(episodeNumber)
             return false
         } catch {
@@ -1179,15 +1217,21 @@ struct SeriesPlayerView: View {
 
     // MARK: - Episode Switching
 
-    /// 避免拖动直接改 currentEpisode 造成状态错位。
-    private func requestEpisodeSwitch(_ target: Int, previousCompleted: Bool = false) {
-        guard target != currentEpisode, target >= 1, target <= totalEpisodes else { return }
+    /// 统一切集入口：先同步进入目标页，再异步加载播放合同或展示锁集权益。
+    @discardableResult
+    private func requestEpisodeSwitch(
+        _ target: Int,
+        previousCompleted: Bool = false,
+        animatePage: Bool = true
+    ) -> Bool {
+        guard target != currentEpisode, target >= 1, target <= totalEpisodes else { return false }
+        episodeLoadError = nil
         let previous = currentEpisode
         episodeSwitchTask?.cancel()
         episodePrefetchTask?.cancel()
         guard let transitionToken = playerCoordinator.beginSeriesEpisodeTransition(
             dramaID: drama.id
-        ) else { return }
+        ) else { return false }
 
         playbackTraceStartedAt = CACurrentMediaTime()
         playbackTraceReason = "switch"
@@ -1200,10 +1244,13 @@ struct SeriesPlayerView: View {
             )
         )
 
-        // UI 与目标集立即同步；引擎已原子清空旧媒体，等待期间只显示目标封面。
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+        // 手势翻页由共享分页器提供外层原子动画；选集、自动下一集仍在这里动画。
+        if animatePage {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                currentEpisode = target
+            }
+        } else {
             currentEpisode = target
-            dragOffset = 0
         }
 
         episodeSwitchTask = Task { @MainActor in
@@ -1249,6 +1296,32 @@ struct SeriesPlayerView: View {
             prefetchNextEpisode(after: target)
             Logger.player.info("SeriesTrace 切集已提交播放器 目标集=\(target) 播放索引=\(playableIndex)")
         }
+        return true
+    }
+
+    /// 重试当前目标集，不改变集数，也不复用已经明确失败的首屏请求 Task。
+    private func retryCurrentEpisodePlayback() {
+        episodeLoadError = nil
+        initialPlayAssetTask?.cancel()
+        initialPlayAssetTask = nil
+
+        episodeSwitchTask?.cancel()
+        episodeSwitchTask = Task { @MainActor in
+            if episodes.isEmpty {
+                await loadEpisodes()
+                return
+            }
+
+            guard await ensurePlayAsset(for: currentEpisode) else {
+                guard unlockState == nil else { return }
+                playerCoordinator.engine.endContentTransitionWithoutMedia()
+                if episodeLoadError == nil {
+                    episodeLoadError = "Unable to load this episode. Please try again."
+                }
+                return
+            }
+            initializeEpisodePlayer()
+        }
     }
 
     /// 页面只提前获取下一集播放合同；真正的媒体预加载统一交给共享 PlayerSlotPool。
@@ -1284,6 +1357,7 @@ struct SeriesPlayerView: View {
 
         // 内存缓存命中
         if episodeMediaSources[episodeId] != nil {
+            if recordTrace { episodeLoadError = nil }
             Logger.player.info("SeriesTrace 播放源命中内存缓存 集数=\(episodeNumber)")
             if recordTrace { playerCoordinator.engine.markTrace("缓存命中") }
             return true
@@ -1293,6 +1367,7 @@ struct SeriesPlayerView: View {
         if let url = URL(string: ep.videoURL),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             episodeMediaSources[episodeId] = .mp4(url)
+            if recordTrace { episodeLoadError = nil }
             Logger.player.info("SeriesTrace 播放源使用剧集URL 集数=\(episodeNumber)")
             if recordTrace { playerCoordinator.engine.markTrace("剧集URL") }
             return true
@@ -1307,6 +1382,9 @@ struct SeriesPlayerView: View {
                 return true
             }
             // 同一次请求已经明确失败或被权益拦截，本轮不再立即重试相同接口。
+            if recordTrace, unlockState == nil {
+                episodeLoadError = "Unable to load this episode. Please try again."
+            }
             return false
         }
 
@@ -1325,12 +1403,14 @@ struct SeriesPlayerView: View {
                     episodeResumeTimes[episodeId] = TimeInterval(resume)
                 }
                 unlockedEpisodes.insert(episodeNumber)
+                if recordTrace { episodeLoadError = nil }
                 Logger.player.info("SeriesTrace 播放源请求成功 集数=\(episodeNumber) 类型=\(dto.sourceType) 耗时=\(Int(elapsed))ms")
                 if recordTrace { playerCoordinator.engine.markTrace("播放源") }
                 return true
             }
             Logger.player.warning("SeriesTrace 播放源为空 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             if recordTrace {
+                episodeLoadError = "This episode is temporarily unavailable."
                 playerCoordinator.engine.markTrace("播放源失败-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "播放源失败")
             }
@@ -1339,6 +1419,7 @@ struct SeriesPlayerView: View {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 已进入解锁流程")
             if recordTrace {
+                episodeLoadError = nil
                 playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "锁集阻断")
             }
@@ -1350,6 +1431,7 @@ struct SeriesPlayerView: View {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
             if recordTrace {
+                episodeLoadError = "Unable to load this episode. Please try again."
                 playerCoordinator.engine.markTrace("网络失败-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "网络失败")
             }
@@ -1528,25 +1610,24 @@ struct SeriesPlayerView: View {
     // MARK: - Episode Pager
 
     private func episodePager(in geo: GeometryProxy) -> some View {
-        let pageHeight = geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom
-        let yOffset = -CGFloat(currentEpisode - 1) * pageHeight + dragOffset
-
-        return ZStack {
-            ForEach(visibleEpisodeIndices(), id: \.self) { ep in
-                let isCurrent = ep == currentEpisode
-                ShortVideoPlayerView(
-                    player: isCurrent ? playerForEpisode(ep) : nil,
-                    coverURL: drama.coverURL,
-                    engine: playerCoordinator.engine,
-                    showsSystemPlaybackButton: false
-                )
-                .allowsHitTesting(false)
-                .frame(width: geo.size.width, height: pageHeight)
-                .position(x: geo.size.width / 2, y: CGFloat(ep - 1) * pageHeight + pageHeight / 2 + yOffset)
+        VerticalVideoPager(
+            state: pagerState,
+            pageCount: totalEpisodes,
+            currentIndex: currentEpisode - 1,
+            pageHeight: { _ in
+                geo.size.height + geo.safeAreaInsets.top + geo.safeAreaInsets.bottom
             }
+        ) { index, isCurrent in
+            let episodeNumber = index + 1
+            ShortVideoPlayerView(
+                player: isCurrent ? playerForEpisode(episodeNumber) : nil,
+                coverURL: drama.coverURL,
+                engine: playerCoordinator.engine,
+                showsSystemPlaybackButton: false
+            )
+            .allowsHitTesting(false)
         }
-        .frame(width: geo.size.width, height: pageHeight)
-        .clipped()
+        .frame(width: geo.size.width, height: geo.size.height)
     }
 
     /// 只有播放器当前 item 确实属于该集时才挂载 AVPlayer。
@@ -1558,47 +1639,7 @@ struct SeriesPlayerView: View {
         return playerCoordinator.engine.currentPlayer
     }
 
-    private func visibleEpisodeIndices() -> [Int] {
-        guard totalEpisodes > 0 else { return [currentEpisode] }
-        let lo = max(1, currentEpisode - 1)
-        let hi = min(totalEpisodes, currentEpisode + 1)
-        guard lo <= hi else { return [currentEpisode] }
-        return Array(lo...hi)
-    }
-
     // MARK: - Gestures
-
-    private var episodeDragGesture: some Gesture {
-        DragGesture(minimumDistance: 10)
-            .onChanged { value in
-                guard canHandleEpisodeDrag(value) else { return }
-                let t = value.translation.height
-                if currentEpisode == 1 && t > 0 { dragOffset = t * 0.4 }
-                else if currentEpisode == totalEpisodes && t < 0 { dragOffset = t * 0.4 }
-                else { dragOffset = t }
-            }
-            .onEnded { value in
-                guard canHandleEpisodeDrag(value) else {
-                    Logger.player.info("SeriesGesture 忽略手势 起点X=\(Int(value.startLocation.x)) 横向=\(Int(value.translation.width)) 纵向=\(Int(value.translation.height))")
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { dragOffset = 0 }
-                    return
-                }
-                let velocity = value.predictedEndTranslation.height - value.translation.height
-                let oldEpisode = currentEpisode
-                var targetEpisode = oldEpisode
-                if value.translation.height < -80 || velocity < -300 {
-                    targetEpisode = min(oldEpisode + 1, totalEpisodes)
-                } else if value.translation.height > 80 || velocity > 300 {
-                    targetEpisode = max(oldEpisode - 1, 1)
-                }
-                Logger.player.info("SeriesGesture 手势结束 原集=\(oldEpisode) 目标集=\(targetEpisode) 纵向=\(Int(value.translation.height)) 速度=\(Int(velocity)) 总集数=\(totalEpisodes)")
-                if targetEpisode != oldEpisode {
-                    requestEpisodeSwitch(targetEpisode)
-                } else {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) { dragOffset = 0 }
-                }
-            }
-    }
 
     /// Series 全屏切集必须像 For You 一样从页面大部分区域可触发，
     /// 但要避开左边缘返回、进度条拖动、弹层和明显横滑。
