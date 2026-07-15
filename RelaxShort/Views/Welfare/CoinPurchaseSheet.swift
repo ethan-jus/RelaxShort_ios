@@ -404,14 +404,9 @@ struct EpisodeUnlockPurchaseSheet: View {
             if selectedTab == .coins {
                 coinMetadata
             } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("VIP 全剧畅看")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundStyle(paleGold)
-                    Text("无限畅看 · 1080P · 离线下载")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                }
+                Text("VIP 全剧畅看")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(paleGold)
             }
             Spacer()
             Button(action: onDismiss) {

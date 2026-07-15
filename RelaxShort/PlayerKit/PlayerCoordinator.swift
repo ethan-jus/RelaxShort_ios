@@ -26,6 +26,7 @@ final class PlayerCoordinator: ObservableObject {
     private var seriesPlaybackFinishedHandler: (dramaID: String, action: @MainActor () -> Void)?
     private var claimGeneration: Int = 0
     private var currentSeriesIdentity: SeriesMediaIdentity?
+    private var pendingSeamlessHandoff: SeriesMediaIdentity?
 
     init() {
         self.engine = ShortVideoPlayerEngine()
@@ -45,11 +46,50 @@ final class PlayerCoordinator: ObservableObject {
 
     /// Series 在任何网络请求前先取得唯一播放权，阻止旧 For You 媒体继续播放。
     func beginSeries(dramaID: String) {
+        let seriesOwner = Owner.series(dramaID: dramaID)
+        // Watch Full 已在导航前完成所有权移交时，保留正在播放的同一个 AVPlayer。
+        if owner == seriesOwner, pendingSeamlessHandoff?.dramaID == dramaID {
+            pendingSeamlessHandoff = nil
+            return
+        }
+        pendingSeamlessHandoff = nil
         invalidateCurrentClaim()
         seriesPlaybackFinishedHandler = nil
         currentSeriesIdentity = nil
-        owner = .series(dramaID: dramaID)
+        owner = seriesOwner
         engine.deactivate()
+    }
+
+    /// For You → Series 的无缝交接。媒体身份一致时只转移播放权，不暂停、不 seek、不重建。
+    /// 若当前媒体不匹配，仍返回进度上下文，Series 会沿用常规安全准备流程。
+    func handoffForYouToSeries(
+        dramaID: String,
+        episodeNumber: Int
+    ) -> PlayerHandoffContext {
+        let context = engine.makeHandoffContext(
+            dramaID: dramaID,
+            episodeNumber: episodeNumber
+        )
+        let expectedMediaID = PlayerMediaItem.stableID(
+            dramaID: dramaID,
+            episodeNumber: episodeNumber
+        )
+        guard owner == .forYou, engine.currentItem?.id == expectedMediaID else {
+            return context
+        }
+
+        invalidateCurrentClaim()
+        seriesPlaybackFinishedHandler = nil
+        let identity = SeriesMediaIdentity(
+            dramaID: dramaID,
+            episodeNumber: episodeNumber,
+            mediaID: expectedMediaID
+        )
+        currentSeriesIdentity = identity
+        pendingSeamlessHandoff = identity
+        owner = .series(dramaID: dramaID)
+        Logger.player.debug("For You → Series 已移交同一播放器 剧ID=\(dramaID) 集数=\(episodeNumber)")
+        return context
     }
 
     /// Series 的结束动作只绑定当前剧，页面释放或 owner 切换后不会收到迟到回调。
@@ -336,6 +376,7 @@ final class PlayerCoordinator: ObservableObject {
         if case .series = owner {
             seriesPlaybackFinishedHandler = nil
             currentSeriesIdentity = nil
+            pendingSeamlessHandoff = nil
         }
         engine.deactivate()
         self.owner = nil

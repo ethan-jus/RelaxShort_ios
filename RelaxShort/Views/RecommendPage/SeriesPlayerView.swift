@@ -78,6 +78,7 @@ struct SeriesPlayerView: View {
         static let topBarHeight: CGFloat = 44
         static let membershipRowHeight: CGFloat = 30
         static let unlockPurchasePanelFraction: CGFloat = 0.62
+        static let purchasePlanRowHeight: CGFloat = 78
     }
 
     private enum PlayerSheet: Identifiable {
@@ -343,9 +344,10 @@ struct SeriesPlayerView: View {
         initialTab: EpisodeUnlockPurchaseTab,
         in geo: GeometryProxy
     ) -> some View {
-        let panelHeight = min(
-            620,
-            geo.size.height * ChromeMetrics.unlockPurchasePanelFraction
+        let panelHeight = max(
+            460,
+            min(620, geo.size.height * ChromeMetrics.unlockPurchasePanelFraction)
+                - ChromeMetrics.purchasePlanRowHeight
         )
 
         return ZStack {
@@ -1055,7 +1057,7 @@ struct SeriesPlayerView: View {
         let actionRailGap = max(18, geo.size.width * 0.055)
         let progressWidth = max(0, geo.size.width - horizontalPadding * 2)
         let contentMaxWidth = max(0, progressWidth - actionRailWidth - actionRailGap)
-        let contentWidth = max(0, min(contentMaxWidth, geo.size.width * 0.74))
+        let contentWidth = contentMaxWidth
         let bottomInset = UIApplication.safeAreaInsets.bottom + ChromeMetrics.bottomGap
 
         return VStack(spacing: 0) {

@@ -156,13 +156,7 @@ struct RecommendView: View {
                         isPresented: $showAbout,
                         onWatchFullSeries: {
                             showAbout = false
-                            let handoff = session.engine.makeHandoffContext(dramaID: drama.id, episodeNumber: max(1, drama.currentEpisode))
-                            appStore.navigationTarget = SeriesPlayerNav(
-                                drama: drama,
-                                startEpisode: max(1, drama.currentEpisode),
-                                handoff: handoff,
-                                sourceScene: "for_you"
-                            )
+                            navigateToSeries(drama)
                         }
                     )
                     .zIndex(200)
@@ -293,7 +287,7 @@ struct RecommendView: View {
         let actionRailGap = max(18, geo.size.width * 0.055)
         let availableWidth = max(0, geo.size.width - horizontalPadding * 2)
         let maxContentWidth = max(0, availableWidth - actionRailWidth - actionRailGap)
-        let contentWidth = max(0, min(maxContentWidth, geo.size.width * 0.74))
+        let contentWidth = maxContentWidth
         let bottomSafeArea = UIApplication.safeAreaInsets.bottom
         let tabBarAvoidance = bottomSafeArea + DramaBoxBottomTabBar.totalHeight
 
@@ -304,6 +298,7 @@ struct RecommendView: View {
                     HStack(alignment: .bottom, spacing: actionRailGap) {
                         VStack(alignment: .leading, spacing: 6) {
                             Button {
+                                guard !pagerState.isDragging else { return }
                                 withAnimation(.easeOut(duration: 0.25)) { showAbout = true }
                             } label: {
                                 HStack(spacing: 4) {
@@ -331,7 +326,10 @@ struct RecommendView: View {
                             synopsisView(drama.synopsis, contentWidth: contentWidth)
                                 .lineSpacing(3)
                                 .contentShape(Rectangle())
-                                .onTapGesture { withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() } }
+                                .onTapGesture {
+                                    guard !pagerState.isDragging else { return }
+                                    withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() }
+                                }
                         }
                         .frame(width: contentWidth, alignment: .leading)
 
@@ -358,13 +356,7 @@ struct RecommendView: View {
 
                     // 使用按钮显式跳转，避免手势层抢占点击
                     Button {
-                        let handoff = session.engine.makeHandoffContext(dramaID: drama.id, episodeNumber: max(1, drama.currentEpisode))
-                        appStore.navigationTarget = SeriesPlayerNav(
-                            drama: drama,
-                            startEpisode: max(1, drama.currentEpisode),
-                            handoff: handoff,
-                            sourceScene: "for_you"
-                        )
+                        navigateToSeries(drama)
                     } label: {
                         Text("Watch Full Series")
                             .font(.system(size: 16, weight: .bold))
@@ -492,23 +484,36 @@ struct RecommendView: View {
             .map { $0 }
     }
 
+    /// 点击全剧入口时先把同一个 AVPlayer 的所有权交给 Series，再触发导航。
+    /// For You 因路由遮挡而执行生命周期暂停时，已不再持有播放权，因此不会打断画面。
+    private func navigateToSeries(_ drama: DramaItem, preservesPlayback: Bool = true) {
+        guard !pagerState.isDragging else { return }
+        let episodeNumber = max(1, drama.currentEpisode)
+        let handoff = preservesPlayback
+            ? playerCoordinator.handoffForYouToSeries(
+                dramaID: drama.id,
+                episodeNumber: episodeNumber
+            )
+            : session.engine.makeHandoffContext(
+                dramaID: drama.id,
+                episodeNumber: episodeNumber
+            )
+        appStore.navigationTarget = SeriesPlayerNav(
+            drama: drama,
+            startEpisode: episodeNumber,
+            handoff: handoff,
+            sourceScene: "for_you"
+        )
+    }
+
     // MARK: - 自动播放配置
 
     private func setupAutoPlay() {
         playerCoordinator.setForYouPlaybackFinishedHandler {
             guard viewModel.dramas.indices.contains(session.currentIndex) else { return }
             let drama = viewModel.dramas[session.currentIndex]
-            let episodeNumber = max(1, drama.currentEpisode)
-            let handoff = session.engine.makeHandoffContext(
-                dramaID: drama.id,
-                episodeNumber: episodeNumber
-            )
-            appStore.navigationTarget = SeriesPlayerNav(
-                drama: drama,
-                startEpisode: episodeNumber,
-                handoff: handoff,
-                sourceScene: "for_you"
-            )
+            // 自动播完进入全剧时不能复用停在尾帧的 Player；常规准备流程会按规则从头播放。
+            navigateToSeries(drama, preservesPlayback: false)
         }
     }
 

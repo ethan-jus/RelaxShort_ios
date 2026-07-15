@@ -68,10 +68,10 @@ enum PlayerItemFactory {
             return url
         case .mp4WithExternalSubtitles(let videoURL, _):
             return videoURL
-        case .hls:
+        case .hls, .hlsWithFallback:
+            // HLS+fallback 复合源继续交给 AVPlayer 原生直连加载；部分源不可靠支持 Range，
+            // 若接入 completion 型缓存代理会等完整响应后才出首帧，反而拖慢 Series 切集。
             return nil
-        case .hlsWithFallback(_, let fallbackMP4URL):
-            return fallbackMP4URL
         }
     }
 
