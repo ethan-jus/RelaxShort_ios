@@ -503,13 +503,17 @@ struct RecommendView: View {
                     targetIndex = max(oldIndex - 1, 0)
                 }
 
+                // 索引切换与拖拽归零必须属于同一个动画事务：旧页完成剩余滑出距离，
+                // 新页同步滑入；目标不可播放时 currentIndex 不变，仅自然回弹。
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.82)) {
+                    if targetIndex != oldIndex {
+                        _ = session.attemptTransition(
+                            from: oldIndex,
+                            to: targetIndex,
+                            autoplay: isPlaybackVisible
+                        )
+                    }
                     dragOffset = 0
-                }
-
-                // TASK-0001-D: 受控 transition — 无可播放映射时拒绝切换
-                if targetIndex != oldIndex {
-                    _ = session.attemptTransition(from: oldIndex, to: targetIndex, autoplay: isPlaybackVisible)
                 }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { isDraggingPage = false }
             }
