@@ -28,8 +28,16 @@ final class AppInitService {
             didInitialize = true
             Logger.general.info("AppInitService: initialized ui=\(dto.uiLanguage) content=\(dto.contentLanguage) country=\(dto.countryCode)")
         } catch {
+            guard Self.shouldReportFailure(error) else { return }
             Logger.general.warning("AppInitService: init failed (will retry on next launch): \(error.localizedDescription)")
         }
+    }
+
+    /// SwiftUI 生命周期或系统主动取消任务属于正常结束，不应伪装成启动失败。
+    static func shouldReportFailure(_ error: Error) -> Bool {
+        if error is CancellationError { return false }
+        if let urlError = error as? URLError, urlError.code == .cancelled { return false }
+        return true
     }
 
     /// 将后端语言决策写入 UserDefaults

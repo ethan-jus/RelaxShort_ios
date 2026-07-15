@@ -70,7 +70,15 @@ private struct MemberScrollOffsetReader: UIViewRepresentable {
             let normalizedOffset =
                 scrollView.contentOffset.y
                 + scrollView.adjustedContentInset.top
-            offsetY.wrappedValue = max(0, normalizedOffset)
+            let nextOffset = max(0, normalizedOffset)
+
+            // KVO 可能在 UIViewRepresentable 的 update/layout 周期内同步回调。
+            // 下一轮主队列再写 Binding，避免 SwiftUI 的“view update 期间修改状态”警告。
+            DispatchQueue.main.async { [weak self] in
+                guard let self,
+                      abs(self.offsetY.wrappedValue - nextOffset) > 0.5 else { return }
+                self.offsetY.wrappedValue = nextOffset
+            }
         }
     }
 }

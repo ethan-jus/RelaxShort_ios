@@ -51,17 +51,6 @@ struct MainTabView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: SeriesPlayerNav.self) { nav in
-                SeriesPlayerView(
-                    drama: nav.drama,
-                    startEpisode: nav.startEpisode,
-                    initialEpisodeID: nav.episodeID,
-                    initialResumeTime: nav.resumeTime,
-                    handoff: nav.handoff,
-                    sourceScene: nav.sourceScene
-                )
-                    .environmentObject(playerCoordinator)
-            }
             .navigationDestination(item: $appStore.navigationTarget) { nav in
                 SeriesPlayerView(
                     drama: nav.drama,

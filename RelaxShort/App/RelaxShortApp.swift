@@ -3,6 +3,14 @@ import AVFoundation
 import GoogleMobileAds
 import GoogleSignIn
 
+enum AppAudioSessionConfiguration {
+    static let category: AVAudioSession.Category = .playback
+    static let mode: AVAudioSession.Mode = .moviePlayback
+
+    // `.allowAirPlay` 只适用于 `.playAndRecord`；纯播放类别本身已支持 AirPlay。
+    static let options: AVAudioSession.CategoryOptions = []
+}
+
 @main
 struct RelaxShortApp: App {
     @UIApplicationDelegateAdaptor(FacebookAppDelegate.self)
@@ -51,7 +59,11 @@ struct RelaxShortApp: App {
     private func configureAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay])
+            try session.setCategory(
+                AppAudioSessionConfiguration.category,
+                mode: AppAudioSessionConfiguration.mode,
+                options: AppAudioSessionConfiguration.options
+            )
             try session.setActive(true)
         } catch {
             print("[PlayerKit] audioSession configure failed: \(error.localizedDescription)")
@@ -68,10 +80,6 @@ struct RelaxShortApp: App {
                         }
                     }
                     .transition(.opacity)
-                    // Task13: 启动页期间调用 app/init，不阻塞进入主界面
-                    .task {
-                        await AppInitService.shared.initialize()
-                    }
                 } else {
                     MainTabView(playerCoordinator: playerCoordinator, dependencies: dependencies)
                         .environmentObject(appStore)
@@ -96,6 +104,11 @@ struct RelaxShortApp: App {
             }
             .preferredColorScheme(appStore.preferredColorScheme)
             .statusBarHidden(true)
+            // 挂在稳定根视图上，避免 Splash 退出时取消尚未完成的 app/init。
+            .task {
+                guard !AppRuntimeEnvironment.isUnitTesting else { return }
+                await AppInitService.shared.initialize()
+            }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
                 await authStore.bootstrap()
