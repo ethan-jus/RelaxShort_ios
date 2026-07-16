@@ -1,5 +1,63 @@
 import SwiftUI
 import AVKit
+import UIKit
+
+/// Series 的播放器冷启动必须等系统导航转场结束，避免 AVFoundation 首次初始化阻塞 push 动画。
+private struct NavigationTransitionCompletionObserver: UIViewControllerRepresentable {
+    let onCompletion: @MainActor () -> Void
+
+    func makeUIViewController(context: Context) -> ObserverViewController {
+        ObserverViewController(onCompletion: onCompletion)
+    }
+
+    func updateUIViewController(_ controller: ObserverViewController, context: Context) {
+        controller.onCompletion = onCompletion
+    }
+
+    final class ObserverViewController: UIViewController {
+        var onCompletion: @MainActor () -> Void
+        private var hasCompleted = false
+        private var hasRegisteredTransition = false
+
+        init(onCompletion: @escaping @MainActor () -> Void) {
+            self.onCompletion = onCompletion
+            super.init(nibName: nil, bundle: nil)
+            view.isUserInteractionEnabled = false
+            view.backgroundColor = .clear
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            guard !hasRegisteredTransition else { return }
+            guard let coordinator = transitionCoordinator
+                ?? navigationController?.transitionCoordinator
+                ?? parent?.transitionCoordinator else { return }
+            hasRegisteredTransition = true
+            coordinator.animate(alongsideTransition: nil) { [weak self] _ in
+                self?.completeOnce()
+            }
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            // 无转场协调器（预览或直接展示）时，viewDidAppear 仍能提供可靠的完成时机。
+            completeOnce()
+        }
+
+        private func completeOnce() {
+            guard !hasCompleted else { return }
+            hasCompleted = true
+            Task { @MainActor [onCompletion] in
+                onCompletion()
+            }
+        }
+    }
+}
 
 enum EpisodeUnlockPanelLayout {
     /// 首层解锁面板统一使用同一高度，VIP 专享与普通付费集不再随内容多少伸缩。
@@ -69,6 +127,8 @@ struct SeriesPlayerView: View {
     @State private var unlockState: EpisodeUnlockFlowState?
     /// 顶部返回动作已提前完成 Series → For You 所有权交接，onDisappear 不再重复释放。
     @State private var hasPreparedReturn = false
+    /// 首次 AVPlayer/AVPlayerLayer 创建不得与 NavigationStack 的横向转场竞争主线程。
+    @State private var hasCompletedNavigationTransition = false
 
     private enum ChromeMetrics {
         static let horizontalPadding: CGFloat = 16
@@ -194,6 +254,12 @@ struct SeriesPlayerView: View {
         .preferredColorScheme(.dark)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .background {
+            NavigationTransitionCompletionObserver {
+                hasCompletedNavigationTransition = true
+            }
+            .frame(width: 0, height: 0)
+        }
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .share:
@@ -219,7 +285,8 @@ struct SeriesPlayerView: View {
                 .presentationDragIndicator(.hidden)
             }
         }
-        .task(id: drama.id) {
+        .task(id: hasCompletedNavigationTransition) {
+            guard hasCompletedNavigationTransition else { return }
             await startPlaybackSession()
             await dependencies.bookmarkStore.loadStatus(seriesIDs: [drama.id])
         }
