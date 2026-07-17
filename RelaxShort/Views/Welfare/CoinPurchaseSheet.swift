@@ -7,7 +7,7 @@ import SwiftUI
 /// 布局：
 /// - 4 个金币包卡片，选中高亮
 /// - 底部「立即购买」按钮
-/// - 支持 StoreKit 2 真实购买 + Mock 回退
+/// - 支持 Xcode 本地 StoreKit 与真实 Apple 购买；真实交易必须由后端验单发币
 struct CoinPurchaseSheet: View {
 
     // MARK: - Dependencies
@@ -18,6 +18,8 @@ struct CoinPurchaseSheet: View {
     // MARK: - Callbacks
 
     var onDismiss: (() -> Void)?
+    /// 获取当前登录用户绑定 Apple 交易的 appAccountToken。
+    var fetchAppleAccountToken: (() async throws -> UUID)?
     /// Series 解锁场景传入：先服务端验单发币，成功后才能展示购买成功。
     var verifyPurchase: ((ApplePurchaseReceipt) async throws -> Int)?
     var onPurchaseCompleted: ((Int) -> Void)?
@@ -251,10 +253,20 @@ struct CoinPurchaseSheet: View {
 
         Task {
             do {
-                let receipt = try await storeKit.purchaseCoinPackage(pkg)
+                guard let fetchAppleAccountToken else {
+                    throw APIError(code: "PAYMENT_ACCOUNT_UNAVAILABLE", message: "支付账号暂不可用，请稍后重试")
+                }
+                let token = try await storeKit.resolveAppAccountToken(using: fetchAppleAccountToken)
+                let receipt = try await storeKit.purchaseCoinPackage(
+                    pkg,
+                    appAccountToken: token
+                )
                 let verifiedBalance: Int
-                if let verifyPurchase {
+                if receipt.requiresBackendVerification, let verifyPurchase {
                     verifiedBalance = try await verifyPurchase(receipt)
+                    await storeKit.completeCoinDelivery(receipt)
+                } else if receipt.requiresBackendVerification {
+                    throw APIError(code: "PAYMENT_VERIFY_UNAVAILABLE", message: "支付验单暂不可用，请稍后重试")
                 } else {
                     verifiedBalance = coinStore.coinBalance + receipt.coins
                 }
@@ -309,7 +321,7 @@ struct EpisodeUnlockPurchaseSheet: View {
     let onDismiss: () -> Void
     let verifyCoinPurchase: (ApplePurchaseReceipt) async throws -> Int
     let verifyVIPPurchase: (ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount
-    let refreshAccount: () async throws -> EpisodeUnlockAccount
+    let fetchAppleAccountToken: () async throws -> UUID
     let onCoinPurchaseCompleted: (Int) -> Void
     let onVIPPurchaseCompleted: (EpisodeUnlockAccount) -> Void
 
@@ -333,7 +345,7 @@ struct EpisodeUnlockPurchaseSheet: View {
         onDismiss: @escaping () -> Void,
         verifyCoinPurchase: @escaping (ApplePurchaseReceipt) async throws -> Int,
         verifyVIPPurchase: @escaping (ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount,
-        refreshAccount: @escaping () async throws -> EpisodeUnlockAccount,
+        fetchAppleAccountToken: @escaping () async throws -> UUID,
         onCoinPurchaseCompleted: @escaping (Int) -> Void,
         onVIPPurchaseCompleted: @escaping (EpisodeUnlockAccount) -> Void
     ) {
@@ -345,7 +357,7 @@ struct EpisodeUnlockPurchaseSheet: View {
         self.onDismiss = onDismiss
         self.verifyCoinPurchase = verifyCoinPurchase
         self.verifyVIPPurchase = verifyVIPPurchase
-        self.refreshAccount = refreshAccount
+        self.fetchAppleAccountToken = fetchAppleAccountToken
         self.onCoinPurchaseCompleted = onCoinPurchaseCompleted
         self.onVIPPurchaseCompleted = onVIPPurchaseCompleted
         _selectedTab = State(initialValue: initialTab)
@@ -629,16 +641,36 @@ struct EpisodeUnlockPurchaseSheet: View {
         Task {
             do {
                 if selectedTab == .coins, let package = selectedPackage {
-                    let receipt = try await storeKit.purchaseCoinPackage(package)
-                    let verifiedBalance = try await verifyCoinPurchase(receipt)
+                    let token = try await storeKit.resolveAppAccountToken(using: fetchAppleAccountToken)
+                    let receipt = try await storeKit.purchaseCoinPackage(
+                        package,
+                        appAccountToken: token
+                    )
+                    let verifiedBalance: Int
+                    if receipt.requiresBackendVerification {
+                        verifiedBalance = try await verifyCoinPurchase(receipt)
+                        await storeKit.completeCoinDelivery(receipt)
+                    } else {
+                        verifiedBalance = balance + receipt.coins
+                    }
                     await MainActor.run {
                         coinStore.synchronize(balance: verifiedBalance)
                         isPurchasing = false
                         onCoinPurchaseCompleted(verifiedBalance)
                     }
                 } else if let subscription = selectedSubscription {
-                    let receipt = try await storeKit.purchaseVIP(subscription)
-                    let account = try await verifyVIPPurchase(receipt)
+                    let token = try await storeKit.resolveAppAccountToken(using: fetchAppleAccountToken)
+                    let receipt = try await storeKit.purchaseVIP(
+                        subscription,
+                        appAccountToken: token
+                    )
+                    let account: EpisodeUnlockAccount
+                    if receipt.requiresBackendVerification {
+                        account = try await verifyVIPPurchase(receipt)
+                        await storeKit.completeVIPDelivery(receipt)
+                    } else {
+                        account = EpisodeUnlockAccount(balance: balance, isVIP: true)
+                    }
                     await MainActor.run {
                         coinStore.synchronize(balance: account.balance)
                         isPurchasing = false
@@ -660,9 +692,19 @@ struct EpisodeUnlockPurchaseSheet: View {
         errorMessage = nil
         Task {
             do {
-                try await storeKit.restorePurchases()
-                let account = try await refreshAccount()
-                guard account.isVIP else {
+                let token = try await storeKit.resolveAppAccountToken(using: fetchAppleAccountToken)
+                let receipts = try await storeKit.restoreVIPPurchases(appAccountToken: token)
+                var restoredAccount: EpisodeUnlockAccount?
+                for receipt in receipts {
+                    if receipt.requiresBackendVerification {
+                        let account = try await verifyVIPPurchase(receipt)
+                        await storeKit.completeVIPDelivery(receipt)
+                        restoredAccount = account
+                    } else {
+                        restoredAccount = EpisodeUnlockAccount(balance: balance, isVIP: true)
+                    }
+                }
+                guard let account = restoredAccount, account.isVIP else {
                     throw APIError(code: "VIP_NOT_ACTIVE", message: "未发现可恢复的会员权益")
                 }
                 await MainActor.run {

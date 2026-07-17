@@ -112,6 +112,7 @@ struct RelaxShortApp: App {
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
                 await authStore.bootstrap()
+                await synchronizePendingStoreKitTransactions()
             }
             .onOpenURL { url in
                 _ = GIDSignIn.sharedInstance.handle(url)
@@ -120,6 +121,7 @@ struct RelaxShortApp: App {
                 if newPhase == .active && !showSplash {
                     dependencies.discoveryAnalytics.flushPending()
                     handleHotStartAd()
+                    Task { await synchronizePendingStoreKitTransactions() }
                 }
                 if newPhase == .background {
                     dependencies.discoveryAnalytics.flushForBackground()
@@ -136,5 +138,31 @@ struct RelaxShortApp: App {
         guard adService.wasInBackground else { return }
         guard adService.shouldShowAppOpen, !showHotStartSplash else { return }
         showHotStartSplash = true
+    }
+
+    /// 补偿购买后崩溃、断网或后端暂时失败留下的未完成真实 Apple 交易。
+    private func synchronizePendingStoreKitTransactions() async {
+        do {
+            let token = try await dependencies.detailRepository.fetchAppleAccountToken()
+            let receipts = await storeKit.unfinishedPurchaseReceipts(appAccountToken: token)
+            for receipt in receipts {
+                do {
+                    if ProductID(rawValue: receipt.productID)?.isCoinPackage == true {
+                        let balance = try await dependencies.detailRepository.verifyCoinPurchase(receipt)
+                        await storeKit.completeCoinDelivery(receipt)
+                        coinStore.synchronize(balance: balance)
+                    } else {
+                        let account = try await dependencies.detailRepository.verifyVIPPurchase(receipt)
+                        guard account.isVIP else { continue }
+                        await storeKit.completeVIPDelivery(receipt)
+                        coinStore.synchronize(balance: account.balance)
+                    }
+                } catch {
+                    Logger.store.warning("StoreKit pending delivery failed for \(receipt.productID): \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            Logger.store.warning("StoreKit pending sync unavailable: \(error.localizedDescription)")
+        }
     }
 }

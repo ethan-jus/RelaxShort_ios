@@ -31,6 +31,8 @@ enum APIEndpoint {
     case episodeUnlock(episodeId: String, method: EpisodeUnlockMethod, idempotencyKey: String)
     /// Apple StoreKit 验单并由服务端发放权益
     case applePaymentVerify(receipt: ApplePurchaseReceipt, idempotencyKey: String)
+    /// 获取当前登录用户绑定 StoreKit 交易的稳定 appAccountToken
+    case appleAccountToken
 
     // MARK: - Task15 第二批 v2 端点
 
@@ -91,7 +93,7 @@ extension APIEndpoint {
     /// 真实后端 baseURL
     var baseURL: String {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences,
              .discoveryEvents,
@@ -113,6 +115,7 @@ extension APIEndpoint {
         case .episodePlay(let id):          return "/api/v2/episodes/\(id)/play"
         case .episodeUnlock(let id, let method, _): return "/api/v2/episodes/\(id)/unlock/\(method.rawValue)"
         case .applePaymentVerify:           return "/api/v2/payments/apple/verify"
+        case .appleAccountToken:            return "/api/v2/payments/apple/account-token"
         // ── Task15 v2 ──
         case .home:                         return "/api/v2/home"
         case .searchDefault:                return "/api/v2/search/default"
@@ -160,7 +163,7 @@ extension APIEndpoint {
     var method: HTTPMethod {
         switch self {
         case .appInit:              return .post
-        case .forYou, .seriesEpisodes, .episodePlay,
+        case .forYou, .seriesEpisodes, .episodePlay, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet: return .get
         case .updateUserPreferences: return .patch
@@ -184,7 +187,7 @@ extension APIEndpoint {
     /// 真实 v2 端点标记（用于 X-Device-Id）
     private var requiresRealV2Header: Bool {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
@@ -197,7 +200,7 @@ extension APIEndpoint {
     /// 后端必须从 Bearer 会话解析用户的端点；匿名账户也属于有效会话。
     var requiresAuthenticatedSession: Bool {
         switch self {
-        case .episodePlay, .episodeUnlock, .applePaymentVerify, .userMe, .userWallet, .updateUserPreferences,
+        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark:
             return true
@@ -326,7 +329,7 @@ extension APIEndpoint {
             ]
         case .seriesEpisodes:
             break
-        case .episodePlay, .episodeUnlock, .applePaymentVerify:
+        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken:
             break
         // ── Task15 v2 query params ──
         case .home(let cl, let cc):

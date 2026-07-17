@@ -122,6 +122,14 @@ final class RealDetailRepository: DetailRepositoryProtocol {
         return account
     }
 
+    func fetchAppleAccountToken() async throws -> UUID {
+        let response: AppleAccountTokenResponseDTO = try await client.requestData(.appleAccountToken)
+        guard let token = UUID(uuidString: response.appAccountToken) else {
+            throw APIError(code: "INVALID_APP_ACCOUNT_TOKEN", message: "支付账号标识无效，请稍后重试")
+        }
+        return token
+    }
+
     /// 获取播放地址并按兼容方式更新 episode.videoURL
     func fetchPlaybackURL(episodeId: String) async throws -> String? {
         let source = try await fetchPlayAsset(episodeId: episodeId)

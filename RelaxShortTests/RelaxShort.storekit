@@ -14,7 +14,86 @@
 
   ],
   "products" : [
-
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "A37B2001",
+      "localizations" : [
+        {
+          "description" : "300 coins",
+          "displayName" : "300 Coins",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "300 金币",
+          "displayName" : "300 金币",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.relaxshort.coins.small",
+      "referenceName" : "RelaxShort 300 Coins",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "A37B2002",
+      "localizations" : [
+        {
+          "description" : "700 coins plus 50 bonus coins",
+          "displayName" : "750 Coins",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "700 金币，加赠 50 金币",
+          "displayName" : "750 金币",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.relaxshort.coins.medium",
+      "referenceName" : "RelaxShort 750 Coins",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "19.99",
+      "familyShareable" : false,
+      "internalID" : "A37B2003",
+      "localizations" : [
+        {
+          "description" : "1500 coins plus 150 bonus coins",
+          "displayName" : "1650 Coins",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "1500 金币，加赠 150 金币",
+          "displayName" : "1650 金币",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.relaxshort.coins.large",
+      "referenceName" : "RelaxShort 1650 Coins",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "49.99",
+      "familyShareable" : false,
+      "internalID" : "A37B2004",
+      "localizations" : [
+        {
+          "description" : "4000 coins plus 500 bonus coins",
+          "displayName" : "4500 Coins",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "4000 金币，加赠 500 金币",
+          "displayName" : "4500 金币",
+          "locale" : "zh_CN"
+        }
+      ],
+      "productID" : "com.relaxshort.coins.xlarge",
+      "referenceName" : "RelaxShort 4500 Coins",
+      "type" : "Consumable"
+    }
   ],
   "settings" : {
     "_askToBuyEnabled" : false,

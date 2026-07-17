@@ -87,3 +87,7 @@ struct ApplePaymentVerifyResponseDTO: Decodable {
     let status: String?
     let wallet: WalletSummaryDTO?
 }
+
+struct AppleAccountTokenResponseDTO: Decodable {
+    let appAccountToken: String
+}

@@ -344,6 +344,9 @@ struct MockDetailRepository: DetailRepositoryProtocol {
     func verifyVIPPurchase(_ receipt: ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount {
         EpisodeUnlockAccount(balance: 100, isVIP: true)
     }
+    func fetchAppleAccountToken() async throws -> UUID {
+        UUID(uuidString: "3DF2AF28-C7BD-34BC-B307-01DC6FF85CB5")!
+    }
     func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem] {
         try await Task.sleep(nanoseconds: MC.delay); return Array(MockData.dramas.shuffled().prefix(6))
     }

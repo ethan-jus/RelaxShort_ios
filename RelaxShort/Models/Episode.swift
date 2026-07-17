@@ -58,6 +58,11 @@ struct ApplePurchaseReceipt: Equatable {
     let environment: String
     let appAccountToken: String?
     let coins: Int
+
+    /// Xcode StoreKit Configuration 只用于本地开发；Sandbox/Production 必须由后端验单发货。
+    var requiresBackendVerification: Bool {
+        environment.caseInsensitiveCompare("XCODE") != .orderedSame
+    }
 }
 
 struct EpisodeUnlockFlowState: Equatable {

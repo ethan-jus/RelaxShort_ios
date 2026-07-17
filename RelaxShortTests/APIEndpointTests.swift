@@ -80,4 +80,36 @@ struct APIEndpointTests {
         #expect(endpoint.headers["X-Idempotency-Key"] == "unlock-key")
         #expect(endpoint.requiresAuthenticatedSession)
     }
+
+    @Test
+    func appleAccountTokenEndpointIsAuthenticatedGet() {
+        let endpoint = APIEndpoint.appleAccountToken
+
+        #expect(endpoint.path == "/api/v2/payments/apple/account-token")
+        #expect(endpoint.method == .get)
+        #expect(endpoint.requiresAuthenticatedSession)
+        #expect(endpoint.body == nil)
+    }
+
+    @Test
+    func appleVerifyIncludesAccountTokenAndIdempotencyKey() {
+        let receipt = ApplePurchaseReceipt(
+            transactionID: "2000000123456789",
+            productID: ProductID.vipMonthly.rawValue,
+            environment: "SANDBOX",
+            appAccountToken: "3df2af28-c7bd-34bc-b307-01dc6ff85cb5",
+            coins: 0
+        )
+        let endpoint = APIEndpoint.applePaymentVerify(
+            receipt: receipt,
+            idempotencyKey: "apple-2000000123456789"
+        )
+        let dictionary = endpoint.body.flatMap {
+            try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+        }
+
+        #expect(endpoint.headers["X-Idempotency-Key"] == "apple-2000000123456789")
+        #expect(dictionary?["app_account_token"] as? String == receipt.appAccountToken)
+        #expect(dictionary?["transaction_id"] as? String == receipt.transactionID)
+    }
 }

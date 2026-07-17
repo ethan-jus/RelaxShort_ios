@@ -118,7 +118,9 @@ struct VIPPurchaseState: Equatable {
         case idle
         case purchasing(ProductID)
         case pending(ProductID)
+        case awaitingServerVerification(ProductID)
         case active(ProductID)
+        case serverActive(ProductID?)
         case failed(String)
     }
 
@@ -131,10 +133,16 @@ struct VIPPurchaseState: Equatable {
 
     var activeProductID: ProductID? {
         if case .active(let productID) = phase { return productID }
+        if case .serverActive(let productID) = phase { return productID }
         return nil
     }
 
-    var hasActiveSubscription: Bool { activeProductID != nil }
+    var hasActiveSubscription: Bool {
+        switch phase {
+        case .active, .serverActive: return true
+        default: return false
+        }
+    }
 
     var errorMessage: String? {
         if case .failed(let message) = phase { return message }
@@ -153,6 +161,14 @@ struct VIPPurchaseState: Equatable {
         phase = .pending(productID)
     }
 
+    mutating func awaitServerVerification(productID: ProductID) {
+        phase = .awaitingServerVerification(productID)
+    }
+
+    mutating func activateFromServer(productID: ProductID? = nil) {
+        phase = .serverActive(productID)
+    }
+
     mutating func cancel() {
         phase = .idle
     }
@@ -166,16 +182,20 @@ struct VIPPurchaseState: Equatable {
 
 /// 内购管理器 — 使用 StoreKit 2 API
 ///
-/// VIP 必须使用 StoreKit 2 已加载商品；金币包在 Task37B 前保留原有开发模拟流程。
+/// VIP 与金币包都必须使用 StoreKit 2 已加载商品；真实 Apple 交易由后端验单后才发放权益。
 ///
 /// 用法：
 /// ```swift
 /// @EnvironmentObject var storeKit: StoreKitManager
-/// let receipt = try await storeKit.purchaseCoinPackage(pkg)
-/// try await storeKit.restorePurchases()
+/// let receipt = try await storeKit.purchaseCoinPackage(pkg, appAccountToken: token)
+/// let receipts = try await storeKit.restoreVIPPurchases(appAccountToken: token)
 /// ```
 @MainActor
 final class StoreKitManager: ObservableObject {
+
+    private static let localTestingAccountToken = UUID(
+        uuidString: "A37A0001-0000-4000-8000-000000000001"
+    )!
 
     // MARK: - Published State
 
@@ -229,6 +249,18 @@ final class StoreKitManager: ObservableObject {
 
     // MARK: - Public API — Display Price
 
+    /// Xcode StoreKit Configuration 不依赖后端；真实商店环境必须取得服务端用户令牌。
+    func resolveAppAccountToken(
+        using fetchFromServer: () async throws -> UUID
+    ) async throws -> UUID {
+        if let result = try? await StoreKit.AppTransaction.shared,
+           case .verified(let appTransaction) = result,
+           appTransaction.environment == .xcode {
+            return Self.localTestingAccountToken
+        }
+        return try await fetchFromServer()
+    }
+
     /// 获取产品显示价格
     /// - 优先返回 App Store 真实价格（含本地化货币符号）
     /// - 回退到本地定义的 fallback 价格
@@ -265,7 +297,10 @@ final class StoreKitManager: ObservableObject {
     /// - Parameter package: 要购买的金币包
     /// - Returns: 购买成功后的 Apple 交易凭证；必须交给服务端验单后才能发币。
     /// - Throws: `StoreKitPurchaseError` 或 StoreKit 原生错误
-    func purchaseCoinPackage(_ package: CoinPackage) async throws -> ApplePurchaseReceipt {
+    func purchaseCoinPackage(
+        _ package: CoinPackage,
+        appAccountToken: UUID
+    ) async throws -> ApplePurchaseReceipt {
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
@@ -274,19 +309,18 @@ final class StoreKitManager: ObservableObject {
 
         // ── StoreKit 2 真实购买 ──
         if let product = storeKitProducts[package.productID.rawValue] {
-            let result = try await product.purchase()
+            let result = try await product.purchase(options: [
+                .appAccountToken(appAccountToken)
+            ])
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
-                await transaction.finish()
+                let receipt = purchaseReceipt(from: transaction, coins: totalCoins)
+                if !receipt.requiresBackendVerification {
+                    await transaction.finish()
+                }
                 Logger.store.info("StoreKit: purchased \(product.id) → \(totalCoins) coins")
-                return ApplePurchaseReceipt(
-                    transactionID: String(transaction.id),
-                    productID: transaction.productID,
-                    environment: String(describing: transaction.environment).uppercased(),
-                    appAccountToken: transaction.appAccountToken?.uuidString,
-                    coins: totalCoins
-                )
+                return receipt
 
             case .userCancelled:
                 Logger.store.info("StoreKit: user cancelled purchase")
@@ -301,25 +335,23 @@ final class StoreKitManager: ObservableObject {
             }
         }
 
-        // 金币真实内购属于 Task37B；当前保持既有开发模拟能力。
-        try await Task.sleep(nanoseconds: 800_000_000)
-        Logger.store.info("StoreKit(mock): purchased \(package.productID.rawValue) → \(totalCoins) coins")
-        return ApplePurchaseReceipt(
-            transactionID: "mock-\(UUID().uuidString)",
-            productID: package.productID.rawValue,
-            environment: "SANDBOX",
-            appAccountToken: nil,
-            coins: totalCoins
-        )
+        let error = StoreKitPurchaseError.productUnavailable(package.productID)
+        purchaseError = error.localizedDescription
+        throw error
     }
 
     // MARK: - Public API — Purchase VIP
 
     /// 购买 VIP 订阅
-    /// - Parameter subscription: 要购买的订阅
+    /// - Parameters:
+    ///   - subscription: 要购买的订阅
+    ///   - appAccountToken: 后端为当前登录用户签发的稳定交易归属 UUID
     /// - Returns: 购买成功后的 Apple 交易凭证；必须由服务端验单后才能授予 VIP。
     /// - Throws: `StoreKitPurchaseError` 或 StoreKit 原生错误
-    func purchaseVIP(_ subscription: VIPSubscription) async throws -> ApplePurchaseReceipt {
+    func purchaseVIP(
+        _ subscription: VIPSubscription,
+        appAccountToken: UUID
+    ) async throws -> ApplePurchaseReceipt {
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
@@ -329,20 +361,21 @@ final class StoreKitManager: ObservableObject {
         // ── StoreKit 2 真实购买 ──
         if let product = storeKitProducts[subscription.productID.rawValue] {
             do {
-                let result = try await product.purchase()
+                let result = try await product.purchase(options: [
+                    .appAccountToken(appAccountToken)
+                ])
                 switch result {
                 case .success(let verification):
                     let transaction = try checkVerified(verification)
-                    await transaction.finish()
-                    vipPurchaseState.activate(productID: subscription.productID)
+                    let receipt = purchaseReceipt(from: transaction, coins: 0)
+                    if receipt.requiresBackendVerification {
+                        vipPurchaseState.awaitServerVerification(productID: subscription.productID)
+                    } else {
+                        await transaction.finish()
+                        vipPurchaseState.activate(productID: subscription.productID)
+                    }
                     Logger.store.info("StoreKit: purchased VIP \(product.id)")
-                    return ApplePurchaseReceipt(
-                        transactionID: String(transaction.id),
-                        productID: transaction.productID,
-                        environment: String(describing: transaction.environment).uppercased(),
-                        appAccountToken: transaction.appAccountToken?.uuidString,
-                        coins: 0
-                    )
+                    return receipt
 
                 case .userCancelled:
                     Logger.store.info("StoreKit: user cancelled VIP purchase")
@@ -381,21 +414,86 @@ final class StoreKitManager: ObservableObject {
 
     // MARK: - Public API — Restore Purchases
 
-    /// 恢复购买 — 调用 App Store 同步所有历史交易
-    ///
-    /// 恢复的交易会通过 `Transaction.updates` 异步投递，
-    /// 在 `startTransactionListener()` 中统一处理。
-    func restorePurchases() async throws {
+    /// 恢复购买并返回当前有效 VIP 交易。真实 Apple 环境仍需逐笔交给后端验单。
+    func restoreVIPPurchases(appAccountToken: UUID) async throws -> [ApplePurchaseReceipt] {
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
 
         try await StoreKit.AppStore.sync()
-        await refreshVIPEntitlements()
-        guard vipPurchaseState.hasActiveSubscription else {
+        var receipts: [ApplePurchaseReceipt] = []
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let transaction) = result,
+                  transaction.revocationDate == nil,
+                  transaction.expirationDate.map({ $0 > Date() }) ?? true,
+                  let productID = ProductID(rawValue: transaction.productID),
+                  productID.isVIPSubscription else { continue }
+
+            let receipt = purchaseReceipt(from: transaction, coins: 0)
+            if receipt.requiresBackendVerification {
+                guard transaction.appAccountToken == appAccountToken else { continue }
+                vipPurchaseState.awaitServerVerification(productID: productID)
+            } else {
+                await transaction.finish()
+                vipPurchaseState.activate(productID: productID)
+            }
+            receipts.append(receipt)
+        }
+        guard !receipts.isEmpty else {
             throw StoreKitPurchaseError.noActiveSubscription
         }
         Logger.store.info("StoreKitManager: purchases restored")
+        return receipts
+    }
+
+    /// 后端确认权益已写入后才完成真实 Apple 交易并更新 App 会员态。
+    func completeVIPDelivery(_ receipt: ApplePurchaseReceipt) async {
+        guard let productID = ProductID(rawValue: receipt.productID) else { return }
+        await finishTransaction(receipt)
+        vipPurchaseState.activateFromServer(productID: productID)
+    }
+
+    /// 后端确认金币已记账后才完成真实消耗型交易，失败时保留交易供用户重试。
+    func completeCoinDelivery(_ receipt: ApplePurchaseReceipt) async {
+        await finishTransaction(receipt)
+    }
+
+    /// 返回尚未完成且属于当前 App 用户的真实 Apple 交易，供启动时补偿后端发货。
+    func unfinishedPurchaseReceipts(appAccountToken: UUID) async -> [ApplePurchaseReceipt] {
+        var receipts: [ApplePurchaseReceipt] = []
+        for await result in Transaction.unfinished {
+            guard case .verified(let transaction) = result,
+                  transaction.appAccountToken == appAccountToken,
+                  transaction.revocationDate == nil,
+                  let productID = ProductID(rawValue: transaction.productID),
+                  productID.isCoinPackage || productID.isVIPSubscription else { continue }
+            if productID.isVIPSubscription,
+               transaction.expirationDate.map({ $0 <= Date() }) ?? false {
+                continue
+            }
+            let receipt = purchaseReceipt(from: transaction, coins: 0)
+            guard receipt.requiresBackendVerification else { continue }
+            receipts.append(receipt)
+        }
+        return receipts
+    }
+
+    private func finishTransaction(_ receipt: ApplePurchaseReceipt) async {
+        for await result in Transaction.all {
+            guard case .verified(let transaction) = result,
+                  String(transaction.id) == receipt.transactionID else { continue }
+            await transaction.finish()
+            break
+        }
+    }
+
+    /// 使用后端钱包/VIP 查询结果同步会员页，不能用本地 StoreKit 结果代替真实服务端权益。
+    func synchronizeServerVIP(isActive: Bool) {
+        if isActive {
+            vipPurchaseState.activateFromServer()
+        } else if case .serverActive = vipPurchaseState.phase {
+            vipPurchaseState.cancel()
+        }
     }
 
     /// 以 StoreKit 当前有效权益为本地测试环境的唯一会员状态来源。
@@ -406,14 +504,15 @@ final class StoreKitManager: ObservableObject {
                   transaction.revocationDate == nil,
                   transaction.expirationDate.map({ $0 > Date() }) ?? true,
                   let productID = ProductID(rawValue: transaction.productID),
-                  ProductID.supportedVIPSubscriptions.contains(productID) else { continue }
+                  productID.isVIPSubscription,
+                  purchaseReceipt(from: transaction, coins: 0).requiresBackendVerification == false else { continue }
             activeProductID = productID
             break
         }
 
         if let activeProductID {
             vipPurchaseState.activate(productID: activeProductID)
-        } else if vipPurchaseState.hasActiveSubscription {
+        } else if case .active = vipPurchaseState.phase {
             vipPurchaseState.cancel()
         }
     }
@@ -423,15 +522,23 @@ final class StoreKitManager: ObservableObject {
     /// 启动 StoreKit 2 Transaction 监听
     ///
     /// 监听所有通过 `Transaction.updates` 投递的新交易
-    /// （包括购买、恢复、家庭共享等），自动验证并完成。
+    /// （包括购买、恢复、家庭共享等）。Xcode 本地交易可直接完成，真实交易等待后端发货。
     private func startTransactionListener() {
         transactionListenerTask = Task {
             for await result in Transaction.updates {
                 switch result {
                 case .verified(let transaction):
-                    await transaction.finish()
-                    await self.refreshVIPEntitlements()
-                    Logger.store.info("StoreKitManager: transaction finished for \(transaction.productID)")
+                    let receipt = self.purchaseReceipt(from: transaction, coins: 0)
+                    if receipt.requiresBackendVerification {
+                        if let productID = ProductID(rawValue: transaction.productID), productID.isVIPSubscription {
+                            self.vipPurchaseState.awaitServerVerification(productID: productID)
+                        }
+                        Logger.store.info("StoreKitManager: transaction awaits server verification for \(transaction.productID)")
+                    } else {
+                        await transaction.finish()
+                        await self.refreshVIPEntitlements()
+                        Logger.store.info("StoreKitManager: local transaction finished for \(transaction.productID)")
+                    }
                 case .unverified:
                     Logger.store.error("StoreKitManager: unverified transaction received")
                 }
@@ -449,6 +556,16 @@ final class StoreKitManager: ObservableObject {
         case .unverified:
             throw StoreKitPurchaseError.unverified
         }
+    }
+
+    private func purchaseReceipt(from transaction: StoreKit.Transaction, coins: Int) -> ApplePurchaseReceipt {
+        ApplePurchaseReceipt(
+            transactionID: String(transaction.id),
+            productID: transaction.productID,
+            environment: String(describing: transaction.environment).uppercased(),
+            appAccountToken: transaction.appAccountToken?.uuidString,
+            coins: coins
+        )
     }
 
     // MARK: - Private — Fallback Price

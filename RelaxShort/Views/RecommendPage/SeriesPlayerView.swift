@@ -431,8 +431,8 @@ struct SeriesPlayerView: View {
                     verifyVIPPurchase: { receipt in
                         try await dependencies.detailRepository.verifyVIPPurchase(receipt)
                     },
-                    refreshAccount: {
-                        try await dependencies.detailRepository.fetchUnlockAccount()
+                    fetchAppleAccountToken: {
+                        try await dependencies.detailRepository.fetchAppleAccountToken()
                     },
                     onCoinPurchaseCompleted: { balance in
                         if var latest = unlockState {

@@ -184,7 +184,7 @@ final class APIClient {
         let method = request.httpMethod ?? "?"
         let url = request.url?.absoluteString ?? "?"
         logger.info("⬆️ \(method) \(url)")
-        if url.contains("/events/discovery") { return }
+        if url.contains("/events/discovery") || url.contains("/payments/apple") { return }
         if let body = request.httpBody,
            let json = try? JSONSerialization.jsonObject(with: body) {
             logger.debug("    Body: \(String(describing: json))")

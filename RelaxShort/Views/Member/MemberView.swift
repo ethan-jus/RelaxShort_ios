@@ -117,6 +117,7 @@ struct MemberView: View {
 
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject private var storeKit: StoreKitManager
+    @EnvironmentObject private var dependencies: DependencyContainer
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var viewModel: MemberViewModel
@@ -228,6 +229,7 @@ struct MemberView: View {
         .onAppear {
             viewModel.loadIfNeeded()
             viewModel.startPromotionCountdown()
+            Task { await synchronizeServerMembership() }
         }
         .onDisappear {
             viewModel.stopPromotionCountdown()
@@ -318,7 +320,17 @@ extension MemberView {
         guard !storeKit.isPurchasing else { return }
         Task {
             do {
-                try await storeKit.restorePurchases()
+                let token = try await storeKit.resolveAppAccountToken {
+                    try await dependencies.detailRepository.fetchAppleAccountToken()
+                }
+                let receipts = try await storeKit.restoreVIPPurchases(appAccountToken: token)
+                for receipt in receipts where receipt.requiresBackendVerification {
+                    let account = try await dependencies.detailRepository.verifyVIPPurchase(receipt)
+                    guard account.isVIP else {
+                        throw APIError(code: "VIP_NOT_ACTIVE", message: "会员权益尚未生效，请稍后重试")
+                    }
+                    await storeKit.completeVIPDelivery(receipt)
+                }
                 showPurchaseMessage("profile.membership_active".localized)
             } catch {
                 showPurchaseMessage(error.localizedDescription)
@@ -672,7 +684,20 @@ extension MemberView {
 
         Task {
             do {
-                _ = try await storeKit.purchaseVIP(subscription)
+                let token = try await storeKit.resolveAppAccountToken {
+                    try await dependencies.detailRepository.fetchAppleAccountToken()
+                }
+                let receipt = try await storeKit.purchaseVIP(
+                    subscription,
+                    appAccountToken: token
+                )
+                if receipt.requiresBackendVerification {
+                    let account = try await dependencies.detailRepository.verifyVIPPurchase(receipt)
+                    guard account.isVIP else {
+                        throw APIError(code: "VIP_NOT_ACTIVE", message: "会员权益尚未生效，请稍后重试")
+                    }
+                    await storeKit.completeVIPDelivery(receipt)
+                }
                 showPurchaseMessage("profile.membership_active".localized)
             } catch StoreKitPurchaseError.userCancelled {
                 return
@@ -685,6 +710,17 @@ extension MemberView {
     private func showPurchaseMessage(_ message: String) {
         purchaseMessage = message
         showsPurchaseMessage = true
+    }
+
+    private func synchronizeServerMembership() async {
+        do {
+            let account = try await dependencies.detailRepository.fetchUnlockAccount()
+            storeKit.synchronizeServerVIP(isActive: account.isVIP)
+        } catch {
+            #if DEBUG
+            Logger.ui.warning("MemberView: membership sync failed — \(error.localizedDescription)")
+            #endif
+        }
     }
 }
 
@@ -725,5 +761,6 @@ extension View {
     )
         .environmentObject(AppStore())
         .environmentObject(StoreKitManager())
+        .environmentObject(DependencyContainer())
         .preferredColorScheme(.dark)
 }

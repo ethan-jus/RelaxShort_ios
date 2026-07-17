@@ -19,6 +19,19 @@ struct StoreKitVIPPurchaseTests {
     }
 
     @Test
+    func localStoreKitConfigurationProvidesAllCoinProducts() throws {
+        let bundle = Bundle(for: StoreKitVIPPurchaseBundleToken.self)
+        let url = try #require(bundle.url(forResource: "RelaxShort", withExtension: "storekit"))
+        let data = try Data(contentsOf: url)
+        let root = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let products = try #require(root["products"] as? [[String: Any]])
+        let configuredIDs = Set(products.compactMap { $0["productID"] as? String })
+        let expectedIDs = Set(ProductID.allCases.filter(\.isCoinPackage).map(\.rawValue))
+
+        #expect(configuredIDs == expectedIDs)
+    }
+
+    @Test
     func memberCatalogUsesWeeklyMonthlyAndYearlyProducts() {
         #expect(ProductID.supportedVIPSubscriptions == [
             .vipWeekly,
@@ -41,6 +54,36 @@ struct StoreKitVIPPurchaseTests {
         #expect(state.activeProductID == .vipMonthly)
         #expect(state.hasActiveSubscription)
         #expect(state.isPurchasing == false)
+    }
+
+    @Test
+    func realAppleTransactionWaitsForServerDelivery() {
+        var state = VIPPurchaseState()
+
+        state.awaitServerVerification(productID: .vipMonthly)
+
+        #expect(state.phase == .awaitingServerVerification(.vipMonthly))
+        #expect(state.hasActiveSubscription == false)
+    }
+
+    @Test
+    func onlyXcodeTransactionsCanGrantLocalVIP() {
+        let local = ApplePurchaseReceipt(
+            transactionID: "1", productID: ProductID.vipWeekly.rawValue,
+            environment: "XCODE", appAccountToken: nil, coins: 0
+        )
+        let sandbox = ApplePurchaseReceipt(
+            transactionID: "2", productID: ProductID.vipWeekly.rawValue,
+            environment: "SANDBOX", appAccountToken: UUID().uuidString, coins: 0
+        )
+        let production = ApplePurchaseReceipt(
+            transactionID: "3", productID: ProductID.vipWeekly.rawValue,
+            environment: "PRODUCTION", appAccountToken: UUID().uuidString, coins: 0
+        )
+
+        #expect(local.requiresBackendVerification == false)
+        #expect(sandbox.requiresBackendVerification)
+        #expect(production.requiresBackendVerification)
     }
 
     @Test

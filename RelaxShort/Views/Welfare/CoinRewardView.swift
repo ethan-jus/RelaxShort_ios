@@ -12,6 +12,7 @@ struct CoinRewardView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var coinStore: CoinStore
     @EnvironmentObject var storeKitManager: StoreKitManager
+    @EnvironmentObject private var dependencies: DependencyContainer
     @StateObject private var viewModel: CoinRewardViewModel
     private let mode: CoinRewardPresentationMode
 
@@ -75,7 +76,13 @@ struct CoinRewardView: View {
                 CoinPurchaseSheet(
                     coinStore: coinStore,
                     storeKit: storeKitManager,
-                    onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { showCoinPurchase = false } }
+                    onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { showCoinPurchase = false } },
+                    fetchAppleAccountToken: {
+                        try await dependencies.detailRepository.fetchAppleAccountToken()
+                    },
+                    verifyPurchase: { receipt in
+                        try await dependencies.detailRepository.verifyCoinPurchase(receipt)
+                    }
                 )
                 .transition(.move(edge: .bottom))
                 .zIndex(100)
@@ -360,5 +367,6 @@ struct CoinRewardView: View {
     CoinRewardView()
         .environmentObject(CoinStore())
         .environmentObject(StoreKitManager())
+        .environmentObject(DependencyContainer())
         .preferredColorScheme(.dark)
 }
