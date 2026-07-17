@@ -243,11 +243,12 @@
 "member.discount" = "限时优惠";
 "member.plan.weekly" = "周会员";
 "member.plan.yearly" = "年会员";
-"member.plan.weekly_detail" = "$12.99/周，前3周优惠价，之后$19.99/周";
-"member.plan.yearly_detail" = "$149.99/年";
+"member.plan.weekly_detail" = "首购优惠结束后按周自动续费。";
+"membership.monthly_detail" = "按月自动续费。";
+"member.plan.yearly_detail" = "按年自动续费。";
 "member.why_join" = "为什么加入会员？";
 "member.benefit.unlimited" = "无限畅看";
-"member.benefit.unlimited_detail" = "16,000+ 部剧集免费看，每周稳定上新 100+ 部";
+"member.benefit.unlimited_detail" = "订阅有效期内畅看付费剧集和会员专属剧集。";
 "member.benefit.download" = "离线下载";
 "member.benefit.points" = "会员积分";
 "member.benefit.exclusive" = "会员专属剧集";
@@ -273,6 +274,24 @@
 "member.auto_renew" = "自动续费，可随时取消";
 "member.content.empty" = "暂无会员专属剧集";
 "member.content.failed" = "会员内容加载失败";
+"member.promotion.weekly_intro" = "前 %2$d 周每周 %1$@，之后恢复周套餐标准价格。";
+"member.disclosure.access" = "会员仅在订阅有效期内解锁付费剧集和会员专属剧集；金币为单独购买的消耗型商品。";
+"member.disclosure.renewal" = "费用将从 Apple 账户扣除。除非在当前周期结束前至少 24 小时取消，否则订阅会自动续费。";
+"member.disclosure.restore" = "“恢复购买”仅恢复符合条件的 Apple 会员订阅，不会恢复已购买的消耗型金币。";
+"member.terms" = "使用条款";
+"member.privacy" = "隐私政策";
+"member.manage_subscription" = "管理订阅";
+"member.manage_subscription_unavailable" = "暂时无法打开订阅管理，请稍后重试。";
+"member.go_to_profile" = "前往个人中心";
+"member.login_required" = "购买或恢复会员前，请先前往个人中心登录。";
+"member.price_unavailable" = "暂不可用";
+"member.retry_app_store" = "重新连接 App Store";
+"member.plans_unavailable" = "会员套餐当前不可用，请稍后重试。";
+"member.standard_price" = "标准续费价格：";
+"member.legal_unavailable" = "使用条款和隐私政策暂未加载，加载完成前无法购买。";
+"member.cta.subscribe" = "订阅%1$@ · %2$@";
+"common.cancel" = "取消";
+"common.back" = "返回";
 
 /* ---- Profile (Task33) ---- */
 "profile.sign_in" = "登录";

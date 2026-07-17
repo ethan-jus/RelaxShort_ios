@@ -5,7 +5,7 @@ import SwiftUI
 
 /// StoreKit 产品标识符枚举
 /// 映射到 App Store Connect 中配置的 Product ID
-enum ProductID: String, CaseIterable {
+enum ProductID: String, CaseIterable, Hashable {
     // 金币包
     case coinsSmall  = "com.relaxshort.coins.small"
     case coinsMedium = "com.relaxshort.coins.medium"
@@ -84,6 +84,36 @@ struct VIPSubscription: Identifiable, Equatable {
     let period: String          // "周" / "月" / "季" / "年"
     let price: String
     let dailyEquivalent: String // "¥1.86/天"
+}
+
+/// StoreKit 已确认用户有资格使用的 introductory offer 展示数据。
+struct VIPIntroductoryOfferDisplay: Equatable {
+    let displayPrice: String
+    let paymentMode: MemberPromotionPaymentMode
+    let periodUnit: MemberPromotionPeriodUnit
+    let periodValue: Int
+    let periodCount: Int
+
+    func matches(_ promotion: MemberPromotion) -> Bool {
+        promotion.offerType == .introductory
+            && paymentMode == promotion.paymentMode
+            && periodUnit == promotion.periodUnit
+            && periodValue == promotion.periodValue
+            && periodCount == promotion.periodCount
+    }
+}
+
+enum StoreKitEntitlementPolicy {
+    /// currentEntitlements 已包含订阅宽限期；恢复与常规刷新都只排除撤销交易。
+    static func shouldKeepCurrentEntitlement(
+        revocationDate: Date?,
+        expirationDate: Date?,
+        now: Date
+    ) -> Bool {
+        _ = expirationDate
+        _ = now
+        return revocationDate == nil
+    }
 }
 
 // MARK: - StoreKit Purchase Error
@@ -203,7 +233,10 @@ final class StoreKitManager: ObservableObject {
     @Published var purchaseError: String?
     /// StoreKit 产品是否已加载（从 App Store 成功获取）
     @Published var isStoreKitReady: Bool = false
+    @Published private(set) var isLoadingProducts = false
     @Published private(set) var vipPurchaseState = VIPPurchaseState()
+    @Published private(set) var vipIntroductoryOffers:
+        [ProductID: VIPIntroductoryOfferDisplay] = [:]
 
     // MARK: - Private State
 
@@ -269,6 +302,17 @@ final class StoreKitManager: ObservableObject {
             ?? fallbackPrice(for: productID)
     }
 
+    /// Member 订阅页只允许展示 StoreKit 返回的本地化价格，不使用硬编码币种回退。
+    func storeDisplayPrice(for productID: ProductID) -> String? {
+        storeKitProducts[productID.rawValue]?.displayPrice
+    }
+
+    func introductoryOffer(
+        for productID: ProductID
+    ) -> VIPIntroductoryOfferDisplay? {
+        vipIntroductoryOffers[productID]
+    }
+
     // MARK: - Public API — Request Products
 
     /// 从 App Store 获取产品信息
@@ -276,10 +320,38 @@ final class StoreKitManager: ObservableObject {
     /// 成功时将产品缓存到 `storeKitProducts`，
     /// 失败时清空缓存、回退到 mock 模式。
     func requestProducts() async {
+        guard !isLoadingProducts else { return }
+        isLoadingProducts = true
+        defer { isLoadingProducts = false }
         do {
             let allIDs = ProductID.allCases.map(\.rawValue)
             let products = try await Product.products(for: Set(allIDs))
             storeKitProducts = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
+            var eligibleOffers:
+                [ProductID: VIPIntroductoryOfferDisplay] = [:]
+            for productID in ProductID.supportedVIPSubscriptions {
+                guard let product = storeKitProducts[productID.rawValue],
+                      let subscription = product.subscription,
+                      let offer = subscription.introductoryOffer,
+                      offer.type == .introductory,
+                      let paymentMode = memberPaymentMode(
+                        for: offer.paymentMode
+                      ),
+                      let periodUnit = memberPeriodUnit(
+                        for: offer.period.unit
+                      ),
+                      await subscription.isEligibleForIntroOffer else {
+                    continue
+                }
+                eligibleOffers[productID] = VIPIntroductoryOfferDisplay(
+                    displayPrice: offer.displayPrice,
+                    paymentMode: paymentMode,
+                    periodUnit: periodUnit,
+                    periodValue: offer.period.value,
+                    periodCount: offer.periodCount
+                )
+            }
+            vipIntroductoryOffers = eligibleOffers
             isStoreKitReady = ProductID.supportedVIPSubscriptions.allSatisfy {
                 storeKitProducts[$0.rawValue] != nil
             }
@@ -287,6 +359,7 @@ final class StoreKitManager: ObservableObject {
         } catch {
             Logger.store.warning("StoreKitManager: product request failed — \(error.localizedDescription)")
             storeKitProducts = [:]
+            vipIntroductoryOffers = [:]
             isStoreKitReady = false
         }
     }
@@ -424,8 +497,11 @@ final class StoreKitManager: ObservableObject {
         var receipts: [ApplePurchaseReceipt] = []
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
-                  transaction.revocationDate == nil,
-                  transaction.expirationDate.map({ $0 > Date() }) ?? true,
+                  StoreKitEntitlementPolicy.shouldKeepCurrentEntitlement(
+                    revocationDate: transaction.revocationDate,
+                    expirationDate: transaction.expirationDate,
+                    now: Date()
+                  ),
                   let productID = ProductID(rawValue: transaction.productID),
                   productID.isVIPSubscription else { continue }
 
@@ -501,8 +577,11 @@ final class StoreKitManager: ObservableObject {
         var activeProductID: ProductID?
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result,
-                  transaction.revocationDate == nil,
-                  transaction.expirationDate.map({ $0 > Date() }) ?? true,
+                  StoreKitEntitlementPolicy.shouldKeepCurrentEntitlement(
+                    revocationDate: transaction.revocationDate,
+                    expirationDate: transaction.expirationDate,
+                    now: Date()
+                  ),
                   let productID = ProductID(rawValue: transaction.productID),
                   productID.isVIPSubscription,
                   purchaseReceipt(from: transaction, coins: 0).requiresBackendVerification == false else { continue }
@@ -566,6 +645,29 @@ final class StoreKitManager: ObservableObject {
             appAccountToken: transaction.appAccountToken?.uuidString,
             coins: coins
         )
+    }
+
+    private func memberPaymentMode(
+        for paymentMode: Product.SubscriptionOffer.PaymentMode
+    ) -> MemberPromotionPaymentMode? {
+        switch paymentMode {
+        case .payAsYouGo: return .payAsYouGo
+        case .payUpFront: return .payUpFront
+        case .freeTrial: return .freeTrial
+        default: return nil
+        }
+    }
+
+    private func memberPeriodUnit(
+        for unit: Product.SubscriptionPeriod.Unit
+    ) -> MemberPromotionPeriodUnit? {
+        switch unit {
+        case .day: return .day
+        case .week: return .week
+        case .month: return .month
+        case .year: return .year
+        default: return nil
+        }
     }
 
     // MARK: - Private — Fallback Price

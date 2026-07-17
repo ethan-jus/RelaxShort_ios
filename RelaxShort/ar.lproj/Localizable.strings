@@ -238,11 +238,12 @@
 "member.discount" = "خصم";
 "member.plan.weekly" = "أسبوعي";
 "member.plan.yearly" = "سنوي";
-"member.plan.weekly_detail" = "$12.99/أسبوع، أول 3 أسابيع، ثم $19.99/أسبوع";
-"member.plan.yearly_detail" = "$149.99/سنة";
+"member.plan.weekly_detail" = "تتم الفوترة أسبوعيًا بعد انتهاء أي عرض تمهيدي.";
+"membership.monthly_detail" = "تتم الفوترة شهريًا.";
+"member.plan.yearly_detail" = "تتم الفوترة سنويًا.";
 "member.why_join" = "لماذا تنضم؟";
 "member.benefit.unlimited" = "وصول غير محدود";
-"member.benefit.unlimited_detail" = "أكثر من 16,000 مسلسل مجاني، أكثر من 100 مسلسل جديد أسبوعياً";
+"member.benefit.unlimited_detail" = "شاهد الحلقات المدفوعة والحصرية أثناء سريان الاشتراك.";
 "member.benefit.download" = "تنزيل";
 "member.benefit.points" = "نقاط العضوية";
 "member.benefit.exclusive" = "مسلسلات حصرية للأعضاء";
@@ -268,6 +269,24 @@
 "member.auto_renew" = "تجديد تلقائي، يمكنك الإلغاء في أي وقت";
 "member.content.empty" = "لا توجد مسلسلات حصرية متاحة";
 "member.content.failed" = "فشل تحميل محتوى العضوية";
+"member.promotion.weekly_intro" = "%@ أسبوعيًا لأول %d أسابيع، ثم يُطبق السعر الأسبوعي القياسي.";
+"member.disclosure.access" = "يفتح الاشتراك الحلقات المدفوعة والحصرية فقط أثناء سريانه. تُباع العملات بشكل منفصل.";
+"member.disclosure.renewal" = "يتم الخصم من حساب Apple. يتجدد الاشتراك تلقائيًا ما لم يتم إلغاؤه قبل نهاية الفترة الحالية بـ24 ساعة على الأقل.";
+"member.disclosure.restore" = "تستعيد ميزة استعادة المشتريات اشتراكات Apple المؤهلة فقط؛ ولا يمكن استعادة العملات الاستهلاكية.";
+"member.terms" = "شروط الاستخدام";
+"member.privacy" = "سياسة الخصوصية";
+"member.manage_subscription" = "إدارة الاشتراك";
+"member.manage_subscription_unavailable" = "إدارة الاشتراك غير متاحة مؤقتًا.";
+"member.go_to_profile" = "الانتقال إلى الملف الشخصي";
+"member.login_required" = "سجّل الدخول من الملف الشخصي قبل شراء العضوية أو استعادتها.";
+"member.price_unavailable" = "غير متاح";
+"member.retry_app_store" = "إعادة محاولة App Store";
+"member.plans_unavailable" = "خطط العضوية غير متاحة حاليًا. يُرجى المحاولة مرة أخرى.";
+"member.standard_price" = "سعر التجديد القياسي:";
+"member.legal_unavailable" = "روابط الشروط والخصوصية غير متاحة. تم تعطيل الشراء حتى يتم تحميلها.";
+"member.cta.subscribe" = "الاشتراك في %@ · %@";
+"common.cancel" = "إلغاء";
+"common.back" = "رجوع";
 
 /* ---- Profile (Task33) ---- */
 "profile.sign_in" = "تسجيل الدخول";

@@ -238,11 +238,12 @@
 "member.discount" = "割引";
 "member.plan.weekly" = "週間";
 "member.plan.yearly" = "年間";
-"member.plan.weekly_detail" = "$12.99/週、最初の3週間、その後$19.99/週";
-"member.plan.yearly_detail" = "$149.99/年";
+"member.plan.weekly_detail" = "紹介オファー終了後は週ごとに請求されます。";
+"membership.monthly_detail" = "月ごとに請求されます。";
+"member.plan.yearly_detail" = "年ごとに請求されます。";
 "member.why_join" = "メンバー特典";
 "member.benefit.unlimited" = "見放題";
-"member.benefit.unlimited_detail" = "16,000本以上のドラマが見放題、毎週100本以上追加";
+"member.benefit.unlimited_detail" = "登録期間中、有料エピソードと会員限定エピソードを視聴できます。";
 "member.benefit.download" = "ダウンロード";
 "member.benefit.points" = "メンバーポイント";
 "member.benefit.exclusive" = "メンバー限定ドラマ";
@@ -268,6 +269,24 @@
 "member.auto_renew" = "自動更新、いつでもキャンセル可能";
 "member.content.empty" = "メンバー限定ドラマはありません";
 "member.content.failed" = "メンバーコンテンツの読み込みに失敗しました";
+"member.promotion.weekly_intro" = "最初の%2$d週間は週額%1$@、その後は通常の週額になります。";
+"member.disclosure.access" = "登録が有効な期間のみ、有料および会員限定エピソードを利用できます。コインは別売りです。";
+"member.disclosure.renewal" = "料金はApple Accountに請求されます。期間終了の24時間以上前に解約しない限り自動更新されます。";
+"member.disclosure.restore" = "「購入を復元」は対象のAppleサブスクリプションのみを復元します。消費型コインは復元できません。";
+"member.terms" = "利用規約";
+"member.privacy" = "プライバシーポリシー";
+"member.manage_subscription" = "サブスクリプションを管理";
+"member.manage_subscription_unavailable" = "現在サブスクリプション管理を利用できません。";
+"member.go_to_profile" = "プロフィールへ";
+"member.login_required" = "購入または復元する前に、プロフィールからサインインしてください。";
+"member.price_unavailable" = "利用できません";
+"member.retry_app_store" = "App Storeに再接続";
+"member.plans_unavailable" = "メンバーシッププランは現在利用できません。もう一度お試しください。";
+"member.standard_price" = "通常の更新価格：";
+"member.legal_unavailable" = "利用規約とプライバシーのリンクを読み込めません。読み込みが完了するまで購入できません。";
+"member.cta.subscribe" = "%@に登録 · %@";
+"common.cancel" = "キャンセル";
+"common.back" = "戻る";
 
 /* ---- Profile (Task33) ---- */
 "profile.sign_in" = "ログイン";

@@ -238,11 +238,12 @@
 "member.discount" = "Descuento";
 "member.plan.weekly" = "Semanal";
 "member.plan.yearly" = "Anual";
-"member.plan.weekly_detail" = "$12.99/semana, primeras 3 semanas, luego $19.99/semana";
-"member.plan.yearly_detail" = "$149.99/año";
+"member.plan.weekly_detail" = "Facturación semanal después de cualquier oferta de introducción.";
+"membership.monthly_detail" = "Facturación mensual.";
+"member.plan.yearly_detail" = "Facturación anual.";
 "member.why_join" = "¿Por qué unirse?";
 "member.benefit.unlimited" = "Acceso Ilimitado";
-"member.benefit.unlimited_detail" = "Más de 16,000 series gratis, más de 100 nuevas cada semana";
+"member.benefit.unlimited_detail" = "Mira episodios de pago y exclusivos mientras la suscripción esté activa.";
 "member.benefit.download" = "Descargar";
 "member.benefit.points" = "Puntos de Miembro";
 "member.benefit.exclusive" = "Series Exclusivas";
@@ -268,6 +269,24 @@
 "member.auto_renew" = "Renovación automática, cancela cuando quieras";
 "member.content.empty" = "No hay series exclusivas disponibles";
 "member.content.failed" = "Error al cargar el contenido de miembro";
+"member.promotion.weekly_intro" = "%@ por semana durante las primeras %d semanas; después se aplica el precio semanal estándar.";
+"member.disclosure.access" = "La suscripción desbloquea episodios de pago y exclusivos solo mientras esté activa. Las monedas se venden por separado.";
+"member.disclosure.renewal" = "El pago se carga a tu Cuenta de Apple. La suscripción se renueva automáticamente salvo que canceles al menos 24 horas antes.";
+"member.disclosure.restore" = "Restaurar compras solo restaura suscripciones de Apple elegibles; las monedas consumibles no se pueden restaurar.";
+"member.terms" = "Términos de uso";
+"member.privacy" = "Política de privacidad";
+"member.manage_subscription" = "Gestionar suscripción";
+"member.manage_subscription_unavailable" = "La gestión de suscripciones no está disponible temporalmente.";
+"member.go_to_profile" = "Ir al perfil";
+"member.login_required" = "Inicia sesión desde Perfil antes de comprar o restaurar una suscripción.";
+"member.price_unavailable" = "No disponible";
+"member.retry_app_store" = "Reintentar App Store";
+"member.plans_unavailable" = "Los planes de membresía no están disponibles. Inténtalo de nuevo.";
+"member.standard_price" = "Precio de renovación estándar:";
+"member.legal_unavailable" = "Los enlaces de términos y privacidad no están disponibles. La compra queda desactivada hasta que se carguen.";
+"member.cta.subscribe" = "Suscribirse a %@ · %@";
+"common.cancel" = "Cancelar";
+"common.back" = "Atrás";
 
 /* ---- Profile (Task33) ---- */
 "profile.sign_in" = "Iniciar sesión";

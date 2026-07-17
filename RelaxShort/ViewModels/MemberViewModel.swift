@@ -23,10 +23,13 @@ final class MemberViewModel: ObservableObject {
     @Published private(set) var loadState: LoadState = .idle
     @Published private(set) var backgroundPosters: [DramaItem] = []
     @Published private(set) var memberOnlyDramas: [DramaItem] = []
+    @Published private(set) var plans: [MemberPlanDisplayOption] = []
+    @Published private(set) var benefits: [MemberBenefitDisplayItem] = []
+    @Published private(set) var legalLinks: MemberLegalLinks?
     @Published var selectedPlanID = MemberDisplayConfig.defaultSelectedPlanID
 
-    /// 促销倒计时剩余秒数，页面可见期间从 1 小时本地递减，不持久化
-    @Published private(set) var promotionRemainingSeconds: Int = MemberDisplayConfig.promotionDuration
+    /// 当前时间只用于计算服务端促销窗口倒计时，不创建本地活动。
+    @Published private(set) var currentDate = Date()
 
     // MARK: - Dependencies
 
@@ -63,9 +66,7 @@ final class MemberViewModel: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard let self else { break }
-                if self.promotionRemainingSeconds > 0 {
-                    self.promotionRemainingSeconds -= 1
-                }
+                self.currentDate = Date()
             }
         }
     }
@@ -76,11 +77,17 @@ final class MemberViewModel: ObservableObject {
         countdownTask = nil
     }
 
-    /// 促销倒计时展示文本，始终输出两位小时、分钟和秒。
-    var formattedPromotionCountdown: String {
-        let hours = promotionRemainingSeconds / 3_600
-        let minutes = (promotionRemainingSeconds % 3_600) / 60
-        let seconds = promotionRemainingSeconds % 60
+    /// 促销倒计时展示文本，活动过期后返回 nil。
+    func formattedPromotionCountdown(
+        for promotion: MemberPromotion
+    ) -> String? {
+        let remaining = Int(
+            promotion.endsAt.timeIntervalSince(currentDate)
+        )
+        guard remaining > 0 else { return nil }
+        let hours = remaining / 3_600
+        let minutes = (remaining % 3_600) / 60
+        let seconds = remaining % 60
         return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
@@ -95,10 +102,20 @@ final class MemberViewModel: ObservableObject {
             )
             backgroundPosters = content.backgroundPosters
             memberOnlyDramas = content.memberOnlyDramas
+            // 服务端可售目录是唯一依据；空数组表示当前没有可售套餐。
+            plans = content.plans
+            benefits = content.benefits
+            legalLinks = content.legalLinks
+            if !plans.contains(where: { $0.id == selectedPlanID }) {
+                selectedPlanID = plans.first?.id
+                    ?? MemberDisplayConfig.defaultSelectedPlanID
+            }
             hasLoaded = true
             loadState = (content.backgroundPosters.isEmpty && content.memberOnlyDramas.isEmpty) ? .empty : .loaded
         } catch {
-            // 静态套餐和权益仍可浏览，仅真实剧集区显示错误
+            plans = []
+            benefits = []
+            legalLinks = nil
             loadState = .failed(error.localizedDescription)
             Logger.viewModel.error("MemberViewModel loadContent failed: \(error)")
         }

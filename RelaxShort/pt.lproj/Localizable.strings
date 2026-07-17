@@ -238,11 +238,12 @@
 "member.discount" = "Desconto";
 "member.plan.weekly" = "Semanal";
 "member.plan.yearly" = "Anual";
-"member.plan.weekly_detail" = "$12.99/semana, primeiras 3 semanas, depois $19.99/semana";
-"member.plan.yearly_detail" = "$149.99/ano";
+"member.plan.weekly_detail" = "Cobrança semanal após qualquer oferta introdutória.";
+"membership.monthly_detail" = "Cobrança mensal.";
+"member.plan.yearly_detail" = "Cobrança anual.";
 "member.why_join" = "Por que Assinar?";
 "member.benefit.unlimited" = "Acesso Ilimitado";
-"member.benefit.unlimited_detail" = "Mais de 16.000 séries grátis, mais de 100 novas por semana";
+"member.benefit.unlimited_detail" = "Assista a episódios pagos e exclusivos enquanto a assinatura estiver ativa.";
 "member.benefit.download" = "Download";
 "member.benefit.points" = "Pontos de Membro";
 "member.benefit.exclusive" = "Séries Exclusivas";
@@ -268,6 +269,24 @@
 "member.auto_renew" = "Renovação automática, cancele quando quiser";
 "member.content.empty" = "Nenhuma série exclusiva disponível";
 "member.content.failed" = "Falha ao carregar conteúdo de membro";
+"member.promotion.weekly_intro" = "%@ por semana nas primeiras %d semanas; depois, aplica-se o preço semanal padrão.";
+"member.disclosure.access" = "A assinatura desbloqueia episódios pagos e exclusivos somente enquanto estiver ativa. As moedas são vendidas separadamente.";
+"member.disclosure.renewal" = "O pagamento é cobrado na sua Conta Apple. A assinatura é renovada automaticamente, salvo cancelamento com pelo menos 24 horas de antecedência.";
+"member.disclosure.restore" = "Restaurar compras restaura apenas assinaturas Apple elegíveis; moedas consumíveis não podem ser restauradas.";
+"member.terms" = "Termos de Uso";
+"member.privacy" = "Política de Privacidade";
+"member.manage_subscription" = "Gerenciar Assinatura";
+"member.manage_subscription_unavailable" = "O gerenciamento de assinatura está temporariamente indisponível.";
+"member.go_to_profile" = "Ir para o Perfil";
+"member.login_required" = "Entre pelo Perfil antes de comprar ou restaurar uma assinatura.";
+"member.price_unavailable" = "Indisponível";
+"member.retry_app_store" = "Tentar App Store novamente";
+"member.plans_unavailable" = "Os planos de assinatura estão indisponíveis. Tente novamente.";
+"member.standard_price" = "Preço padrão de renovação:";
+"member.legal_unavailable" = "Os links de termos e privacidade não estão disponíveis. A compra fica desativada até o carregamento.";
+"member.cta.subscribe" = "Assinar %@ · %@";
+"common.cancel" = "Cancelar";
+"common.back" = "Voltar";
 
 /* ---- Profile (Task33) ---- */
 "profile.sign_in" = "Entrar";

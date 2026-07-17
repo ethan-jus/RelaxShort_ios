@@ -127,6 +127,9 @@ protocol VIPRepositoryProtocol {
 struct MemberContent {
     let backgroundPosters: [DramaItem]
     let memberOnlyDramas: [DramaItem]
+    let plans: [MemberPlanDisplayOption]
+    let benefits: [MemberBenefitDisplayItem]
+    let legalLinks: MemberLegalLinks?
 }
 
 /// Member 订阅页数据仓库协议

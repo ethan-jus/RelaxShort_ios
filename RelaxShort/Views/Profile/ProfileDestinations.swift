@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 // MARK: - Settings View
 
@@ -13,6 +14,7 @@ struct SettingsView: View {
     @State private var showLogoutAlert = false
     @State private var cachedVideoBytes: Int64 = 0
     @State private var showClearCacheAlert = false
+    @State private var subscriptionManagementError: String?
     @AppStorage("playerMediaCacheEnabled") private var videoCacheEnabled = true
     @AppStorage("playerMediaCacheMaximumBytes") private var videoCacheMaximumBytes = Int(PlayerMediaCacheSettings.defaultMaximumBytes)
 #if DEBUG
@@ -22,7 +24,13 @@ struct SettingsView: View {
     var body: some View {
         List {
             Section {
-                settingRow(title: "Manage Membership", systemImage: "crown.fill", color: DB.gold)
+                Button(action: manageSubscription) {
+                    settingRow(
+                        title: "member.manage_subscription".localized,
+                        systemImage: "crown.fill",
+                        color: DB.gold
+                    )
+                }
                 if authStore.isLoggedIn,
                    let email = authStore.currentUser?.email,
                    !email.isEmpty {
@@ -131,10 +139,37 @@ struct SettingsView: View {
         } message: {
             Text("Cached public videos will be removed. VIP downloads are not affected.")
         }
+        .alert(
+            subscriptionManagementError ?? "",
+            isPresented: Binding(
+                get: { subscriptionManagementError != nil },
+                set: { if !$0 { subscriptionManagementError = nil } }
+            )
+        ) {
+            Button("common.cancel".localized, role: .cancel) {}
+        }
     }
 
     private func refreshCachedVideoBytes() {
         cachedVideoBytes = HTTPRangeMediaCache.shared.totalCachedBytes()
+    }
+
+    private func manageSubscription() {
+        Task {
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+            else {
+                subscriptionManagementError =
+                    "member.manage_subscription_unavailable".localized
+                return
+            }
+            do {
+                try await StoreKit.AppStore.showManageSubscriptions(in: scene)
+            } catch {
+                subscriptionManagementError = error.localizedDescription
+            }
+        }
     }
 
     private func settingRow(title: String, systemImage: String, color: Color) -> some View {

@@ -242,11 +242,12 @@
 "member.discount" = "Discount";
 "member.plan.weekly" = "Weekly";
 "member.plan.yearly" = "Yearly";
-"member.plan.weekly_detail" = "$12.99/week, first 3 weeks, then $19.99/week";
-"member.plan.yearly_detail" = "$149.99/year";
+"member.plan.weekly_detail" = "Billed weekly after any introductory offer.";
+"membership.monthly_detail" = "Billed monthly.";
+"member.plan.yearly_detail" = "Billed yearly.";
 "member.why_join" = "Why Join?";
 "member.benefit.unlimited" = "Unlimited Access";
-"member.benefit.unlimited_detail" = "16,000+ shows free to watch, 100+ new weekly";
+"member.benefit.unlimited_detail" = "Watch paid and members-only episodes while your subscription is active.";
 "member.benefit.download" = "Download";
 "member.benefit.points" = "Member Points";
 "member.benefit.exclusive" = "Members-Only Dramas";
@@ -272,6 +273,24 @@
 "member.auto_renew" = "Auto-renewal, cancel anytime";
 "member.content.empty" = "No members-only dramas available";
 "member.content.failed" = "Failed to load member content";
+"member.promotion.weekly_intro" = "%@ per week for the first %d weeks, then the standard weekly price.";
+"member.disclosure.access" = "Membership unlocks paid and members-only episodes only while the subscription is active. Coins are sold separately.";
+"member.disclosure.renewal" = "Payment is charged to your Apple Account. The subscription renews automatically unless canceled at least 24 hours before the current period ends.";
+"member.disclosure.restore" = "Restore Purchases restores eligible Apple subscriptions only; consumable coins can’t be restored.";
+"member.terms" = "Terms of Use";
+"member.privacy" = "Privacy Policy";
+"member.manage_subscription" = "Manage Subscription";
+"member.manage_subscription_unavailable" = "Subscription management is temporarily unavailable.";
+"member.go_to_profile" = "Go to Profile";
+"member.login_required" = "Please sign in from Profile before purchasing or restoring a membership.";
+"member.price_unavailable" = "Unavailable";
+"member.retry_app_store" = "Retry App Store";
+"member.plans_unavailable" = "Membership plans are currently unavailable. Please try again.";
+"member.standard_price" = "Standard renewal price:";
+"member.legal_unavailable" = "Terms and privacy links are unavailable. Purchasing is disabled until they load.";
+"member.cta.subscribe" = "Subscribe to %@ · %@";
+"common.cancel" = "Cancel";
+"common.back" = "Back";
 
 /* ---- Profile (Task33) ---- */
 "profile.sign_in" = "Sign In";

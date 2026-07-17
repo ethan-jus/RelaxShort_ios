@@ -132,11 +132,17 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "12.99",
+          "displayPrice" : "19.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "A37A1001",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "displayPrice" : "12.99",
+            "internalID" : "A37A1101",
+            "paymentMode" : "PayAsYouGo",
+            "periodCount" : 3,
+            "subscriptionPeriod" : "P1W"
+          },
           "localizations" : [
             {
               "description" : "Weekly VIP access",

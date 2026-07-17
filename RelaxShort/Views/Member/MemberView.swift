@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 import UIKit
 
 /// 直接监听 SwiftUI ScrollView 底层 UIScrollView 的标准化滚动距离。
@@ -107,8 +108,8 @@ private extension UIView {
 /// - 底部 Tab 模式：全屏展示，无返回按钮
 /// - Push 模式（profile/播放器入口）：显示返回按钮
 ///
-/// 顶部暂时使用 `/api/v2/member` 返回的第一张 background poster 作为固定背景，
-/// 套餐、权益为第一版临时静态配置，会员专属剧集使用真实数据 + 真实播放器导航。
+/// 套餐、权益、促销窗口与法律链接由 `/api/v2/member` 管理；
+/// 价格、优惠资格与购买结果以 StoreKit 为准。
 struct MemberView: View {
     enum Mode {
         case push
@@ -116,6 +117,7 @@ struct MemberView: View {
     }
 
     @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject private var authStore: AuthStore
     @EnvironmentObject private var storeKit: StoreKitManager
     @EnvironmentObject private var dependencies: DependencyContainer
     @Environment(\.dismiss) private var dismiss
@@ -124,6 +126,7 @@ struct MemberView: View {
     @State private var scrollOffsetY: CGFloat = 0
     @State private var purchaseMessage: String?
     @State private var showsPurchaseMessage = false
+    @State private var purchaseAlertOffersProfile = false
     let mode: Mode
 
     init(mode: Mode, repository: MemberRepositoryProtocol) {
@@ -137,14 +140,14 @@ struct MemberView: View {
 
     private let backgroundHeight: CGFloat = 260
     private let titleInitialTop: CGFloat = 64
-    private let titleHeight: CGFloat = 52
+    @ScaledMetric(relativeTo: .largeTitle)
+    private var titleHeight: CGFloat = 52
     private let pageInset: CGFloat = 16
     private let planCardGap: CGFloat = 12
     private let planRadius: CGFloat = 6
     private let selectedRailWidth: CGFloat = 54
     private let benefitIconSize: CGFloat = 30
     private let benefitRowSpacing: CGFloat = 24
-    private let ctaHeight: CGFloat = 50
 
     // MARK: - Body
 
@@ -160,9 +163,7 @@ struct MemberView: View {
             )
             let tabClearance = mode == .tab
                 ? DramaBoxBottomTabBar.totalHeight + bottomInset
-                : bottomInset
-            let reservedBottomHeight =
-                ctaHeight + 30 + tabClearance + DT.Space.xl
+                : 0
             let titleOffsetY = max(
                 titleInitialTop - scrollOffsetY,
                 0
@@ -202,7 +203,7 @@ struct MemberView: View {
                         termsSection
                             .padding(.top, DT.Space.xl)
                     }
-                    .padding(.bottom, reservedBottomHeight)
+                    .padding(.bottom, DT.Space.xl)
                 }
 
                 pinnedTitleMask
@@ -213,16 +214,12 @@ struct MemberView: View {
                     .offset(y: titleOffsetY)
                     .zIndex(3)
 
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
                 fixedCTA(
                     bottomClearance: tabClearance,
                     availableWidth: geo.size.width
                 )
-                    .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity,
-                        alignment: .bottom
-                    )
-                    .zIndex(4)
             }
         }
         .preferredColorScheme(.dark)
@@ -235,7 +232,20 @@ struct MemberView: View {
             viewModel.stopPromotionCountdown()
         }
         .alert(purchaseMessage ?? "", isPresented: $showsPurchaseMessage) {
-            Button("OK", role: .cancel) {}
+            if purchaseAlertOffersProfile {
+                Button("member.go_to_profile".localized) {
+                    if mode == .push {
+                        dismiss()
+                    }
+                    appStore.selectedTab = .profile
+                }
+            }
+            Button(
+                purchaseAlertOffersProfile
+                    ? "common.cancel".localized
+                    : "OK",
+                role: .cancel
+            ) {}
         }
     }
 }
@@ -276,6 +286,7 @@ extension MemberView {
         .frame(width: width, height: backgroundHeight + topInset)
         .offset(y: -topInset)
         .ignoresSafeArea(edges: .top)
+        .accessibilityHidden(true)
     }
 
     /// 标题和恢复购买始终使用同一个视图，仅连续改变纵向位置，避免吸附时闪切。
@@ -284,23 +295,28 @@ extension MemberView {
             if mode == .push {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.headline.weight(.semibold))
                         .foregroundColor(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 44, height: 44)
                 }
+                .accessibilityLabel("common.back".localized)
             }
 
             Text("member.title".localized)
-                .font(.system(size: 28, weight: .heavy))
+                .font(.largeTitle.weight(.heavy))
                 .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
 
             Spacer()
 
             Button(action: restorePurchase) {
                 Text("member.restore".localized)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(.white)
+                    .frame(minWidth: 44, minHeight: 44)
             }
+            .disabled(storeKit.isPurchasing)
         }
         .frame(height: titleHeight)
         .padding(.horizontal, mode == .push ? DT.Space.sm : pageInset)
@@ -333,7 +349,7 @@ extension MemberView {
                 }
                 showPurchaseMessage("profile.membership_active".localized)
             } catch {
-                showPurchaseMessage(error.localizedDescription)
+                handlePurchaseError(error)
             }
         }
     }
@@ -344,8 +360,50 @@ extension MemberView {
 
     private var plansSection: some View {
         VStack(spacing: planCardGap) {
-            ForEach(MemberDisplayConfig.plans) { plan in
-                planCard(for: plan)
+            if viewModel.plans.isEmpty {
+                switch viewModel.loadState {
+                case .idle, .loading:
+                    ProgressView()
+                        .tint(.white)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                case .loaded, .empty, .failed:
+                    VStack(spacing: DT.Space.sm) {
+                        Text("member.plans_unavailable".localized)
+                            .font(.footnote)
+                            .foregroundColor(.white.opacity(0.76))
+                            .multilineTextAlignment(.center)
+                        Button(L10n.commonRetry) {
+                            viewModel.retry()
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 88)
+                }
+            } else {
+                ForEach(viewModel.plans) { plan in
+                    planCard(for: plan)
+                }
+
+                if viewModel.plans.allSatisfy({
+                    storeKit.storeDisplayPrice(for: $0.productID) == nil
+                }) {
+                    Button {
+                        Task { await storeKit.requestProducts() }
+                    } label: {
+                        HStack(spacing: DT.Space.sm) {
+                            if storeKit.isLoadingProducts {
+                                ProgressView().tint(.white)
+                            }
+                            Text("member.retry_app_store".localized)
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundColor(.white)
+                    .disabled(storeKit.isLoadingProducts)
+                }
             }
         }
         .padding(.horizontal, pageInset)
@@ -354,6 +412,13 @@ extension MemberView {
     @ViewBuilder
     private func planCard(for plan: MemberPlanDisplayOption) -> some View {
         let isSelected = viewModel.selectedPlanID == plan.id
+        let standardPrice = storeKit.storeDisplayPrice(
+            for: plan.productID
+        )
+        let offer = activeOffer(for: plan)
+        let displayedPrice = offer?.displayPrice
+            ?? standardPrice
+            ?? "member.price_unavailable".localized
 
         Button(action: {
             withAnimation(.easeInOut(duration: 0.2)) {
@@ -371,59 +436,78 @@ extension MemberView {
                     // 选中标记
                     if isSelected {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 16, weight: .bold))
+                            .font(.headline.weight(.bold))
                             .foregroundColor(.white)
+                            .accessibilityHidden(true)
                     }
                 }
                 .frame(width: selectedRailWidth)
 
-                // 套餐内容
                 HStack {
-                    VStack(alignment: .leading, spacing: DT.Space.xs) {
-                        HStack(spacing: 6) {
-                            Text(plan.titleKey.localized)
-                                .font(.system(size: 18, weight: .regular))
+                    VStack(alignment: .leading, spacing: DT.Space.sm) {
+                        Text(plan.titleKey.localized)
+                            .font(.headline)
+                            .foregroundColor(.white)
+
+                        if let promotion = plan.promotion,
+                           offer != nil,
+                           let countdown = viewModel
+                            .formattedPromotionCountdown(for: promotion) {
+                            Text(
+                                "\(promotion.badgeKey.localized) \(countdown)"
+                            )
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, DT.Space.sm)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule().fill(Color.purple.opacity(0.9))
+                            )
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+
+                        HStack(alignment: .lastTextBaseline, spacing: DT.Space.xs) {
+                            Text(displayedPrice)
+                                .font(.title2.weight(.bold))
                                 .foregroundColor(.white)
 
-                            if plan.showsPromotion {
-                                Text(
-                                    "\("member.discount".localized) \(viewModel.formattedPromotionCountdown)"
-                                )
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 3)
-                                            .fill(Color.purple.opacity(0.8))
+                            if offer != nil, let standardPrice {
+                                Text(standardPrice)
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.68))
+                                    .strikethrough(
+                                        true,
+                                        color: .white.opacity(0.68)
                                     )
                             }
                         }
 
-                        HStack(alignment: .lastTextBaseline, spacing: DT.Space.xs) {
-                            Text(storeKit.displayPrice(for: plan.productID))
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundColor(.white)
-
-                            if let orig = plan.originalPrice {
-                                Text(orig)
-                                    .font(.system(size: 13))
-                                    .foregroundColor(DT.Color.textTertiary)
-                                    .strikethrough(true, color: DT.Color.textTertiary)
-                            }
+                        if let offer,
+                           let promotion = plan.promotion {
+                            Text(
+                                String(
+                                    format: promotion.titleKey.localized,
+                                    offer.displayPrice,
+                                    offer.periodCount
+                                )
+                            )
+                            .font(.footnote)
+                            .foregroundColor(.white.opacity(0.76))
+                            .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Text(plan.detailKey.localized)
+                                .font(.footnote)
+                                .foregroundColor(.white.opacity(0.76))
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-
-                        Text(plan.detailKey.localized)
-                            .font(.system(size: 12))
-                            .foregroundColor(DT.Color.textSecondary)
                     }
 
                     Spacer()
                 }
                 .padding(.horizontal, DT.Space.md)
-                .padding(.vertical, DT.Space.md + 2)
+                .padding(.vertical, DT.Space.lg)
             }
-            .frame(height: plan.showsPromotion ? 130 : 112)
+            .frame(minHeight: 112)
             .background(
                 RoundedRectangle(cornerRadius: planRadius)
                     .fill(DT.Color.bgCard)
@@ -437,6 +521,49 @@ extension MemberView {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            planAccessibilityLabel(
+                plan: plan,
+                displayedPrice: displayedPrice,
+                standardPrice: standardPrice,
+                offer: offer
+            )
+        )
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    private func activeOffer(
+        for plan: MemberPlanDisplayOption
+    ) -> VIPIntroductoryOfferDisplay? {
+        guard let promotion = plan.promotion,
+              promotion.offerType == .introductory else {
+            return nil
+        }
+        let offer = storeKit.introductoryOffer(for: plan.productID)
+        return promotion.canDisplay(
+            at: viewModel.currentDate,
+            hasMatchingStoreOffer: offer?.matches(promotion) == true
+        ) ? offer : nil
+    }
+
+    private func planAccessibilityLabel(
+        plan: MemberPlanDisplayOption,
+        displayedPrice: String,
+        standardPrice: String?,
+        offer: VIPIntroductoryOfferDisplay?
+    ) -> String {
+        guard let offer,
+              let promotion = plan.promotion,
+              let standardPrice else {
+            return "\(plan.titleKey.localized), \(displayedPrice), \(plan.detailKey.localized)"
+        }
+        let offerDisclosure = String(
+            format: promotion.titleKey.localized,
+            offer.displayPrice,
+            offer.periodCount
+        )
+        return "\(plan.titleKey.localized), \(offerDisclosure), \("member.standard_price".localized) \(standardPrice)"
     }
 }
 
@@ -444,42 +571,50 @@ extension MemberView {
 extension MemberView {
 
     private var benefitsSection: some View {
-        VStack(alignment: .leading, spacing: DT.Space.lg) {
-            Text("member.why_join".localized)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white)
-                .padding(.horizontal, pageInset)
+        Group {
+            if !viewModel.benefits.isEmpty {
+                VStack(alignment: .leading, spacing: DT.Space.lg) {
+                    Text("member.why_join".localized)
+                        .font(.title2.weight(.bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, pageInset)
 
-            VStack(spacing: benefitRowSpacing) {
-                ForEach(MemberDisplayConfig.benefits) { benefit in
-                    benefitRow(for: benefit)
+                    VStack(spacing: benefitRowSpacing) {
+                        ForEach(viewModel.benefits) { benefit in
+                            benefitRow(for: benefit)
+                        }
+                    }
+                    .padding(.horizontal, pageInset)
                 }
             }
-            .padding(.horizontal, pageInset)
         }
     }
 
-    private func benefitRow(for benefit: MemberDisplayConfig.Benefit) -> some View {
+    private func benefitRow(
+        for benefit: MemberBenefitDisplayItem
+    ) -> some View {
         HStack(spacing: DT.Space.md) {
             Image(systemName: benefit.icon)
-                .font(.system(size: 18, weight: .medium))
+                .font(.headline.weight(.medium))
                 .foregroundColor(.white)
                 .frame(width: benefitIconSize)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(benefit.titleKey.localized)
-                    .font(.system(size: 15))
+                    .font(.body)
                     .foregroundColor(.white)
 
                 if let detailKey = benefit.detailKey {
                     Text(detailKey.localized)
-                        .font(.system(size: 12))
-                        .foregroundColor(DT.Color.textSecondary)
+                        .font(.footnote)
+                        .foregroundColor(.white.opacity(0.76))
                 }
             }
 
             Spacer()
         }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -488,23 +623,24 @@ extension MemberView {
 
     @ViewBuilder
     private func memberDramasSection(width: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: DT.Space.md) {
-            Text("member.dramas.title".localized)
-                .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white)
-                .padding(.horizontal, pageInset)
+        switch viewModel.loadState {
+        case .idle, .empty:
+            EmptyView()
+        case .loaded where viewModel.memberOnlyDramas.isEmpty:
+            EmptyView()
+        case .loading, .loaded, .failed:
+            VStack(alignment: .leading, spacing: DT.Space.md) {
+                Text("member.dramas.title".localized)
+                    .font(.title2.weight(.bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, pageInset)
 
-            switch viewModel.loadState {
-            case .loading:
-                loadingGridView(width: width)
-            case .empty:
-                emptyContentView
-            case .failed:
-                errorView
-            default:
-                if viewModel.memberOnlyDramas.isEmpty {
-                    emptyContentView
-                } else {
+                switch viewModel.loadState {
+                case .loading:
+                    loadingGridView(width: width)
+                case .failed:
+                    errorView
+                default:
                     dramaGridView(width: width)
                 }
             }
@@ -537,9 +673,9 @@ extension MemberView {
                             height: cardHeight
                         )
                         Text(drama.title)
-                            .font(.system(size: 12, weight: .medium))
+                            .font(.caption.weight(.medium))
                             .foregroundColor(.white)
-                            .lineLimit(1)
+                            .lineLimit(2)
                     }
                     .frame(width: cardWidth)
                 }
@@ -586,8 +722,9 @@ extension MemberView {
                 .foregroundColor(DT.Color.textSecondary)
             Button(action: { viewModel.retry() }) {
                 Text(L10n.commonRetry)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundColor(DT.logoRed)
+                    .frame(minWidth: 44, minHeight: 44)
             }
         }
         .frame(maxWidth: .infinity)
@@ -601,25 +738,80 @@ extension MemberView {
     private var termsSection: some View {
         VStack(alignment: .leading, spacing: DT.Space.md) {
             Text("member.tips.title".localized)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(DT.Color.textSecondary)
-
-            Text("member.service_agreement".localized)
-                .font(.system(size: 14))
-                .underline()
-                .foregroundColor(DT.Color.textSecondary)
+                .font(.headline)
+                .foregroundColor(.white.opacity(0.82))
 
             VStack(alignment: .leading, spacing: DT.Space.sm) {
-                ForEach(1...10, id: \.self) { index in
-                    Text("member.tips.item\(index)".localized)
-                        .font(.system(size: 13))
-                        .foregroundColor(DT.Color.textSecondary)
+                ForEach([
+                    "member.disclosure.access",
+                    "member.disclosure.renewal",
+                    "member.disclosure.restore"
+                ], id: \.self) { key in
+                    Text(key.localized)
+                        .font(.footnote)
+                        .foregroundColor(.white.opacity(0.76))
                         .lineSpacing(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            VStack(alignment: .leading, spacing: DT.Space.xs) {
+                if let links = viewModel.legalLinks {
+                    Link(
+                        "member.terms".localized,
+                        destination: links.termsURL
+                    )
+                    .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                    Link(
+                        "member.privacy".localized,
+                        destination: links.privacyURL
+                    )
+                    .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                } else {
+                    Text("member.legal_unavailable".localized)
+                        .font(.footnote)
+                        .foregroundColor(.white.opacity(0.76))
+                    Button(L10n.commonRetry) {
+                        viewModel.retry()
+                    }
+                    .frame(minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+
+                Button(
+                    "member.manage_subscription".localized,
+                    action: manageSubscription
+                )
+                .frame(minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .font(.footnote.weight(.semibold))
+            .foregroundColor(.white)
+            .tint(.white)
+            .frame(minHeight: 44, alignment: .leading)
         }
         .padding(.horizontal, pageInset)
+    }
+
+    private func manageSubscription() {
+        Task {
+            guard let scene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive })
+            else {
+                showPurchaseMessage(
+                    "member.manage_subscription_unavailable".localized
+                )
+                return
+            }
+            do {
+                try await StoreKit.AppStore.showManageSubscriptions(in: scene)
+            } catch {
+                showPurchaseMessage(error.localizedDescription)
+            }
+        }
     }
 }
 
@@ -631,6 +823,30 @@ extension MemberView {
         availableWidth: CGFloat
     ) -> some View {
         let buttonWidth = max(272, min(availableWidth - 48, 340))
+        let plan = viewModel.plans.first {
+            $0.id == viewModel.selectedPlanID
+        }
+        let displayedPrice = plan.flatMap {
+            activeOffer(for: $0)?.displayPrice
+                ?? storeKit.storeDisplayPrice(for: $0.productID)
+        }
+        let canPurchase = MemberPurchasePolicy.canPurchase(
+            hasPlan: plan != nil,
+            hasStorePrice: displayedPrice != nil,
+            hasLegalLinks: viewModel.legalLinks != nil
+        )
+        let buttonTitle: String
+        if storeKit.vipPurchaseState.hasActiveSubscription {
+            buttonTitle = "profile.membership_active".localized
+        } else if let plan, let displayedPrice {
+            buttonTitle = String(
+                format: "member.cta.subscribe".localized,
+                plan.titleKey.localized,
+                displayedPrice
+            )
+        } else {
+            buttonTitle = "member.join_now".localized
+        }
 
         return VStack(spacing: DT.Space.sm) {
             Button {
@@ -640,30 +856,36 @@ extension MemberView {
                     if storeKit.isPurchasing {
                         ProgressView().tint(.white)
                     } else {
-                        Text(
-                            storeKit.vipPurchaseState.hasActiveSubscription
-                                ? "profile.membership_active".localized
-                                : "member.join_now".localized
-                        )
-                        .font(.system(size: 17, weight: .bold))
+                        Text(buttonTitle)
+                        .font(.headline.weight(.bold))
                         .foregroundColor(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                        .padding(.horizontal, DT.Space.md)
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: ctaHeight)
+                .frame(minHeight: 52)
                 .background(
                     RoundedRectangle(cornerRadius: DB.posterRadius)
                         .fill(DT.logoRed)
                 )
             }
             .buttonStyle(.plain)
-            .disabled(storeKit.isPurchasing || storeKit.vipPurchaseState.hasActiveSubscription)
+            .disabled(
+                storeKit.isPurchasing
+                    || storeKit.vipPurchaseState.hasActiveSubscription
+                    || !canPurchase
+            )
             .frame(width: buttonWidth)
+            .accessibilityLabel(buttonTitle)
 
             Text("member.auto_renew".localized)
-                .font(.system(size: 12))
-                .foregroundColor(DT.Color.textSecondary)
+                .font(.footnote)
+                .foregroundColor(.white.opacity(0.76))
         }
+        .padding(.top, DT.Space.md)
         .padding(.bottom, bottomClearance + DT.Space.sm)
         .background(
             LinearGradient(
@@ -677,7 +899,9 @@ extension MemberView {
 
     private func purchaseSelectedPlan() {
         guard !storeKit.isPurchasing,
-              let plan = MemberDisplayConfig.plans.first(where: { $0.id == viewModel.selectedPlanID }),
+              let plan = viewModel.plans.first(where: { $0.id == viewModel.selectedPlanID }),
+              storeKit.storeDisplayPrice(for: plan.productID) != nil,
+              viewModel.legalLinks != nil,
               let subscription = storeKit.vipSubscriptions.first(where: { $0.productID == plan.productID }) else {
             return
         }
@@ -702,14 +926,44 @@ extension MemberView {
             } catch StoreKitPurchaseError.userCancelled {
                 return
             } catch {
-                showPurchaseMessage(error.localizedDescription)
+                handlePurchaseError(error)
             }
         }
     }
 
-    private func showPurchaseMessage(_ message: String) {
+    private func showPurchaseMessage(
+        _ message: String,
+        offersProfile: Bool = false
+    ) {
         purchaseMessage = message
+        purchaseAlertOffersProfile = offersProfile
         showsPurchaseMessage = true
+    }
+
+    private func handlePurchaseError(_ error: Error) {
+        let apiCode = (error as? APIError)?.code
+        let apiRequiresLogin = [
+            "UNAUTHORIZED",
+            "AUTH_ACCESS_TOKEN_EXPIRED",
+            "AUTH_REFRESH_TOKEN_INVALID",
+            "AUTH_REFRESH_TOKEN_REUSED"
+        ].contains(apiCode)
+        let networkRequiresLogin: Bool
+        if let networkError = error as? NetworkError,
+           case .unauthorized = networkError {
+            networkRequiresLogin = true
+        } else {
+            networkRequiresLogin = false
+        }
+
+        if apiRequiresLogin || networkRequiresLogin || !authStore.hasSession {
+            showPurchaseMessage(
+                "member.login_required".localized,
+                offersProfile: true
+            )
+        } else {
+            showPurchaseMessage(error.localizedDescription)
+        }
     }
 
     private func synchronizeServerMembership() async {
@@ -760,6 +1014,7 @@ extension View {
         repository: RealMemberRepository()
     )
         .environmentObject(AppStore())
+        .environmentObject(AuthStore())
         .environmentObject(StoreKitManager())
         .environmentObject(DependencyContainer())
         .preferredColorScheme(.dark)
