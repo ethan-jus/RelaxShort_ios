@@ -116,10 +116,13 @@ struct MemberView: View {
     }
 
     @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject private var storeKit: StoreKitManager
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var viewModel: MemberViewModel
     @State private var scrollOffsetY: CGFloat = 0
+    @State private var purchaseMessage: String?
+    @State private var showsPurchaseMessage = false
     let mode: Mode
 
     init(mode: Mode, repository: MemberRepositoryProtocol) {
@@ -229,6 +232,9 @@ struct MemberView: View {
         .onDisappear {
             viewModel.stopPromotionCountdown()
         }
+        .alert(purchaseMessage ?? "", isPresented: $showsPurchaseMessage) {
+            Button("OK", role: .cancel) {}
+        }
     }
 }
 
@@ -288,7 +294,7 @@ extension MemberView {
 
             Spacer()
 
-            Button(action: logRestoreTap) {
+            Button(action: restorePurchase) {
                 Text("member.restore".localized)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
@@ -308,11 +314,16 @@ extension MemberView {
             )
     }
 
-    /// 第一版尚未接入恢复购买能力；只保留入口，不展示 Coming Soon。
-    private func logRestoreTap() {
-        #if DEBUG
-        Logger.ui.info("Member Restore tapped — purchase flow is not integrated")
-        #endif
+    private func restorePurchase() {
+        guard !storeKit.isPurchasing else { return }
+        Task {
+            do {
+                try await storeKit.restorePurchases()
+                showPurchaseMessage("profile.membership_active".localized)
+            } catch {
+                showPurchaseMessage(error.localizedDescription)
+            }
+        }
     }
 }
 
@@ -378,7 +389,7 @@ extension MemberView {
                         }
 
                         HStack(alignment: .lastTextBaseline, spacing: DT.Space.xs) {
-                            Text(plan.price)
+                            Text(storeKit.displayPrice(for: plan.productID))
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundColor(.white)
 
@@ -611,21 +622,30 @@ extension MemberView {
 
         return VStack(spacing: DT.Space.sm) {
             Button {
-                #if DEBUG
-                Logger.ui.info("Member Join Now tapped — purchase not available")
-                #endif
+                purchaseSelectedPlan()
             } label: {
-                Text("member.join_now".localized)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: ctaHeight)
-                    .background(
-                        RoundedRectangle(cornerRadius: DB.posterRadius)
-                            .fill(DT.logoRed)
-                    )
+                Group {
+                    if storeKit.isPurchasing {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text(
+                            storeKit.vipPurchaseState.hasActiveSubscription
+                                ? "profile.membership_active".localized
+                                : "member.join_now".localized
+                        )
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(.white)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: ctaHeight)
+                .background(
+                    RoundedRectangle(cornerRadius: DB.posterRadius)
+                        .fill(DT.logoRed)
+                )
             }
             .buttonStyle(.plain)
+            .disabled(storeKit.isPurchasing || storeKit.vipPurchaseState.hasActiveSubscription)
             .frame(width: buttonWidth)
 
             Text("member.auto_renew".localized)
@@ -641,6 +661,30 @@ extension MemberView {
             )
             .ignoresSafeArea(edges: .bottom)
         )
+    }
+
+    private func purchaseSelectedPlan() {
+        guard !storeKit.isPurchasing,
+              let plan = MemberDisplayConfig.plans.first(where: { $0.id == viewModel.selectedPlanID }),
+              let subscription = storeKit.vipSubscriptions.first(where: { $0.productID == plan.productID }) else {
+            return
+        }
+
+        Task {
+            do {
+                _ = try await storeKit.purchaseVIP(subscription)
+                showPurchaseMessage("profile.membership_active".localized)
+            } catch StoreKitPurchaseError.userCancelled {
+                return
+            } catch {
+                showPurchaseMessage(error.localizedDescription)
+            }
+        }
+    }
+
+    private func showPurchaseMessage(_ message: String) {
+        purchaseMessage = message
+        showsPurchaseMessage = true
     }
 }
 
@@ -680,5 +724,6 @@ extension View {
         repository: RealMemberRepository()
     )
         .environmentObject(AppStore())
+        .environmentObject(StoreKitManager())
         .preferredColorScheme(.dark)
 }

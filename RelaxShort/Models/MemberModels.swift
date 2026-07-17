@@ -2,10 +2,10 @@ import Foundation
 
 // MARK: - Member Plan Display Option
 
-/// Member 套餐展示选项（仅 UI 展示用，非后端数据）。
-/// 第一版为临时配置，不关联 StoreKit 商品或后端价格。
+/// Member 套餐展示选项。产品标识与 StoreKit 对齐，价格由 StoreKit 优先提供。
 struct MemberPlanDisplayOption: Identifiable, Equatable {
     let id: String
+    let productID: ProductID
     /// 本地化 key 对应的套餐标题
     let titleKey: String
     /// 展示价格（USD 字符串）
@@ -20,9 +20,7 @@ struct MemberPlanDisplayOption: Identifiable, Equatable {
 
 // MARK: - Member Display Config
 
-/// Member 页面第一版临时展示配置。
-/// 套餐价格、权益文案和促销信息均为静态展示，不驱动购买或 StoreKit 行为。
-/// 后续接入后端套餐配置时替换此枚举。
+/// Member 页面展示配置。套餐选择驱动 StoreKit 购买；促销与权益文案仍为本地配置。
 enum MemberDisplayConfig {
 
     /// 当前选中的套餐 ID
@@ -32,6 +30,7 @@ enum MemberDisplayConfig {
     static let plans: [MemberPlanDisplayOption] = [
         .init(
             id: "weekly",
+            productID: .vipWeekly,
             titleKey: "member.plan.weekly",
             price: "$12.99",
             originalPrice: "$19.99",
@@ -39,7 +38,17 @@ enum MemberDisplayConfig {
             showsPromotion: true
         ),
         .init(
+            id: "monthly",
+            productID: .vipMonthly,
+            titleKey: "membership.monthly",
+            price: "$29.99",
+            originalPrice: nil,
+            detailKey: "membership.monthly_detail",
+            showsPromotion: false
+        ),
+        .init(
             id: "yearly",
+            productID: .vipYearly,
             titleKey: "member.plan.yearly",
             price: "$149.99/year",
             originalPrice: nil,

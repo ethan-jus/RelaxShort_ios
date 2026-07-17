@@ -1,0 +1,155 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "A37A0001",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      { "enabled" : false, "name" : "Load Products" },
+      { "enabled" : false, "name" : "Purchase" },
+      { "enabled" : false, "name" : "Verification" },
+      { "enabled" : false, "name" : "App Store Sync" },
+      { "enabled" : false, "name" : "Subscription Status" },
+      { "enabled" : false, "name" : "App Transaction" },
+      { "enabled" : false, "name" : "Manage Subscriptions Sheet" },
+      { "enabled" : false, "name" : "Refund Request Sheet" },
+      { "enabled" : false, "name" : "Offer Code Redeem Sheet" }
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "A37A1000",
+      "localizations" : [
+
+      ],
+      "name" : "RelaxShort VIP",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "12.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "A37A1001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Weekly VIP access",
+              "displayName" : "Weekly VIP",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "每周 VIP 会员",
+              "displayName" : "周会员",
+              "locale" : "zh_CN"
+            }
+          ],
+          "productID" : "com.relaxshort.vip.weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "RelaxShort VIP Weekly",
+          "subscriptionGroupID" : "A37A1000",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "29.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "A37A1002",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Monthly VIP access",
+              "displayName" : "Monthly VIP",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "每月 VIP 会员",
+              "displayName" : "月会员",
+              "locale" : "zh_CN"
+            }
+          ],
+          "productID" : "com.relaxshort.vip.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "RelaxShort VIP Monthly",
+          "subscriptionGroupID" : "A37A1000",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "149.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "A37A1003",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Yearly VIP access",
+              "displayName" : "Yearly VIP",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "每年 VIP 会员",
+              "displayName" : "年会员",
+              "locale" : "zh_CN"
+            }
+          ],
+          "productID" : "com.relaxshort.vip.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "RelaxShort VIP Yearly",
+          "subscriptionGroupID" : "A37A1000",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

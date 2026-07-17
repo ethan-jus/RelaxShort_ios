@@ -18,6 +18,13 @@ enum ProductID: String, CaseIterable {
     case vipQuarterly = "com.relaxshort.vip.quarterly"
     case vipYearly    = "com.relaxshort.vip.yearly"
 
+    /// 当前 RelaxShort 对外销售的 VIP 套餐。季度套餐保留旧标识，但不进入购买界面。
+    static let supportedVIPSubscriptions: [ProductID] = [
+        .vipWeekly,
+        .vipMonthly,
+        .vipYearly
+    ]
+
     /// 是否为金币包
     var isCoinPackage: Bool {
         switch self {
@@ -86,6 +93,8 @@ enum StoreKitPurchaseError: Error, LocalizedError {
     case userCancelled
     case pending
     case unverified
+    case productUnavailable(ProductID)
+    case noActiveSubscription
     case unknown
 
     var errorDescription: String? {
@@ -93,8 +102,63 @@ enum StoreKitPurchaseError: Error, LocalizedError {
         case .userCancelled: return "用户取消购买"
         case .pending:       return "购买等待处理中"
         case .unverified:    return "交易验证失败"
+        case .productUnavailable(let productID):
+            return "App Store 商品暂不可用：\(productID.rawValue)"
+        case .noActiveSubscription:
+            return "未发现可恢复的有效会员订阅"
         case .unknown:       return "未知错误"
         }
+    }
+}
+
+// MARK: - VIP Purchase State
+
+struct VIPPurchaseState: Equatable {
+    enum Phase: Equatable {
+        case idle
+        case purchasing(ProductID)
+        case pending(ProductID)
+        case active(ProductID)
+        case failed(String)
+    }
+
+    private(set) var phase: Phase = .idle
+
+    var isPurchasing: Bool {
+        if case .purchasing = phase { return true }
+        return false
+    }
+
+    var activeProductID: ProductID? {
+        if case .active(let productID) = phase { return productID }
+        return nil
+    }
+
+    var hasActiveSubscription: Bool { activeProductID != nil }
+
+    var errorMessage: String? {
+        if case .failed(let message) = phase { return message }
+        return nil
+    }
+
+    mutating func begin(productID: ProductID) {
+        phase = .purchasing(productID)
+    }
+
+    mutating func activate(productID: ProductID) {
+        phase = .active(productID)
+    }
+
+    mutating func markPending(productID: ProductID) {
+        phase = .pending(productID)
+    }
+
+    mutating func cancel() {
+        phase = .idle
+    }
+
+    mutating func fail(message: String) {
+        phase = .failed(message)
     }
 }
 
@@ -102,9 +166,7 @@ enum StoreKitPurchaseError: Error, LocalizedError {
 
 /// 内购管理器 — 使用 StoreKit 2 API
 ///
-/// 双重模式：
-/// 1. **StoreKit 2 真实购买** — 当 App Store Connect 配置了产品时自动使用
-/// 2. **Mock 回退** — 当产品请求失败或未配置时，使用本地定义的 fallback 数据
+/// VIP 必须使用 StoreKit 2 已加载商品；金币包在 Task37B 前保留原有开发模拟流程。
 ///
 /// 用法：
 /// ```swift
@@ -121,6 +183,7 @@ final class StoreKitManager: ObservableObject {
     @Published var purchaseError: String?
     /// StoreKit 产品是否已加载（从 App Store 成功获取）
     @Published var isStoreKitReady: Bool = false
+    @Published private(set) var vipPurchaseState = VIPPurchaseState()
 
     // MARK: - Private State
 
@@ -140,19 +203,24 @@ final class StoreKitManager: ObservableObject {
         CoinPackage(id: "pack_4000", productID: .coinsXLarge, amount: 4000, price: "$49.99", bonus: 500,   isPopular: false),
     ]
 
-    /// VIP 订阅列表（本地回退数据）
-    let vipSubscriptions: [VIPSubscription] = [
-        VIPSubscription(id: "vip_weekly",    productID: .vipWeekly,    period: "周", price: "$12.99",  dailyEquivalent: "$1.86/天"),
-        VIPSubscription(id: "vip_monthly",   productID: .vipMonthly,   period: "月", price: "$29.99",  dailyEquivalent: "$1.00/天"),
-        VIPSubscription(id: "vip_quarterly", productID: .vipQuarterly, period: "季", price: "$68.99",  dailyEquivalent: "$0.77/天"),
-        VIPSubscription(id: "vip_yearly",    productID: .vipYearly,    period: "年", price: "$199.99", dailyEquivalent: "$0.55/天"),
-    ]
+    /// VIP 订阅列表。价格优先使用 StoreKit 本地化价格。
+    var vipSubscriptions: [VIPSubscription] {
+        [
+            VIPSubscription(id: "vip_weekly",  productID: .vipWeekly,  period: "周", price: displayPrice(for: .vipWeekly),  dailyEquivalent: "$1.86/天"),
+            VIPSubscription(id: "vip_monthly", productID: .vipMonthly, period: "月", price: displayPrice(for: .vipMonthly), dailyEquivalent: "$1.00/天"),
+            VIPSubscription(id: "vip_yearly",  productID: .vipYearly,  period: "年", price: displayPrice(for: .vipYearly),  dailyEquivalent: "$0.41/天")
+        ]
+    }
 
     // MARK: - Init
 
     init() {
+        guard !AppRuntimeEnvironment.isUnitTesting else { return }
         startTransactionListener()
-        Task { await requestProducts() }
+        Task {
+            await requestProducts()
+            await refreshVIPEntitlements()
+        }
     }
 
     deinit {
@@ -180,10 +248,12 @@ final class StoreKitManager: ObservableObject {
             let allIDs = ProductID.allCases.map(\.rawValue)
             let products = try await Product.products(for: Set(allIDs))
             storeKitProducts = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
-            isStoreKitReady = true
+            isStoreKitReady = ProductID.supportedVIPSubscriptions.allSatisfy {
+                storeKitProducts[$0.rawValue] != nil
+            }
             Logger.store.info("StoreKitManager: loaded \(self.storeKitProducts.count) products from App Store")
         } catch {
-            Logger.store.warning("StoreKitManager: product request failed, using mock fallback — \(error.localizedDescription)")
+            Logger.store.warning("StoreKitManager: product request failed — \(error.localizedDescription)")
             storeKitProducts = [:]
             isStoreKitReady = false
         }
@@ -231,7 +301,7 @@ final class StoreKitManager: ObservableObject {
             }
         }
 
-        // ── Mock 回退 ──
+        // 金币真实内购属于 Task37B；当前保持既有开发模拟能力。
         try await Task.sleep(nanoseconds: 800_000_000)
         Logger.store.info("StoreKit(mock): purchased \(package.productID.rawValue) → \(totalCoins) coins")
         return ApplePurchaseReceipt(
@@ -254,45 +324,59 @@ final class StoreKitManager: ObservableObject {
         purchaseError = nil
         defer { isPurchasing = false }
 
+        vipPurchaseState.begin(productID: subscription.productID)
+
         // ── StoreKit 2 真实购买 ──
         if let product = storeKitProducts[subscription.productID.rawValue] {
-            let result = try await product.purchase()
-            switch result {
-            case .success(let verification):
-                let transaction = try checkVerified(verification)
-                await transaction.finish()
-                Logger.store.info("StoreKit: purchased VIP \(product.id)")
-                return ApplePurchaseReceipt(
-                    transactionID: String(transaction.id),
-                    productID: transaction.productID,
-                    environment: String(describing: transaction.environment).uppercased(),
-                    appAccountToken: transaction.appAccountToken?.uuidString,
-                    coins: 0
-                )
+            do {
+                let result = try await product.purchase()
+                switch result {
+                case .success(let verification):
+                    let transaction = try checkVerified(verification)
+                    await transaction.finish()
+                    vipPurchaseState.activate(productID: subscription.productID)
+                    Logger.store.info("StoreKit: purchased VIP \(product.id)")
+                    return ApplePurchaseReceipt(
+                        transactionID: String(transaction.id),
+                        productID: transaction.productID,
+                        environment: String(describing: transaction.environment).uppercased(),
+                        appAccountToken: transaction.appAccountToken?.uuidString,
+                        coins: 0
+                    )
 
-            case .userCancelled:
-                Logger.store.info("StoreKit: user cancelled VIP purchase")
-                throw StoreKitPurchaseError.userCancelled
+                case .userCancelled:
+                    Logger.store.info("StoreKit: user cancelled VIP purchase")
+                    vipPurchaseState.cancel()
+                    throw StoreKitPurchaseError.userCancelled
 
-            case .pending:
-                Logger.store.info("StoreKit: VIP purchase pending")
-                throw StoreKitPurchaseError.pending
+                case .pending:
+                    Logger.store.info("StoreKit: VIP purchase pending")
+                    vipPurchaseState.markPending(productID: subscription.productID)
+                    throw StoreKitPurchaseError.pending
 
-            @unknown default:
-                throw StoreKitPurchaseError.unknown
+                @unknown default:
+                    throw StoreKitPurchaseError.unknown
+                }
+            } catch let error as StoreKitPurchaseError {
+                switch error {
+                case .userCancelled, .pending:
+                    break
+                default:
+                    vipPurchaseState.fail(message: error.localizedDescription)
+                    purchaseError = error.localizedDescription
+                }
+                throw error
+            } catch {
+                vipPurchaseState.fail(message: error.localizedDescription)
+                purchaseError = error.localizedDescription
+                throw error
             }
         }
 
-        // ── Mock 回退 ──
-        try await Task.sleep(nanoseconds: 800_000_000)
-        Logger.store.info("StoreKit(mock): purchased VIP \(subscription.productID.rawValue)")
-        return ApplePurchaseReceipt(
-            transactionID: "mock-\(UUID().uuidString)",
-            productID: subscription.productID.rawValue,
-            environment: "SANDBOX",
-            appAccountToken: nil,
-            coins: 0
-        )
+        let error = StoreKitPurchaseError.productUnavailable(subscription.productID)
+        vipPurchaseState.fail(message: error.localizedDescription)
+        purchaseError = error.localizedDescription
+        throw error
     }
 
     // MARK: - Public API — Restore Purchases
@@ -302,8 +386,36 @@ final class StoreKitManager: ObservableObject {
     /// 恢复的交易会通过 `Transaction.updates` 异步投递，
     /// 在 `startTransactionListener()` 中统一处理。
     func restorePurchases() async throws {
+        isPurchasing = true
+        purchaseError = nil
+        defer { isPurchasing = false }
+
         try await StoreKit.AppStore.sync()
+        await refreshVIPEntitlements()
+        guard vipPurchaseState.hasActiveSubscription else {
+            throw StoreKitPurchaseError.noActiveSubscription
+        }
         Logger.store.info("StoreKitManager: purchases restored")
+    }
+
+    /// 以 StoreKit 当前有效权益为本地测试环境的唯一会员状态来源。
+    func refreshVIPEntitlements() async {
+        var activeProductID: ProductID?
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let transaction) = result,
+                  transaction.revocationDate == nil,
+                  transaction.expirationDate.map({ $0 > Date() }) ?? true,
+                  let productID = ProductID(rawValue: transaction.productID),
+                  ProductID.supportedVIPSubscriptions.contains(productID) else { continue }
+            activeProductID = productID
+            break
+        }
+
+        if let activeProductID {
+            vipPurchaseState.activate(productID: activeProductID)
+        } else if vipPurchaseState.hasActiveSubscription {
+            vipPurchaseState.cancel()
+        }
     }
 
     // MARK: - Private — Transaction Listener
@@ -318,6 +430,7 @@ final class StoreKitManager: ObservableObject {
                 switch result {
                 case .verified(let transaction):
                     await transaction.finish()
+                    await self.refreshVIPEntitlements()
                     Logger.store.info("StoreKitManager: transaction finished for \(transaction.productID)")
                 case .unverified:
                     Logger.store.error("StoreKitManager: unverified transaction received")
@@ -350,7 +463,7 @@ final class StoreKitManager: ObservableObject {
         case .vipWeekly:     return "$12.99"
         case .vipMonthly:    return "$29.99"
         case .vipQuarterly:  return "$68.99"
-        case .vipYearly:     return "$199.99"
+        case .vipYearly:     return "$149.99"
         }
     }
 }
