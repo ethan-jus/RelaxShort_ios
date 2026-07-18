@@ -49,6 +49,7 @@ final class RealDetailRepository: DetailRepositoryProtocol {
                 videoURL: "",   // 播放页需单独调 episodePlay 填充
                 duration: TimeInterval(item.durationSeconds ?? 0),
                 isLocked: !(item.isFree ?? true) || (item.vipRequired ?? false),
+                isUnlocked: item.unlocked ?? false,
                 unlockCoinPrice: item.unlockCoinCost.flatMap { Int(truncating: $0 as NSNumber) },
                 requiresVIP: item.vipRequired ?? false
             )

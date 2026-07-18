@@ -16,6 +16,8 @@ struct Episode: Codable, Identifiable {
     let duration: TimeInterval
     /// 是否锁定（需付费/VIP 解锁）
     let isLocked: Bool
+    /// 当前用户是否通过金币或广告获得了永久解锁权益。
+    var isUnlocked: Bool = false
     /// 解锁所需金币数 (v1 DramaBox 复刻)
     var unlockCoinPrice: Int? = nil
     /// VIP 专享集不能通过金币或广告绕过。
@@ -92,6 +94,7 @@ struct EpisodeUnlockFlowState: Equatable {
     var coinShortfall: Int { max(0, coinCost - balance) }
     var hasEnoughCoins: Bool { balance >= coinCost }
     var blocksPlaybackInteraction: Bool { true }
+    var playbackTargetEpisode: Int { episodeNumber }
 
     var primaryButtonTitle: String {
         if selection == .vip { return "开通 VIP 并解锁" }

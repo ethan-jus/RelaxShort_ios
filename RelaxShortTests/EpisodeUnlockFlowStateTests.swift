@@ -70,4 +70,16 @@ struct EpisodeUnlockFlowStateTests {
         state.close()
         #expect(state.presentation == .lockedFrame)
     }
+
+    @Test
+    func unlockCompletionKeepsOriginallyRequestedEpisode() {
+        let state = EpisodeUnlockFlowState(
+            episodeNumber: 4,
+            coinCost: 30,
+            balance: 100,
+            vipOnly: false
+        )
+
+        #expect(state.playbackTargetEpisode == 4)
+    }
 }

@@ -446,7 +446,8 @@ struct SeriesPlayerView: View {
                     onVIPPurchaseCompleted: { account in
                         coinStore.synchronize(balance: account.balance)
                         unlockPurchaseTab = nil
-                        Task { await resumeCurrentEpisodeAfterUnlock() }
+                        guard let targetEpisode = unlockState?.playbackTargetEpisode else { return }
+                        Task { await resumeEpisodeAfterUnlock(targetEpisode) }
                     }
                 )
                 .id(initialTab)
@@ -804,7 +805,7 @@ struct SeriesPlayerView: View {
                 guard var state = unlockState, state.episodeNumber == episodeNumber else { return }
                 coinStore.synchronize(balance: account.balance)
                 if account.isVIP {
-                    await resumeCurrentEpisodeAfterUnlock()
+                    await resumeEpisodeAfterUnlock(state.playbackTargetEpisode)
                     return
                 }
                 state.balance = account.balance
@@ -824,13 +825,14 @@ struct SeriesPlayerView: View {
               !state.isProcessing,
               let episodeID = episodeID(for: state.episodeNumber),
               method != .ads || state.canUnlockWithAd else { return }
+        let targetEpisode = state.playbackTargetEpisode
         state.isProcessing = true
         state.errorMessage = nil
         unlockState = state
         do {
             if method == .ads {
                 try await unlockEpisodeWithRewardedInterstitial(episodeID: episodeID)
-                await resumeCurrentEpisodeAfterUnlock()
+                await resumeEpisodeAfterUnlock(targetEpisode)
                 return
             }
             let result = try await dependencies.detailRepository.unlockEpisode(episodeId: episodeID, method: method)
@@ -840,7 +842,7 @@ struct SeriesPlayerView: View {
             if let balance = result.balanceAfter {
                 coinStore.synchronize(balance: balance)
             }
-            await resumeCurrentEpisodeAfterUnlock()
+            await resumeEpisodeAfterUnlock(targetEpisode)
         } catch let error as APIError {
             guard var latest = unlockState else { return }
             latest.isProcessing = false
@@ -899,8 +901,8 @@ struct SeriesPlayerView: View {
     }
 
     @MainActor
-    private func resumeCurrentEpisodeAfterUnlock() async {
-        let episodeNumber = currentEpisode
+    private func resumeEpisodeAfterUnlock(_ episodeNumber: Int) async {
+        currentEpisode = episodeNumber
         initialPlayAssetTask?.cancel()
         initialPlayAssetTask = nil
         if let id = episodeID(for: episodeNumber) {
@@ -927,7 +929,7 @@ struct SeriesPlayerView: View {
             let account = try await dependencies.detailRepository.fetchUnlockAccount()
             coinStore.synchronize(balance: account.balance)
             if account.isVIP {
-                await resumeCurrentEpisodeAfterUnlock()
+                await resumeEpisodeAfterUnlock(state.playbackTargetEpisode)
             } else {
                 state.balance = account.balance
                 unlockState = state
@@ -1017,6 +1019,11 @@ struct SeriesPlayerView: View {
         let startedAt = CACurrentMediaTime()
         do {
             episodes = try await repo.fetchEpisodes(dramaId: drama.id)
+            unlockedEpisodes = Set(
+                episodes.lazy
+                    .filter { $0.isLocked && $0.isUnlocked }
+                    .map(\.episodeNumber)
+            )
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.info("SeriesTrace 剧集列表加载完成 剧ID=\(drama.id) 数量=\(episodes.count) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("剧集列表")
@@ -1992,8 +1999,10 @@ struct SeriesPlayerView: View {
 
     private func isEpisodeLocked(_ ep: Int) -> Bool {
         if unlockedEpisodes.contains(ep) { return false }
-        let freeRange = drama.freeEpisodeRange ?? 1...3
-        return !freeRange.contains(ep)
+        if let episode = episodes.first(where: { $0.episodeNumber == ep }) {
+            return episode.isLocked
+        }
+        return !(drama.freeEpisodeRange ?? 1...3).contains(ep)
     }
 
 }
@@ -2100,8 +2109,10 @@ private struct EpisodePickerSheet: View {
     @ViewBuilder
     private func episodeCell(_ ep: Int) -> some View {
         let isCurrent = ep == currentEpisode
-        let freeRange = drama.freeEpisodeRange ?? 1...3
-        let isLocked = !unlockedEpisodes.contains(ep) && !freeRange.contains(ep)
+        let episodeIsLocked = episodes.first(where: { $0.episodeNumber == ep })?.isLocked
+            ?? !(drama.freeEpisodeRange ?? 1...3).contains(ep)
+        let isUnlocked = episodeIsLocked && unlockedEpisodes.contains(ep)
+        let isLocked = episodeIsLocked && !isUnlocked
         Button {
             // 锁图标仅作预提示；最终权限以播放接口为准，支持已登录 VIP 直接播放。
             onSelectEpisode(ep)
@@ -2118,10 +2129,10 @@ private struct EpisodePickerSheet: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 // Lock badge
-                if isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 8))
-                        .foregroundColor(DB.mutedText)
+                if episodeIsLocked {
+                    Image(systemName: isUnlocked ? "lock.open.fill" : "lock.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(isUnlocked ? DB.gold.opacity(0.75) : .white)
                         .padding(3)
                 }
 

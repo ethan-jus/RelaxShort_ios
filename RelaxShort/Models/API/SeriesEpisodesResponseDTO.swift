@@ -17,6 +17,7 @@ struct EpisodeItemDTO: Decodable {
     let durationSeconds: Int?
     let isFree: Bool?
     let vipRequired: Bool?
+    let unlocked: Bool?
     let unlockCoinCost: Decimal?
     let status: Int?
 
@@ -28,6 +29,7 @@ struct EpisodeItemDTO: Decodable {
         case durationSeconds
         case isFree
         case vipRequired
+        case unlocked
         case unlockCoinCost
         case status
     }
@@ -41,6 +43,7 @@ struct EpisodeItemDTO: Decodable {
         durationSeconds = try container.decodeIfPresent(Int.self, forKey: .durationSeconds)
         isFree = FlexibleBoolDecoder.decode(container, forKey: .isFree)
         vipRequired = FlexibleBoolDecoder.decode(container, forKey: .vipRequired)
+        unlocked = FlexibleBoolDecoder.decode(container, forKey: .unlocked)
         unlockCoinCost = try container.decodeIfPresent(Decimal.self, forKey: .unlockCoinCost)
         status = try container.decodeIfPresent(Int.self, forKey: .status)
     }
