@@ -73,26 +73,25 @@ struct ProfileView: View {
                     guestHeader
                 }
 
-                // 会员卡
+                // 会员主视觉
                 membershipCard
-                    .padding(.top, DT.Space.md)
 
-                // 菜单第一组
+                // 核心入口
                 ProfileMenuCard {
-                    ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.coinGold, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                    ProfileMenuRow(icon: "wallet.pass.fill", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle.fill", onTap: { selectedDestination = .wallet })
-                    ProfileMenuRow(icon: "gift.fill", iconColor: .orange, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
+                    ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
+                    ProfileMenuRow(icon: "wallet.fill", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle.fill", subtitleIconColor: DT.logoRed, onTap: { selectedDestination = .wallet })
+                    ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
                     ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
-                    ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, showsDivider: false, onTap: { selectedDestination = .downloads })
+                    ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
                 }
-                .padding(.top, DT.Space.lg)
+                .padding(.top, DT.Space.sm)
 
-                // 菜单第二组
+                // 辅助入口
                 ProfileMenuCard {
                     ProfileMenuRow(icon: "globe", iconColor: .white, title: L10n.language, onTap: { selectedDestination = .language })
                     ProfileMenuRow(icon: "questionmark.circle.fill", iconColor: .white, title: "profile.help_feedback".localized, showsDivider: false, onTap: { selectedDestination = .customerService })
                 }
-                .padding(.top, DT.Space.md)
+                .padding(.top, 2)
             }
             .padding(.bottom, DT.Layout.tabBarHeight + DT.Space.xl)
         }

@@ -28,91 +28,105 @@ struct ProfileIdentityHeader: View {
     let onSettings: () -> Void
 
     var body: some View {
-        VStack(spacing: DT.Space.xs) {
-            HStack {
-                Spacer()
-                Button(action: onSettings) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("profile.settings".localized)
-            }
-            .frame(height: 44)
+        ZStack(alignment: .top) {
+            Image("ProfileRedLight")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 190)
+                .offset(x: 82, y: -18)
+                .blendMode(.screen)
+                .allowsHitTesting(false)
 
-            HStack(alignment: .center, spacing: DT.Space.md) {
-                Button(action: onTap) {
-                    ProfileAvatarView(
-                        url: avatarURL,
-                        initials: String(title.prefix(2)).uppercased(),
-                        size: 72,
-                        showsGuestIcon: isGuest
-                    )
+            VStack(spacing: DT.Space.sm) {
+                HStack {
+                    Spacer()
+                    Button(action: onSettings) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("profile.settings".localized)
                 }
-                .buttonStyle(.plain)
+                .frame(height: 44)
 
-                VStack(alignment: .leading, spacing: DT.Space.sm) {
+                HStack(alignment: .center, spacing: DT.Space.lg) {
                     Button(action: onTap) {
-                        HStack(spacing: 6) {
-                            Text(title)
-                                .font(.system(size: 21, weight: .bold))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-
-                            if isGuest {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-                        }
+                        ProfileAvatarView(
+                            url: avatarURL,
+                            initials: String(title.prefix(2)).uppercased(),
+                            size: 82,
+                            showsGuestIcon: isGuest
+                        )
                     }
                     .buttonStyle(.plain)
 
-                    HStack(spacing: DT.Space.sm) {
-                        HStack(spacing: 5) {
-                            Text("ID \(displayID)")
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                            CopyIDButton(displayID: displayID)
+                    VStack(alignment: .leading, spacing: DT.Space.sm) {
+                        Button(action: onTap) {
+                            HStack(spacing: 7) {
+                                Text(title)
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+
+                                if isGuest {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.92))
+                                }
+                            }
                         }
+                        .buttonStyle(.plain)
 
-                        Rectangle()
-                            .fill(DB.divider)
-                            .frame(width: 1, height: 13)
+                        HStack(spacing: 7) {
+                            HStack(spacing: 3) {
+                                Text("ID \(displayID)")
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.72)
+                                    .layoutPriority(1)
+                                CopyIDButton(displayID: displayID)
+                            }
 
-                        HStack(spacing: 5) {
-                            Image(systemName: "bookmark.fill")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(L10n.favoriteCount(favoriteCount))
-                                .lineLimit(1)
+                            Rectangle()
+                                .fill(.white.opacity(0.18))
+                                .frame(width: 1, height: 15)
+
+                            HStack(spacing: 5) {
+                                Image(systemName: "bookmark.fill")
+                                    .font(.system(size: 11, weight: .semibold))
+                                Text(L10n.favoriteCount(favoriteCount))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                            }
+                        }
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.62))
+
+                        if isVIP {
+                            HStack(spacing: 4) {
+                                Image(systemName: "crown.fill")
+                                    .font(.system(size: 10))
+                                Text("VIP")
+                                    .font(.system(size: 10, weight: .bold))
+                            }
+                            .foregroundColor(DT.memberGold)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(DT.memberGold.opacity(0.14))
+                            .clipShape(Capsule())
                         }
                     }
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(DT.Color.textSecondary)
 
-                    if isVIP {
-                        HStack(spacing: 4) {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 10))
-                            Text("VIP")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundColor(DB.gold)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(DB.gold.opacity(0.14))
-                        .clipShape(Capsule())
-                    }
+                    Spacer(minLength: 0)
                 }
-
-                Spacer(minLength: 0)
             }
+            .padding(.horizontal, DT.Space.xl)
         }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.bottom, DT.Space.md)
+        .frame(height: 190)
+        .clipped()
     }
 }
 
@@ -131,7 +145,7 @@ private struct CopyIDButton: View {
         } label: {
             Image(systemName: didCopy ? "checkmark" : "square.on.square")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(didCopy ? DB.gold : .white.opacity(0.72))
+                .foregroundColor(didCopy ? DT.memberGold : .white.opacity(0.72))
                 .frame(width: 24, height: 24)
                 .contentShape(Rectangle())
         }
@@ -191,9 +205,7 @@ struct ProfileAvatarView: View {
 
 // MARK: - Profile Membership Card
 
-/// 会员卡：深红到黑色渐变，主按钮使用 Logo 红。
-/// 非会员显示"加入会员"、4 项核心权益和加入按钮。
-/// 已开通会员显示会员状态与真实有效期。
+/// 会员主视觉：电影感红黑渐变、金色皇冠资产和四项核心权益。
 struct ProfileMembershipCard: View {
     let isVIP: Bool
     let vipExpireDate: Date?
@@ -207,110 +219,130 @@ struct ProfileMembershipCard: View {
     }
 
     private var memberGold: Color { DT.memberGold }
-    private var benefitText: Color { Color(hex: "#CBC4BC") }
-    private var subtitleGray: Color { Color(hex: "#C5BFB8") }
+    private var benefitText: Color { Color(hex: "#E3C98B") }
+    private var subtitleGray: Color { Color.white.opacity(0.68) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if isVIP {
-                HStack {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(memberGold)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("profile.membership_active".localized)
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.white)
-                        Text(expiryText)
-                            .font(DT.Font.caption)
-                            .foregroundColor(subtitleGray)
-                    }
-                    Spacer()
-                }
-                .padding(DT.Space.lg)
-            } else {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("profile.join_membership".localized)
-                            .font(.system(size: 19, weight: .bold))
-                            .foregroundColor(.white)
-                        Text("vip.unlock_all".localized)
-                            .font(DT.Font.small)
-                            .foregroundColor(subtitleGray)
-                    }
-                    Spacer()
-                    Text("profile.join_action".localized)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, DT.Space.lg)
-                        .padding(.vertical, DT.Space.sm)
-                        .background(DT.logoRed)
-                        .cornerRadius(DT.Radius.sm)
-                }
-                .padding(DT.Space.lg)
+        VStack(spacing: DT.Space.sm) {
+            HStack(spacing: DT.Space.sm) {
+                Image("ProfileVIPCrown")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 92, height: 68)
+                    .blendMode(.screen)
+                    .accessibilityHidden(true)
 
-                HStack(spacing: 0) {
-                    membershipBenefit(icon: "play.rectangle", text: "profile.membership_benefit_series".localized)
-                    membershipBenefit(icon: "gift", text: "profile.membership_benefit_points".localized)
-                    membershipBenefit(icon: "arrow.down.to.line", text: "profile.membership_benefit_download".localized)
-                    HDBenefitView()
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(isVIP ? "profile.membership_active".localized : "profile.join_membership".localized)
+                        .font(.system(size: 19, weight: .bold))
+                        .foregroundColor(memberGold)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.76)
+                    Text(isVIP ? expiryText : "vip.unlock_all".localized)
+                        .font(.system(size: 12))
+                        .foregroundColor(subtitleGray)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
-                .padding(.bottom, DT.Space.md)
+
+                Spacer(minLength: 4)
+
+                if isVIP {
+                    HStack(spacing: 4) {
+                        Image(systemName: "crown.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("VIP")
+                            .font(.system(size: 12, weight: .bold))
+                    }
+                    .foregroundColor(Color(hex: "#2A1603"))
+                    .padding(.horizontal, 12)
+                    .frame(height: 36)
+                    .background(memberGold)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                } else {
+                    Text("profile.join_action".localized)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .padding(.horizontal, 14)
+                        .frame(height: 40)
+                        .background(DT.logoRed)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+            }
+            .frame(height: 72)
+
+            HStack(spacing: 0) {
+                membershipBenefit(icon: "play.rectangle", text: "profile.membership_benefit_series".localized)
+                benefitDivider
+                membershipBenefit(icon: "gift", text: "profile.membership_benefit_points".localized)
+                benefitDivider
+                membershipBenefit(icon: "arrow.down.to.line", text: "profile.membership_benefit_download".localized)
+                benefitDivider
+                HDBenefitView()
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 12)
         .background {
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(hex: "#221719"),
-                        Color(hex: "#321D20"),
-                        Color(hex: "#1A1416")
+                        Color(hex: "#070707"),
+                        Color(hex: "#2B0908"),
+                        Color(hex: "#150303")
                     ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
+                    startPoint: .bottomLeading,
+                    endPoint: .topTrailing
                 )
                 RadialGradient(
-                    colors: [memberGold.opacity(0.25), .clear],
+                    colors: [DT.logoRed.opacity(0.34), .clear],
                     center: .topTrailing,
                     startRadius: 0,
-                    endRadius: 220
+                    endRadius: 250
                 )
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: DB.cardRadius))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: DB.cardRadius)
-                .stroke(memberGold.opacity(0.55), lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(DT.logoRed.opacity(0.48), lineWidth: 1)
         )
-        .shadow(color: memberGold.opacity(0.2), radius: 18, y: 6)
-        .contentShape(RoundedRectangle(cornerRadius: DB.cardRadius))
+        .shadow(color: DT.logoRed.opacity(0.16), radius: 16, y: 6)
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onTapGesture(perform: onJoin)
         .accessibilityAddTraits(.isButton)
         .padding(.horizontal, DT.Space.pageH)
-        .padding(.top, DT.Space.sm)
     }
 
     private func membershipBenefit(icon: String, text: String) -> some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.system(size: 18, weight: .medium))
                 .foregroundColor(memberGold)
             Text(text)
-                .font(.system(size: 10))
+                .font(.system(size: 10, weight: .medium))
                 .foregroundColor(benefitText)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
-                .frame(minHeight: 24, alignment: .top)
         }
+        .frame(height: 48)
         .frame(maxWidth: .infinity)
+    }
+
+    private var benefitDivider: some View {
+        Rectangle()
+            .fill(.white.opacity(0.16))
+            .frame(width: 1, height: 44)
     }
 }
 
 /// 自定义 HD 文字徽章，弥补 SF Symbols 的缺失。
 private struct HDBenefitView: View {
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 4) {
             ZStack {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .stroke(DT.memberGold, lineWidth: 1.5)
@@ -320,13 +352,13 @@ private struct HDBenefitView: View {
                     .foregroundColor(DT.memberGold)
             }
             Text("profile.membership_benefit_quality".localized)
-                .font(.system(size: 10))
-                .foregroundColor(Color(hex: "#CBC4BC"))
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(Color(hex: "#E3C98B"))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
-                .frame(minHeight: 24, alignment: .top)
         }
+        .frame(height: 48)
         .frame(maxWidth: .infinity)
     }
 }
@@ -344,9 +376,7 @@ struct ProfileMenuCard<Content: View>: View {
         VStack(spacing: 0) {
             content
         }
-        .background(DB.panel)
-        .clipShape(RoundedRectangle(cornerRadius: DB.cardRadius))
-        .padding(.horizontal, DT.Space.pageH)
+        .padding(.horizontal, DT.Space.lg)
     }
 }
 
@@ -359,7 +389,6 @@ struct ProfileMenuRow: View {
     let subtitle: String?
     let subtitleIcon: String?
     let subtitleIconColor: Color
-    @State private var coinPulse = false
     let showsDivider: Bool
     let onTap: () -> Void
 
@@ -387,13 +416,15 @@ struct ProfileMenuRow: View {
         Button(action: onTap) {
             HStack(spacing: DT.Space.md) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(.system(size: 19, weight: .medium))
                     .foregroundColor(iconColor)
-                    .frame(width: 24)
+                    .frame(width: 28)
 
                 Text(title)
-                    .font(.system(size: 15))
+                    .font(.system(size: 16))
                     .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
 
                 Spacer()
 
@@ -402,12 +433,6 @@ struct ProfileMenuRow: View {
                         Image(systemName: sIcon)
                             .font(.system(size: 14))
                             .foregroundColor(subtitleIconColor)
-                            .scaleEffect(coinPulse ? 1.5 : 1.0)
-                            .onAppear {
-                                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                                    coinPulse = true
-                                }
-                            }
                     }
                     Text(sub)
                         .font(.system(size: 15, weight: .medium))
@@ -416,19 +441,20 @@ struct ProfileMenuRow: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 12))
-                    .foregroundColor(DB.mutedText)
+                    .foregroundColor(.white.opacity(0.42))
             }
-            .padding(.horizontal, DT.Space.lg)
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .padding(.horizontal, DT.Space.md)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
 
         if showsDivider {
-            Divider()
-                .background(DB.divider)
-                .padding(.leading, 56)
+            Rectangle()
+                .fill(.white.opacity(0.12))
+                .frame(height: 1)
+                .padding(.leading, 52)
         }
     }
 }
@@ -437,33 +463,43 @@ struct ProfileMenuRow: View {
 
 struct ProfileHeaderSkeleton: View {
     var body: some View {
-        VStack(spacing: DT.Space.xs) {
-            HStack {
-                Spacer()
-                Circle()
-                    .fill(DB.panelElevated)
-                    .frame(width: 36, height: 36)
-                    .padding(4)
-            }
-            .frame(height: 44)
+        ZStack(alignment: .top) {
+            Image("ProfileRedLight")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 190)
+                .offset(x: 82, y: -18)
+                .blendMode(.screen)
 
-            HStack(spacing: DT.Space.md) {
-                Circle()
-                    .fill(DB.panelElevated)
-                    .frame(width: 72, height: 72)
-                VStack(alignment: .leading, spacing: 10) {
-                    RoundedRectangle(cornerRadius: 4)
+            VStack(spacing: DT.Space.sm) {
+                HStack {
+                    Spacer()
+                    Circle()
                         .fill(DB.panelElevated)
-                        .frame(width: 120, height: 18)
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(DB.panelElevated)
-                        .frame(width: 150, height: 12)
+                        .frame(width: 36, height: 36)
+                        .padding(4)
                 }
-                Spacer()
+                .frame(height: 44)
+
+                HStack(spacing: DT.Space.lg) {
+                    Circle()
+                        .fill(DB.panelElevated)
+                        .frame(width: 82, height: 82)
+                    VStack(alignment: .leading, spacing: 12) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(DB.panelElevated)
+                            .frame(width: 120, height: 22)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(DB.panelElevated)
+                            .frame(width: 170, height: 13)
+                    }
+                    Spacer()
+                }
             }
+            .padding(.horizontal, DT.Space.xl)
         }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.bottom, DT.Space.md)
+        .frame(height: 190)
+        .clipped()
     }
 }
 
