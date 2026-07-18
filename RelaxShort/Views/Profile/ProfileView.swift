@@ -79,7 +79,7 @@ struct ProfileView: View {
                 // 核心入口
                 ProfileMenuCard {
                     ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                    ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle", subtitleIconColor: DT.logoRed, onTap: { selectedDestination = .wallet })
+                    ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle", subtitleIconColor: DT.coinGold, onTap: { selectedDestination = .wallet })
                     ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
                     ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
                     ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })

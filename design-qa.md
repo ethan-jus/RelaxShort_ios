@@ -2,30 +2,28 @@
 
 - Reference: Product Design option 1 (`call_t2YucWBlJ4a65CFbtW5U3aSl.png`)
 - User review capture: `1-照片-1.jpg`
-- Implementation captures:
-  - `/tmp/relaxshort-profile-refinement-final-top.png`
-  - `/tmp/relaxshort-profile-refinement-final-bottom.png`
+- Implementation capture: `/tmp/relaxshort-profile-light-final.png`
 - Viewport: iPhone 17 simulator, guest profile state
-- Comparison: `/tmp/relaxshort-profile-refinement-comparison.png`
+- Full comparison: `/tmp/relaxshort-profile-light-comparison.png`
+- Focused comparison: `/tmp/relaxshort-profile-light-focused-comparison.png`
 
 ## Findings
 
-- Header height and identity composition remain unchanged.
-- The guest avatar now uses the darker black-gray treatment from the selected design.
-- The red light sweep is darker and shifted left so its visual weight matches the reference more closely.
-- The membership card now reads as a black-to-red gradient instead of a uniformly red panel.
-- The crown asset uses the requested lighter three-point silhouette, side-tip spheres, right sparkle, centered play button, and double-ring pedestal.
-- Menu rows are taller, dividers are half-point lines that stop before the disclosure arrows, and the arrows have a clearer visual weight.
-- The wallet entry uses a visible outline card icon; its balance coin and the help icon use outline symbols.
-- No clipped text, overlapping controls, broken dividers, or missing menu icons were observed across the top and scrolled captures.
+- The header red light now occupies a broader area, extends farther left, and uses a softer blurred treatment closer to the selected design.
+- The guest avatar size remains unchanged while the header height is reduced, bringing the membership card closer to the login area.
+- The membership card now has a clear deep-red top fading into a black bottom, with the left side kept darker for text contrast.
+- Menu symbols use a regular stroke weight instead of the previous medium weight.
+- The wallet balance keeps its outline coin symbol and restores the gold accent color.
+- No clipped text, overlapping controls, broken dividers, or missing menu icons were observed in the final capture.
+- The implemented red light is slightly more cloud-like than the reference ribbons; this is a low-severity visual difference and matches the requested larger, blurrier treatment.
 
 ## Iterations
 
-1. Replaced the first bulky crown asset with a closer image generated from the user's crown reference.
-2. Reduced the crown and red-light assets to Retina-appropriate dimensions without visible loss.
-3. Darkened the guest avatar and rebuilt the membership-card gradient.
-4. Increased menu-row height, refined divider geometry, and enlarged disclosure arrows.
-5. Restored the wallet icon and changed wallet balance and help symbols to outline variants.
-6. Shifted and dimmed the header light, then rebuilt, installed, and recaptured the iPhone 17 implementation.
+1. The previous red sweep was too narrow and defined, so it was regenerated as a broader, softer dark-crimson light field and repositioned in the header.
+2. The header remained visually too tall, so its container was reduced from 190 to 166 points without changing the avatar size.
+3. The card background still read as a diagonal or mostly red gradient, so it was rebuilt as a top-to-bottom red-to-black gradient with a dark leading overlay.
+4. Menu symbol weight was reduced from medium to regular.
+5. The wallet balance coin accent was restored from red to gold.
+6. The updated build was installed and compared against the selected design at the iPhone 17 viewport.
 
 final result: passed

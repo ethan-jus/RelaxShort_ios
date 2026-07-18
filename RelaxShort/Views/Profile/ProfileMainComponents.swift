@@ -32,9 +32,10 @@ struct ProfileIdentityHeader: View {
             Image("ProfileRedLight")
                 .resizable()
                 .scaledToFill()
-                .frame(height: 190)
-                .offset(x: 0, y: -18)
-                .opacity(0.42)
+                .frame(height: 166)
+                .offset(x: -6, y: -12)
+                .blur(radius: 4)
+                .opacity(0.62)
                 .blendMode(.screen)
                 .allowsHitTesting(false)
 
@@ -126,7 +127,7 @@ struct ProfileIdentityHeader: View {
             }
             .padding(.horizontal, DT.Space.xl)
         }
-        .frame(height: 190)
+        .frame(height: 166)
         .clipped()
     }
 }
@@ -290,15 +291,24 @@ struct ProfileMembershipCard: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(hex: "#030303"),
-                        Color(hex: "#0B0303"),
-                        Color(hex: "#260807")
+                        Color(hex: "#350B09"),
+                        Color(hex: "#180504"),
+                        Color(hex: "#030303")
                     ],
-                    startPoint: .bottomLeading,
-                    endPoint: .topTrailing
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.78),
+                        Color.black.opacity(0.22),
+                        .clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
                 RadialGradient(
-                    colors: [DT.logoRed.opacity(0.18), .clear],
+                    colors: [DT.logoRed.opacity(0.12), .clear],
                     center: .topTrailing,
                     startRadius: 0,
                     endRadius: 220
@@ -417,7 +427,7 @@ struct ProfileMenuRow: View {
         Button(action: onTap) {
             HStack(spacing: DT.Space.md) {
                 Image(systemName: icon)
-                    .font(.system(size: 19, weight: .medium))
+                    .font(.system(size: 19, weight: .regular))
                     .foregroundColor(iconColor)
                     .frame(width: 28)
 
@@ -470,9 +480,10 @@ struct ProfileHeaderSkeleton: View {
             Image("ProfileRedLight")
                 .resizable()
                 .scaledToFill()
-                .frame(height: 190)
-                .offset(x: 0, y: -18)
-                .opacity(0.42)
+                .frame(height: 166)
+                .offset(x: -6, y: -12)
+                .blur(radius: 4)
+                .opacity(0.62)
                 .blendMode(.screen)
 
             VStack(spacing: DT.Space.sm) {
@@ -502,7 +513,7 @@ struct ProfileHeaderSkeleton: View {
             }
             .padding(.horizontal, DT.Space.xl)
         }
-        .frame(height: 190)
+        .frame(height: 166)
         .clipped()
     }
 }
