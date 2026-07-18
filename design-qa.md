@@ -1,29 +1,28 @@
 # Profile Redesign Visual QA
 
-- Reference: Product Design option 1 (`call_t2YucWBlJ4a65CFbtW5U3aSl.png`)
-- User review capture: `1-照片-1.jpg`
-- Implementation capture: `/tmp/relaxshort-profile-light-final.png`
+- Source visual truth: `/Users/ethan/.codex/generated_images/019f7584-bd41-7d51-a3dc-a76e8823bdb8/call_t2YucWBlJ4a65CFbtW5U3aSl.png`
+- User reference crop: `/var/folders/24/hnnvyxbn1s13bt4bjv9bl4m40000gn/T/codex-clipboard-67130b08-8e16-4697-b90c-33c92722b2b0.png`
+- Implementation capture: `/tmp/relaxshort-profile-final-refinement-v2.png`
 - Viewport: iPhone 17 simulator, guest profile state
-- Full comparison: `/tmp/relaxshort-profile-light-comparison.png`
-- Focused comparison: `/tmp/relaxshort-profile-light-focused-comparison.png`
+- Full-view comparison: `/tmp/relaxshort-profile-final-refinement-comparison.png`
+- Focused comparison: the full-view comparison renders both mobile screens at readable size, so a separate crop was not needed for the top light and CTA.
 
 ## Findings
 
-- The header red light now occupies a broader area, extends farther left, and uses a softer blurred treatment closer to the selected design.
-- The guest avatar size remains unchanged while the header height is reduced, bringing the membership card closer to the login area.
-- The membership card now has a clear deep-red top fading into a black bottom, with the left side kept darker for text contrast.
-- Menu symbols use a regular stroke weight instead of the previous medium weight.
-- The wallet balance keeps its outline coin symbol and restores the gold accent color.
-- No clipped text, overlapping controls, broken dividers, or missing menu icons were observed in the final capture.
-- The implemented red light is slightly more cloud-like than the reference ribbons; this is a low-severity visual difference and matches the requested larger, blurrier treatment.
+- Fonts and typography: the existing title, metadata, membership copy, and menu hierarchy remain consistent with the approved implementation; the shorter CTA keeps its text vertically centered.
+- Spacing and layout rhythm: the avatar and membership-card spacing remains unchanged; the CTA height is reduced from 40 to 36 points without changing its horizontal padding.
+- Colors and visual tokens: the original sharper red ribbon asset is shown at higher opacity without an extra blur layer, restoring the brighter cinematic red treatment.
+- Image quality and asset fidelity: the existing `ProfileRedLight` raster asset is reused at native quality and now extends behind the top safe area instead of ending below the status bar.
+- Copy and content: all visible profile copy remains unchanged.
+- The status bar and profile header now read as one continuous black-and-red background with no visible rectangular image boundary.
+- No clipping, overlap, missing controls, or horizontal layout drift remains in the final capture.
 
 ## Iterations
 
-1. The previous red sweep was too narrow and defined, so it was regenerated as a broader, softer dark-crimson light field and repositioned in the header.
-2. The header remained visually too tall, so its container was reduced from 190 to 166 points without changing the avatar size.
-3. The card background still read as a diagonal or mostly red gradient, so it was rebuilt as a top-to-bottom red-to-black gradient with a dark leading overlay.
-4. Menu symbol weight was reduced from medium to regular.
-5. The wallet balance coin accent was restored from red to gold.
-6. The updated build was installed and compared against the selected design at the iPhone 17 viewport.
+1. Earlier finding: the red light was dimmed by a four-point blur and 0.62 opacity, and it was clipped to the safe-area header. Fix: removed the secondary blur, increased opacity to 0.88, and moved the asset to the page-level background with top safe-area coverage.
+2. Earlier finding: the first page-level implementation allowed the raster asset's intrinsic width to widen the layout, clipping the avatar and card edges. Fix: constrained the background and scroll content to `GeometryReader` width.
+3. CTA refinement: reduced the non-member action height from 40 to 36 points.
+4. Post-fix evidence: `/tmp/relaxshort-profile-final-refinement-v2.png` shows the status-bar integration, restored ribbon definition, centered CTA text, and corrected horizontal margins.
+5. Final comparison evidence: `/tmp/relaxshort-profile-final-refinement-comparison.png` shows no remaining actionable P0, P1, or P2 mismatch for the requested changes.
 
 final result: passed

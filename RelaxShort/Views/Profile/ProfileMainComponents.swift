@@ -29,16 +29,6 @@ struct ProfileIdentityHeader: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Image("ProfileRedLight")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 166)
-                .offset(x: -6, y: -12)
-                .blur(radius: 4)
-                .opacity(0.62)
-                .blendMode(.screen)
-                .allowsHitTesting(false)
-
             VStack(spacing: DT.Space.sm) {
                 HStack {
                     Spacer()
@@ -268,7 +258,7 @@ struct ProfileMembershipCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .padding(.horizontal, 14)
-                        .frame(height: 40)
+                        .frame(height: 36)
                         .background(DT.logoRed)
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
@@ -477,15 +467,6 @@ struct ProfileMenuRow: View {
 struct ProfileHeaderSkeleton: View {
     var body: some View {
         ZStack(alignment: .top) {
-            Image("ProfileRedLight")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 166)
-                .offset(x: -6, y: -12)
-                .blur(radius: 4)
-                .opacity(0.62)
-                .blendMode(.screen)
-
             VStack(spacing: DT.Space.sm) {
                 HStack {
                     Spacer()

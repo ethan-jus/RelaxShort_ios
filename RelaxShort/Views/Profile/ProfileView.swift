@@ -64,38 +64,56 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                // 顶部用户区
-                if authStore.isLoggedIn {
-                    loggedInHeader
-                } else {
-                    guestHeader
-                }
+        GeometryReader { proxy in
+            ZStack(alignment: .top) {
+                DB.black
+                    .ignoresSafeArea()
 
-                // 会员主视觉
-                membershipCard
+                Image("ProfileRedLight")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: 228)
+                    .offset(x: -4, y: -42)
+                    .opacity(0.88)
+                    .blendMode(.screen)
+                    .clipped()
+                    .ignoresSafeArea(edges: .top)
+                    .allowsHitTesting(false)
 
-                // 核心入口
-                ProfileMenuCard {
-                    ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                    ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle", subtitleIconColor: DT.coinGold, onTap: { selectedDestination = .wallet })
-                    ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
-                    ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
-                    ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
-                }
-                .padding(.top, DT.Space.sm)
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        // 顶部用户区
+                        if authStore.isLoggedIn {
+                            loggedInHeader
+                        } else {
+                            guestHeader
+                        }
 
-                // 辅助入口
-                ProfileMenuCard {
-                    ProfileMenuRow(icon: "globe", iconColor: .white, title: L10n.language, onTap: { selectedDestination = .language })
-                    ProfileMenuRow(icon: "questionmark.circle", iconColor: .white, title: "profile.help_feedback".localized, showsDivider: false, onTap: { selectedDestination = .customerService })
+                        // 会员主视觉
+                        membershipCard
+
+                        // 核心入口
+                        ProfileMenuCard {
+                            ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
+                            ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle", subtitleIconColor: DT.coinGold, onTap: { selectedDestination = .wallet })
+                            ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
+                            ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
+                            ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
+                        }
+                        .padding(.top, DT.Space.sm)
+
+                        // 辅助入口
+                        ProfileMenuCard {
+                            ProfileMenuRow(icon: "globe", iconColor: .white, title: L10n.language, onTap: { selectedDestination = .language })
+                            ProfileMenuRow(icon: "questionmark.circle", iconColor: .white, title: "profile.help_feedback".localized, showsDivider: false, onTap: { selectedDestination = .customerService })
+                        }
+                        .padding(.top, 2)
+                    }
+                    .padding(.bottom, DT.Layout.tabBarHeight + DT.Space.xl)
                 }
-                .padding(.top, 2)
+                .frame(width: proxy.size.width)
             }
-            .padding(.bottom, DT.Layout.tabBarHeight + DT.Space.xl)
         }
-        .background(DB.black)
         .navigationDestination(item: $selectedDestination) { destination in
             profileDestination(for: destination)
         }
