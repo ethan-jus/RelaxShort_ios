@@ -868,14 +868,27 @@ private struct DramaBoxSearchHeaderView: View {
             Button {
                 onVIPTap()
             } label: {
-                AnimatedPromoButton(symbol: "crown.fill", badge: "-25%", tint: Color(red: 1, green: 0.82, blue: 0.15), delay: 0)
+                AnimatedPromoButton(badge: "-25%", delay: 0) {
+                    VIPCrownView(
+                        width: 36,
+                        height: 27,
+                        tint: Color(red: 1, green: 0.82, blue: 0.15),
+                        glowColor: Color(red: 1, green: 0.36, blue: 0.12),
+                        glowRadius: 3
+                    )
+                }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("vip.tab.title".localized)
 
             Button {
                 onRewardTap()
             } label: {
-                AnimatedPromoButton(symbol: "gift.fill", badge: "+150", tint: Color(red: 0.9, green: 0.2, blue: 0.2), delay: 0.3)
+                AnimatedPromoButton(badge: "+150", delay: 0.3) {
+                    Image(systemName: "gift.fill")
+                        .font(.system(size: 23, weight: .semibold))
+                        .foregroundColor(Color(red: 0.9, green: 0.2, blue: 0.2))
+                }
             }
             .buttonStyle(.plain)
         }
@@ -887,18 +900,15 @@ private struct DramaBoxSearchHeaderView: View {
 
 // MARK: - Animated Promo Button (pure decoration, tap handled by parent)
 
-private struct AnimatedPromoButton: View {
-    let symbol: String
+private struct AnimatedPromoButton<Icon: View>: View {
     let badge: String
-    var tint: Color = DT.brandGold
     var delay: Double = 0
+    @ViewBuilder let icon: () -> Icon
     @State private var anim = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Image(systemName: symbol)
-                .font(.system(size: 23, weight: .semibold))
-                .foregroundColor(tint)
+            icon()
                 .frame(width: 36, height: 36)
 
             Text(badge)

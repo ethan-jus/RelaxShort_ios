@@ -1,5 +1,44 @@
 import SwiftUI
 
+// MARK: - VIP Crown
+
+/// 可复用的会员皇冠素材。
+///
+/// 黑色背景通过 `.screen` 混合模式自然融入深色界面；可按使用场景调整尺寸、颜色与光晕。
+struct VIPCrownView: View {
+    let width: CGFloat
+    var height: CGFloat? = nil
+    var tint: Color = .white
+    var opacity: Double = 1
+    var glowColor: Color? = nil
+    var glowRadius: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            if glowRadius > 0 {
+                crownImage(color: glowColor ?? tint)
+                    .blur(radius: glowRadius)
+                    .opacity(0.55)
+                    .blendMode(.screen)
+            }
+
+            crownImage(color: tint)
+                .blendMode(.screen)
+        }
+        .frame(width: width, height: height)
+        .opacity(opacity)
+        .accessibilityHidden(true)
+    }
+
+    private func crownImage(color: Color) -> some View {
+        Image("ProfileVIPCrown")
+            .resizable()
+            .scaledToFit()
+            .frame(width: width, height: height)
+            .colorMultiply(color)
+    }
+}
+
 // MARK: - Cover Image View
 /// 封面图片异步加载组件，使用项目共享 ImageLoader 内存缓存
 ///

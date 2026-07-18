@@ -217,12 +217,12 @@ struct ProfileMembershipCard: View {
     var body: some View {
         VStack(spacing: DT.Space.sm) {
             HStack(spacing: DT.Space.sm) {
-                Image("ProfileVIPCrown")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 92, height: 68)
-                    .blendMode(.screen)
-                    .accessibilityHidden(true)
+                VIPCrownView(
+                    width: 92,
+                    height: 68,
+                    glowColor: memberGold,
+                    glowRadius: 2
+                )
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(isVIP ? "profile.membership_active".localized : "profile.join_membership".localized)
