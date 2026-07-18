@@ -917,9 +917,12 @@ private struct AnimatedPromoButton<Icon: View>: View {
                     .padding(.vertical, 2)
                     .background(DT.hotTag)
                     .cornerRadius(3)
-                    .rotationEffect(.degrees(45), anchor: .bottomTrailing)
+                    .rotationEffect(.degrees(45))
+                    .alignmentGuide(.trailing) { dimensions in
+                        dimensions[HorizontalAlignment.center]
+                    }
                     .alignmentGuide(.top) { dimensions in
-                        dimensions[.bottom]
+                        dimensions[VerticalAlignment.center]
                     }
                     .offset(x: -2, y: 10)
             }
