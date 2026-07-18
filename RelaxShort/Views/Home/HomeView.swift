@@ -868,12 +868,7 @@ private struct DramaBoxSearchHeaderView: View {
             Button {
                 onVIPTap()
             } label: {
-                AnimatedPromoButton(
-                    badge: "-25%",
-                    delay: 0,
-                    badgeRotation: .degrees(45),
-                    badgeOffset: CGSize(width: 4, height: -4)
-                ) {
+                AnimatedPromoButton(badge: "-25%", delay: 0) {
                     VIPCrownView(
                         width: 40,
                         height: 30,
@@ -908,26 +903,26 @@ private struct DramaBoxSearchHeaderView: View {
 private struct AnimatedPromoButton<Icon: View>: View {
     let badge: String
     var delay: Double = 0
-    var badgeRotation: Angle = .zero
-    var badgeOffset: CGSize = CGSize(width: 2, height: 2)
     @ViewBuilder let icon: () -> Icon
     @State private var anim = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            icon()
-                .frame(width: 36, height: 36)
-
-            Text(badge)
-                .font(.system(size: 7, weight: .heavy))
-                .foregroundColor(.white)
-                .padding(.horizontal, 3)
-                .padding(.vertical, 2)
-                .background(DT.hotTag)
-                .cornerRadius(3)
-                .rotationEffect(badgeRotation)
-                .offset(x: badgeOffset.width, y: badgeOffset.height)
-        }
+        icon()
+            .frame(width: 36, height: 36)
+            .overlay(alignment: .topTrailing) {
+                Text(badge)
+                    .font(.system(size: 7, weight: .heavy))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 2)
+                    .background(DT.hotTag)
+                    .cornerRadius(3)
+                    .rotationEffect(.degrees(45), anchor: .bottomTrailing)
+                    .alignmentGuide(.top) { dimensions in
+                        dimensions[.bottom]
+                    }
+                    .offset(x: -2, y: 10)
+            }
         .frame(width: 42, height: 42, alignment: .center)
         .scaleEffect(anim ? 1.1 : 1.0)
         .onAppear {
