@@ -275,6 +275,7 @@
 "member.disclosure.restore" = "「恢復購買」僅恢復符合條件的 Apple 會員訂閱，不會恢復已購買的消耗型金幣。";
 "member.terms" = "使用條款";
 "member.privacy" = "隱私政策";
+"settings.privacy_options" = "隱私選項";
 "member.manage_subscription" = "管理訂閱";
 "member.manage_subscription_unavailable" = "暫時無法開啟訂閱管理，請稍後再試。";
 "member.go_to_profile" = "前往個人中心";

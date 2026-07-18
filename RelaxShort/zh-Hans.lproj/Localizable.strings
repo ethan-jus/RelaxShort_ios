@@ -280,6 +280,7 @@
 "member.disclosure.restore" = "“恢复购买”仅恢复符合条件的 Apple 会员订阅，不会恢复已购买的消耗型金币。";
 "member.terms" = "使用条款";
 "member.privacy" = "隐私政策";
+"settings.privacy_options" = "隐私选项";
 "member.manage_subscription" = "管理订阅";
 "member.manage_subscription_unavailable" = "暂时无法打开订阅管理，请稍后重试。";
 "member.go_to_profile" = "前往个人中心";

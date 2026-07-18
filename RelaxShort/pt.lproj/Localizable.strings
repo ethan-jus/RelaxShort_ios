@@ -275,6 +275,7 @@
 "member.disclosure.restore" = "Restaurar compras restaura apenas assinaturas Apple elegíveis; moedas consumíveis não podem ser restauradas.";
 "member.terms" = "Termos de Uso";
 "member.privacy" = "Política de Privacidade";
+"settings.privacy_options" = "Opções de privacidade";
 "member.manage_subscription" = "Gerenciar Assinatura";
 "member.manage_subscription_unavailable" = "O gerenciamento de assinatura está temporariamente indisponível.";
 "member.go_to_profile" = "Ir para o Perfil";

@@ -279,6 +279,7 @@
 "member.disclosure.restore" = "Restore Purchases restores eligible Apple subscriptions only; consumable coins can’t be restored.";
 "member.terms" = "Terms of Use";
 "member.privacy" = "Privacy Policy";
+"settings.privacy_options" = "Privacy Choices";
 "member.manage_subscription" = "Manage Subscription";
 "member.manage_subscription_unavailable" = "Subscription management is temporarily unavailable.";
 "member.go_to_profile" = "Go to Profile";

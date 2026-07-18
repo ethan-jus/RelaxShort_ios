@@ -275,6 +275,7 @@
 "member.disclosure.restore" = "Restaurar compras solo restaura suscripciones de Apple elegibles; las monedas consumibles no se pueden restaurar.";
 "member.terms" = "Términos de uso";
 "member.privacy" = "Política de privacidad";
+"settings.privacy_options" = "Opciones de privacidad";
 "member.manage_subscription" = "Gestionar suscripción";
 "member.manage_subscription_unavailable" = "La gestión de suscripciones no está disponible temporalmente.";
 "member.go_to_profile" = "Ir al perfil";

@@ -1,6 +1,5 @@
 import SwiftUI
 import AVFoundation
-import GoogleMobileAds
 import GoogleSignIn
 
 enum AppAudioSessionConfiguration {
@@ -41,20 +40,6 @@ struct RelaxShortApp: App {
             serverClientID: "1003872687588-8518sh0gca5q8ei5a1d93pj0vlj36n1i.apps.googleusercontent.com"
         )
 
-        // 注册测试设备，确保真机+模拟器调试时都能加载测试广告
-        GADMobileAds.sharedInstance().requestConfiguration.testDeviceIdentifiers = [
-            "00008130-001128D23A2A001C"   // iPhone 15 Pro Max
-        ]
-        // testDeviceIdentifiers 必须在 start() 之前设置
-        GADMobileAds.sharedInstance().start { status in
-            print("🦐 [AdMob] SDK 初始化完成")
-            DispatchQueue.main.async {
-                RealAdService.shared.isSDKReady = true
-                Task {
-                    await RealAdService.shared.prepareAds()
-                }
-            }
-        }
     }
 
     private func configureAudioSession() {
@@ -95,6 +80,10 @@ struct RelaxShortApp: App {
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
                 await AppInitService.shared.initialize()
+            }
+            .task {
+                guard !AppRuntimeEnvironment.isUnitTesting else { return }
+                await PrivacyConsentManager.shared.gatherConsentAndStartAds()
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }

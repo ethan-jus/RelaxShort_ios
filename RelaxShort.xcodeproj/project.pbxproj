@@ -113,6 +113,8 @@
 		BD62F14F9F5854A4669A9515 /* APIEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BF71E8082163CE2F05D8E65 /* APIEndpoint.swift */; };
 		C1D76D631694C10F3B7D91D8 /* HomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1B75AD8D686D57AB9CDC758 /* HomeViewModel.swift */; };
 		C338F43626F4160B5B35BD86 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 945B30FA95757C96CC22C8F1 /* GoogleMobileAds */; };
+		C40000000000000000000001 /* GoogleUserMessagingPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = C40000000000000000000002 /* GoogleUserMessagingPlatform */; };
+		C40000000000000000000003 /* PrivacyConsentManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40000000000000000000004 /* PrivacyConsentManager.swift */; };
 		C3846580A6769F859B9D7406 /* AdService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF389AD770099338D3F8AAF2 /* AdService.swift */; };
 		C6680317189D82D2B9397409 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A121A77EFE00386139727 /* StoreKitManager.swift */; };
 		CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408582F2968E474DADC30E92 /* ProfileDestinations.swift */; };
@@ -194,6 +196,7 @@
 		3E062C5AE506CB3FC932836A /* SharedComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedComponents.swift; sourceTree = "<group>"; };
 		3E07DF14795E56458A576B7D /* RealSearchRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealSearchRepository.swift; sourceTree = "<group>"; };
 		3F30DE30D08251279912E670 /* RealAdService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealAdService.swift; sourceTree = "<group>"; };
+		C40000000000000000000004 /* PrivacyConsentManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyConsentManager.swift; sourceTree = "<group>"; };
 		408582F2968E474DADC30E92 /* ProfileDestinations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ProfileDestinations.swift; path = RelaxShort/Views/Profile/ProfileDestinations.swift; sourceTree = SOURCE_ROOT; };
 		457158D3B20C8360F9FE045F /* DramaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DramaItem.swift; sourceTree = "<group>"; };
 		45C2B9C4EFA543902B3CA1D1 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -328,6 +331,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C338F43626F4160B5B35BD86 /* GoogleMobileAds in Frameworks */,
+				C40000000000000000000001 /* GoogleUserMessagingPlatform in Frameworks */,
 				A34B00000000000000000007 /* GoogleSignIn in Frameworks */,
 				A34B00000000000000000008 /* GoogleSignInSwift in Frameworks */,
 				FBB340000000000000000001 /* FacebookCore in Frameworks */,
@@ -494,6 +498,7 @@
 				92BA45403A687DDCFEC0BFB2 /* ImageLoader.swift */,
 				83FB8814D1C728B6ACFF446E /* MockAPIRepository.swift */,
 				59DE53B2962106BFD119821C /* NetworkError.swift */,
+				C40000000000000000000004 /* PrivacyConsentManager.swift */,
 				3F30DE30D08251279912E670 /* RealAdService.swift */,
 				816C2A833938C5A1359FED73 /* RepositoryProtocols.swift */,
 				142D16FA5DD46D6AC295A967 /* StorageService.swift */,
@@ -745,6 +750,7 @@
 			name = RelaxShort;
 			packageProductDependencies = (
 				945B30FA95757C96CC22C8F1 /* GoogleMobileAds */,
+				C40000000000000000000002 /* GoogleUserMessagingPlatform */,
 				A34D00000000000000000001 /* GoogleSignIn */,
 				A34D00000000000000000002 /* GoogleSignInSwift */,
 				FBD340000000000000000001 /* FacebookCore */,
@@ -843,6 +849,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				9426733FD624226EADA96C67 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+				C40000000000000000000005 /* XCRemoteSwiftPackageReference "swift-package-manager-google-user-messaging-platform" */,
 				A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				FBE340000000000000000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
 			);
@@ -951,6 +958,7 @@
 				ED523DCF8E19074DB9CE3EEF /* RankView.swift in Sources */,
 				E792C7488A231F2C32982561 /* RankViewModel.swift in Sources */,
 				515D6A18AF0E16B92039B736 /* RealAdService.swift in Sources */,
+				C40000000000000000000003 /* PrivacyConsentManager.swift in Sources */,
 				FB1270575E45544AA548243B /* RealSearchRepository.swift in Sources */,
 				T31A00100000000000000001 /* WatchProgressReport.swift in Sources */,
 				T31A00300000000000000003 /* FavoritesResponseDTO.swift in Sources */,
@@ -1311,6 +1319,14 @@
 				minimumVersion = 11.0.0;
 			};
 		};
+		C40000000000000000000005 /* XCRemoteSwiftPackageReference "swift-package-manager-google-user-messaging-platform" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/swift-package-manager-google-user-messaging-platform";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 		A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
@@ -1334,6 +1350,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 9426733FD624226EADA96C67 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
+		};
+		C40000000000000000000002 /* GoogleUserMessagingPlatform */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C40000000000000000000005 /* XCRemoteSwiftPackageReference "swift-package-manager-google-user-messaging-platform" */;
+			productName = GoogleUserMessagingPlatform;
 		};
 		A34D00000000000000000001 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

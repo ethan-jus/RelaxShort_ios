@@ -275,6 +275,7 @@
 "member.disclosure.restore" = "「購入を復元」は対象のAppleサブスクリプションのみを復元します。消費型コインは復元できません。";
 "member.terms" = "利用規約";
 "member.privacy" = "プライバシーポリシー";
+"settings.privacy_options" = "プライバシー設定";
 "member.manage_subscription" = "サブスクリプションを管理";
 "member.manage_subscription_unavailable" = "現在サブスクリプション管理を利用できません。";
 "member.go_to_profile" = "プロフィールへ";

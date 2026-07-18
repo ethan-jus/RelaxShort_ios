@@ -275,6 +275,7 @@
 "member.disclosure.restore" = "تستعيد ميزة استعادة المشتريات اشتراكات Apple المؤهلة فقط؛ ولا يمكن استعادة العملات الاستهلاكية.";
 "member.terms" = "شروط الاستخدام";
 "member.privacy" = "سياسة الخصوصية";
+"settings.privacy_options" = "خيارات الخصوصية";
 "member.manage_subscription" = "إدارة الاشتراك";
 "member.manage_subscription_unavailable" = "إدارة الاشتراك غير متاحة مؤقتًا.";
 "member.go_to_profile" = "الانتقال إلى الملف الشخصي";

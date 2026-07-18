@@ -6,9 +6,9 @@ import StoreKit
 /// DramaBox 风格设置页。Task33 保持原有实现不变。
 struct SettingsView: View {
     @State private var downloadWithMobileData = false
-    @State private var personalizedAds = true
     @State private var personalizedRecs = true
     @State private var marketingComms = false
+    @ObservedObject private var privacyConsent = PrivacyConsentManager.shared
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authStore: AuthStore
     @State private var showLogoutAlert = false
@@ -80,7 +80,17 @@ struct SettingsView: View {
 
             Section {
                 toggleRow(title: "Personalized Recommendations", isOn: $personalizedRecs)
-                toggleRow(title: "Personalized Ads", isOn: $personalizedAds)
+                if privacyConsent.isPrivacyOptionsRequired {
+                    Button {
+                        Task { await privacyConsent.presentPrivacyOptions() }
+                    } label: {
+                        settingRow(
+                            title: "settings.privacy_options".localized,
+                            systemImage: "hand.raised.fill",
+                            color: .blue
+                        )
+                    }
+                }
                 toggleRow(title: "Marketing Communications", isOn: $marketingComms)
             }
 
@@ -148,7 +158,18 @@ struct SettingsView: View {
         ) {
             Button("common.cancel".localized, role: .cancel) {}
         }
-    }
+        .alert(
+            privacyConsent.lastErrorMessage ?? "",
+            isPresented: Binding(
+                get: { privacyConsent.lastErrorMessage != nil },
+                set: { if !$0 { privacyConsent.clearLastError() } }
+            )
+        ) {
+            Button("common.cancel".localized, role: .cancel) {
+                privacyConsent.clearLastError()
+            }
+        }
+        }
 
     private func refreshCachedVideoBytes() {
         cachedVideoBytes = HTTPRangeMediaCache.shared.totalCachedBytes()
