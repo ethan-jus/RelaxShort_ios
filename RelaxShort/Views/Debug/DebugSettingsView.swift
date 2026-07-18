@@ -1,4 +1,8 @@
+import AppTrackingTransparency
+import GoogleMobileAds
 import SwiftUI
+import UIKit
+import UserMessagingPlatform
 
 // MARK: - Debug Settings View (DEBUG only)
 
@@ -14,6 +18,12 @@ struct DebugSettingsView: View {
     @State private var countryCode = UserDefaults.standard.string(forKey: "app_country_code") ?? "-"
     @State private var matchedLanguage = UserDefaults.standard.string(forKey: "app_matched_language") ?? "-"
     @State private var fallbackReason = UserDefaults.standard.string(forKey: "app_fallback_reason") ?? "-"
+    @State private var adapterDiagnostics: [AdAdapterDiagnostic] = []
+    @State private var attStatus = "-"
+    @State private var canRequestAds = false
+    @State private var privacyOptionsStatus = "-"
+    @State private var isPresentingAdInspector = false
+    @State private var adInspectorErrorMessage: String?
 
     @StateObject private var smokeRunner = RealAPISmokeRunner()
 
@@ -53,6 +63,60 @@ struct DebugSettingsView: View {
                     LabeledContent("Country", value: countryCode)
                     LabeledContent("Matched", value: matchedLanguage)
                     LabeledContent("Fallback", value: fallbackReason)
+                }
+
+                Section("Ad Diagnostics") {
+                    LabeledContent("ATT", value: attStatus)
+                    LabeledContent("UMP Ad Requests", value: canRequestAds ? "Allowed" : "Blocked")
+                    LabeledContent("Privacy Options", value: privacyOptionsStatus)
+
+                    if adapterDiagnostics.isEmpty {
+                        Text("No adapter status. Mobile Ads may not be initialized yet.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(adapterDiagnostics) { diagnostic in
+                            HStack(alignment: .top, spacing: 10) {
+                                Circle()
+                                    .fill(diagnostic.isReady ? Color.green : Color.orange)
+                                    .frame(width: 8, height: 8)
+                                    .padding(.top, 5)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(diagnostic.displayName)
+                                        .font(.caption)
+                                        .bold()
+                                    Text(diagnostic.className)
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("\(diagnostic.detail) · \(diagnostic.latency, specifier: "%.3f")s")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        }
+                    }
+
+                    Button("Refresh Ad Status") {
+                        refreshAdDiagnostics()
+                    }
+
+                    Button {
+                        presentAdInspector()
+                    } label: {
+                        if isPresentingAdInspector {
+                            HStack {
+                                ProgressView()
+                                Text("Opening Ad Inspector...")
+                            }
+                        } else {
+                            Text("Open Ad Inspector")
+                        }
+                    }
+                    .disabled(isPresentingAdInspector)
+
+                    Text("Ad Inspector requires this device to be registered as a test device.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("Actions") {
@@ -112,6 +176,19 @@ struct DebugSettingsView: View {
             .navigationTitle("Debug Settings")
         }
         .onAppear { refreshContext() }
+        .alert(
+            "广告诊断",
+            isPresented: Binding(
+                get: { adInspectorErrorMessage != nil },
+                set: { if !$0 { adInspectorErrorMessage = nil } }
+            )
+        ) {
+            Button("确定", role: .cancel) {
+                adInspectorErrorMessage = nil
+            }
+        } message: {
+            Text(adInspectorErrorMessage ?? "")
+        }
     }
 
     private func refreshContext() {
@@ -120,7 +197,118 @@ struct DebugSettingsView: View {
         countryCode = UserDefaults.standard.string(forKey: "app_country_code") ?? "-"
         matchedLanguage = UserDefaults.standard.string(forKey: "app_matched_language") ?? "-"
         fallbackReason = UserDefaults.standard.string(forKey: "app_fallback_reason") ?? "-"
+        refreshAdDiagnostics()
     }
+
+    private func refreshAdDiagnostics() {
+        attStatus = Self.attStatusDescription
+        canRequestAds = UMPConsentInformation.sharedInstance.canRequestAds
+        privacyOptionsStatus = Self.privacyOptionsStatusDescription
+        adapterDiagnostics = MobileAds.shared.initializationStatus.adapterStatusesByClassName
+            .map { className, status in
+                AdAdapterDiagnostic(
+                    className: className,
+                    displayName: Self.adapterDisplayName(for: className),
+                    isReady: status.state == .ready,
+                    detail: status.description,
+                    latency: status.latency
+                )
+            }
+            .sorted {
+                if $0.displayName == $1.displayName {
+                    return $0.className < $1.className
+                }
+                return $0.displayName < $1.displayName
+            }
+    }
+
+    private func presentAdInspector() {
+        guard let viewController = Self.topViewController() else {
+            adInspectorErrorMessage = "无法找到可用于展示 Ad Inspector 的页面。"
+            return
+        }
+
+        isPresentingAdInspector = true
+        MobileAds.shared.presentAdInspector(from: viewController) { error in
+            Task { @MainActor in
+                isPresentingAdInspector = false
+                if let error {
+                    adInspectorErrorMessage = "Ad Inspector 无法打开：\(error.localizedDescription)"
+                }
+                refreshAdDiagnostics()
+            }
+        }
+    }
+
+    private static var attStatusDescription: String {
+        switch ATTrackingManager.trackingAuthorizationStatus {
+        case .notDetermined:
+            return "Not Requested"
+        case .restricted:
+            return "Restricted"
+        case .denied:
+            return "Denied"
+        case .authorized:
+            return "Authorized"
+        @unknown default:
+            return "Unknown"
+        }
+    }
+
+    private static var privacyOptionsStatusDescription: String {
+        switch UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus {
+        case .unknown:
+            return "Unknown"
+        case .required:
+            return "Required"
+        case .notRequired:
+            return "Not Required"
+        @unknown default:
+            return "Unknown"
+        }
+    }
+
+    private static func adapterDisplayName(for className: String) -> String {
+        let lowercaseName = className.lowercased()
+        if lowercaseName.contains("pangle") {
+            return "Pangle"
+        }
+        if lowercaseName.contains("meta") || lowercaseName.contains("facebook") {
+            return "Meta"
+        }
+        if lowercaseName.contains("google") || lowercaseName.contains("admob") {
+            return "Google"
+        }
+        return className
+    }
+
+    private static func topViewController(from suppliedRoot: UIViewController? = nil) -> UIViewController? {
+        let root = suppliedRoot ?? UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController
+        if let navigation = root as? UINavigationController {
+            return topViewController(from: navigation.visibleViewController)
+        }
+        if let tab = root as? UITabBarController {
+            return topViewController(from: tab.selectedViewController)
+        }
+        if let presented = root?.presentedViewController {
+            return topViewController(from: presented)
+        }
+        return root
+    }
+}
+
+private struct AdAdapterDiagnostic: Identifiable {
+    var id: String { className }
+
+    let className: String
+    let displayName: String
+    let isReady: Bool
+    let detail: String
+    let latency: TimeInterval
 }
 
 #if DEBUG

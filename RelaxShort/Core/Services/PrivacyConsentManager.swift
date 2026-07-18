@@ -30,7 +30,6 @@ final class PrivacyConsentManager: ObservableObject {
         refreshPrivacyOptionsRequirement()
 
         if let updateError {
-            lastErrorMessage = updateError.localizedDescription
             Logger.store.warning("UMP consent update failed: \(updateError.localizedDescription)")
             startMobileAdsIfAllowed()
             return
@@ -41,7 +40,6 @@ final class PrivacyConsentManager: ObservableObject {
                 throw formError
             }
         } catch {
-            lastErrorMessage = error.localizedDescription
             Logger.store.warning("UMP consent form failed: \(error.localizedDescription)")
         }
 
