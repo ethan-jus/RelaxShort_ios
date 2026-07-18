@@ -5,19 +5,19 @@ import SwiftUI
 final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     static let shared = RealAdService()
 
-    private var appOpenAd: GADAppOpenAd?
+    private var appOpenAd: AppOpenAd?
     private var appOpenLoadTime: Date?
-    private var appOpenLoadTask: Task<GADAppOpenAd?, Never>?
+    private var appOpenLoadTask: Task<AppOpenAd?, Never>?
     private var appOpenAdOnDismiss: (() -> Void)?
     private var lastBackgroundTime: Date?
-    private var rewardedAd: GADRewardedAd?
+    private var rewardedAd: RewardedAd?
     private var rewardedAdUnitID: String?
     private var rewardedAdLoadTime: Date?
-    private var rewardedAdLoadTask: Task<GADRewardedAd?, Never>?
-    private var rewardedInterstitialAd: GADRewardedInterstitialAd?
+    private var rewardedAdLoadTask: Task<RewardedAd?, Never>?
+    private var rewardedInterstitialAd: RewardedInterstitialAd?
     private var rewardedInterstitialAdUnitID: String?
     private var rewardedInterstitialAdLoadTime: Date?
-    private var rewardedInterstitialLoadTask: Task<GADRewardedInterstitialAd?, Never>?
+    private var rewardedInterstitialLoadTask: Task<RewardedInterstitialAd?, Never>?
     private var rewardedPresentation: RewardedPresentationDelegate?
     private var cachedConfig: AdsConfig?
     private var isShowingAppOpenAd = false
@@ -111,7 +111,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         isShowingAppOpenAd = true
         appOpenAd = nil
         isAppOpenAdReady = false
-        ad.present(fromRootViewController: topVC)
+        ad.present(from: topVC)
     }
 
     func preloadRewardedAd(placement: AdPlacementConfig) async {
@@ -176,25 +176,25 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     func showInterstitial() async -> Bool { true }
 
     private func configureSSV(
-        on ad: GADRewardedAd,
+        on ad: RewardedAd,
         customData: String
     ) {
-        let options = GADServerSideVerificationOptions()
-        options.customRewardString = customData
+        let options = ServerSideVerificationOptions()
+        options.customRewardText = customData
         ad.serverSideVerificationOptions = options
     }
 
     private func configureSSV(
-        on ad: GADRewardedInterstitialAd,
+        on ad: RewardedInterstitialAd,
         customData: String
     ) {
-        let options = GADServerSideVerificationOptions()
-        options.customRewardString = customData
+        let options = ServerSideVerificationOptions()
+        options.customRewardText = customData
         ad.serverSideVerificationOptions = options
     }
 
     private func present(
-        ad: GADRewardedAd,
+        ad: RewardedAd,
         from viewController: UIViewController,
         rewardCoins: Int
     ) async -> AdRewardResult {
@@ -206,14 +206,14 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             )
             rewardedPresentation = delegate
             ad.fullScreenContentDelegate = delegate
-            ad.present(fromRootViewController: viewController) {
+            ad.present(from: viewController) {
                 delegate.didEarnReward()
             }
         }
     }
 
     private func present(
-        ad: GADRewardedInterstitialAd,
+        ad: RewardedInterstitialAd,
         from viewController: UIViewController,
         rewardCoins: Int
     ) async -> AdRewardResult {
@@ -225,7 +225,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             )
             rewardedPresentation = delegate
             ad.fullScreenContentDelegate = delegate
-            ad.present(fromRootViewController: viewController) {
+            ad.present(from: viewController) {
                 delegate.didEarnReward()
             }
         }
@@ -246,7 +246,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         return top
     }
 
-    private var validAppOpenAd: GADAppOpenAd? {
+    private var validAppOpenAd: AppOpenAd? {
         guard let appOpenAd,
               let appOpenLoadTime,
               Date().timeIntervalSince(appOpenLoadTime) < AdConfig.adExpiryInterval else {
@@ -278,11 +278,11 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
 
         let unitID = placement.adUnitID
         print("🦐 [AdService] 开始预加载开屏广告，unitID: \(unitID)")
-        let task = Task { @MainActor [weak self] () -> GADAppOpenAd? in
+        let task = Task { @MainActor [weak self] () -> AppOpenAd? in
             do {
-                let ad = try await GADAppOpenAd.load(
-                    withAdUnitID: unitID,
-                    request: GADRequest()
+                let ad = try await AppOpenAd.load(
+                    with: unitID,
+                    request: Request()
                 )
                 ad.fullScreenContentDelegate = self
                 self?.appOpenAd = ad
@@ -301,7 +301,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         return await task.value != nil
     }
 
-    private func ensureRewardedAd(for unitID: String) async -> GADRewardedAd? {
+    private func ensureRewardedAd(for unitID: String) async -> RewardedAd? {
         if rewardedAdUnitID == unitID,
            let rewardedAd,
            let rewardedAdLoadTime,
@@ -312,11 +312,11 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         if let rewardedAdLoadTask {
             return await rewardedAdLoadTask.value
         }
-        let task = Task { @MainActor [weak self] () -> GADRewardedAd? in
+        let task = Task { @MainActor [weak self] () -> RewardedAd? in
             do {
-                let ad = try await GADRewardedAd.load(
-                    withAdUnitID: unitID,
-                    request: GADRequest()
+                let ad = try await RewardedAd.load(
+                    with: unitID,
+                    request: Request()
                 )
                 self?.rewardedAd = ad
                 self?.rewardedAdUnitID = unitID
@@ -336,7 +336,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
 
     private func ensureRewardedInterstitialAd(
         for unitID: String
-    ) async -> GADRewardedInterstitialAd? {
+    ) async -> RewardedInterstitialAd? {
         if rewardedInterstitialAdUnitID == unitID,
            let rewardedInterstitialAd,
            let rewardedInterstitialAdLoadTime,
@@ -347,11 +347,11 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         if let rewardedInterstitialLoadTask {
             return await rewardedInterstitialLoadTask.value
         }
-        let task = Task { @MainActor [weak self] () -> GADRewardedInterstitialAd? in
+        let task = Task { @MainActor [weak self] () -> RewardedInterstitialAd? in
             do {
-                let ad = try await GADRewardedInterstitialAd.load(
-                    withAdUnitID: unitID,
-                    request: GADRequest()
+                let ad = try await RewardedInterstitialAd.load(
+                    with: unitID,
+                    request: Request()
                 )
                 self?.rewardedInterstitialAd = ad
                 self?.rewardedInterstitialAdUnitID = unitID
@@ -369,7 +369,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         return await task.value
     }
 
-    private func takeRewardedAd(for unitID: String) async -> GADRewardedAd? {
+    private func takeRewardedAd(for unitID: String) async -> RewardedAd? {
         guard let ad = await ensureRewardedAd(for: unitID) else { return nil }
         rewardedAd = nil
         rewardedAdLoadTime = nil
@@ -378,7 +378,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
 
     private func takeRewardedInterstitialAd(
         for unitID: String
-    ) async -> GADRewardedInterstitialAd? {
+    ) async -> RewardedInterstitialAd? {
         guard let ad = await ensureRewardedInterstitialAd(for: unitID) else { return nil }
         rewardedInterstitialAd = nil
         rewardedInterstitialAdLoadTime = nil
@@ -386,15 +386,15 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     }
 }
 
-extension RealAdService: GADFullScreenContentDelegate {
-    func adDidDismissFullScreenContent(_ ad: GADFullScreenPresentingAd) {
+extension RealAdService: FullScreenContentDelegate {
+    func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
         print("🦐 [AdService] 广告关闭")
         isShowingAppOpenAd = false
         appOpenAdOnDismiss?()
         appOpenAdOnDismiss = nil
         Task { await loadAppOpenAd() }
     }
-    func ad(_ ad: GADFullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
+    func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
         print("🦐 [AdService] 广告展示失败: \(error.localizedDescription)")
         isShowingAppOpenAd = false
         appOpenAdOnDismiss?()
@@ -404,7 +404,7 @@ extension RealAdService: GADFullScreenContentDelegate {
 }
 
 @MainActor
-private final class RewardedPresentationDelegate: NSObject, GADFullScreenContentDelegate {
+private final class RewardedPresentationDelegate: NSObject, FullScreenContentDelegate {
     private let rewardCoins: Int
     private var continuation: CheckedContinuation<AdRewardResult, Never>?
     private let onFinish: () -> Void
@@ -424,12 +424,12 @@ private final class RewardedPresentationDelegate: NSObject, GADFullScreenContent
         earnedReward = true
     }
 
-    func adDidDismissFullScreenContent(_ ad: GADFullScreenPresentingAd) {
+    func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
         finish(earnedReward ? .rewarded(coins: rewardCoins) : .cancelled)
     }
 
     func ad(
-        _ ad: GADFullScreenPresentingAd,
+        _ ad: FullScreenPresentingAd,
         didFailToPresentFullScreenContentWithError error: Error
     ) {
         finish(.failed)

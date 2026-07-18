@@ -115,6 +115,8 @@
 		C338F43626F4160B5B35BD86 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = 945B30FA95757C96CC22C8F1 /* GoogleMobileAds */; };
 		C40000000000000000000001 /* GoogleUserMessagingPlatform in Frameworks */ = {isa = PBXBuildFile; productRef = C40000000000000000000002 /* GoogleUserMessagingPlatform */; };
 		C40000000000000000000003 /* PrivacyConsentManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C40000000000000000000004 /* PrivacyConsentManager.swift */; };
+		C41000000000000000000001 /* MetaAdapterTarget in Frameworks */ = {isa = PBXBuildFile; productRef = C41000000000000000000002 /* MetaAdapterTarget */; };
+		C41000000000000000000003 /* PangleAdapterTarget in Frameworks */ = {isa = PBXBuildFile; productRef = C41000000000000000000004 /* PangleAdapterTarget */; };
 		C3846580A6769F859B9D7406 /* AdService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF389AD770099338D3F8AAF2 /* AdService.swift */; };
 		C6680317189D82D2B9397409 /* StoreKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A121A77EFE00386139727 /* StoreKitManager.swift */; };
 		CAD19E0F63784384B4057737 /* ProfileDestinations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408582F2968E474DADC30E92 /* ProfileDestinations.swift */; };
@@ -332,6 +334,8 @@
 			files = (
 				C338F43626F4160B5B35BD86 /* GoogleMobileAds in Frameworks */,
 				C40000000000000000000001 /* GoogleUserMessagingPlatform in Frameworks */,
+				C41000000000000000000001 /* MetaAdapterTarget in Frameworks */,
+				C41000000000000000000003 /* PangleAdapterTarget in Frameworks */,
 				A34B00000000000000000007 /* GoogleSignIn in Frameworks */,
 				A34B00000000000000000008 /* GoogleSignInSwift in Frameworks */,
 				FBB340000000000000000001 /* FacebookCore in Frameworks */,
@@ -751,6 +755,8 @@
 			packageProductDependencies = (
 				945B30FA95757C96CC22C8F1 /* GoogleMobileAds */,
 				C40000000000000000000002 /* GoogleUserMessagingPlatform */,
+				C41000000000000000000002 /* MetaAdapterTarget */,
+				C41000000000000000000004 /* PangleAdapterTarget */,
 				A34D00000000000000000001 /* GoogleSignIn */,
 				A34D00000000000000000002 /* GoogleSignInSwift */,
 				FBD340000000000000000001 /* FacebookCore */,
@@ -850,6 +856,8 @@
 			packageReferences = (
 				9426733FD624226EADA96C67 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 				C40000000000000000000005 /* XCRemoteSwiftPackageReference "swift-package-manager-google-user-messaging-platform" */,
+				C41000000000000000000005 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-meta" */,
+				C41000000000000000000006 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-pangle" */,
 				A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 				FBE340000000000000000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
 			);
@@ -1316,7 +1324,7 @@
 			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 11.0.0;
+				minimumVersion = 13.4.0;
 			};
 		};
 		C40000000000000000000005 /* XCRemoteSwiftPackageReference "swift-package-manager-google-user-messaging-platform" */ = {
@@ -1325,6 +1333,22 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 2.0.0;
+			};
+		};
+		C41000000000000000000005 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-meta" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/googleads-mobile-ios-mediation-meta";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+		C41000000000000000000006 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-pangle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googleads/googleads-mobile-ios-mediation-pangle";
+			requirement = {
+				branch = main;
+				kind = branch;
 			};
 		};
 		A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
@@ -1355,6 +1379,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C40000000000000000000005 /* XCRemoteSwiftPackageReference "swift-package-manager-google-user-messaging-platform" */;
 			productName = GoogleUserMessagingPlatform;
+		};
+		C41000000000000000000002 /* MetaAdapterTarget */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C41000000000000000000005 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-meta" */;
+			productName = MetaAdapterTarget;
+		};
+		C41000000000000000000004 /* PangleAdapterTarget */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C41000000000000000000006 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-pangle" */;
+			productName = PangleAdapterTarget;
 		};
 		A34D00000000000000000001 /* GoogleSignIn */ = {
 			isa = XCSwiftPackageProductDependency;

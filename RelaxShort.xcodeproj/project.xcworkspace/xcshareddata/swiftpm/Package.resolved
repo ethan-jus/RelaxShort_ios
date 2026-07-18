@@ -1,6 +1,15 @@
 {
-  "originHash" : "be60fd65be8c4afa9d1d659cb770c832dd47785e4aedaa34afa142b60e87f63a",
+  "originHash" : "fe7b28a64cba675fe2d1551bf9503462a0321b7938b16c11276e9f1a276dae95",
   "pins" : [
+    {
+      "identity" : "adsglobalpackage",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/bytedance/AdsGlobalPackage.git",
+      "state" : {
+        "revision" : "e2d9f0850c7f9ce6c3d1256208ca0c00418dd259",
+        "version" : "8.1.1-release.1"
+      }
+    },
     {
       "identity" : "app-check",
       "kind" : "remoteSourceControl",
@@ -26,6 +35,33 @@
       "state" : {
         "revision" : "3818dd2ccb6547c6d320ff68a1bd599789c3a44f",
         "version" : "18.1.0"
+      }
+    },
+    {
+      "identity" : "fbaudiencenetwork",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/facebook/FBAudienceNetwork.git",
+      "state" : {
+        "revision" : "0b7bd807fff993055838e6d6a410eddf590c09ac",
+        "version" : "6.21.1"
+      }
+    },
+    {
+      "identity" : "googleads-mobile-ios-mediation-meta",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/googleads/googleads-mobile-ios-mediation-meta",
+      "state" : {
+        "branch" : "main",
+        "revision" : "4553121feb88d1f29a2d097587649ecc0afb8806"
+      }
+    },
+    {
+      "identity" : "googleads-mobile-ios-mediation-pangle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/googleads/googleads-mobile-ios-mediation-pangle",
+      "state" : {
+        "branch" : "main",
+        "revision" : "36bbfd567fe57e8e2a10e3f0e96f82fdc903fa98"
       }
     },
     {
@@ -87,8 +123,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/googleads/swift-package-manager-google-mobile-ads",
       "state" : {
-        "revision" : "7778cc1ab037c10dbbe026959e51e616bd961be9",
-        "version" : "11.13.0"
+        "revision" : "7651abff585dc8dacd1744222d5f03bdd2a8532a",
+        "version" : "13.6.0"
       }
     },
     {

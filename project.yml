@@ -8,10 +8,16 @@ options:
 packages:
   GoogleMobileAds:
     url: https://github.com/googleads/swift-package-manager-google-mobile-ads
-    from: "11.0.0"
+    from: "13.4.0"
   GoogleUserMessagingPlatform:
     url: https://github.com/googleads/swift-package-manager-google-user-messaging-platform
     from: "2.0.0"
+  MetaAdapter:
+    url: https://github.com/googleads/googleads-mobile-ios-mediation-meta
+    branch: main
+  PangleAdapter:
+    url: https://github.com/googleads/googleads-mobile-ios-mediation-pangle
+    branch: main
 
 settings:
   base:
@@ -27,6 +33,8 @@ targets:
     dependencies:
       - package: GoogleMobileAds
       - package: GoogleUserMessagingPlatform
+      - package: MetaAdapter
+      - package: PangleAdapter
     settings:
       base:
         INFOPLIST_FILE: RelaxShort/Info.plist
@@ -50,6 +58,10 @@ targets:
         GADApplicationIdentifier: ca-app-pub-1181692914441160~7575609396
         SKAdNetworkItems:
           - SKAdNetworkIdentifier: cstr6suwn9.skadnetwork
+          - SKAdNetworkIdentifier: n38lu8286q.skadnetwork
+          - SKAdNetworkIdentifier: v9wttpbfk9.skadnetwork
+          - SKAdNetworkIdentifier: 22mmun2rn5.skadnetwork
+          - SKAdNetworkIdentifier: 238da6jt44.skadnetwork
         NSUserTrackingUsageDescription: "为了提供个性化广告，我们需要获取您的广告标识符"
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

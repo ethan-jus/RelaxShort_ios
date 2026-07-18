@@ -1,5 +1,7 @@
 import Foundation
+import AppTrackingTransparency
 import GoogleMobileAds
+import PangleAdapter
 import UserMessagingPlatform
 
 /// 统一管理 UMP 同意流程和广告 SDK 启动时序。
@@ -105,10 +107,13 @@ final class PrivacyConsentManager: ObservableObject {
         guard !didStartMobileAds else { return }
         didStartMobileAds = true
 
-        GADMobileAds.sharedInstance().requestConfiguration.testDeviceIdentifiers = [
+        let allowsTracking = ATTrackingManager.trackingAuthorizationStatus == .authorized
+        GADMediationAdapterPangle.setPAConsent(allowsTracking ? 1 : 0)
+
+        MobileAds.shared.requestConfiguration.testDeviceIdentifiers = [
             "00008130-001128D23A2A001C"
         ]
-        GADMobileAds.sharedInstance().start { _ in
+        MobileAds.shared.start { _ in
             Task { @MainActor in
                 Logger.store.info("AdMob SDK initialized after UMP consent")
                 RealAdService.shared.isSDKReady = true
