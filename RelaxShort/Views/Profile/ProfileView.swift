@@ -73,7 +73,7 @@ struct ProfileView: View {
                     .resizable()
                     .scaledToFill()
                     .frame(width: proxy.size.width, height: 228)
-                    .offset(x: -4, y: -42)
+                    .offset(x: -4, y: 10)
                     .opacity(0.88)
                     .blendMode(.screen)
                     .clipped()
