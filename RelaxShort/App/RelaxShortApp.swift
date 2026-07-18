@@ -27,8 +27,6 @@ struct RelaxShortApp: App {
 
     /// 控制启动页 → 主界面的过渡
     @State private var showSplash = true
-    /// 热启动 Splash 覆盖层
-    @State private var showHotStartSplash = false
     @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - Init
@@ -52,6 +50,9 @@ struct RelaxShortApp: App {
             print("🦐 [AdMob] SDK 初始化完成")
             DispatchQueue.main.async {
                 RealAdService.shared.isSDKReady = true
+                Task {
+                    await RealAdService.shared.prepareAds()
+                }
             }
         }
     }
@@ -74,11 +75,7 @@ struct RelaxShortApp: App {
         WindowGroup {
             ZStack {
                 if showSplash {
-                    SplashView {
-                        withAnimation(.easeInOut(duration: 0.4)) {
-                            showSplash = false
-                        }
-                    }
+                    SplashView(onFinish: finishColdStart, autoFinishAfter: nil)
                     .transition(.opacity)
                 } else {
                     MainTabView(playerCoordinator: playerCoordinator, dependencies: dependencies)
@@ -91,16 +88,6 @@ struct RelaxShortApp: App {
                         .transition(.opacity)
                 }
 
-                // 热启动 Splash 覆盖层
-                if showHotStartSplash {
-                    SplashView {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            showHotStartSplash = false
-                        }
-                    }
-                    .transition(.opacity)
-                    .zIndex(100)
-                }
             }
             .preferredColorScheme(appStore.preferredColorScheme)
             .statusBarHidden(true)
@@ -108,6 +95,10 @@ struct RelaxShortApp: App {
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
                 await AppInitService.shared.initialize()
+            }
+            .task {
+                guard !AppRuntimeEnvironment.isUnitTesting else { return }
+                await runColdStartAdFlow()
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
@@ -120,7 +111,7 @@ struct RelaxShortApp: App {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active && !showSplash {
                     dependencies.discoveryAnalytics.flushPending()
-                    handleHotStartAd()
+                    handleForegroundAd()
                     Task { await synchronizePendingStoreKitTransactions() }
                 }
                 if newPhase == .background {
@@ -134,10 +125,39 @@ struct RelaxShortApp: App {
         }
     }
 
-    private func handleHotStartAd() {
-        guard adService.wasInBackground else { return }
-        guard adService.shouldShowAppOpen, !showHotStartSplash else { return }
-        showHotStartSplash = true
+    private func runColdStartAdFlow() async {
+        try? await Task.sleep(for: .seconds(AdConfig.brandingDuration))
+
+        let deadline = Date().addingTimeInterval(AdConfig.coldStartLoadTimeout)
+        while !adService.isAppOpenAdReady && Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+
+        guard showSplash, scenePhase == .active else {
+            finishColdStart()
+            return
+        }
+        if adService.isAppOpenAdReady {
+            adService.showAppOpenAd(onDismiss: finishColdStart)
+        } else {
+            finishColdStart()
+        }
+    }
+
+    private func handleForegroundAd() {
+        guard adService.consumeBackgroundAppOpenOpportunity() else { return }
+        guard adService.isAppOpenAdReady else {
+            Task { await adService.prepareAds() }
+            return
+        }
+        adService.showAppOpenAd(onDismiss: {})
+    }
+
+    private func finishColdStart() {
+        guard showSplash else { return }
+        withAnimation(.easeInOut(duration: 0.4)) {
+            showSplash = false
+        }
     }
 
     /// 补偿购买后崩溃、断网或后端暂时失败留下的未完成真实 Apple 交易。

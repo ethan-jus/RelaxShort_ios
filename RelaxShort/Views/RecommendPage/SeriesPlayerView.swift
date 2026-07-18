@@ -96,6 +96,7 @@ struct SeriesPlayerView: View {
     /// 缓存每集的后端 resumeTime，切集时使用当前 episode 的值
     @State private var episodeResumeTimes: [String: TimeInterval] = [:]
     @State private var unlockedEpisodes: Set<Int> = []
+    @State private var episodeUnlockAdPlacement: AdPlacementConfig?
     @State private var isUIVisible = true
     @State private var autoHideTask: Task<Void, Never>?
     /// 缓存播放接口返回的媒体源（key = episodeId），避免切回已访问剧集时重复请求。
@@ -858,13 +859,7 @@ struct SeriesPlayerView: View {
 
     @MainActor
     private func unlockEpisodeWithRewardedInterstitial(episodeID: String) async throws {
-        let config = try await dependencies.adConfigRepository.fetchAdsConfig()
-        let placement = config.interstitialUnlockEpisode
-        guard config.adsEnabled,
-              placement.enabled,
-              placement.format == .rewardedInterstitial else {
-            throw APIError(code: "ADS_NOT_AVAILABLE", message: "广告解锁暂不可用")
-        }
+        let placement = try await resolvedEpisodeUnlockAdPlacement()
 
         let session = try await dependencies.adRewardRepository.startSession(
             placementCode: placement.placementCode,
@@ -1024,6 +1019,9 @@ struct SeriesPlayerView: View {
                     .filter { $0.isLocked && $0.isUnlocked }
                     .map(\.episodeNumber)
             )
+            Task { @MainActor in
+                await preloadEpisodeUnlockAd()
+            }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.info("SeriesTrace 剧集列表加载完成 剧ID=\(drama.id) 数量=\(episodes.count) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("剧集列表")
@@ -1542,6 +1540,36 @@ struct SeriesPlayerView: View {
             }
             initializeEpisodePlayer()
         }
+    }
+
+    @MainActor
+    private func preloadEpisodeUnlockAd() async {
+        do {
+            let config = try await dependencies.adConfigRepository.fetchAdsConfig()
+            let placement = config.interstitialUnlockEpisode
+            guard config.adsEnabled,
+                  placement.enabled,
+                  placement.format == .rewardedInterstitial else { return }
+            episodeUnlockAdPlacement = placement
+            await dependencies.adService.preloadRewardedAd(placement: placement)
+        } catch {
+            Logger.store.info("Episode unlock ad preload unavailable: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    private func resolvedEpisodeUnlockAdPlacement() async throws -> AdPlacementConfig {
+        if let episodeUnlockAdPlacement { return episodeUnlockAdPlacement }
+        let config = try await dependencies.adConfigRepository.fetchAdsConfig()
+        let placement = config.interstitialUnlockEpisode
+        guard config.adsEnabled,
+              placement.enabled,
+              placement.format == .rewardedInterstitial else {
+            throw APIError(code: "ADS_NOT_AVAILABLE", message: "广告解锁暂不可用")
+        }
+        episodeUnlockAdPlacement = placement
+        await dependencies.adService.preloadRewardedAd(placement: placement)
+        return placement
     }
 
     /// 页面只提前获取下一集播放合同；真正的媒体预加载统一交给共享 PlayerSlotPool。

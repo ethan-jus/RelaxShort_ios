@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// DramaBox 风格启动页：纯黑底 + 中心 logo + 名称 + tagline
-/// v1 不加载真实广告，直接 2 秒后进入主页
 struct SplashView: View {
     var onFinish: () -> Void
+    var autoFinishAfter: TimeInterval? = 2
 
     @State private var opacity: Double = 0
 
@@ -48,9 +48,10 @@ struct SplashView: View {
         .statusBarHidden(true)
         .onAppear {
             withAnimation(.easeIn(duration: 0.6)) { opacity = 1 }
-            // v1 mock: 2秒后进入主页
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                onFinish()
+            if let autoFinishAfter {
+                DispatchQueue.main.asyncAfter(deadline: .now() + autoFinishAfter) {
+                    onFinish()
+                }
             }
         }
     }

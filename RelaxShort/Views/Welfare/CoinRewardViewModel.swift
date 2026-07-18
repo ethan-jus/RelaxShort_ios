@@ -29,6 +29,7 @@ final class CoinRewardViewModel: ObservableObject {
     private let adConfigRepository: AdConfigRepositoryProtocol
     private let adRewardRepository: AdRewardRepositoryProtocol
     private let detailRepository: DetailRepositoryProtocol
+    private var rewardedCoinPlacement: AdPlacementConfig?
 
     // MARK: - Init
 
@@ -86,6 +87,10 @@ final class CoinRewardViewModel: ObservableObject {
                 && placement.format == .rewarded
                 ? placement.maxPerUserPerDay
                 : 0
+            if maxDailyAdWatchCount > 0 {
+                rewardedCoinPlacement = placement
+                await adService.preloadRewardedAd(placement: placement)
+            }
         } catch {
             logError("CoinRewardViewModel.fetchAdsConfig failed: \(error)")
         }
@@ -112,12 +117,10 @@ final class CoinRewardViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            let config = try await adConfigRepository.fetchAdsConfig()
-            let placement = config.rewardedEarnCoins
+            let placement = try await resolvedRewardedCoinPlacement()
             maxDailyAdWatchCount = placement.maxPerUserPerDay
             adWatchCoinReward = placement.rewardCoins
-            guard config.adsEnabled,
-                  placement.enabled,
+            guard placement.enabled,
                   placement.format == .rewarded,
                   remainingAdWatchCount > 0 else {
                 throw APIError(code: "ADS_NOT_AVAILABLE", message: "激励广告暂不可用")
@@ -174,6 +177,20 @@ final class CoinRewardViewModel: ObservableObject {
             }
         }
         return false
+    }
+
+    private func resolvedRewardedCoinPlacement() async throws -> AdPlacementConfig {
+        if let rewardedCoinPlacement { return rewardedCoinPlacement }
+        let config = try await adConfigRepository.fetchAdsConfig()
+        let placement = config.rewardedEarnCoins
+        guard config.adsEnabled,
+              placement.enabled,
+              placement.format == .rewarded else {
+            throw APIError(code: "ADS_NOT_AVAILABLE", message: "激励广告暂不可用")
+        }
+        rewardedCoinPlacement = placement
+        await adService.preloadRewardedAd(placement: placement)
+        return placement
     }
 
     private func logError(_ message: String) {

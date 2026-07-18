@@ -7,9 +7,20 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
 
     private var appOpenAd: GADAppOpenAd?
     private var appOpenLoadTime: Date?
+    private var appOpenLoadTask: Task<GADAppOpenAd?, Never>?
     private var appOpenAdOnDismiss: (() -> Void)?
     private var lastBackgroundTime: Date?
+    private var rewardedAd: GADRewardedAd?
+    private var rewardedAdUnitID: String?
+    private var rewardedAdLoadTime: Date?
+    private var rewardedAdLoadTask: Task<GADRewardedAd?, Never>?
+    private var rewardedInterstitialAd: GADRewardedInterstitialAd?
+    private var rewardedInterstitialAdUnitID: String?
+    private var rewardedInterstitialAdLoadTime: Date?
+    private var rewardedInterstitialLoadTask: Task<GADRewardedInterstitialAd?, Never>?
     private var rewardedPresentation: RewardedPresentationDelegate?
+    private var cachedConfig: AdsConfig?
+    private var isShowingAppOpenAd = false
     private let adConfigRepository: AdConfigRepositoryProtocol = RealAdConfigRepository()
     @Published var isSDKReady = false
     @Published var isAppOpenAdReady = false
@@ -31,64 +42,52 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         print("🦐 [AdService] App 进入后台")
     }
 
-    /// 判断是否应该展示开屏广告
-    var shouldShowAppOpen: Bool {
-        guard let lastBg = lastBackgroundTime else {
-            // 冷启动 → 展示
-            return true
-        }
+    /// 每次前台恢复只消费一次机会；短时间切回不展示。
+    func consumeBackgroundAppOpenOpportunity() -> Bool {
+        guard wasInBackground, let lastBg = lastBackgroundTime else { return false }
+        wasInBackground = false
         let bgDuration = Date().timeIntervalSince(lastBg)
         let should = bgDuration >= AdConfig.hotStartAdInterval
         print("🦐 [AdService] 后台时长: \(Int(bgDuration))s, 阈值: \(Int(AdConfig.hotStartAdInterval))s, 展示: \(should)")
         return should
     }
 
-    func loadAppOpenAd() async -> Bool {
+    func prepareAds() async {
+        guard isSDKReady else { return }
         do {
             let config = try await adConfigRepository.fetchAdsConfig()
-            let placement = config.appOpen
-            guard config.adsEnabled,
-                  placement.enabled,
-                  placement.format == .appOpen,
-                  !placement.adUnitID.isEmpty else {
-                print("🦐 [AdService] 开屏广告位已关闭或配置无效")
-                return false
-            }
-            let unitID = placement.adUnitID
-            print("🦐 [AdService] 开始加载广告，unitID: \(unitID)")
-            let request = GADRequest()
-            let ad = try await GADAppOpenAd.load(
-                withAdUnitID: unitID,
-                request: request
+            cachedConfig = config
+            guard config.adsEnabled else { return }
+            async let appOpen: Bool = loadAppOpenAd(using: config.appOpen)
+            async let rewarded: Void = preloadRewardedAd(placement: config.rewardedEarnCoins)
+            async let rewardedInterstitial: Void = preloadRewardedAd(
+                placement: config.interstitialUnlockEpisode
             )
-            await MainActor.run {
-                appOpenAd = ad
-                appOpenLoadTime = Date()
-                isAppOpenAdReady = true
-                ad.fullScreenContentDelegate = self
-            }
-            print("🦐 [AdService] ✅ 广告加载成功 responseID: \(ad.responseInfo.responseIdentifier ?? "nil")")
-            return true
+            _ = await (appOpen, rewarded, rewardedInterstitial)
         } catch {
-            let nsError = error as NSError
-            print("🦐 [AdService] ❌ 广告加载失败 code=\(nsError.code) domain=\(nsError.domain) desc=\(nsError.localizedDescription)")
+            print("🦐 [AdService] 广告配置加载失败: \(error.localizedDescription)")
+        }
+    }
+
+    func loadAppOpenAd() async -> Bool {
+        do {
+            let config = try await resolvedConfig()
+            let placement = config.appOpen
+            guard config.adsEnabled else { return false }
+            return await loadAppOpenAd(using: placement)
+        } catch {
+            print("🦐 [AdService] 开屏广告配置加载失败: \(error.localizedDescription)")
             return false
         }
     }
 
     func showAppOpenAd(onDismiss: @escaping () -> Void) {
-        guard let ad = appOpenAd else {
+        guard rewardedPresentation == nil,
+              !isShowingAppOpenAd,
+              let ad = validAppOpenAd else {
             print("🦐 [AdService] 广告未就绪")
             onDismiss()
-            return
-        }
-
-        if let loadTime = appOpenLoadTime,
-           Date().timeIntervalSince(loadTime) > AdConfig.adExpiryInterval {
-            print("🦐 [AdService] 广告已过期")
-            appOpenAd = nil
-            isAppOpenAdReady = false
-            onDismiss()
+            Task { await loadAppOpenAd() }
             return
         }
 
@@ -100,6 +99,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             .first(where: { $0.isKeyWindow }),
               let rootVC = keyWindow.rootViewController else {
             onDismiss()
+            appOpenAdOnDismiss = nil
             return
         }
 
@@ -108,9 +108,24 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             topVC = presented
         }
 
-        ad.present(fromRootViewController: topVC)
+        isShowingAppOpenAd = true
         appOpenAd = nil
         isAppOpenAdReady = false
+        ad.present(fromRootViewController: topVC)
+    }
+
+    func preloadRewardedAd(placement: AdPlacementConfig) async {
+        guard isSDKReady,
+              placement.enabled,
+              !placement.adUnitID.isEmpty else { return }
+        switch placement.format {
+        case .rewarded:
+            _ = await ensureRewardedAd(for: placement.adUnitID)
+        case .rewardedInterstitial:
+            _ = await ensureRewardedInterstitialAd(for: placement.adUnitID)
+        default:
+            return
+        }
     }
 
     func showRewardedAd(
@@ -120,6 +135,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         guard placement.enabled,
               !placement.adUnitID.isEmpty,
               [.rewarded, .rewardedInterstitial].contains(placement.format),
+              !isShowingAppOpenAd,
               rewardedPresentation == nil,
               let viewController = topViewController() else {
             return .failed
@@ -128,33 +144,32 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         do {
             switch placement.format {
             case .rewarded:
-                let ad = try await GADRewardedAd.load(
-                    withAdUnitID: placement.adUnitID,
-                    request: GADRequest()
-                )
+                guard let ad = await takeRewardedAd(for: placement.adUnitID) else {
+                    return .failed
+                }
                 configureSSV(on: ad, customData: ssvCustomData)
-                return await present(
+                let result = await present(
                     ad: ad,
                     from: viewController,
                     rewardCoins: placement.rewardCoins
                 )
+                Task { await preloadRewardedAd(placement: placement) }
+                return result
             case .rewardedInterstitial:
-                let ad = try await GADRewardedInterstitialAd.load(
-                    withAdUnitID: placement.adUnitID,
-                    request: GADRequest()
-                )
+                guard let ad = await takeRewardedInterstitialAd(for: placement.adUnitID) else {
+                    return .failed
+                }
                 configureSSV(on: ad, customData: ssvCustomData)
-                return await present(
+                let result = await present(
                     ad: ad,
                     from: viewController,
                     rewardCoins: placement.rewardCoins
                 )
+                Task { await preloadRewardedAd(placement: placement) }
+                return result
             default:
                 return .failed
             }
-        } catch {
-            print("🦐 [AdService] 激励广告加载失败: \(error.localizedDescription)")
-            return .failed
         }
     }
 
@@ -230,18 +245,161 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         }
         return top
     }
+
+    private var validAppOpenAd: GADAppOpenAd? {
+        guard let appOpenAd,
+              let appOpenLoadTime,
+              Date().timeIntervalSince(appOpenLoadTime) < AdConfig.adExpiryInterval else {
+            self.appOpenAd = nil
+            isAppOpenAdReady = false
+            return nil
+        }
+        return appOpenAd
+    }
+
+    private func resolvedConfig() async throws -> AdsConfig {
+        if let cachedConfig { return cachedConfig }
+        let config = try await adConfigRepository.fetchAdsConfig()
+        cachedConfig = config
+        return config
+    }
+
+    private func loadAppOpenAd(using placement: AdPlacementConfig) async -> Bool {
+        guard placement.enabled,
+              placement.format == .appOpen,
+              !placement.adUnitID.isEmpty else {
+            print("🦐 [AdService] 开屏广告位已关闭或配置无效")
+            return false
+        }
+        if validAppOpenAd != nil { return true }
+        if let appOpenLoadTask {
+            return await appOpenLoadTask.value != nil
+        }
+
+        let unitID = placement.adUnitID
+        print("🦐 [AdService] 开始预加载开屏广告，unitID: \(unitID)")
+        let task = Task { @MainActor [weak self] () -> GADAppOpenAd? in
+            do {
+                let ad = try await GADAppOpenAd.load(
+                    withAdUnitID: unitID,
+                    request: GADRequest()
+                )
+                ad.fullScreenContentDelegate = self
+                self?.appOpenAd = ad
+                self?.appOpenLoadTime = Date()
+                self?.isAppOpenAdReady = true
+                self?.appOpenLoadTask = nil
+                print("🦐 [AdService] ✅ 开屏广告预加载成功")
+                return ad
+            } catch {
+                self?.appOpenLoadTask = nil
+                print("🦐 [AdService] ❌ 开屏广告预加载失败: \(error.localizedDescription)")
+                return nil
+            }
+        }
+        appOpenLoadTask = task
+        return await task.value != nil
+    }
+
+    private func ensureRewardedAd(for unitID: String) async -> GADRewardedAd? {
+        if rewardedAdUnitID == unitID,
+           let rewardedAd,
+           let rewardedAdLoadTime,
+           Date().timeIntervalSince(rewardedAdLoadTime) < AdConfig.rewardedAdExpiryInterval {
+            return rewardedAd
+        }
+        rewardedAd = nil
+        if let rewardedAdLoadTask {
+            return await rewardedAdLoadTask.value
+        }
+        let task = Task { @MainActor [weak self] () -> GADRewardedAd? in
+            do {
+                let ad = try await GADRewardedAd.load(
+                    withAdUnitID: unitID,
+                    request: GADRequest()
+                )
+                self?.rewardedAd = ad
+                self?.rewardedAdUnitID = unitID
+                self?.rewardedAdLoadTime = Date()
+                self?.rewardedAdLoadTask = nil
+                print("🦐 [AdService] ✅ 奖励页激励视频预加载成功")
+                return ad
+            } catch {
+                self?.rewardedAdLoadTask = nil
+                print("🦐 [AdService] ❌ 激励视频预加载失败: \(error.localizedDescription)")
+                return nil
+            }
+        }
+        rewardedAdLoadTask = task
+        return await task.value
+    }
+
+    private func ensureRewardedInterstitialAd(
+        for unitID: String
+    ) async -> GADRewardedInterstitialAd? {
+        if rewardedInterstitialAdUnitID == unitID,
+           let rewardedInterstitialAd,
+           let rewardedInterstitialAdLoadTime,
+           Date().timeIntervalSince(rewardedInterstitialAdLoadTime) < AdConfig.rewardedAdExpiryInterval {
+            return rewardedInterstitialAd
+        }
+        rewardedInterstitialAd = nil
+        if let rewardedInterstitialLoadTask {
+            return await rewardedInterstitialLoadTask.value
+        }
+        let task = Task { @MainActor [weak self] () -> GADRewardedInterstitialAd? in
+            do {
+                let ad = try await GADRewardedInterstitialAd.load(
+                    withAdUnitID: unitID,
+                    request: GADRequest()
+                )
+                self?.rewardedInterstitialAd = ad
+                self?.rewardedInterstitialAdUnitID = unitID
+                self?.rewardedInterstitialAdLoadTime = Date()
+                self?.rewardedInterstitialLoadTask = nil
+                print("🦐 [AdService] ✅ 解锁激励插屏预加载成功")
+                return ad
+            } catch {
+                self?.rewardedInterstitialLoadTask = nil
+                print("🦐 [AdService] ❌ 激励插屏预加载失败: \(error.localizedDescription)")
+                return nil
+            }
+        }
+        rewardedInterstitialLoadTask = task
+        return await task.value
+    }
+
+    private func takeRewardedAd(for unitID: String) async -> GADRewardedAd? {
+        guard let ad = await ensureRewardedAd(for: unitID) else { return nil }
+        rewardedAd = nil
+        rewardedAdLoadTime = nil
+        return ad
+    }
+
+    private func takeRewardedInterstitialAd(
+        for unitID: String
+    ) async -> GADRewardedInterstitialAd? {
+        guard let ad = await ensureRewardedInterstitialAd(for: unitID) else { return nil }
+        rewardedInterstitialAd = nil
+        rewardedInterstitialAdLoadTime = nil
+        return ad
+    }
 }
 
 extension RealAdService: GADFullScreenContentDelegate {
     func adDidDismissFullScreenContent(_ ad: GADFullScreenPresentingAd) {
         print("🦐 [AdService] 广告关闭")
+        isShowingAppOpenAd = false
         appOpenAdOnDismiss?()
         appOpenAdOnDismiss = nil
+        Task { await loadAppOpenAd() }
     }
     func ad(_ ad: GADFullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
         print("🦐 [AdService] 广告展示失败: \(error.localizedDescription)")
+        isShowingAppOpenAd = false
         appOpenAdOnDismiss?()
         appOpenAdOnDismiss = nil
+        Task { await loadAppOpenAd() }
     }
 }
 

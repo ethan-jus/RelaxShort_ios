@@ -14,6 +14,9 @@ enum AdConfig {
     /// 广告过期时间（秒），AdMob 官方是 4 小时
     static let adExpiryInterval: TimeInterval = 4 * 3600
 
+    /// 激励广告缓存最多保留一小时，超时后重新请求，避免展示陈旧竞价结果。
+    static let rewardedAdExpiryInterval: TimeInterval = 3600
+
     /// 开屏广告单元 ID — 自动区分正式/开发环境
     /// 判断依据：App Store 分发的包 receipt 不是 sandbox
     /// 开发构建 / TestFlight / 模拟器 → 测试广告
