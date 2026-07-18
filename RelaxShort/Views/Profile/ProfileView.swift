@@ -79,7 +79,7 @@ struct ProfileView: View {
                 // 核心入口
                 ProfileMenuCard {
                     ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                    ProfileMenuRow(icon: "wallet.fill", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle.fill", subtitleIconColor: DT.logoRed, onTap: { selectedDestination = .wallet })
+                    ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle", subtitleIconColor: DT.logoRed, onTap: { selectedDestination = .wallet })
                     ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
                     ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
                     ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
@@ -89,7 +89,7 @@ struct ProfileView: View {
                 // 辅助入口
                 ProfileMenuCard {
                     ProfileMenuRow(icon: "globe", iconColor: .white, title: L10n.language, onTap: { selectedDestination = .language })
-                    ProfileMenuRow(icon: "questionmark.circle.fill", iconColor: .white, title: "profile.help_feedback".localized, showsDivider: false, onTap: { selectedDestination = .customerService })
+                    ProfileMenuRow(icon: "questionmark.circle", iconColor: .white, title: "profile.help_feedback".localized, showsDivider: false, onTap: { selectedDestination = .customerService })
                 }
                 .padding(.top, 2)
             }

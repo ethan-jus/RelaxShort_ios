@@ -33,7 +33,8 @@ struct ProfileIdentityHeader: View {
                 .resizable()
                 .scaledToFill()
                 .frame(height: 190)
-                .offset(x: 82, y: -18)
+                .offset(x: 0, y: -18)
+                .opacity(0.42)
                 .blendMode(.screen)
                 .allowsHitTesting(false)
 
@@ -177,7 +178,7 @@ struct ProfileAvatarView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color(hex: "#35363A"), Color(hex: "#222327")],
+                                colors: [Color(hex: "#202124"), Color(hex: "#0D0E10")],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -289,18 +290,18 @@ struct ProfileMembershipCard: View {
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(hex: "#070707"),
-                        Color(hex: "#2B0908"),
-                        Color(hex: "#150303")
+                        Color(hex: "#030303"),
+                        Color(hex: "#0B0303"),
+                        Color(hex: "#260807")
                     ],
                     startPoint: .bottomLeading,
                     endPoint: .topTrailing
                 )
                 RadialGradient(
-                    colors: [DT.logoRed.opacity(0.34), .clear],
+                    colors: [DT.logoRed.opacity(0.18), .clear],
                     center: .topTrailing,
                     startRadius: 0,
-                    endRadius: 250
+                    endRadius: 220
                 )
             }
         }
@@ -440,11 +441,12 @@ struct ProfileMenuRow: View {
                 }
 
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.42))
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.48))
+                    .frame(width: 20)
             }
             .padding(.horizontal, DT.Space.md)
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -452,9 +454,10 @@ struct ProfileMenuRow: View {
 
         if showsDivider {
             Rectangle()
-                .fill(.white.opacity(0.12))
-                .frame(height: 1)
+                .fill(.white.opacity(0.10))
+                .frame(height: 0.5)
                 .padding(.leading, 52)
+                .padding(.trailing, 44)
         }
     }
 }
@@ -468,7 +471,8 @@ struct ProfileHeaderSkeleton: View {
                 .resizable()
                 .scaledToFill()
                 .frame(height: 190)
-                .offset(x: 82, y: -18)
+                .offset(x: 0, y: -18)
+                .opacity(0.42)
                 .blendMode(.screen)
 
             VStack(spacing: DT.Space.sm) {
