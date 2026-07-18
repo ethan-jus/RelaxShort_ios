@@ -18,29 +18,32 @@ final class CoinRewardViewModel: ObservableObject {
     /// 今日已观看激励广告次数
     @Published var dailyAdWatchCount: Int = 0
     /// 每日最大激励广告次数
-    let maxDailyAdWatchCount: Int = 5
+    @Published var maxDailyAdWatchCount: Int = 0
     /// 每次观看广告获得的金币
-    let adWatchCoinReward: Int = 20
-    /// 是否正在展示广告
-    @Published var isShowingRewardedAd: Bool = false
-    /// 当前广告倒计时（秒）
-    @Published var adCountdown: Int = 0
-    /// 广告总时长（秒）
-    let adDuration: Int = 3
+    @Published var adWatchCoinReward: Int = 0
 
     // MARK: - Dependencies
 
     private let repository: CoinRewardRepositoryProtocol
     private let adService: any AdServiceProtocol
+    private let adConfigRepository: AdConfigRepositoryProtocol
+    private let adRewardRepository: AdRewardRepositoryProtocol
+    private let detailRepository: DetailRepositoryProtocol
 
     // MARK: - Init
 
     init(
         repository: CoinRewardRepositoryProtocol,
-        adService: (any AdServiceProtocol)? = nil
+        adService: (any AdServiceProtocol)? = nil,
+        adConfigRepository: AdConfigRepositoryProtocol = RealAdConfigRepository(),
+        adRewardRepository: AdRewardRepositoryProtocol = RealAdRewardRepository(),
+        detailRepository: DetailRepositoryProtocol? = nil
     ) {
         self.repository = repository
         self.adService = adService ?? RealAdService.shared
+        self.adConfigRepository = adConfigRepository
+        self.adRewardRepository = adRewardRepository
+        self.detailRepository = detailRepository ?? RealDetailRepository()
         Task { await loadData() }
     }
 
@@ -74,6 +77,18 @@ final class CoinRewardViewModel: ObservableObject {
         } catch {
             logError("CoinRewardViewModel.fetchTasks failed: \(error)")
         }
+
+        do {
+            let config = try await adConfigRepository.fetchAdsConfig()
+            let placement = config.rewardedEarnCoins
+            adWatchCoinReward = placement.rewardCoins
+            maxDailyAdWatchCount = config.adsEnabled && placement.enabled
+                && placement.format == .rewarded
+                ? placement.maxPerUserPerDay
+                : 0
+        } catch {
+            logError("CoinRewardViewModel.fetchAdsConfig failed: \(error)")
+        }
     }
 
     // MARK: - Actions
@@ -91,23 +106,53 @@ final class CoinRewardViewModel: ObservableObject {
 
     /// 观看激励广告获得金币
     func watchAdForCoins() async {
-        guard self.dailyAdWatchCount < self.maxDailyAdWatchCount else { return }
+        guard !isLoading else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
 
-        isShowingRewardedAd = true
-        await startCountdown(seconds: adDuration)
+        do {
+            let config = try await adConfigRepository.fetchAdsConfig()
+            let placement = config.rewardedEarnCoins
+            maxDailyAdWatchCount = placement.maxPerUserPerDay
+            adWatchCoinReward = placement.rewardCoins
+            guard config.adsEnabled,
+                  placement.enabled,
+                  placement.format == .rewarded,
+                  remainingAdWatchCount > 0 else {
+                throw APIError(code: "ADS_NOT_AVAILABLE", message: "激励广告暂不可用")
+            }
 
-        let result = await adService.showRewardedAd(coins: adWatchCoinReward)
-        isShowingRewardedAd = false
+            let session = try await adRewardRepository.startSession(
+                placementCode: placement.placementCode,
+                rewardType: "coins",
+                targetEpisodeID: nil
+            )
+            guard session.placement.format == .rewarded else {
+                throw APIError(code: "AD_FORMAT_MISMATCH", message: "广告配置不一致，请稍后重试")
+            }
 
-        switch result {
-        case .rewarded(let coins):
-            coinBalance += coins
-            self.dailyAdWatchCount += 1
-            #if DEBUG
-            Logger.viewModel.info("CoinRewardVM: ad watch rewarded \(coins) coins, daily count: \(self.dailyAdWatchCount)")
-            #endif
-        case .cancelled, .failed:
-            break
+            let result = await adService.showRewardedAd(
+                placement: session.placement,
+                ssvCustomData: session.ssvCustomData
+            )
+            guard case .rewarded = result else {
+                if case .failed = result {
+                    errorMessage = "广告加载失败，请稍后重试"
+                }
+                return
+            }
+
+            guard try await waitForDelivery(of: session) else {
+                throw APIError(code: "AD_REWARD_PENDING", message: "奖励确认中，请稍后刷新")
+            }
+            let account = try await detailRepository.fetchUnlockAccount()
+            coinBalance = account.balance
+            dailyAdWatchCount += 1
+        } catch let error as APIError {
+            errorMessage = error.localizedDescription
+        } catch {
+            errorMessage = "广告暂不可用，请检查网络后重试"
         }
     }
 
@@ -118,14 +163,17 @@ final class CoinRewardViewModel: ObservableObject {
 
     // MARK: - Private
 
-    /// 倒计时（每秒更新 adCountdown，用于 UI 展示）
-    private func startCountdown(seconds: Int) async {
-        adCountdown = seconds
-        for _ in 0..<seconds {
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
-            guard isShowingRewardedAd else { return }
-            adCountdown -= 1
+    private func waitForDelivery(of session: AdRewardSession) async throws -> Bool {
+        for attempt in 0..<12 {
+            let completion = try await adRewardRepository.completeSession(session)
+            if completion.isDelivered {
+                return true
+            }
+            if attempt < 11 {
+                try await Task.sleep(for: .milliseconds(500))
+            }
         }
+        return false
     }
 
     private func logError(_ message: String) {

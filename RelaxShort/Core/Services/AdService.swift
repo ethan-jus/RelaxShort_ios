@@ -15,11 +15,13 @@ enum AdRewardResult {
 
 // MARK: - Ad Service Protocol
 
+@MainActor
 protocol AdServiceProtocol {
-    /// 展示激励广告，用户观看完整后获得奖励
-    func showRewardedAd(coins: Int) async -> AdRewardResult
-    /// 展示解锁广告，观看完整后解锁当前剧集
-    func showUnlockAd() async -> AdRewardResult
+    /// 根据服务端广告位格式展示激励视频或激励插屏。
+    func showRewardedAd(
+        placement: AdPlacementConfig,
+        ssvCustomData: String
+    ) async -> AdRewardResult
     /// 展示插屏广告
     func showInterstitial() async -> Bool
     /// 加载开屏广告
@@ -47,7 +49,10 @@ final class MockAdService: ObservableObject, AdServiceProtocol {
         #endif
     }
 
-    func showRewardedAd(coins: Int) async -> AdRewardResult {
+    func showRewardedAd(
+        placement: AdPlacementConfig,
+        ssvCustomData: String
+    ) async -> AdRewardResult {
         guard self.dailyAdWatchCount < self.maxDailyAdWatchCount else {
             #if DEBUG
             Logger.store.info("MockAdService: daily ad watch limit reached (\(self.dailyAdWatchCount)/\(self.maxDailyAdWatchCount))")
@@ -60,29 +65,12 @@ final class MockAdService: ObservableObject, AdServiceProtocol {
         dailyAdWatchCount += 1
         if Double.random(in: 0...1) < 0.9 {
             #if DEBUG
-            Logger.store.info("MockAdService: rewarded ad completed, earned \(coins) coins")
+            Logger.store.info("MockAdService: rewarded ad completed, earned \(placement.rewardCoins) coins")
             #endif
-            return .rewarded(coins: coins)
+            return .rewarded(coins: placement.rewardCoins)
         } else {
             #if DEBUG
             Logger.store.info("MockAdService: rewarded ad failed (random)")
-            #endif
-            return .failed
-        }
-    }
-
-    func showUnlockAd() async -> AdRewardResult {
-        isShowingAd = true
-        defer { isShowingAd = false }
-        await startCountdown(seconds: adDuration)
-        if Double.random(in: 0...1) < 0.9 {
-            #if DEBUG
-            Logger.store.info("MockAdService: unlock ad completed")
-            #endif
-            return .rewarded(coins: 0)
-        } else {
-            #if DEBUG
-            Logger.store.info("MockAdService: unlock ad failed (random)")
             #endif
             return .failed
         }

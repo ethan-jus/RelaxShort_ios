@@ -55,22 +55,6 @@ struct CoinRewardView: View {
                 RulePopupView(isPresented: $showRules)
             }
 
-            // 激励广告弹窗
-            if viewModel.isShowingRewardedAd {
-                RewardedAdView(
-                    mode: .earnCoins(amount: viewModel.adWatchCoinReward),
-                    countdown: viewModel.adCountdown,
-                    totalDuration: viewModel.adDuration,
-                    isCompleted: false,
-                    isFailed: false,
-                    resultText: nil,
-                    onDismiss: {
-                        viewModel.isShowingRewardedAd = false
-                    }
-                )
-                .zIndex(2)
-            }
-
             // 金币购买弹窗
             if showCoinPurchase {
                 CoinPurchaseSheet(
@@ -91,6 +75,20 @@ struct CoinRewardView: View {
         .animation(.easeInOut(duration: 0.28), value: showCoinPurchase)
         .onReceive(NotificationCenter.default.publisher(for: .showCoinPurchase)) { _ in
             withAnimation(.easeInOut(duration: 0.25)) { showCoinPurchase = true }
+        }
+        .onChange(of: viewModel.coinBalance) { _, balance in
+            coinStore.synchronize(balance: balance)
+        }
+        .alert(
+            "Ad unavailable",
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(viewModel.errorMessage ?? "")
         }
     }
 
@@ -291,7 +289,7 @@ struct CoinRewardView: View {
             // 右侧按钮
             Button {
                 guard canWatch else { return }
-                viewModel.isShowingRewardedAd = true
+                Task { await viewModel.watchAdForCoins() }
             } label: {
                 Text(canWatch ? L10n.adWatchNow : L10n.adWatchedToday)
                     .font(DT.Font.body(13, weight: .medium))
@@ -301,7 +299,7 @@ struct CoinRewardView: View {
                     .background(canWatch ? DT.brandPink : DT.Color.textPrimary.opacity(0.08))
                     .cornerRadius(DT.Radius.sm)
             }
-            .disabled(!canWatch)
+            .disabled(!canWatch || viewModel.isLoading)
         }
         .padding(DT.Space.lg)
         .background(DT.Color.bgCard)

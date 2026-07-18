@@ -19,6 +19,8 @@
 		1FF3E1A102BEF7AA8D4F9D2A /* ImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92BA45403A687DDCFEC0BFB2 /* ImageLoader.swift */; };
 		2C154A54BD9F2FF30E9D0E37 /* RankingResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ACE4BF9A6467F42C0968C1D /* RankingResponseDTO.swift */; };
 		2E4AAF0C01CE42B2A39F4D43 /* RealMemberRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCCCF0A8A63420F846E6A38 /* RealMemberRepository.swift */; };
+		E38000000000000000000001 /* AdsResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = E38000000000000000000011 /* AdsResponseDTO.swift */; };
+		E38000000000000000000002 /* RealAdRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E38000000000000000000012 /* RealAdRepository.swift */; };
 		2E9BFA93C65881A7FF34909B /* DesignToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8EDBD506501279A0BBE11E /* DesignToken.swift */; };
 		35ACFDD66549ADA723C21EE5 /* DSComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDA4BA0E4DC46492199EAA48 /* DSComponents.swift */; };
 		3621D61EEDEABAB261DB3D9C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 85C47C44A64449764305DA46 /* Assets.xcassets */; };
@@ -202,6 +204,8 @@
 		5A96C2B4E2AC50B8B17D50FC /* API/SeriesEpisodesResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API/SeriesEpisodesResponseDTO.swift; sourceTree = "<group>"; };
 		5D8EDBD506501279A0BBE11E /* DesignToken.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignToken.swift; sourceTree = "<group>"; };
 		5DCCCF0A8A63420F846E6A38 /* RealMemberRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealMemberRepository.swift; path = RelaxShort/Core/Services/RealMemberRepository.swift; sourceTree = SOURCE_ROOT; };
+		E38000000000000000000011 /* AdsResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AdsResponseDTO.swift; path = RelaxShort/Models/API/AdsResponseDTO.swift; sourceTree = SOURCE_ROOT; };
+		E38000000000000000000012 /* RealAdRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealAdRepository.swift; path = RelaxShort/Core/Services/RealAdRepository.swift; sourceTree = SOURCE_ROOT; };
 		5E638B042AF7EB7EEEB410B2 /* ShortVideoPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortVideoPlayerView.swift; sourceTree = "<group>"; };
 		614217FBE8E7FD906F0E7F17 /* RulePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePopupView.swift; sourceTree = "<group>"; };
 		6734F3AADD3FC80F4E33192D /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
@@ -572,6 +576,8 @@
 			children = (
 				5DCCCF0A8A63420F846E6A38 /* RealMemberRepository.swift */,
 				ABE66037A6F14B1FA8BA0DA9 /* MemberResponseDTO.swift */,
+				E38000000000000000000011 /* AdsResponseDTO.swift */,
+				E38000000000000000000012 /* RealAdRepository.swift */,
 				0797BAFECB9547DD90CE90AE /* MemberModels.swift */,
 				86D8BBC63EA44177801BB30D /* MemberViewModel.swift */,
 				EC39FF880BF54A0AB34DA75A /* MemberView.swift */,
@@ -999,6 +1005,8 @@
 				82AA4DB580892A726175B04F /* RankingEntry.swift in Sources */,
 				2E4AAF0C01CE42B2A39F4D43 /* RealMemberRepository.swift in Sources */,
 				1209CA13FE97426E9C6D6308 /* MemberResponseDTO.swift in Sources */,
+				E38000000000000000000001 /* AdsResponseDTO.swift in Sources */,
+				E38000000000000000000002 /* RealAdRepository.swift in Sources */,
 				D7D9F92CE08942F48FE5B6C4 /* MemberModels.swift in Sources */,
 				71D41707ADD14AF18AA788EB /* MemberViewModel.swift in Sources */,
 				04AD97E5CBAE40B48D335B50 /* MemberView.swift in Sources */,

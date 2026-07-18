@@ -152,3 +152,61 @@ protocol CoinRewardRepositoryProtocol {
     /// 获取任务列表
     func fetchTasks() async throws -> [CoinTask]
 }
+
+// MARK: - Ads
+
+enum AdFormat: String {
+    case appOpen = "app_open"
+    case rewarded
+    case rewardedInterstitial = "rewarded_interstitial"
+    case interstitial
+    case unknown
+}
+
+struct AdPlacementConfig {
+    let placementCode: String
+    let enabled: Bool
+    let adUnitID: String
+    let format: AdFormat
+    let rewardCoins: Int
+    let maxPerUserPerDay: Int
+    let cooldownSeconds: Int
+}
+
+struct AdsConfig {
+    let adsEnabled: Bool
+    let appOpen: AdPlacementConfig
+    let rewardedEarnCoins: AdPlacementConfig
+    let interstitialUnlockEpisode: AdPlacementConfig
+    let interstitial: AdPlacementConfig
+}
+
+struct AdRewardSession {
+    let id: Int64
+    let idempotencyKey: String
+    let placement: AdPlacementConfig
+    let rewardType: String
+    let ssvCustomData: String
+}
+
+struct AdRewardCompletion {
+    let status: String
+    let pendingVerification: Bool
+
+    var isDelivered: Bool {
+        status == "completed" && !pendingVerification
+    }
+}
+
+protocol AdConfigRepositoryProtocol {
+    func fetchAdsConfig() async throws -> AdsConfig
+}
+
+protocol AdRewardRepositoryProtocol {
+    func startSession(
+        placementCode: String,
+        rewardType: String,
+        targetEpisodeID: String?
+    ) async throws -> AdRewardSession
+    func completeSession(_ session: AdRewardSession) async throws -> AdRewardCompletion
+}

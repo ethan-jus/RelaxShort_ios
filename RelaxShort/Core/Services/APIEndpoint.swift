@@ -64,6 +64,21 @@ enum APIEndpoint {
 
     case member(contentLanguage: String?, countryCode: String?)
 
+    // MARK: - Task38 广告
+
+    case adsConfig
+    case adsRewardStart(
+        placementCode: String,
+        rewardType: String,
+        targetEpisodeID: String?,
+        idempotencyKey: String
+    )
+    case adsRewardComplete(
+        sessionID: Int64,
+        placementCode: String,
+        idempotencyKey: String
+    )
+
     // MARK: - 旧 mock 端点（保留兼容）
 
     case homeFeed(category: DramaCategory)
@@ -98,7 +113,7 @@ extension APIEndpoint {
              .userMe, .userWallet, .updateUserPreferences,
              .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
-             .member:
+             .member, .adsConfig, .adsRewardStart, .adsRewardComplete:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -137,6 +152,9 @@ extension APIEndpoint {
         case .setBookmark(let seriesID, _):  return "/api/v2/series/\(seriesID)/bookmark"
         // ── Task32 v2 ──
         case .member:                        return "/api/v2/member"
+        case .adsConfig:                     return "/api/v2/ads/config"
+        case .adsRewardStart:                return "/api/v2/ads/reward/start"
+        case .adsRewardComplete:             return "/api/v2/ads/reward/complete"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -169,7 +187,8 @@ extension APIEndpoint {
         case .updateUserPreferences: return .patch
         case .episodeUnlock, .applePaymentVerify: return .post
         case .discoveryEvents:     return .post
-        case .member:              return .get
+        case .member, .adsConfig:  return .get
+        case .adsRewardStart, .adsRewardComplete: return .post
         case .watchHistoryV2, .bookmarksV2, .bookmarkStatus: return .get
         case .deleteWatchHistory: return .delete
         case .watchProgress: return .post
@@ -191,7 +210,7 @@ extension APIEndpoint {
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
-             .member:
+             .member, .adsConfig, .adsRewardStart, .adsRewardComplete:
             return true
         default: return false
         }
@@ -202,7 +221,8 @@ extension APIEndpoint {
         switch self {
         case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
-             .bookmarksV2, .bookmarkStatus, .setBookmark:
+             .bookmarksV2, .bookmarkStatus, .setBookmark,
+             .adsRewardStart, .adsRewardComplete:
             return true
         default:
             return false
@@ -237,7 +257,8 @@ extension APIEndpoint {
         }
 
         switch self {
-        case .episodeUnlock(_, _, let key), .applePaymentVerify(_, let key):
+        case .episodeUnlock(_, _, let key), .applePaymentVerify(_, let key),
+             .adsRewardStart(_, _, _, let key), .adsRewardComplete(_, _, let key):
             base["X-Idempotency-Key"] = key
         default:
             break
@@ -301,6 +322,20 @@ extension APIEndpoint {
             ]
             if let token = receipt.appAccountToken { dict["app_account_token"] = token }
             params = dict
+        case .adsRewardStart(let placementCode, let rewardType, let targetEpisodeID, _):
+            var dict: [String: Any] = [
+                "placement_code": placementCode,
+                "reward_type": rewardType
+            ]
+            if let targetEpisodeID, let numericID = Int64(targetEpisodeID) {
+                dict["target_episode_id"] = numericID
+            }
+            params = dict
+        case .adsRewardComplete(let sessionID, let placementCode, _):
+            params = [
+                "session_id": sessionID,
+                "placement_code": placementCode
+            ]
         default:
             params = [:]
         }
@@ -329,7 +364,8 @@ extension APIEndpoint {
             ]
         case .seriesEpisodes:
             break
-        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken:
+        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
+             .adsConfig, .adsRewardStart, .adsRewardComplete:
             break
         // ── Task15 v2 query params ──
         case .home(let cl, let cc):

@@ -19,6 +19,9 @@ final class DependencyContainer: ObservableObject {
     let memberRepository: MemberRepositoryProtocol
     let vipRepository: VIPRepositoryProtocol
     let coinRewardRepository: CoinRewardRepositoryProtocol
+    let adConfigRepository: AdConfigRepositoryProtocol
+    let adRewardRepository: AdRewardRepositoryProtocol
+    let adService: any AdServiceProtocol
     let discoveryAnalytics: any DiscoveryAnalyticsTracking
 
     // MARK: - Stores
@@ -37,6 +40,9 @@ final class DependencyContainer: ObservableObject {
         memberRepository: MemberRepositoryProtocol? = nil,
         vipRepository: VIPRepositoryProtocol = MockVIPRepository(),
         coinRewardRepository: CoinRewardRepositoryProtocol = MockCoinRewardRepository(),
+        adConfigRepository: AdConfigRepositoryProtocol = RealAdConfigRepository(),
+        adRewardRepository: AdRewardRepositoryProtocol = RealAdRewardRepository(),
+        adService: (any AdServiceProtocol)? = nil,
         discoveryAnalytics: (any DiscoveryAnalyticsTracking)? = nil
     ) {
         // 已完成真实接入的模块：直接注入 Real Repository，不依赖 use_real_api 开关
@@ -50,6 +56,9 @@ final class DependencyContainer: ObservableObject {
         // 未完成真实接入的模块：保持原有注入方式
         self.vipRepository = vipRepository
         self.coinRewardRepository = coinRewardRepository
+        self.adConfigRepository = adConfigRepository
+        self.adRewardRepository = adRewardRepository
+        self.adService = adService ?? RealAdService.shared
 
         // Analytics：使用真实 Client
         self.discoveryAnalytics = discoveryAnalytics ?? DiscoveryAnalyticsClient()

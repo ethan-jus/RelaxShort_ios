@@ -828,6 +828,11 @@ struct SeriesPlayerView: View {
         state.errorMessage = nil
         unlockState = state
         do {
+            if method == .ads {
+                try await unlockEpisodeWithRewardedInterstitial(episodeID: episodeID)
+                await resumeCurrentEpisodeAfterUnlock()
+                return
+            }
             let result = try await dependencies.detailRepository.unlockEpisode(episodeId: episodeID, method: method)
             guard result.unlocked else {
                 throw APIError(code: "UNLOCK_FAILED", message: "解锁失败，请重试")
@@ -847,6 +852,50 @@ struct SeriesPlayerView: View {
             latest.errorMessage = "解锁失败，请检查网络后重试"
             unlockState = latest
         }
+    }
+
+    @MainActor
+    private func unlockEpisodeWithRewardedInterstitial(episodeID: String) async throws {
+        let config = try await dependencies.adConfigRepository.fetchAdsConfig()
+        let placement = config.interstitialUnlockEpisode
+        guard config.adsEnabled,
+              placement.enabled,
+              placement.format == .rewardedInterstitial else {
+            throw APIError(code: "ADS_NOT_AVAILABLE", message: "广告解锁暂不可用")
+        }
+
+        let session = try await dependencies.adRewardRepository.startSession(
+            placementCode: placement.placementCode,
+            rewardType: "unlock_episode",
+            targetEpisodeID: episodeID
+        )
+        guard session.placement.format == .rewardedInterstitial else {
+            throw APIError(code: "AD_FORMAT_MISMATCH", message: "广告配置不一致，请稍后重试")
+        }
+
+        let result = await dependencies.adService.showRewardedAd(
+            placement: session.placement,
+            ssvCustomData: session.ssvCustomData
+        )
+        switch result {
+        case .rewarded:
+            break
+        case .cancelled:
+            throw APIError(code: "AD_NOT_COMPLETED", message: "完整观看广告后才能解锁")
+        case .failed:
+            throw APIError(code: "AD_LOAD_FAILED", message: "广告加载失败，请稍后重试")
+        }
+
+        for attempt in 0..<12 {
+            let completion = try await dependencies.adRewardRepository.completeSession(session)
+            if completion.isDelivered {
+                return
+            }
+            if attempt < 11 {
+                try await Task.sleep(for: .milliseconds(500))
+            }
+        }
+        throw APIError(code: "AD_REWARD_PENDING", message: "解锁确认中，请稍后重试")
     }
 
     @MainActor
