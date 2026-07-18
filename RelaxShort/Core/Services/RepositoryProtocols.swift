@@ -145,12 +145,8 @@ protocol MemberRepositoryProtocol {
 
 /// 福利中心/赚金币数据仓库协议
 protocol CoinRewardRepositoryProtocol {
-    /// 获取签到日数据
-    func fetchCheckInDays() async throws -> [CheckInDay]
-    /// 获取金币余额
-    func fetchCoinBalance() async throws -> Int
-    /// 获取任务列表
-    func fetchTasks() async throws -> [CoinTask]
+    func fetchRewardCenter() async throws -> RewardCenterState
+    func checkIn() async throws -> RewardCenterState
 }
 
 // MARK: - Ads
@@ -209,4 +205,5 @@ protocol AdRewardRepositoryProtocol {
         targetEpisodeID: String?
     ) async throws -> AdRewardSession
     func completeSession(_ session: AdRewardSession) async throws -> AdRewardCompletion
+    func cancelSession(_ session: AdRewardSession) async
 }

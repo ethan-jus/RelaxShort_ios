@@ -14,6 +14,7 @@ struct CoinPurchaseSheet: View {
 
     let coinStore: CoinStore
     let storeKit: StoreKitManager
+    var firstPurchaseBonusAvailable: Bool? = nil
 
     // MARK: - Callbacks
 
@@ -127,7 +128,7 @@ struct CoinPurchaseSheet: View {
                             .font(DT.Font.caption)
                             .foregroundColor(DT.Color.textSecondary)
 
-                        if let label = package.label {
+                        if let label = displayedLabel(for: package) {
                             Text(label)
                                 .font(DT.Font.tabLabel)
                                 .foregroundColor(DT.brandGold)
@@ -138,8 +139,12 @@ struct CoinPurchaseSheet: View {
                         }
                     }
 
-                    if let bonus = package.bonus, bonus > 0 {
-                        Text(L10n.bonusCoins(bonus))
+                    if let bonus = displayedBonus(for: package), bonus > 0 {
+                        Text(
+                            package.productID == .coinsSmall
+                                ? "First purchase bonus +\(bonus)"
+                                : L10n.bonusCoins(bonus)
+                        )
                             .font(DT.Font.small)
                             .foregroundColor(DT.Color.textTertiary)
                     }
@@ -179,6 +184,20 @@ struct CoinPurchaseSheet: View {
                     )
             )
         }
+    }
+
+    private func displayedBonus(for package: CoinPackage) -> Int? {
+        if package.productID == .coinsSmall, firstPurchaseBonusAvailable == false {
+            return nil
+        }
+        return package.bonus
+    }
+
+    private func displayedLabel(for package: CoinPackage) -> String? {
+        if package.productID == .coinsSmall, firstPurchaseBonusAvailable == false {
+            return nil
+        }
+        return package.label
     }
 
     // MARK: - Purchase Button

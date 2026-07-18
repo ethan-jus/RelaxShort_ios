@@ -35,3 +35,8 @@ struct AdRewardCompleteResponseDTO: Decodable {
     let pendingVerification: Bool
     let rewardCoins: Decimal?
 }
+
+struct AdRewardCancelResponseDTO: Decodable {
+    let sessionId: Int64
+    let status: String
+}

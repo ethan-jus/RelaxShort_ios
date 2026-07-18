@@ -183,27 +183,6 @@ enum MockData {
         VIPBenefit(icon: "star",                        title: "VIP专属剧集"),
     ]
 
-    static let checkInDays: [CheckInDay] = [
-        CheckInDay(label: "今天",   coins: "+10",  checked: true),
-        CheckInDay(label: "第2天",  coins: "+15",  checked: true),
-        CheckInDay(label: "第3天",  coins: "+20",  checked: false),
-        CheckInDay(label: "第4天",  coins: "+25",  checked: false),
-        CheckInDay(label: "第5天",  coins: "+35",  checked: false),
-        CheckInDay(label: "第6天",  coins: "+50",  checked: false),
-        CheckInDay(label: "第7天",  coins: "+100", checked: false),
-    ]
-
-    static let coinTasks: [CoinTask] = [
-        CoinTask(iconName: "calendar.badge.checkmark", title: "每日签到",   subtitle: "签到领金币",            buttonText: "去签到"),
-        CoinTask(iconName: "play.rectangle",           title: "观看5分钟",  subtitle: "看剧5分钟赚金币",        buttonText: "去看剧"),
-        CoinTask(iconName: "play.rectangle.fill",       title: "观看30分钟", subtitle: "看剧30分钟赚更多金币",    buttonText: "去看剧"),
-        CoinTask(iconName: "square.and.arrow.up",       title: "分享短剧",  subtitle: "分享给好友一起看",        buttonText: "去分享"),
-        CoinTask(iconName: "person.badge.plus",         title: "邀请好友",  subtitle: "邀请好友各得200金币",     buttonText: "去邀请"),
-        CoinTask(iconName: "creditcard",                title: "首次充值",  subtitle: "首充额外赠送500金币",     buttonText: "去充值"),
-        CoinTask(iconName: "checkmark.seal",            title: "看完一部剧",subtitle: "完整看完一部剧集赠送80金币",buttonText: "去看剧"),
-        CoinTask(iconName: "flame",                     title: "连续签到",  subtitle: "连续签到7天额外送150金币",buttonText: "去签到"),
-    ]
-
     // MARK: - v1 DramaBox 复刻稳定数据分组
 
     /// For You 推荐流 (全部30部，顺序稳定)
@@ -400,13 +379,31 @@ struct MockVIPRepository: VIPRepositoryProtocol {
 }
 
 struct MockCoinRewardRepository: CoinRewardRepositoryProtocol {
-    func fetchCheckInDays() async throws -> [CheckInDay] {
-        try await Task.sleep(nanoseconds: MC.delay); return MockData.checkInDays
+    func fetchRewardCenter() async throws -> RewardCenterState {
+        try await Task.sleep(nanoseconds: MC.delay)
+        return Self.state
     }
-    func fetchCoinBalance() async throws -> Int {
-        try await Task.sleep(nanoseconds: MC.delay); return MockData.profile.coinBalance
+
+    func checkIn() async throws -> RewardCenterState {
+        try await Task.sleep(nanoseconds: MC.delay)
+        return Self.state
     }
-    func fetchTasks() async throws -> [CoinTask] {
-        try await Task.sleep(nanoseconds: MC.delay); return MockData.coinTasks
-    }
+
+    private static let state = RewardCenterState(
+        coinBalance: MockData.profile.coinBalance,
+        firstCoinPurchaseBonusAvailable: true,
+        claimedCheckInToday: false,
+        completedCheckInDays: 0,
+        nextCheckInReward: 10,
+        checkInDays: [10, 20, 30, 35, 40, 45, 70].enumerated().map {
+            CheckInDay(dayNumber: $0.offset + 1, rewardCoins: $0.element, completed: false, current: $0.offset == 0)
+        },
+        adPlacementCode: "rewarded_earn_coins",
+        completedAdCount: 0,
+        maxAdCount: 5,
+        nextAdReward: 20,
+        adSteps: [20, 30, 50, 80, 120].enumerated().map {
+            AdRewardStep(stepNumber: $0.offset + 1, rewardCoins: $0.element, completed: false, current: $0.offset == 0)
+        }
+    )
 }

@@ -39,7 +39,7 @@ final class DependencyContainer: ObservableObject {
         profileRepository: ProfileRepositoryProtocol? = nil,
         memberRepository: MemberRepositoryProtocol? = nil,
         vipRepository: VIPRepositoryProtocol = MockVIPRepository(),
-        coinRewardRepository: CoinRewardRepositoryProtocol = MockCoinRewardRepository(),
+        coinRewardRepository: CoinRewardRepositoryProtocol = RealCoinRewardRepository(),
         adConfigRepository: AdConfigRepositoryProtocol = RealAdConfigRepository(),
         adRewardRepository: AdRewardRepositoryProtocol = RealAdRewardRepository(),
         adService: (any AdServiceProtocol)? = nil,

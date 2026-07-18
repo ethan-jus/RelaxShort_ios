@@ -21,6 +21,8 @@
 		2E4AAF0C01CE42B2A39F4D43 /* RealMemberRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DCCCF0A8A63420F846E6A38 /* RealMemberRepository.swift */; };
 		E38000000000000000000001 /* AdsResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = E38000000000000000000011 /* AdsResponseDTO.swift */; };
 		E38000000000000000000002 /* RealAdRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E38000000000000000000012 /* RealAdRepository.swift */; };
+		E39000000000000000000001 /* RewardCenterResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = E39000000000000000000011 /* RewardCenterResponseDTO.swift */; };
+		E39000000000000000000002 /* RealCoinRewardRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = E39000000000000000000012 /* RealCoinRewardRepository.swift */; };
 		2E9BFA93C65881A7FF34909B /* DesignToken.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D8EDBD506501279A0BBE11E /* DesignToken.swift */; };
 		35ACFDD66549ADA723C21EE5 /* DSComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDA4BA0E4DC46492199EAA48 /* DSComponents.swift */; };
 		3621D61EEDEABAB261DB3D9C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 85C47C44A64449764305DA46 /* Assets.xcassets */; };
@@ -206,6 +208,8 @@
 		5DCCCF0A8A63420F846E6A38 /* RealMemberRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealMemberRepository.swift; path = RelaxShort/Core/Services/RealMemberRepository.swift; sourceTree = SOURCE_ROOT; };
 		E38000000000000000000011 /* AdsResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AdsResponseDTO.swift; path = RelaxShort/Models/API/AdsResponseDTO.swift; sourceTree = SOURCE_ROOT; };
 		E38000000000000000000012 /* RealAdRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealAdRepository.swift; path = RelaxShort/Core/Services/RealAdRepository.swift; sourceTree = SOURCE_ROOT; };
+		E39000000000000000000011 /* RewardCenterResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RewardCenterResponseDTO.swift; path = RelaxShort/Models/API/RewardCenterResponseDTO.swift; sourceTree = SOURCE_ROOT; };
+		E39000000000000000000012 /* RealCoinRewardRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealCoinRewardRepository.swift; path = RelaxShort/Core/Services/RealCoinRewardRepository.swift; sourceTree = SOURCE_ROOT; };
 		5E638B042AF7EB7EEEB410B2 /* ShortVideoPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortVideoPlayerView.swift; sourceTree = "<group>"; };
 		614217FBE8E7FD906F0E7F17 /* RulePopupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RulePopupView.swift; sourceTree = "<group>"; };
 		6734F3AADD3FC80F4E33192D /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
@@ -578,6 +582,8 @@
 				ABE66037A6F14B1FA8BA0DA9 /* MemberResponseDTO.swift */,
 				E38000000000000000000011 /* AdsResponseDTO.swift */,
 				E38000000000000000000012 /* RealAdRepository.swift */,
+				E39000000000000000000011 /* RewardCenterResponseDTO.swift */,
+				E39000000000000000000012 /* RealCoinRewardRepository.swift */,
 				0797BAFECB9547DD90CE90AE /* MemberModels.swift */,
 				86D8BBC63EA44177801BB30D /* MemberViewModel.swift */,
 				EC39FF880BF54A0AB34DA75A /* MemberView.swift */,
@@ -1007,6 +1013,8 @@
 				1209CA13FE97426E9C6D6308 /* MemberResponseDTO.swift in Sources */,
 				E38000000000000000000001 /* AdsResponseDTO.swift in Sources */,
 				E38000000000000000000002 /* RealAdRepository.swift in Sources */,
+				E39000000000000000000001 /* RewardCenterResponseDTO.swift in Sources */,
+				E39000000000000000000002 /* RealCoinRewardRepository.swift in Sources */,
 				D7D9F92CE08942F48FE5B6C4 /* MemberModels.swift in Sources */,
 				71D41707ADD14AF18AA788EB /* MemberViewModel.swift in Sources */,
 				04AD97E5CBAE40B48D335B50 /* MemberView.swift in Sources */,

@@ -80,4 +80,14 @@ final class RealAdRewardRepository: AdRewardRepositoryProtocol {
             pendingVerification: dto.pendingVerification
         )
     }
+
+    func cancelSession(_ session: AdRewardSession) async {
+        let _: AdRewardCancelResponseDTO? = try? await client.requestData(
+            .adsRewardCancel(
+                sessionID: session.id,
+                placementCode: session.placement.placementCode,
+                idempotencyKey: session.idempotencyKey
+            )
+        )
+    }
 }

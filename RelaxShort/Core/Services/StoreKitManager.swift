@@ -44,10 +44,10 @@ enum ProductID: String, CaseIterable, Hashable {
     /// 对应的金币数量（仅金币包有效）
     var coinAmount: Int {
         switch self {
-        case .coinsSmall:  return 300
-        case .coinsMedium: return 700
-        case .coinsLarge:  return 1500
-        case .coinsXLarge: return 4000
+        case .coinsSmall:  return 800
+        case .coinsMedium: return 550
+        case .coinsLarge:  return 1200
+        case .coinsXLarge: return 2600
         default: return 0
         }
     }
@@ -66,6 +66,7 @@ struct CoinPackage: Identifiable, Equatable {
 
     /// 显示标签（如 "最受欢迎"）
     var label: String? {
+        if productID == .coinsSmall { return "首充双倍" }
         if isPopular { return "最受欢迎" }
         if let bonus, bonus > 0 { return "加赠\(bonus)金币" }
         return nil
@@ -250,10 +251,10 @@ final class StoreKitManager: ObservableObject {
 
     /// 金币包列表（本地回退数据）
     let coinPackages: [CoinPackage] = [
-        CoinPackage(id: "pack_300",  productID: .coinsSmall,  amount: 300,  price: "$4.99",  bonus: nil,   isPopular: false),
-        CoinPackage(id: "pack_700",  productID: .coinsMedium, amount: 700,  price: "$9.99",  bonus: 50,    isPopular: true),
-        CoinPackage(id: "pack_1500", productID: .coinsLarge,  amount: 1500, price: "$19.99", bonus: 150,   isPopular: false),
-        CoinPackage(id: "pack_4000", productID: .coinsXLarge, amount: 4000, price: "$49.99", bonus: 500,   isPopular: false),
+        CoinPackage(id: "pack_400_first", productID: .coinsSmall, amount: 400, price: "$3.99", bonus: 400, isPopular: false),
+        CoinPackage(id: "pack_500", productID: .coinsMedium, amount: 500, price: "$4.99", bonus: 50, isPopular: false),
+        CoinPackage(id: "pack_1000", productID: .coinsLarge, amount: 1000, price: "$9.99", bonus: 200, isPopular: true),
+        CoinPackage(id: "pack_2000", productID: .coinsXLarge, amount: 2000, price: "$19.99", bonus: 600, isPopular: false),
     ]
 
     /// VIP 订阅列表。价格优先使用 StoreKit 本地化价格。

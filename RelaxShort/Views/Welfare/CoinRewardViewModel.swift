@@ -9,7 +9,10 @@ final class CoinRewardViewModel: ObservableObject {
 
     @Published var checkInDays: [CheckInDay] = []
     @Published var coinBalance: Int = 0
-    @Published var tasks: [CoinTask] = []
+    @Published var firstCoinPurchaseBonusAvailable = false
+    @Published var adRewardSteps: [AdRewardStep] = []
+    @Published var claimedCheckInToday = false
+    @Published var nextCheckInReward: Int?
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
 
@@ -19,7 +22,7 @@ final class CoinRewardViewModel: ObservableObject {
     @Published var dailyAdWatchCount: Int = 0
     /// 每日最大激励广告次数
     @Published var maxDailyAdWatchCount: Int = 0
-    /// 每次观看广告获得的金币
+    /// 下一次观看广告获得的金币
     @Published var adWatchCoinReward: Int = 0
 
     // MARK: - Dependencies
@@ -28,7 +31,6 @@ final class CoinRewardViewModel: ObservableObject {
     private let adService: any AdServiceProtocol
     private let adConfigRepository: AdConfigRepositoryProtocol
     private let adRewardRepository: AdRewardRepositoryProtocol
-    private let detailRepository: DetailRepositoryProtocol
     private var rewardedCoinPlacement: AdPlacementConfig?
 
     // MARK: - Init
@@ -37,21 +39,19 @@ final class CoinRewardViewModel: ObservableObject {
         repository: CoinRewardRepositoryProtocol,
         adService: (any AdServiceProtocol)? = nil,
         adConfigRepository: AdConfigRepositoryProtocol = RealAdConfigRepository(),
-        adRewardRepository: AdRewardRepositoryProtocol = RealAdRewardRepository(),
-        detailRepository: DetailRepositoryProtocol? = nil
+        adRewardRepository: AdRewardRepositoryProtocol = RealAdRewardRepository()
     ) {
         self.repository = repository
         self.adService = adService ?? RealAdService.shared
         self.adConfigRepository = adConfigRepository
         self.adRewardRepository = adRewardRepository
-        self.detailRepository = detailRepository ?? RealDetailRepository()
         Task { await loadData() }
     }
 
     // MARK: - Computed
 
     var checkedInCount: Int {
-        checkInDays.filter(\.checked).count
+        checkInDays.filter(\.completed).count
     }
 
     // MARK: - Data Loading
@@ -62,32 +62,17 @@ final class CoinRewardViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            checkInDays = try await repository.fetchCheckInDays()
+            apply(try await repository.fetchRewardCenter())
         } catch {
-            logError("CoinRewardViewModel.fetchCheckInDays failed: \(error)")
-        }
-
-        do {
-            coinBalance = try await repository.fetchCoinBalance()
-        } catch {
-            logError("CoinRewardViewModel.fetchCoinBalance failed: \(error)")
-        }
-
-        do {
-            tasks = try await repository.fetchTasks()
-        } catch {
-            logError("CoinRewardViewModel.fetchTasks failed: \(error)")
+            errorMessage = error.localizedDescription
+            logError("CoinRewardViewModel.fetchRewardCenter failed: \(error)")
         }
 
         do {
             let config = try await adConfigRepository.fetchAdsConfig()
             let placement = config.rewardedEarnCoins
-            adWatchCoinReward = placement.rewardCoins
-            maxDailyAdWatchCount = config.adsEnabled && placement.enabled
-                && placement.format == .rewarded
-                ? placement.maxPerUserPerDay
-                : 0
-            if maxDailyAdWatchCount > 0 {
+            if config.adsEnabled && placement.enabled && placement.format == .rewarded
+                && remainingAdWatchCount > 0 {
                 rewardedCoinPlacement = placement
                 await adService.preloadRewardedAd(placement: placement)
             }
@@ -98,15 +83,16 @@ final class CoinRewardViewModel: ObservableObject {
 
     // MARK: - Actions
 
-    func performCheckIn() {
-        if let nextIndex = checkInDays.firstIndex(where: { !$0.checked }) {
-            checkInDays[nextIndex].checked = true
-            coinBalance += 30
+    func performCheckIn() async {
+        guard !isLoading, !claimedCheckInToday else { return }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            apply(try await repository.checkIn())
+        } catch {
+            errorMessage = error.localizedDescription
         }
-    }
-
-    func performTask(_ task: CoinTask) {
-        // TODO: Phase 2 对接真实 API
     }
 
     /// 观看激励广告获得金币
@@ -118,8 +104,6 @@ final class CoinRewardViewModel: ObservableObject {
 
         do {
             let placement = try await resolvedRewardedCoinPlacement()
-            maxDailyAdWatchCount = placement.maxPerUserPerDay
-            adWatchCoinReward = placement.rewardCoins
             guard placement.enabled,
                   placement.format == .rewarded,
                   remainingAdWatchCount > 0 else {
@@ -140,6 +124,7 @@ final class CoinRewardViewModel: ObservableObject {
                 ssvCustomData: session.ssvCustomData
             )
             guard case .rewarded = result else {
+                await adRewardRepository.cancelSession(session)
                 if case .failed = result {
                     errorMessage = "广告加载失败，请稍后重试"
                 }
@@ -149,9 +134,7 @@ final class CoinRewardViewModel: ObservableObject {
             guard try await waitForDelivery(of: session) else {
                 throw APIError(code: "AD_REWARD_PENDING", message: "奖励确认中，请稍后刷新")
             }
-            let account = try await detailRepository.fetchUnlockAccount()
-            coinBalance = account.balance
-            dailyAdWatchCount += 1
+            apply(try await repository.fetchRewardCenter())
         } catch let error as APIError {
             errorMessage = error.localizedDescription
         } catch {
@@ -191,6 +174,18 @@ final class CoinRewardViewModel: ObservableObject {
         rewardedCoinPlacement = placement
         await adService.preloadRewardedAd(placement: placement)
         return placement
+    }
+
+    private func apply(_ state: RewardCenterState) {
+        coinBalance = state.coinBalance
+        firstCoinPurchaseBonusAvailable = state.firstCoinPurchaseBonusAvailable
+        checkInDays = state.checkInDays
+        claimedCheckInToday = state.claimedCheckInToday
+        nextCheckInReward = state.nextCheckInReward
+        adRewardSteps = state.adSteps
+        dailyAdWatchCount = state.completedAdCount
+        maxDailyAdWatchCount = state.maxAdCount
+        adWatchCoinReward = state.nextAdReward ?? 0
     }
 
     private func logError(_ message: String) {

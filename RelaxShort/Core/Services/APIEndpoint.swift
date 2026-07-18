@@ -78,6 +78,16 @@ enum APIEndpoint {
         placementCode: String,
         idempotencyKey: String
     )
+    case adsRewardCancel(
+        sessionID: Int64,
+        placementCode: String,
+        idempotencyKey: String
+    )
+
+    // MARK: - Task39 奖励中心
+
+    case rewardCenter
+    case rewardCheckIn(idempotencyKey: String)
 
     // MARK: - 旧 mock 端点（保留兼容）
 
@@ -113,7 +123,8 @@ extension APIEndpoint {
              .userMe, .userWallet, .updateUserPreferences,
              .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
-             .member, .adsConfig, .adsRewardStart, .adsRewardComplete:
+             .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
+             .rewardCenter, .rewardCheckIn:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -155,6 +166,9 @@ extension APIEndpoint {
         case .adsConfig:                     return "/api/v2/ads/config"
         case .adsRewardStart:                return "/api/v2/ads/reward/start"
         case .adsRewardComplete:             return "/api/v2/ads/reward/complete"
+        case .adsRewardCancel:               return "/api/v2/ads/reward/cancel"
+        case .rewardCenter:                  return "/api/v2/rewards/center"
+        case .rewardCheckIn:                 return "/api/v2/rewards/check-in"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -188,7 +202,8 @@ extension APIEndpoint {
         case .episodeUnlock, .applePaymentVerify: return .post
         case .discoveryEvents:     return .post
         case .member, .adsConfig:  return .get
-        case .adsRewardStart, .adsRewardComplete: return .post
+        case .adsRewardStart, .adsRewardComplete, .adsRewardCancel, .rewardCheckIn: return .post
+        case .rewardCenter: return .get
         case .watchHistoryV2, .bookmarksV2, .bookmarkStatus: return .get
         case .deleteWatchHistory: return .delete
         case .watchProgress: return .post
@@ -210,7 +225,8 @@ extension APIEndpoint {
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
-             .member, .adsConfig, .adsRewardStart, .adsRewardComplete:
+             .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
+             .rewardCenter, .rewardCheckIn:
             return true
         default: return false
         }
@@ -222,7 +238,8 @@ extension APIEndpoint {
         case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark,
-             .adsRewardStart, .adsRewardComplete:
+             .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
+             .rewardCenter, .rewardCheckIn:
             return true
         default:
             return false
@@ -258,7 +275,8 @@ extension APIEndpoint {
 
         switch self {
         case .episodeUnlock(_, _, let key), .applePaymentVerify(_, let key),
-             .adsRewardStart(_, _, _, let key), .adsRewardComplete(_, _, let key):
+             .adsRewardStart(_, _, _, let key), .adsRewardComplete(_, _, let key),
+             .adsRewardCancel(_, _, let key), .rewardCheckIn(let key):
             base["X-Idempotency-Key"] = key
         default:
             break
@@ -336,6 +354,11 @@ extension APIEndpoint {
                 "session_id": sessionID,
                 "placement_code": placementCode
             ]
+        case .adsRewardCancel(let sessionID, let placementCode, _):
+            params = [
+                "session_id": sessionID,
+                "placement_code": placementCode
+            ]
         default:
             params = [:]
         }
@@ -365,7 +388,8 @@ extension APIEndpoint {
         case .seriesEpisodes:
             break
         case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
-             .adsConfig, .adsRewardStart, .adsRewardComplete:
+             .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
+             .rewardCenter, .rewardCheckIn:
             break
         // ── Task15 v2 query params ──
         case .home(let cl, let cc):
