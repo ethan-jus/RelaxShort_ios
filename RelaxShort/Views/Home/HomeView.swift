@@ -868,10 +868,15 @@ private struct DramaBoxSearchHeaderView: View {
             Button {
                 onVIPTap()
             } label: {
-                AnimatedPromoButton(badge: "-25%", delay: 0) {
+                AnimatedPromoButton(
+                    badge: "-25%",
+                    delay: 0,
+                    badgeRotation: .degrees(45),
+                    badgeOffset: CGSize(width: 4, height: -4)
+                ) {
                     VIPCrownView(
-                        width: 36,
-                        height: 27,
+                        width: 40,
+                        height: 30,
                         tint: Color(red: 1, green: 0.82, blue: 0.15),
                         glowColor: Color(red: 1, green: 0.36, blue: 0.12),
                         glowRadius: 3
@@ -903,6 +908,8 @@ private struct DramaBoxSearchHeaderView: View {
 private struct AnimatedPromoButton<Icon: View>: View {
     let badge: String
     var delay: Double = 0
+    var badgeRotation: Angle = .zero
+    var badgeOffset: CGSize = CGSize(width: 2, height: 2)
     @ViewBuilder let icon: () -> Icon
     @State private var anim = false
 
@@ -918,7 +925,8 @@ private struct AnimatedPromoButton<Icon: View>: View {
                 .padding(.vertical, 2)
                 .background(DT.hotTag)
                 .cornerRadius(3)
-                .offset(x: 2, y: 2)
+                .rotationEffect(badgeRotation)
+                .offset(x: badgeOffset.width, y: badgeOffset.height)
         }
         .frame(width: 42, height: 42, alignment: .center)
         .scaleEffect(anim ? 1.1 : 1.0)
