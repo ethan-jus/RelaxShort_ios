@@ -39,6 +39,7 @@ struct SearchView: View {
         }
         .background(DT.Color.bgPrimary.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .interactivePopGestureEnabled()
         .onChange(of: playerDrama) { _, drama in
             guard let drama else { return }
             viewModel.trackResultClick(dramaID: drama.id)

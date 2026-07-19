@@ -1,4 +1,139 @@
 import SwiftUI
+import UIKit
+
+// MARK: - Navigation Gesture
+
+/// 在隐藏系统导航栏或系统返回按钮的二级页上恢复 iOS 原生屏幕边缘返回手势。
+private struct InteractivePopGestureConfigurator:
+    UIViewControllerRepresentable {
+    let isEnabled: Bool
+
+    func makeUIViewController(
+        context: Context
+    ) -> GestureProbeViewController {
+        GestureProbeViewController(isEnabled: isEnabled)
+    }
+
+    func updateUIViewController(
+        _ controller: GestureProbeViewController,
+        context: Context
+    ) {
+        controller.update(isEnabled: isEnabled)
+    }
+
+    static func dismantleUIViewController(
+        _ controller: GestureProbeViewController,
+        coordinator: Void
+    ) {
+        controller.restore()
+    }
+
+    final class GestureProbeViewController:
+        UIViewController,
+        UIGestureRecognizerDelegate {
+        private var isGestureEnabled: Bool
+        private var isPageVisible = false
+        private weak var configuredNavigationController:
+            UINavigationController?
+        private weak var previousDelegate:
+            (any UIGestureRecognizerDelegate)?
+        private var ownsGestureDelegate = false
+
+        init(isEnabled: Bool) {
+            isGestureEnabled = isEnabled
+            super.init(nibName: nil, bundle: nil)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            isPageVisible = true
+            configureIfNeeded()
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            isPageVisible = false
+            restore()
+        }
+
+        func update(isEnabled: Bool) {
+            isGestureEnabled = isEnabled
+            configureIfNeeded()
+        }
+
+        private func configureIfNeeded() {
+            guard isPageVisible,
+                  isGestureEnabled,
+                  let navigationController,
+                  let gesture =
+                    navigationController.interactivePopGestureRecognizer else {
+                restore()
+                return
+            }
+
+            if configuredNavigationController !== navigationController {
+                restore()
+                configuredNavigationController = navigationController
+            }
+
+            if !ownsGestureDelegate {
+                previousDelegate = gesture.delegate
+                gesture.delegate = self
+                ownsGestureDelegate = true
+            }
+
+            gesture.isEnabled =
+                navigationController.viewControllers.count > 1
+        }
+
+        func restore() {
+            guard ownsGestureDelegate,
+                  let gesture =
+                    configuredNavigationController?
+                    .interactivePopGestureRecognizer else {
+                configuredNavigationController = nil
+                previousDelegate = nil
+                ownsGestureDelegate = false
+                return
+            }
+
+            if gesture.delegate === self {
+                gesture.delegate = previousDelegate
+            }
+            configuredNavigationController = nil
+            previousDelegate = nil
+            ownsGestureDelegate = false
+        }
+
+        func gestureRecognizerShouldBegin(
+            _ gestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            guard let navigationController =
+                    configuredNavigationController else {
+                return false
+            }
+            return navigationController.viewControllers.count > 1
+                && navigationController.transitionCoordinator == nil
+        }
+    }
+}
+
+extension View {
+    /// 保留自定义导航栏视觉，同时恢复系统交互式返回动画与取消手势。
+    func interactivePopGestureEnabled(
+        _ isEnabled: Bool = true
+    ) -> some View {
+        background {
+            InteractivePopGestureConfigurator(isEnabled: isEnabled)
+                .frame(width: 0, height: 0)
+        }
+    }
+}
 
 // MARK: - VIP Crown
 

@@ -255,6 +255,7 @@ struct SeriesPlayerView: View {
         .preferredColorScheme(.dark)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .interactivePopGestureEnabled()
         .background {
             NavigationTransitionCompletionObserver {
                 hasCompletedNavigationTransition = true

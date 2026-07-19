@@ -260,6 +260,7 @@ struct MemberView: View {
         .preferredColorScheme(.dark)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .interactivePopGestureEnabled(mode == .push)
         .onAppear {
             viewModel.loadIfNeeded()
             viewModel.startPromotionCountdown()

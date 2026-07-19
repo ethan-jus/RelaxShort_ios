@@ -73,6 +73,7 @@ struct CoinRewardView: View {
             }
         }
         .animation(.easeInOut(duration: 0.28), value: showCoinPurchase)
+        .interactivePopGestureEnabled(mode == .pushed)
         .onReceive(NotificationCenter.default.publisher(for: .showCoinPurchase)) { _ in
             withAnimation(.easeInOut(duration: 0.25)) { showCoinPurchase = true }
         }
