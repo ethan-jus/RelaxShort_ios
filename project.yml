@@ -62,6 +62,6 @@ targets:
           - SKAdNetworkIdentifier: v9wttpbfk9.skadnetwork
           - SKAdNetworkIdentifier: 22mmun2rn5.skadnetwork
           - SKAdNetworkIdentifier: 238da6jt44.skadnetwork
-        NSUserTrackingUsageDescription: "为了提供个性化广告，我们需要获取您的广告标识符"
+        NSUserTrackingUsageDescription: "We use your device's advertising identifier to provide personalized ads."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait

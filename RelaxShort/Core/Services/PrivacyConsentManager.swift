@@ -108,9 +108,11 @@ final class PrivacyConsentManager: ObservableObject {
         let allowsTracking = ATTrackingManager.trackingAuthorizationStatus == .authorized
         GADMediationAdapterPangle.setPAConsent(allowsTracking ? 1 : 0)
 
+#if DEBUG
         MobileAds.shared.requestConfiguration.testDeviceIdentifiers = [
             "00008130-001128D23A2A001C"
         ]
+#endif
         MobileAds.shared.start { _ in
             Task { @MainActor in
                 Logger.store.info("AdMob SDK initialized after UMP consent")

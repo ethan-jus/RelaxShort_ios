@@ -86,7 +86,7 @@
 		</dict>
 	</dict>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>为了提供个性化广告，我们需要获取您的广告标识符</string>
+	<string>We use your device&apos;s advertising identifier to provide personalized ads.</string>
 	<key>SKAdNetworkItems</key>
 	<array>
 		<dict>
