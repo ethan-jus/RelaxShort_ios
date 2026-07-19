@@ -196,7 +196,7 @@ struct RewardCoinBadge: View {
     }
 }
 
-/// “今日可赚”入口使用的红色金币奖励胶囊，整体轻微跳动。
+/// “今日可赚”入口使用的暗酒红金币奖励胶囊，整体轻微跳动。
 struct RewardEarnableBadge: View {
     @Environment(\.accessibilityReduceMotion)
     private var accessibilityReduceMotion
@@ -213,7 +213,7 @@ struct RewardEarnableBadge: View {
             let seconds = timeline.date.timeIntervalSinceReferenceDate
             let bounceY = accessibilityReduceMotion
                 ? 0
-                : sin(seconds * .pi * 2 / 1.15) * 2.5
+                : sin(seconds * .pi * 2 / 1.5) * 2.5
 
             HStack(spacing: 5) {
                 RewardCoinBadge(
@@ -223,18 +223,22 @@ struct RewardEarnableBadge: View {
                 )
 
                 Text("+\(value)")
-                    .font(.system(size: 12, weight: .heavy))
-                    .foregroundColor(.white)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(DT.rewardBadgeText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
             .padding(.leading, 5)
             .padding(.trailing, 8)
             .frame(height: 28)
-            .background(DT.hotTag)
-            .clipShape(
+            .background {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-            )
+                    .fill(DT.rewardBadgeBackground)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(DT.rewardBadgeBorder.opacity(0.65), lineWidth: 0.75)
+            }
             .offset(y: bounceY)
         }
         .frame(height: 34)
