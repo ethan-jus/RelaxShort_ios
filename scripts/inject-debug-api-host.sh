@@ -1,9 +1,28 @@
 #!/bin/sh
 
-# Debug 真机每次构建前读取 Mac 当前局域网 IPv4，只修改构建产物，不改动仓库中的 Info.plist。
+# Debug 真机自动注入局域网地址；Release 必须显式提供 HTTPS API_BASE_URL。
+# 两种配置都只修改构建产物，不改动仓库中的 Info.plist。
 set -u
 
 if [ "${CONFIGURATION:-}" != "Debug" ]; then
+    api_url="${API_BASE_URL:-}"
+    case "$api_url" in
+        https://*)
+            ;;
+        *)
+            echo "error: Release 构建必须通过 API_BASE_URL 注入正式 HTTPS API 地址"
+            exit 1
+            ;;
+    esac
+
+    plist="${TARGET_BUILD_DIR:-}/${INFOPLIST_PATH:-}"
+    if [ ! -f "$plist" ]; then
+        echo "error: 未找到构建产物 Info.plist，无法注入正式 API 地址: $plist"
+        exit 1
+    fi
+    /usr/libexec/PlistBuddy -c "Delete :API_BASE_URL" "$plist" >/dev/null 2>&1 || true
+    /usr/libexec/PlistBuddy -c "Add :API_BASE_URL string ${api_url}" "$plist"
+    echo "Release API 地址已注入"
     exit 0
 fi
 

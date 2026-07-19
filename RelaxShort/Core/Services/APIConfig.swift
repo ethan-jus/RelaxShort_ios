@@ -34,10 +34,15 @@ enum APIConfig {
         #else
         // Release 只读取正式构建注入的地址，不使用开发者本地覆盖。
         if let envURL = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
-           !envURL.isEmpty {
+           let components = URLComponents(string: envURL),
+           components.scheme?.lowercased() == "https",
+           let host = components.host,
+           !host.isEmpty,
+           host != "localhost",
+           host != "127.0.0.1" {
             return normalized(envURL)
         }
-        return "http://127.0.0.1:8080"
+        preconditionFailure("Release 构建缺少有效的 HTTPS API_BASE_URL")
         #endif
     }
 
