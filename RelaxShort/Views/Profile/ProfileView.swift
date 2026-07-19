@@ -110,7 +110,7 @@ struct ProfileView: View {
                         }
                         .padding(.top, 2)
                     }
-                    .padding(.bottom, DT.Layout.tabBarHeight + DT.Space.xl)
+                    .padding(.bottom, DT.Layout.tabBarHeight + DT.Space.xl + 30)
                 }
                 .frame(width: proxy.size.width)
             }
