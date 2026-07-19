@@ -28,96 +28,91 @@ struct ProfileIdentityHeader: View {
     let onSettings: () -> Void
 
     var body: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: DT.Space.sm) {
-                HStack {
-                    Spacer()
-                    Button(action: onSettings) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 19, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("profile.settings".localized)
+        ZStack(alignment: .topTrailing) {
+            HStack(alignment: .center, spacing: DT.Space.lg) {
+                Button(action: onTap) {
+                    ProfileAvatarView(
+                        url: avatarURL,
+                        initials: String(title.prefix(2)).uppercased(),
+                        size: 82,
+                        showsGuestIcon: isGuest
+                    )
                 }
-                .frame(height: 44)
+                .buttonStyle(.plain)
 
-                HStack(alignment: .center, spacing: DT.Space.lg) {
+                VStack(alignment: .leading, spacing: DT.Space.sm) {
                     Button(action: onTap) {
-                        ProfileAvatarView(
-                            url: avatarURL,
-                            initials: String(title.prefix(2)).uppercased(),
-                            size: 82,
-                            showsGuestIcon: isGuest
-                        )
+                        HStack(spacing: 7) {
+                            Text(title)
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+
+                            if isGuest {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.92))
+                            }
+                        }
                     }
                     .buttonStyle(.plain)
 
-                    VStack(alignment: .leading, spacing: DT.Space.sm) {
-                        Button(action: onTap) {
-                            HStack(spacing: 7) {
-                                Text(title)
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-
-                                if isGuest {
-                                    Image(systemName: "chevron.right")
-                                        .font(.system(size: 14, weight: .bold))
-                                        .foregroundColor(.white.opacity(0.92))
-                                }
-                            }
+                    HStack(spacing: 7) {
+                        HStack(spacing: 3) {
+                            Text("ID \(displayID)")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                                .layoutPriority(1)
+                            CopyIDButton(displayID: displayID)
                         }
-                        .buttonStyle(.plain)
 
-                        HStack(spacing: 7) {
-                            HStack(spacing: 3) {
-                                Text("ID \(displayID)")
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.72)
-                                    .layoutPriority(1)
-                                CopyIDButton(displayID: displayID)
-                            }
+                        Rectangle()
+                            .fill(.white.opacity(0.18))
+                            .frame(width: 1, height: 15)
 
-                            Rectangle()
-                                .fill(.white.opacity(0.18))
-                                .frame(width: 1, height: 15)
-
-                            HStack(spacing: 5) {
-                                Image(systemName: "bookmark.fill")
-                                    .font(.system(size: 11, weight: .semibold))
-                                Text(L10n.favoriteCount(favoriteCount))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-                        }
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.62))
-
-                        if isVIP {
-                            HStack(spacing: 4) {
-                                Image(systemName: "crown.fill")
-                                    .font(.system(size: 10))
-                                Text("VIP")
-                                    .font(.system(size: 10, weight: .bold))
-                            }
-                            .foregroundColor(DT.memberGold)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(DT.memberGold.opacity(0.14))
-                            .clipShape(Capsule())
+                        HStack(spacing: 5) {
+                            Image(systemName: "bookmark.fill")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(L10n.favoriteCount(favoriteCount))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                         }
                     }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.62))
 
-                    Spacer(minLength: 0)
+                    if isVIP {
+                        HStack(spacing: 4) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 10))
+                            Text("VIP")
+                                .font(.system(size: 10, weight: .bold))
+                        }
+                        .foregroundColor(DT.memberGold)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(DT.memberGold.opacity(0.14))
+                        .clipShape(Capsule())
+                    }
                 }
+
+                Spacer(minLength: 44)
             }
             .padding(.horizontal, DT.Space.xl)
+
+            Button(action: onSettings) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundColor(.white)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("profile.settings".localized)
+            .padding(.trailing, DT.Space.xl)
         }
-        .frame(height: 166)
+        .frame(height: 114)
         .clipped()
     }
 }
