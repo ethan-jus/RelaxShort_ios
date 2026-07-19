@@ -151,7 +151,6 @@
 /* ---- Shared Components ---- */
 "shared.total_episodes_prefix" = "총 ";
 
-/* ---- Tab Bar ----
 /* ---- Tab Bar ---- */
 "home.tab.title" = "홈";
 "recommend.tab.title" = "추천";
@@ -213,22 +212,22 @@
 "search.tab.new_releases" = "신규 공개";
 "search.rank_accessibility_format" = "%d위: %@";
 // My List (Task31)
-"my_list.login_guide" = "Login to view your list";
-"my_list.sign_in" = "Sign In";
-"my_list.following" = "Following";
-"my_list.history" = "History";
-"my_list.choose" = "Choose";
-"my_list.remove" = "Remove";
-"my_list.most_trending" = "Most Trending";
-"my_list.empty_following" = "No dramas in your list";
-"my_list.empty_history" = "No watch history";
-"my_list.load_failed" = "Load failed";
-"my_list.partial_remove_failed" = "Some items could not be removed";
-"my_list.episode_progress" = "EP.%d / EP.%d";
-"my_list.selection_selected" = "Selected";
-"my_list.selection_unselected" = "Not selected";
-"my_list.remove_selected_count" = "Remove (%d)";
-"my_list.no_more_content" = "No more content";
+"my_list.login_guide" = "로그인하여 내 목록 보기";
+"my_list.sign_in" = "로그인";
+"my_list.following" = "찜한 콘텐츠";
+"my_list.history" = "기록";
+"my_list.choose" = "선택";
+"my_list.remove" = "삭제";
+"my_list.most_trending" = "인기 콘텐츠";
+"my_list.empty_following" = "목록에 드라마가 없습니다";
+"my_list.empty_history" = "시청 기록이 없습니다";
+"my_list.load_failed" = "불러오지 못했습니다";
+"my_list.partial_remove_failed" = "일부 항목을 삭제하지 못했습니다";
+"my_list.episode_progress" = "%d화 / 총 %d화";
+"my_list.selection_selected" = "선택됨";
+"my_list.selection_unselected" = "선택 안 됨";
+"my_list.remove_selected_count" = "삭제 (%d)";
+"my_list.no_more_content" = "더 이상 콘텐츠가 없습니다";
 
 /* ---- Member (Task32) ---- */
 "member.title" = "멤버십 가입";

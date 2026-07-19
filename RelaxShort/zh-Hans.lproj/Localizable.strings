@@ -155,8 +155,6 @@
 "lang.es" = "Español";
 "lang.ar" = "العربية";
 
-/* ---- Tab Bar ----
-
 /* ---- Tab Bar ---- */
 "home.tab.title" = "首页";
 "recommend.tab.title" = "推荐";
@@ -218,22 +216,22 @@
 "search.tab.new_releases" = "最新上线";
 "search.rank_accessibility_format" = "第%d名：%@";
 // My List (Task31)
-"my_list.login_guide" = "Login to view your list";
-"my_list.sign_in" = "Sign In";
-"my_list.following" = "Following";
-"my_list.history" = "History";
-"my_list.choose" = "Choose";
-"my_list.remove" = "Remove";
-"my_list.most_trending" = "Most Trending";
-"my_list.empty_following" = "No dramas in your list";
-"my_list.empty_history" = "No watch history";
-"my_list.load_failed" = "Load failed";
-"my_list.partial_remove_failed" = "Some items could not be removed";
-"my_list.episode_progress" = "EP.%d / EP.%d";
-"my_list.selection_selected" = "Selected";
-"my_list.selection_unselected" = "Not selected";
-"my_list.remove_selected_count" = "Remove (%d)";
-"my_list.no_more_content" = "No more content";
+"my_list.login_guide" = "登录后查看你的列表";
+"my_list.sign_in" = "登录";
+"my_list.following" = "收藏";
+"my_list.history" = "历史";
+"my_list.choose" = "选择";
+"my_list.remove" = "移除";
+"my_list.most_trending" = "热门推荐";
+"my_list.empty_following" = "列表中暂无短剧";
+"my_list.empty_history" = "暂无观看历史";
+"my_list.load_failed" = "加载失败";
+"my_list.partial_remove_failed" = "部分内容未能移除";
+"my_list.episode_progress" = "第%d集 / 共%d集";
+"my_list.selection_selected" = "已选择";
+"my_list.selection_unselected" = "未选择";
+"my_list.remove_selected_count" = "移除（%d）";
+"my_list.no_more_content" = "没有更多内容";
 
 /* ---- Member (Task32) ---- */
 "member.title" = "加入会员";

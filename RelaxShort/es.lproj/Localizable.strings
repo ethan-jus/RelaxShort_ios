@@ -31,7 +31,7 @@
 "home.rankings" = "Ranking";
 "home.you_are_watching" = "Estás viendo";
 "home.view_all" = "Ver todo";
-"home.episode_count" = " eps";
+"home.episode_count" = " episodios";
 
 /* ---- Rank ---- */
 "rank.search_placeholder" = "Qué casualidad, tú también volviste";
@@ -91,7 +91,7 @@
 "profile.customer_service" = "Atención al Cliente";
 "profile.simplified_chinese" = "Español";
 "profile.feature_in_development" = "En desarrollo";
-"profile.drama" = "Dramas";
+"profile.drama" = "Series";
 "profile.daily_points" = "Diario";
 "profile.points" = "Puntos";
 "profile.quality" = "Calidad";
@@ -151,12 +151,11 @@
 /* ---- Shared Components ---- */
 "shared.total_episodes_prefix" = "";
 
-/* ---- Tab Bar ----
 /* ---- Tab Bar ---- */
 "home.tab.title" = "Inicio";
-"recommend.tab.title" = "Recs";
+"recommend.tab.title" = "Recomendados";
 "vip.tab.title" = "VIP";
-"favorites.tab.title" = "Favs";
+"favorites.tab.title" = "Favoritos";
 "profile.tab.title" = "Yo";
 
 /* ---- Theme Menu ---- */
@@ -213,22 +212,22 @@
 "search.tab.new_releases" = "Nuevos estrenos";
 "search.rank_accessibility_format" = "Puesto %d: %@";
 // My List (Task31)
-"my_list.login_guide" = "Login to view your list";
-"my_list.sign_in" = "Sign In";
-"my_list.following" = "Following";
-"my_list.history" = "History";
-"my_list.choose" = "Choose";
-"my_list.remove" = "Remove";
-"my_list.most_trending" = "Most Trending";
-"my_list.empty_following" = "No dramas in your list";
-"my_list.empty_history" = "No watch history";
-"my_list.load_failed" = "Load failed";
-"my_list.partial_remove_failed" = "Some items could not be removed";
-"my_list.episode_progress" = "EP.%d / EP.%d";
-"my_list.selection_selected" = "Selected";
-"my_list.selection_unselected" = "Not selected";
-"my_list.remove_selected_count" = "Remove (%d)";
-"my_list.no_more_content" = "No more content";
+"my_list.login_guide" = "Inicia sesión para ver tu lista";
+"my_list.sign_in" = "Iniciar sesión";
+"my_list.following" = "Mi lista";
+"my_list.history" = "Historial";
+"my_list.choose" = "Seleccionar";
+"my_list.remove" = "Eliminar";
+"my_list.most_trending" = "Tendencias";
+"my_list.empty_following" = "No hay series en tu lista";
+"my_list.empty_history" = "No hay historial de reproducción";
+"my_list.load_failed" = "Error al cargar";
+"my_list.partial_remove_failed" = "No se pudieron eliminar algunos elementos";
+"my_list.episode_progress" = "Ep. %d de %d";
+"my_list.selection_selected" = "Seleccionado";
+"my_list.selection_unselected" = "No seleccionado";
+"my_list.remove_selected_count" = "Eliminar (%d)";
+"my_list.no_more_content" = "No hay más contenido";
 
 /* ---- Member (Task32) ---- */
 "member.title" = "Unirse a la Membresía";

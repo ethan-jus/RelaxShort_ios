@@ -155,8 +155,6 @@
 "lang.es" = "Español";
 "lang.ar" = "العربية";
 
-/* ---- Tab Bar ----
-
 /* ---- Tab Bar ---- */
 "home.tab.title" = "Home";
 "recommend.tab.title" = "Recs";

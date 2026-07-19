@@ -31,7 +31,7 @@
 "home.rankings" = "Ranking";
 "home.you_are_watching" = "Você está assistindo";
 "home.view_all" = "Ver tudo";
-"home.episode_count" = " eps";
+"home.episode_count" = " episódios";
 
 /* ---- Rank ---- */
 "rank.search_placeholder" = "Que coincidência, você também voltou";
@@ -63,7 +63,7 @@
 
 /* ---- Membership Benefits ---- */
 "benefit.all_shows" = "16.000+ séries grátis\n100+ novas séries por semana";
-"benefit.download" = "Download";
+"benefit.download" = "Baixar";
 "benefit.vip_shows" = "Exclusivos VIP";
 "benefit.themes" = "Temas Exclusivos VIP";
 "benefit.quality" = "Qualidade 1080p";
@@ -86,7 +86,7 @@
 "profile.my_wallet" = "Minha Carteira";
 "profile.welfare_center" = "Central de Benefícios";
 "profile.watch_history" = "Histórico";
-"profile.download" = "Downloads";
+"profile.download" = "Baixados";
 "profile.language" = "Idioma";
 "profile.customer_service" = "Atendimento";
 "profile.simplified_chinese" = "Português";
@@ -151,12 +151,11 @@
 /* ---- Shared Components ---- */
 "shared.total_episodes_prefix" = "";
 
-/* ---- Tab Bar ----
 /* ---- Tab Bar ---- */
 "home.tab.title" = "Início";
-"recommend.tab.title" = "Recs";
+"recommend.tab.title" = "Recomendados";
 "vip.tab.title" = "VIP";
-"favorites.tab.title" = "Favs";
+"favorites.tab.title" = "Favoritos";
 "profile.tab.title" = "Eu";
 
 /* ---- Theme Menu ---- */
@@ -178,7 +177,7 @@
 "player.speed" = "Velocidade";
 "player.playback_settings" = "Configurações de reprodução";
 "player.current_resolution" = "Qualidade atual";
-"player.picture_in_picture" = "Picture in Picture";
+"player.picture_in_picture" = "Imagem em imagem";
 "player.subtitle_feedback_prefix" = "Erro nas legendas? ";
 "player.subtitle_feedback_link" = "Enviar feedback";
 "player.episode_number" = "Ep.%d";
@@ -213,22 +212,22 @@
 "search.tab.new_releases" = "Novos lançamentos";
 "search.rank_accessibility_format" = "Posição %d: %@";
 // My List (Task31)
-"my_list.login_guide" = "Login to view your list";
-"my_list.sign_in" = "Sign In";
-"my_list.following" = "Following";
-"my_list.history" = "History";
-"my_list.choose" = "Choose";
-"my_list.remove" = "Remove";
-"my_list.most_trending" = "Most Trending";
-"my_list.empty_following" = "No dramas in your list";
-"my_list.empty_history" = "No watch history";
-"my_list.load_failed" = "Load failed";
-"my_list.partial_remove_failed" = "Some items could not be removed";
-"my_list.episode_progress" = "EP.%d / EP.%d";
-"my_list.selection_selected" = "Selected";
-"my_list.selection_unselected" = "Not selected";
-"my_list.remove_selected_count" = "Remove (%d)";
-"my_list.no_more_content" = "No more content";
+"my_list.login_guide" = "Entre para ver sua lista";
+"my_list.sign_in" = "Entrar";
+"my_list.following" = "Minha lista";
+"my_list.history" = "Histórico";
+"my_list.choose" = "Selecionar";
+"my_list.remove" = "Remover";
+"my_list.most_trending" = "Em alta";
+"my_list.empty_following" = "Não há séries na sua lista";
+"my_list.empty_history" = "Não há histórico de reprodução";
+"my_list.load_failed" = "Falha ao carregar";
+"my_list.partial_remove_failed" = "Não foi possível remover alguns itens";
+"my_list.episode_progress" = "Ep. %d de %d";
+"my_list.selection_selected" = "Selecionado";
+"my_list.selection_unselected" = "Não selecionado";
+"my_list.remove_selected_count" = "Remover (%d)";
+"my_list.no_more_content" = "Não há mais conteúdo";
 
 /* ---- Member (Task32) ---- */
 "member.title" = "Assinar Membro";
@@ -245,7 +244,7 @@
 "member.subscription_details" = "Detalhes da assinatura";
 "member.benefit.unlimited" = "Acesso Ilimitado";
 "member.benefit.unlimited_detail" = "Assista a episódios pagos e exclusivos enquanto a assinatura estiver ativa.";
-"member.benefit.download" = "Download";
+"member.benefit.download" = "Baixar";
 "member.benefit.download_detail" = "Baixe episódios e assista offline.";
 "member.benefit.points" = "Pontos de Membro";
 "member.benefit.exclusive" = "Séries Exclusivas";
@@ -304,7 +303,7 @@
 "profile.membership_active_until" = "Ativa até %@";
 "profile.membership_benefit_series" = "Todas as séries";
 "profile.membership_benefit_points" = "Recompensas diárias";
-"profile.membership_benefit_download" = "Download";
+"profile.membership_benefit_download" = "Baixar";
 "profile.membership_benefit_quality" = "Qualidade HD";
 "profile.top_up" = "Recarregar";
 "profile.earn_rewards" = "Ganhar recompensas";

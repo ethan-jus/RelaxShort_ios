@@ -151,7 +151,6 @@
 /* ---- Shared Components ---- */
 "shared.total_episodes_prefix" = "全";
 
-/* ---- Tab Bar ----
 /* ---- Tab Bar ---- */
 "home.tab.title" = "ホーム";
 "recommend.tab.title" = "おすすめ";
@@ -213,22 +212,22 @@
 "search.tab.new_releases" = "新着作品";
 "search.rank_accessibility_format" = "第%d位：%@";
 // My List (Task31)
-"my_list.login_guide" = "Login to view your list";
-"my_list.sign_in" = "Sign In";
-"my_list.following" = "Following";
-"my_list.history" = "History";
-"my_list.choose" = "Choose";
-"my_list.remove" = "Remove";
-"my_list.most_trending" = "Most Trending";
-"my_list.empty_following" = "No dramas in your list";
-"my_list.empty_history" = "No watch history";
-"my_list.load_failed" = "Load failed";
-"my_list.partial_remove_failed" = "Some items could not be removed";
-"my_list.episode_progress" = "EP.%d / EP.%d";
-"my_list.selection_selected" = "Selected";
-"my_list.selection_unselected" = "Not selected";
-"my_list.remove_selected_count" = "Remove (%d)";
-"my_list.no_more_content" = "No more content";
+"my_list.login_guide" = "ログインしてリストを表示";
+"my_list.sign_in" = "ログイン";
+"my_list.following" = "お気に入り";
+"my_list.history" = "履歴";
+"my_list.choose" = "選択";
+"my_list.remove" = "削除";
+"my_list.most_trending" = "人気作品";
+"my_list.empty_following" = "リストに作品がありません";
+"my_list.empty_history" = "視聴履歴がありません";
+"my_list.load_failed" = "読み込みに失敗しました";
+"my_list.partial_remove_failed" = "一部の項目を削除できませんでした";
+"my_list.episode_progress" = "第%d話 / 全%d話";
+"my_list.selection_selected" = "選択済み";
+"my_list.selection_unselected" = "未選択";
+"my_list.remove_selected_count" = "削除（%d）";
+"my_list.no_more_content" = "これ以上ありません";
 
 /* ---- Member (Task32) ---- */
 "member.title" = "メンバーシップに加入";

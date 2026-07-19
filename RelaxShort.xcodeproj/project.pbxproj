@@ -265,7 +265,6 @@
 		AAAA5DE92FF18EFF00153BF7 /* RelaxShortTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RelaxShortTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ABE66037A6F14B1FA8BA0DA9 /* MemberResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MemberResponseDTO.swift; path = RelaxShort/Models/API/MemberResponseDTO.swift; sourceTree = SOURCE_ROOT; };
 		AE238EBAE393E9E9AAF06A07 /* LocalizationHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationHelper.swift; sourceTree = "<group>"; };
-		AEFA922168678A653E36A49B /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = Base; path = Base.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B283C7770DFE5035A2A801EA /* AdConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdConfig.swift; sourceTree = "<group>"; };
 		B5D7863E117B7187FC4A21A6 /* SplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		B63560DCD0A454C5BE878E22 /* API/AppInitResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = API/AppInitResponseDTO.swift; sourceTree = "<group>"; };
@@ -851,7 +850,6 @@
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				Base,
 				ar,
 				en,
 				es,
@@ -1084,7 +1082,6 @@
 			isa = PBXVariantGroup;
 			children = (
 				1D6EBAF9C05520F4159DE62D /* ar */,
-				AEFA922168678A653E36A49B /* Base */,
 				45C2B9C4EFA543902B3CA1D1 /* en */,
 				158EE04959229D92A979E900 /* es */,
 				033FA10CEF10A18521342010 /* ja */,

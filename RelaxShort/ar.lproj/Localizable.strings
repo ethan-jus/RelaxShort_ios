@@ -151,7 +151,6 @@
 /* ---- Shared Components ---- */
 "shared.total_episodes_prefix" = "";
 
-/* ---- Tab Bar ----
 /* ---- Tab Bar ---- */
 "home.tab.title" = "الرئيسية";
 "recommend.tab.title" = "توصيات";
@@ -213,22 +212,22 @@
 "search.tab.new_releases" = "الإصدارات الجديدة";
 "search.rank_accessibility_format" = "المرتبة %d: %@";
 // My List (Task31)
-"my_list.login_guide" = "Login to view your list";
-"my_list.sign_in" = "Sign In";
-"my_list.following" = "Following";
-"my_list.history" = "History";
-"my_list.choose" = "Choose";
-"my_list.remove" = "Remove";
-"my_list.most_trending" = "Most Trending";
-"my_list.empty_following" = "No dramas in your list";
-"my_list.empty_history" = "No watch history";
-"my_list.load_failed" = "Load failed";
-"my_list.partial_remove_failed" = "Some items could not be removed";
-"my_list.episode_progress" = "EP.%d / EP.%d";
-"my_list.selection_selected" = "Selected";
-"my_list.selection_unselected" = "Not selected";
-"my_list.remove_selected_count" = "Remove (%d)";
-"my_list.no_more_content" = "No more content";
+"my_list.login_guide" = "سجّل الدخول لعرض قائمتك";
+"my_list.sign_in" = "تسجيل الدخول";
+"my_list.following" = "قائمتي";
+"my_list.history" = "السجل";
+"my_list.choose" = "تحديد";
+"my_list.remove" = "إزالة";
+"my_list.most_trending" = "الأكثر رواجًا";
+"my_list.empty_following" = "لا توجد مسلسلات في قائمتك";
+"my_list.empty_history" = "لا يوجد سجل مشاهدة";
+"my_list.load_failed" = "فشل التحميل";
+"my_list.partial_remove_failed" = "تعذرت إزالة بعض العناصر";
+"my_list.episode_progress" = "الحلقة %d من %d";
+"my_list.selection_selected" = "محدد";
+"my_list.selection_unselected" = "غير محدد";
+"my_list.remove_selected_count" = "إزالة (%d)";
+"my_list.no_more_content" = "لا يوجد المزيد من المحتوى";
 
 /* ---- Member (Task32) ---- */
 "member.title" = "انضم إلى العضوية";
