@@ -443,7 +443,7 @@ struct ProfileMenuRow: View {
                     HStack(spacing: 5) {
                         if usesRewardCoinIcon {
                             RewardCoinBadge(
-                                size: 19,
+                                size: 24,
                                 glowColor: DT.coinGold,
                                 glowRadius: rewardCoinMotion == .none ? 0 : 1,
                                 motion: rewardCoinMotion

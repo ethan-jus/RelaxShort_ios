@@ -196,32 +196,47 @@ struct RewardCoinBadge: View {
     }
 }
 
-/// “今日可赚”入口使用的金币 + 红色倾斜奖励角标。
+/// “今日可赚”入口使用的金币 + 同高红色奖励标签，整体轻微跳动。
 struct RewardEarnableBadge: View {
+    @Environment(\.accessibilityReduceMotion)
+    private var accessibilityReduceMotion
+
     let value: Int
 
     var body: some View {
-        ZStack {
-            RewardCoinBadge(
-                size: 24,
-                glowColor: DT.coinGold,
-                glowRadius: 1,
-                motion: .bounce
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: accessibilityReduceMotion
             )
-            .offset(x: -10, y: 4)
+        ) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+            let bounceY = accessibilityReduceMotion
+                ? 0
+                : sin(seconds * .pi * 2 / 1.15) * 2.5
 
-            Text("+\(value)")
-                .font(.system(size: 7, weight: .heavy))
-                .foregroundColor(.white)
-                .lineLimit(1)
-                .padding(.horizontal, 4)
-                .padding(.vertical, 3)
-                .background(DT.hotTag)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .rotationEffect(.degrees(38))
-                .offset(x: 10, y: -7)
+            HStack(spacing: 4) {
+                RewardCoinBadge(
+                    size: 24,
+                    glowColor: DT.coinGold,
+                    glowRadius: 1
+                )
+
+                Text("+\(value)")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .padding(.horizontal, 5)
+                    .frame(height: 24)
+                    .background(DT.hotTag)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    )
+            }
+            .offset(y: bounceY)
         }
-        .frame(width: 58, height: 40)
+        .frame(height: 30)
         .accessibilityLabel("今日可赚 \(value) 金币")
     }
 }
