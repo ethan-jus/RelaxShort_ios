@@ -173,7 +173,7 @@ struct MemberView: View {
                 ? DramaBoxBottomTabBar.totalHeight + bottomInset
                 : 0
             let pinProgress = min(
-                max((scrollOffsetY - 4) / 28, 0),
+                max(scrollOffsetY / 20, 0),
                 1
             )
             let viewportFrame = geo.frame(in: .global)
@@ -185,11 +185,6 @@ struct MemberView: View {
                     width: geo.size.width,
                     topInset: topInset
                 )
-                .overlay {
-                    Color.black
-                        .opacity(pinProgress)
-                        .allowsHitTesting(false)
-                }
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -226,6 +221,11 @@ struct MemberView: View {
                 }
                 .ignoresSafeArea(edges: .top)
 
+                pinnedHeaderBackground(
+                    topInset: topInset,
+                    opacity: pinProgress
+                )
+
                 memberHeader
                     .frame(height: headerHeight)
                     .padding(.top, topInset)
@@ -233,13 +233,13 @@ struct MemberView: View {
                     .ignoresSafeArea(edges: .top)
                     .zIndex(3)
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+            .overlay(alignment: .bottom) {
                 if showsFloatingCTA {
                     floatingCTA(
                         bottomClearance: tabClearance,
                         availableWidth: geo.size.width
                     )
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .transition(.opacity)
                 }
             }
             .onPreferenceChange(MemberPageCTAFramePreferenceKey.self) { frame in
@@ -248,14 +248,18 @@ struct MemberView: View {
                     viewportFrame.maxY
                     - tabClearance
                     - 76
-                let shouldFloat = frame.minY > replacementLine
+                let shouldFloat = showsFloatingCTA
+                    ? frame.minY > replacementLine
+                    : frame.minY > replacementLine + 24
                 guard shouldFloat != showsFloatingCTA else { return }
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(.easeOut(duration: 0.15)) {
                     showsFloatingCTA = shouldFloat
                 }
             }
         }
         .preferredColorScheme(.dark)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             viewModel.loadIfNeeded()
             viewModel.startPromotionCountdown()
@@ -384,6 +388,19 @@ extension MemberView {
             alignment: .top
         )
         .accessibilityElement(children: .contain)
+    }
+
+    private func pinnedHeaderBackground(
+        topInset: CGFloat,
+        opacity: CGFloat
+    ) -> some View {
+        Color.black
+            .opacity(opacity)
+            .frame(maxWidth: .infinity)
+            .frame(height: topInset + headerHeight)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+            .zIndex(2)
     }
 
     private var memberHeader: some View {
