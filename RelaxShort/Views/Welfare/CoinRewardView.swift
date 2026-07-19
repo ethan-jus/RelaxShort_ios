@@ -223,19 +223,19 @@ private extension CoinRewardView {
             VStack(alignment: .leading, spacing: 0) {
                 Text(L10n.myCoins)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white.opacity(0.68))
+                    .foregroundColor(rewardGold)
 
                 HStack(alignment: .center, spacing: 10) {
                     Text("\(coinStore.coinBalance)")
                         .font(.system(size: 52, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(rewardGold)
                         .contentTransition(.numericText())
 
                     RewardCoinBadge(
-                        size: 30,
-                        color: rewardGold,
-                        lineWidth: 1.5,
-                        fillOpacity: 0.08
+                        size: 46,
+                        glowColor: rewardGold,
+                        glowRadius: 3,
+                        brightness: 0.02
                     )
                     .accessibilityLabel(L10n.coinsUnit)
                 }
@@ -247,8 +247,10 @@ private extension CoinRewardView {
                     }
                 } label: {
                     HStack(spacing: 7) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 11, weight: .bold))
+                        RewardCoinStackIcon(
+                            size: 20,
+                            glowColor: rewardGold
+                        )
                         Text(L10n.buyCoins)
                             .font(.system(size: 13, weight: .semibold))
                     }
@@ -276,7 +278,9 @@ private extension CoinRewardView {
         VStack(alignment: .leading, spacing: 18) {
             rewardSectionHeader(
                 title: L10n.coinDailyCheckIn,
-                progress: "\(viewModel.checkedInCount)/7",
+                subtitle: "连续签到7天，金币奖励逐步提升",
+                completed: viewModel.checkedInCount,
+                total: 7,
                 color: rewardGold
             )
 
@@ -290,11 +294,11 @@ private extension CoinRewardView {
                             amount: $0.rewardCoins,
                             completed: $0.completed,
                             current: $0.current,
-                            symbol: $0.completed ? "checkmark" : "gift.fill",
-                            label: "第\($0.dayNumber)天"
+                            label: "\($0.dayNumber)"
                         )
                     },
-                    color: rewardGold
+                    color: rewardGold,
+                    style: .checkIn
                 )
             }
 
@@ -353,9 +357,12 @@ private extension CoinRewardView {
         VStack(alignment: .leading, spacing: 18) {
             rewardSectionHeader(
                 title: "看视频赚金币",
-                subtitle: "完整观看激励视频即可领取金币",
-                progress:
-                    "\(viewModel.dailyAdWatchCount)/\(viewModel.maxDailyAdWatchCount)",
+                subtitle: "完整观看视频，领取金币奖励",
+                completed: viewModel.dailyAdWatchCount,
+                total: max(
+                    viewModel.maxDailyAdWatchCount,
+                    max(viewModel.adRewardSteps.count, 5)
+                ),
                 color: DT.logoRed
             )
 
@@ -369,11 +376,11 @@ private extension CoinRewardView {
                             amount: $0.rewardCoins,
                             completed: $0.completed,
                             current: $0.current,
-                            symbol: $0.completed ? "checkmark" : "play.fill",
-                            label: "第\($0.stepNumber)次"
+                            label: "\($0.stepNumber)"
                         )
                     },
-                    color: DT.logoRed
+                    color: DT.logoRed,
+                    style: .video
                 )
             }
 
@@ -403,9 +410,14 @@ private extension CoinRewardView {
                     || viewModel.adRewardSteps.isEmpty
             )
 
-            Text("仅完整观看的视频计入次数，每日奖励按服务端时间刷新。")
-                .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.36))
+            HStack(spacing: 5) {
+                Image(systemName: "exclamationmark.circle")
+                    .font(.system(size: 11, weight: .medium))
+                Text("完整观看后发放奖励，每日00:00重置")
+                    .font(.system(size: 11))
+            }
+            .foregroundColor(.white.opacity(0.4))
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(.horizontal, pageInset)
     }
@@ -701,89 +713,131 @@ private extension CoinRewardView {
     func rewardSectionHeader(
         title: String,
         subtitle: String? = nil,
-        progress: String,
+        completed: Int,
+        total: Int,
         color: Color
     ) -> some View {
         HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(.system(size: 21, weight: .bold))
-                    .foregroundColor(.white)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.42))
+            HStack(alignment: .top, spacing: 11) {
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(rewardGold)
+                    .frame(width: 5, height: 30)
+                    .shadow(color: rewardGold.opacity(0.35), radius: 3)
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(.white)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.42))
+                    }
                 }
             }
+
             Spacer()
-            Text(progress)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundColor(color)
-                .padding(.top, 4)
+
+            HStack(spacing: 2) {
+                Text("\(completed)")
+                    .foregroundColor(color)
+                Text("/\(total)")
+                    .foregroundColor(.white.opacity(0.32))
+            }
+            .font(.system(size: 14, weight: .bold, design: .rounded))
+            .padding(.top, 4)
         }
     }
 
     func progressTrack(
         items: [RewardProgressItem],
-        color: Color
+        color: Color,
+        style: RewardProgressStyle
     ) -> some View {
-        ZStack(alignment: .top) {
-            Rectangle()
-                .fill(Color.white.opacity(0.1))
-                .frame(height: 1)
-                .padding(.horizontal, 22)
-                .offset(y: 18)
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                rewardProgressNode(
+                    item,
+                    color: color,
+                    style: style
+                )
 
-            HStack(spacing: 0) {
-                ForEach(items) { item in
-                    VStack(spacing: 6) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    item.completed || item.current
-                                        ? Color.black
-                                        : Color(hex: "#151515")
-                                )
-                                .frame(width: 36, height: 36)
-
-                            Circle()
-                                .stroke(
-                                    item.completed || item.current
-                                        ? color
-                                        : Color.white.opacity(0.14),
-                                    lineWidth: item.current ? 1.6 : 1
-                                )
-                                .frame(width: 36, height: 36)
-
-                            Image(systemName: item.symbol)
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(
-                                    item.completed || item.current
-                                        ? color
-                                        : .white.opacity(0.34)
-                                )
-                        }
-
-                        Text("+\(item.amount)")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(
-                                item.current
-                                    ? color
-                                    : .white.opacity(
-                                        item.completed ? 0.5 : 0.68
-                                    )
-                            )
-
-                        Text(item.label)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(.white.opacity(0.32))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
-                    }
-                    .frame(maxWidth: .infinity)
+                if index < items.count - 1 {
+                    let nextItem = items[index + 1]
+                    Rectangle()
+                        .fill(
+                            item.completed
+                                && (nextItem.completed || nextItem.current)
+                                ? color
+                                : color.opacity(0.2)
+                        )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 2)
+                        .offset(y: style == .checkIn ? 31 : 17)
                 }
             }
         }
+    }
+
+    func rewardProgressNode(
+        _ item: RewardProgressItem,
+        color: Color,
+        style: RewardProgressStyle
+    ) -> some View {
+        VStack(spacing: 6) {
+            if style == .checkIn {
+                Text(item.current ? "今天" : " ")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(color)
+                    .frame(height: 8)
+            }
+
+            ZStack {
+                Circle()
+                    .fill(
+                        item.completed || item.current
+                            ? color.opacity(0.16)
+                            : Color(hex: "#151515")
+                    )
+                    .frame(width: 36, height: 36)
+
+                Circle()
+                    .stroke(
+                        item.completed || item.current
+                            ? color
+                            : color.opacity(0.28),
+                        lineWidth: item.current ? 1.8 : 1
+                    )
+                    .frame(width: 36, height: 36)
+
+                if item.completed {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(color)
+                } else {
+                    Text(item.label)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(
+                            item.current
+                                ? color
+                                : .white.opacity(0.42)
+                        )
+                }
+            }
+
+            if style == .checkIn {
+                Text("第\(item.label)天")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundColor(.white.opacity(0.32))
+                    .lineLimit(1)
+            }
+
+            Text("+\(item.amount)")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(color.opacity(item.current ? 1 : 0.88))
+        }
+        .frame(width: 38)
     }
 
     func rewardAmount(_ amount: Int) -> some View {
@@ -792,10 +846,9 @@ private extension CoinRewardView {
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundColor(rewardGold)
             RewardCoinBadge(
-                size: 16,
-                color: rewardGold,
-                lineWidth: 0.9,
-                fillOpacity: 0.06
+                size: 18,
+                glowColor: rewardGold,
+                glowRadius: 1
             )
         }
     }
@@ -842,8 +895,12 @@ private struct RewardProgressItem: Identifiable {
     let amount: Int
     let completed: Bool
     let current: Bool
-    let symbol: String
     let label: String
+}
+
+private enum RewardProgressStyle {
+    case checkIn
+    case video
 }
 
 // MARK: - Preview

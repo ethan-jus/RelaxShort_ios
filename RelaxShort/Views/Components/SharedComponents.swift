@@ -137,38 +137,63 @@ extension View {
 
 // MARK: - Rewards Visuals
 
-/// Rewards 页面统一使用的可缩放 R 金币徽标。
+/// Rewards 页面统一使用的立体 R 金币素材。
 struct RewardCoinBadge: View {
     let size: CGFloat
-    var color: Color = DT.memberGold
-    var lineWidth: CGFloat = 1.4
-    var fillOpacity: Double = 0.1
+    var tint: Color = .white
+    var glowColor: Color = DT.coinGold
+    var glowRadius: CGFloat = 0
+    var brightness: Double = 0
+
+    var body: some View {
+        Image("RewardCoinIcon")
+            .resizable()
+            .scaledToFit()
+            .colorMultiply(tint)
+            .brightness(brightness)
+            .blendMode(.screen)
+            .shadow(
+                color: glowRadius > 0
+                    ? glowColor.opacity(0.44)
+                    : .clear,
+                radius: glowRadius
+            )
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// 三枚金币叠放图标，用于购买金币等入口。
+struct RewardCoinStackIcon: View {
+    let size: CGFloat
+    var tint: Color = .white
+    var glowColor: Color = DT.coinGold
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(color.opacity(fillOpacity))
+            RewardCoinBadge(
+                size: size * 0.7,
+                tint: tint,
+                glowColor: glowColor
+            )
+            .offset(x: -size * 0.25, y: size * 0.14)
 
-            Circle()
-                .stroke(color, lineWidth: lineWidth)
+            RewardCoinBadge(
+                size: size * 0.7,
+                tint: tint,
+                glowColor: glowColor
+            )
+            .offset(x: size * 0.25, y: size * 0.14)
 
-            Circle()
-                .stroke(
-                    color.opacity(0.46),
-                    lineWidth: max(0.6, lineWidth * 0.5)
-                )
-                .padding(size * 0.15)
-
-            Text("R")
-                .font(.system(
-                    size: size * 0.46,
-                    weight: .bold,
-                    design: .serif
-                ))
-                .foregroundColor(color)
-                .offset(y: -size * 0.01)
+            RewardCoinBadge(
+                size: size * 0.78,
+                tint: tint,
+                glowColor: glowColor,
+                glowRadius: 1
+            )
+            .offset(y: -size * 0.12)
         }
-        .frame(width: size, height: size)
+        .frame(width: size * 1.3, height: size)
         .accessibilityHidden(true)
     }
 }
