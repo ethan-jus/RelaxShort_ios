@@ -235,7 +235,8 @@ private extension CoinRewardView {
                         size: 46,
                         glowColor: rewardGold,
                         glowRadius: 3,
-                        brightness: 0.02
+                        brightness: 0.02,
+                        motion: .bounce
                     )
                     .accessibilityLabel(L10n.coinsUnit)
                 }

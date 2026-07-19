@@ -137,13 +137,24 @@ extension View {
 
 // MARK: - Rewards Visuals
 
+enum RewardCoinMotion {
+    case none
+    case bounce
+    case spin
+}
+
 /// Rewards 页面统一使用的立体 R 金币素材。
 struct RewardCoinBadge: View {
+    @Environment(\.accessibilityReduceMotion)
+    private var accessibilityReduceMotion
+    @State private var isAnimating = false
+
     let size: CGFloat
     var tint: Color = .white
     var glowColor: Color = DT.coinGold
     var glowRadius: CGFloat = 0
     var brightness: Double = 0
+    var motion: RewardCoinMotion = .none
 
     var body: some View {
         Image("RewardCoinIcon")
@@ -151,15 +162,59 @@ struct RewardCoinBadge: View {
             .scaledToFit()
             .colorMultiply(tint)
             .brightness(brightness)
-            .blendMode(.screen)
             .shadow(
                 color: glowRadius > 0
                     ? glowColor.opacity(0.44)
                     : .clear,
                 radius: glowRadius
             )
-        .frame(width: size, height: size)
-        .accessibilityHidden(true)
+            .offset(
+                y: motion == .bounce && isAnimating
+                    ? -size * 0.08
+                    : 0
+            )
+            .scaleEffect(
+                motion == .bounce && isAnimating
+                    ? 1.025
+                    : 1
+            )
+            .rotation3DEffect(
+                .degrees(
+                    motion == .spin && isAnimating
+                        ? 360
+                        : 0
+                ),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.55
+            )
+            .frame(width: size, height: size)
+            .animation(
+                accessibilityReduceMotion
+                    ? nil
+                    : motionAnimation,
+                value: isAnimating
+            )
+            .onAppear {
+                isAnimating = motion != .none
+                    && !accessibilityReduceMotion
+            }
+            .onChange(of: accessibilityReduceMotion) { _, reduceMotion in
+                isAnimating = motion != .none && !reduceMotion
+            }
+            .accessibilityHidden(true)
+    }
+
+    private var motionAnimation: Animation? {
+        switch motion {
+        case .none:
+            return nil
+        case .bounce:
+            return .easeInOut(duration: 0.9)
+                .repeatForever(autoreverses: true)
+        case .spin:
+            return .linear(duration: 3.2)
+                .repeatForever(autoreverses: false)
+        }
     }
 }
 
