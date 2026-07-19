@@ -902,12 +902,23 @@ struct SeriesPlayerView: View {
 
     @MainActor
     private func resumeEpisodeAfterUnlock(_ episodeNumber: Int) async {
+        let resumeStartedAt = CACurrentMediaTime()
         currentEpisode = episodeNumber
         initialPlayAssetTask?.cancel()
         initialPlayAssetTask = nil
-        if let id = episodeID(for: episodeNumber) {
-            episodeMediaSources.removeValue(forKey: id)
+
+        guard let transitionToken = playerCoordinator.beginSeriesEpisodeTransition(
+            dramaID: drama.id
+        ) else {
+            guard var state = unlockState else { return }
+            state.isProcessing = false
+            state.errorMessage = "播放器状态已变化，请重新进入本集"
+            unlockState = state
+            return
         }
+
+        // 已通过权益确认后直接复用仍有效的播放合同；锁集阶段本来就不会缓存正式地址。
+        // 不再无条件清空 episodeMediaSources，避免合法缓存命中时重复请求 /play。
         guard await ensurePlayAsset(for: episodeNumber) else {
             guard var state = unlockState else { return }
             state.isProcessing = false
@@ -915,11 +926,96 @@ struct SeriesPlayerView: View {
             unlockState = state
             return
         }
+
+        let playable = buildPlayableItems(from: episodes)
+        guard let playableIndex = playable.firstIndex(where: {
+            $0.episodeNumber == episodeNumber
+        }) else {
+            playerCoordinator.engine.endContentTransitionWithoutMedia()
+            guard var state = unlockState else { return }
+            state.isProcessing = false
+            state.errorMessage = "权益已更新，但当前剧集暂时无法播放"
+            unlockState = state
+            return
+        }
+
+        let targetEpisodeID = episodeID(for: episodeNumber)
+        let backendResume = targetEpisodeID.flatMap { episodeResumeTimes[$0] }
+        let committed = playerCoordinator.commitSeriesEpisodeTransition(
+            drama: drama,
+            items: playable.map(\.item),
+            startIndex: playableIndex,
+            handoff: nil,
+            backendResumeTime: backendResume,
+            token: transitionToken
+        )
+        guard committed else {
+            guard var state = unlockState else { return }
+            state.isProcessing = false
+            state.errorMessage = "播放器状态已变化，请重试"
+            unlockState = state
+            return
+        }
+
         unlockedEpisodes.insert(episodeNumber)
+
+        if let targetEpisodeID {
+            Task {
+                await dependencies.watchProgressReporter.begin(
+                    seriesID: drama.id,
+                    episodeID: targetEpisodeID
+                )
+            }
+        }
+        prefetchNextEpisode(after: episodeNumber)
+
+        let contractAndCommitMs = (CACurrentMediaTime() - resumeStartedAt) * 1000
+        Logger.player.info(
+            "SeriesTrace 解锁后播放源已提交 集数=\(episodeNumber) 耗时=\(Int(contractAndCommitMs))ms"
+        )
+
+        // 解锁浮层继续覆盖准备中的播放器，避免用户看到播放器重新初始化或黑屏。
+        // 首帧可见后立即关闭；弱网下最多等待 3 秒，超时后交给页面正常加载态。
+        let firstFrameVisible = await waitForUnlockedEpisodeFirstFrame(
+            episodeNumber,
+            timeout: .seconds(3)
+        )
+        let totalResumeMs = (CACurrentMediaTime() - resumeStartedAt) * 1000
+        Logger.player.info(
+            "SeriesTrace 解锁后恢复完成 集数=\(episodeNumber) 首帧=\(firstFrameVisible) 总耗时=\(Int(totalResumeMs))ms"
+        )
+
         unlockState = nil
         unlockPurchaseTab = nil
-        initializeEpisodePlayer()
-        playerCoordinator.engine.play()
+        resetAutoHide()
+    }
+
+    @MainActor
+    private func waitForUnlockedEpisodeFirstFrame(
+        _ episodeNumber: Int,
+        timeout: Duration
+    ) async -> Bool {
+        let targetMediaID = PlayerMediaItem.stableID(
+            dramaID: drama.id,
+            episodeNumber: episodeNumber
+        )
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: timeout)
+
+        while clock.now < deadline {
+            guard playerCoordinator.owner == .series(dramaID: drama.id),
+                  currentEpisode == episodeNumber else { return false }
+            if playerCoordinator.engine.currentItem?.id == targetMediaID,
+               playerCoordinator.engine.hasVisiblePlaybackStarted {
+                return true
+            }
+            do {
+                try await Task.sleep(for: .milliseconds(50))
+            } catch {
+                return false
+            }
+        }
+        return false
     }
 
     @MainActor
