@@ -102,6 +102,17 @@ private extension UIView {
     }
 }
 
+private struct MemberPageCTAFramePreferenceKey: PreferenceKey {
+    static var defaultValue: CGRect = .null
+
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if !next.isNull {
+            value = next
+        }
+    }
+}
+
 // MARK: - Member View (Task32: DramaBox-style subscription page)
 
 /// Member 会员订阅转化页。
@@ -123,6 +134,8 @@ struct MemberView: View {
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var viewModel: MemberViewModel
+    @State private var scrollOffsetY: CGFloat = 0
+    @State private var showsFloatingCTA = true
     @State private var purchaseMessage: String?
     @State private var showsPurchaseMessage = false
     @State private var purchaseAlertOffersProfile = false
@@ -137,7 +150,8 @@ struct MemberView: View {
 
     // MARK: - Layout Constants
 
-    private let heroHeight: CGFloat = 410
+    private let heroHeight: CGFloat = 350
+    private let headerHeight: CGFloat = 54
     private let pageInset: CGFloat = 16
     private let planCardGap: CGFloat = 8
     private let planRadius: CGFloat = 12
@@ -158,37 +172,88 @@ struct MemberView: View {
             let tabClearance = mode == .tab
                 ? DramaBoxBottomTabBar.totalHeight + bottomInset
                 : 0
+            let pinProgress = min(
+                max((scrollOffsetY - 54) / 44, 0),
+                1
+            )
+            let viewportFrame = geo.frame(in: .global)
 
-            ZStack {
+            ZStack(alignment: .top) {
                 Color.black.ignoresSafeArea()
+
+                fixedHeroBackground(
+                    width: geo.size.width,
+                    topInset: topInset
+                )
+                .opacity(1 - pinProgress)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        heroSection(
+                        MemberScrollOffsetReader(offsetY: $scrollOffsetY)
+                            .frame(width: 1, height: 1)
+
+                        heroForeground(
                             width: geo.size.width,
                             topInset: topInset
                         )
 
                         plansSection
-                            .padding(.top, DT.Space.sm)
+                            .padding(.top, 0)
                         benefitsSection
-                            .padding(.top, 36)
+                            .padding(.top, 32)
                         memberDramasSection(width: geo.size.width)
-                            .padding(.top, 36)
+                            .padding(.top, 32)
                         membershipSimpleSection
-                            .padding(.top, 36)
+                            .padding(.top, 32)
                         termsSection
                             .padding(.top, 28)
+                        pageCTA(availableWidth: geo.size.width)
+                            .padding(.top, 28)
+                            .background {
+                                GeometryReader { proxy in
+                                    Color.clear.preference(
+                                        key: MemberPageCTAFramePreferenceKey.self,
+                                        value: proxy.frame(in: .global)
+                                    )
+                                }
+                            }
                     }
-                    .padding(.bottom, 28)
+                    .padding(.bottom, tabClearance + 20)
                 }
                 .ignoresSafeArea(edges: .top)
+
+                pinnedHeaderBackground(
+                    topInset: topInset,
+                    opacity: pinProgress
+                )
+
+                memberHeader
+                    .frame(height: headerHeight)
+                    .padding(.top, topInset)
+                    .padding(.horizontal, pageInset)
+                    .ignoresSafeArea(edges: .top)
+                    .zIndex(3)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                fixedCTA(
-                    bottomClearance: tabClearance,
-                    availableWidth: geo.size.width
-                )
+                if showsFloatingCTA {
+                    floatingCTA(
+                        bottomClearance: tabClearance,
+                        availableWidth: geo.size.width
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
+            }
+            .onPreferenceChange(MemberPageCTAFramePreferenceKey.self) { frame in
+                guard !frame.isNull else { return }
+                let replacementLine =
+                    viewportFrame.maxY
+                    - tabClearance
+                    - 76
+                let shouldFloat = frame.minY > replacementLine
+                guard shouldFloat != showsFloatingCTA else { return }
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showsFloatingCTA = shouldFloat
+                }
             }
         }
         .preferredColorScheme(.dark)
@@ -222,7 +287,11 @@ struct MemberView: View {
 // MARK: - Hero
 extension MemberView {
 
-    private func heroSection(width: CGFloat, topInset: CGFloat) -> some View {
+    @ViewBuilder
+    private func fixedHeroBackground(
+        width: CGFloat,
+        topInset: CGFloat
+    ) -> some View {
         ZStack(alignment: .top) {
             if let poster = viewModel.backgroundPosters.first {
                 CoverImageView(
@@ -266,43 +335,64 @@ extension MemberView {
                 startRadius: 8,
                 endRadius: 280
             )
+        }
+        .frame(width: width, height: heroHeight + topInset)
+        .offset(y: -topInset)
+        .ignoresSafeArea(edges: .top)
+        .accessibilityHidden(true)
+    }
 
-            VStack(spacing: 0) {
-                memberHeader
+    private func heroForeground(
+        width: CGFloat,
+        topInset: CGFloat
+    ) -> some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .frame(height: topInset + headerHeight + 4)
 
-                Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
-                VIPCrownView(
-                    width: 128,
-                    height: 94,
-                    glowColor: memberGold,
-                    glowRadius: 3
-                )
+            VIPCrownView(
+                width: 116,
+                height: 84,
+                glowColor: memberGold,
+                glowRadius: 3
+            )
 
-                Text("vip.unlock_all".localized)
-                    .font(.system(size: 28, weight: .bold, design: .serif))
-                    .foregroundColor(memberGold)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
-                    .padding(.top, 6)
+            Text("vip.unlock_all".localized)
+                .font(.system(size: 27, weight: .bold, design: .serif))
+                .foregroundColor(memberGold)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+                .padding(.top, 2)
 
-                Text("member.benefit.unlimited_detail".localized)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(.white.opacity(0.68))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.78)
-                    .padding(.top, 6)
-                    .padding(.horizontal, 34)
+            Text("member.benefit.unlimited_detail".localized)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundColor(.white.opacity(0.72))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+                .padding(.top, 4)
+                .padding(.horizontal, 34)
 
-                Spacer(minLength: 24)
-            }
-            .padding(.top, topInset)
-            .padding(.horizontal, pageInset)
+            Color.clear
+                .frame(height: 18)
         }
         .frame(width: width, height: heroHeight + topInset)
         .accessibilityElement(children: .contain)
+    }
+
+    private func pinnedHeaderBackground(
+        topInset: CGFloat,
+        opacity: CGFloat
+    ) -> some View {
+        Color.black
+            .opacity(opacity)
+            .frame(height: topInset + headerHeight)
+            .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
+            .zIndex(2)
     }
 
     private var memberHeader: some View {
@@ -404,6 +494,14 @@ extension MemberView {
                                 .font(.subheadline.weight(.semibold))
                         }
                         .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.16), lineWidth: 0.7)
+                        )
                     }
                     .buttonStyle(.plain)
                     .foregroundColor(.white)
@@ -416,16 +514,20 @@ extension MemberView {
 
     @ViewBuilder
     private func planCard(for plan: MemberPlanDisplayOption) -> some View {
-        let isSelected = viewModel.selectedPlanID == plan.id
         let standardPrice = storeKit.storeDisplayPrice(
             for: plan.productID
         )
         let offer = activeOffer(for: plan)
+        let isAvailable = standardPrice != nil || offer != nil
+        let isSelected =
+            isAvailable
+            && viewModel.selectedPlanID == plan.id
         let displayedPrice = offer?.displayPrice
             ?? standardPrice
             ?? "member.price_unavailable".localized
 
         Button(action: {
+            guard isAvailable else { return }
             withAnimation(.easeInOut(duration: 0.2)) {
                 viewModel.selectedPlanID = plan.id
             }
@@ -473,7 +575,11 @@ extension MemberView {
                     }
                 }
                 .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                .foregroundColor(isSelected ? memberGold : .white.opacity(0.48))
+                .foregroundColor(
+                    isSelected
+                        ? memberGold
+                        : .white.opacity(isAvailable ? 0.48 : 0.34)
+                )
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
                 .minimumScaleFactor(0.72)
@@ -521,6 +627,7 @@ extension MemberView {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!isAvailable)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             planAccessibilityLabel(
@@ -570,11 +677,37 @@ extension MemberView {
 // MARK: - Benefits Section
 extension MemberView {
 
+    private var benefitsForDisplay: [MemberBenefitDisplayItem] {
+        guard !viewModel.benefits.isEmpty else { return [] }
+
+        var items = viewModel.benefits
+        let implementedBenefits = [
+            MemberBenefitDisplayItem(
+                id: "download",
+                icon: "arrow.down.to.line",
+                titleKey: "member.benefit.download",
+                detailKey: nil
+            ),
+            MemberBenefitDisplayItem(
+                id: "quality",
+                icon: "rectangle.badge.hd",
+                titleKey: "member.benefit.quality",
+                detailKey: nil
+            )
+        ]
+
+        for benefit in implementedBenefits
+        where !items.contains(where: { $0.id == benefit.id }) {
+            items.append(benefit)
+        }
+        return items
+    }
+
     private var benefitsSection: some View {
         Group {
-            if !viewModel.benefits.isEmpty {
-                let primaryBenefits = Array(viewModel.benefits.prefix(4))
-                let moreBenefits = Array(viewModel.benefits.dropFirst(4))
+            if !benefitsForDisplay.isEmpty {
+                let primaryBenefits = Array(benefitsForDisplay.prefix(4))
+                let moreBenefits = Array(benefitsForDisplay.dropFirst(4))
 
                 VStack(alignment: .leading, spacing: 16) {
                     Text("member.why_join".localized)
@@ -649,31 +782,24 @@ extension MemberView {
         index: Int,
         count: Int
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: benefit.icon)
-                .font(.system(size: 25, weight: .regular))
+                .font(.system(size: 23, weight: .regular))
                 .foregroundColor(memberGold)
-                .frame(width: 34, height: 30, alignment: .leading)
+                .frame(width: 32, height: 30)
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(benefit.titleKey.localized)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
+            Text(benefit.titleKey.localized)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
 
-                if let detailKey = benefit.detailKey {
-                    Text(detailKey.localized)
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.56))
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
         .padding(.horizontal, 14)
-        .padding(.vertical, 16)
+        .padding(.vertical, 12)
         .overlay(alignment: .trailing) {
             if index.isMultiple(of: 2), index + 1 < count {
                 Rectangle()
@@ -731,10 +857,12 @@ extension MemberView {
     @ViewBuilder
     private func memberDramasSection(width: CGFloat) -> some View {
         switch viewModel.loadState {
-        case .idle, .empty:
+        case .idle:
             EmptyView()
+        case .empty:
+            memberDramasEmptySection
         case .loaded where viewModel.memberOnlyDramas.isEmpty:
-            EmptyView()
+            memberDramasEmptySection
         case .loading, .loaded, .failed:
             VStack(alignment: .leading, spacing: 16) {
                 Text("member.dramas.title".localized)
@@ -751,6 +879,27 @@ extension MemberView {
                     dramaGridView(width: width)
                 }
             }
+        }
+    }
+
+    private var memberDramasEmptySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("member.dramas.title".localized)
+                .font(.title2.weight(.bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, pageInset)
+
+            emptyContentView
+                .frame(maxWidth: .infinity)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: "#0B0B0B"))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 0.7)
+                )
+                .padding(.horizontal, pageInset)
         }
     }
 
@@ -884,9 +1033,7 @@ extension MemberView {
                 membershipSimpleRow(
                     icon: "arrow.clockwise",
                     title: "member.restore".localized,
-                    detail: "member.disclosure.restore".localized,
-                    actionTitle: "member.restore".localized,
-                    action: restorePurchase
+                    detail: "member.disclosure.restore".localized
                 )
             }
             .padding(.horizontal, 12)
@@ -961,8 +1108,7 @@ extension MemberView {
             VStack(alignment: .leading, spacing: 10) {
                 ForEach([
                     "member.disclosure.access",
-                    "member.disclosure.renewal",
-                    "member.disclosure.restore"
+                    "member.disclosure.renewal"
                 ], id: \.self) { key in
                     HStack(alignment: .top, spacing: 8) {
                         Circle()
@@ -971,8 +1117,8 @@ extension MemberView {
                             .padding(.top, 7)
 
                         Text(key.localized)
-                            .font(.system(size: 13))
-                            .foregroundColor(.white.opacity(0.58))
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.64))
                             .lineSpacing(3)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -1087,14 +1233,44 @@ extension MemberView {
     }
 }
 
-// MARK: - Fixed CTA
+// MARK: - Purchase CTA
 extension MemberView {
 
-    private func fixedCTA(
+    private func floatingCTA(
         bottomClearance: CGFloat,
         availableWidth: CGFloat
     ) -> some View {
-        let buttonWidth = max(272, availableWidth - pageInset * 2)
+        purchaseCTAButton(availableWidth: availableWidth)
+            .padding(.horizontal, pageInset)
+            .padding(.top, 10)
+            .padding(.bottom, bottomClearance + 10)
+            .background {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.98)
+                        .ignoresSafeArea(edges: .bottom)
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 0.5)
+                }
+            }
+    }
+
+    private func pageCTA(availableWidth: CGFloat) -> some View {
+        VStack(spacing: 8) {
+            purchaseCTAButton(availableWidth: availableWidth)
+
+            Text("member.auto_renew".localized)
+                .font(.footnote)
+                .foregroundColor(.white.opacity(0.66))
+        }
+        .padding(.horizontal, pageInset)
+    }
+
+    private func purchaseCTAButton(
+        availableWidth: CGFloat
+    ) -> some View {
+        let buttonWidth = max(0, availableWidth - pageInset * 2)
         let plan = viewModel.plans.first {
             $0.id == viewModel.selectedPlanID
         }
@@ -1107,9 +1283,12 @@ extension MemberView {
             hasStorePrice: displayedPrice != nil,
             hasLegalLinks: viewModel.legalLinks != nil
         )
+        let shouldRetryStore = plan != nil && displayedPrice == nil
         let buttonTitle: String
         if storeKit.vipPurchaseState.hasActiveSubscription {
             buttonTitle = "profile.membership_active".localized
+        } else if shouldRetryStore {
+            buttonTitle = "member.retry_app_store".localized
         } else if let plan, let displayedPrice {
             buttonTitle = String(
                 format: "member.cta.subscribe".localized,
@@ -1120,66 +1299,51 @@ extension MemberView {
             buttonTitle = "member.join_now".localized
         }
 
-        return VStack(spacing: DT.Space.sm) {
-            Button {
+        return Button {
+            if shouldRetryStore {
+                Task { await storeKit.requestProducts() }
+            } else {
                 purchaseSelectedPlan()
-            } label: {
-                Group {
-                    if storeKit.isPurchasing {
-                        ProgressView().tint(.white)
-                    } else {
-                        Text(buttonTitle)
+            }
+        } label: {
+            Group {
+                if storeKit.isPurchasing || (shouldRetryStore && storeKit.isLoadingProducts) {
+                    ProgressView().tint(.white)
+                } else {
+                    Text(buttonTitle)
                         .font(.headline.weight(.bold))
                         .foregroundColor(.white)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
                         .padding(.horizontal, DT.Space.md)
-                    }
                 }
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 50)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(hex: "#F02E31"),
-                                    Color(hex: "#D70F1D")
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                )
             }
-            .buttonStyle(.plain)
-            .disabled(
-                storeKit.isPurchasing
-                    || storeKit.vipPurchaseState.hasActiveSubscription
-                    || !canPurchase
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 50)
+            .background(
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#F02E31"),
+                                Color(hex: "#D70F1D")
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
             )
-            .frame(width: buttonWidth)
-            .accessibilityLabel(buttonTitle)
-
-            Text("member.auto_renew".localized)
-                .font(.footnote)
-                .foregroundColor(.white.opacity(0.76))
         }
-        .padding(.top, DT.Space.md)
-        .padding(.bottom, bottomClearance + DT.Space.sm)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.black.opacity(0),
-                    Color.black.opacity(0.94),
-                    Color.black
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .bottom)
+        .buttonStyle(.plain)
+        .disabled(
+            storeKit.isPurchasing
+                || storeKit.vipPurchaseState.hasActiveSubscription
+                || (!canPurchase && !shouldRetryStore)
         )
+        .opacity((canPurchase || shouldRetryStore) ? 1 : 0.48)
+        .frame(width: buttonWidth)
+        .accessibilityLabel(buttonTitle)
     }
 
     private func purchaseSelectedPlan() {

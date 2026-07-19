@@ -31,11 +31,11 @@ final class AppStore: ObservableObject {
 
         var title: String {
             switch self {
-            case .home: return "tab.home".localized
-            case .forYou: return "tab.forYou".localized
-            case .member: return "tab.member".localized
-            case .myList: return "tab.myList".localized
-            case .profile: return "tab.profile".localized
+            case .home: return "home.tab.title".localized
+            case .forYou: return "recommend.tab.title".localized
+            case .member: return "vip.tab.title".localized
+            case .myList: return "favorites.tab.title".localized
+            case .profile: return "profile.tab.title".localized
             }
         }
 
@@ -95,11 +95,5 @@ enum L10nFallback {
         return fallbackDict[key]
     }
 
-    private static let fallbackDict: [String: String] = [
-        "tab.home": "Home",
-        "tab.forYou": "For You",
-        "tab.member": "Member",
-        "tab.myList": "My List",
-        "tab.profile": "Profile",
-    ]
+    private static let fallbackDict: [String: String] = [:]
 }
