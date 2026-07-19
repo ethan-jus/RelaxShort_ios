@@ -636,14 +636,14 @@ private extension CoinRewardView {
                 endRadius: 180
             )
 
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .top, spacing: 12) {
                     ZStack {
                         Circle()
                             .fill(rewardGold.opacity(0.14))
-                            .frame(width: 44, height: 44)
+                            .frame(width: 40, height: 40)
                         Image(systemName: "person.2.fill")
-                            .font(.system(size: 19, weight: .medium))
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(rewardGold)
                     }
 
@@ -688,17 +688,11 @@ private extension CoinRewardView {
                                 .background(rewardGold)
                                 .clipShape(Capsule())
                         }
-
-                        Text("本周还可邀请\n\(viewModel.referral.weeklyRemaining) 位")
-                            .font(.system(size: 9))
-                            .foregroundColor(.white.opacity(0.38))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
                     }
-                    .frame(width: 86)
+                    .frame(width: 80)
                 }
             }
-            .padding(16)
+            .padding(12)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
@@ -718,7 +712,7 @@ private extension CoinRewardView {
                 .foregroundColor(.white.opacity(0.44))
             rewardAmount(amount)
         }
-        .frame(maxWidth: .infinity, minHeight: 48)
+        .frame(maxWidth: .infinity, minHeight: 40)
     }
 
     var firstPurchaseSection: some View {
@@ -1128,7 +1122,7 @@ private struct InviteRewardsSheet: View {
                     }
                 }
 
-                Text("每周最多 3 位、累计最多 20 位有效好友；同账号或同设备不计奖励。")
+                Text("累计最多 20 位有效好友；同账号或同设备不计奖励。")
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.34))
                     .multilineTextAlignment(.center)

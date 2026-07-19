@@ -20,7 +20,7 @@ final class CoinRewardViewModel: ObservableObject {
         inviterRewardCoins: 200,
         inviteeRewardCoins: 100,
         qualifiedFriends: 0,
-        weeklyRemaining: 3,
+        weeklyRemaining: 20,
         lifetimeRemaining: 20,
         codeApplied: false,
         appliedCode: nil,

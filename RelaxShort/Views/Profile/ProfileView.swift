@@ -97,7 +97,7 @@ struct ProfileView: View {
                         ProfileMenuCard {
                             ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
                             ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: "\(rewardSummaryStore.coinBalance)", usesRewardCoinIcon: true, onTap: { selectedDestination = .wallet })
-                            ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, subtitle: "+\(rewardSummaryStore.remainingEarnableCoins)", usesRewardCoinIcon: true, rewardCoinMotion: .bounce, usesCompactRewardValue: true, onTap: { selectedDestination = .welfare })
+                            ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, promoRewardValue: rewardSummaryStore.remainingEarnableCoins, onTap: { selectedDestination = .welfare })
                             ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
                             ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
                         }

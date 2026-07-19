@@ -137,7 +137,7 @@ extension View {
 
 // MARK: - Rewards Visuals
 
-enum RewardCoinMotion {
+enum RewardCoinMotion: Equatable {
     case none
     case bounce
     case spin
@@ -147,7 +147,6 @@ enum RewardCoinMotion {
 struct RewardCoinBadge: View {
     @Environment(\.accessibilityReduceMotion)
     private var accessibilityReduceMotion
-    @State private var isAnimating = false
 
     let size: CGFloat
     var tint: Color = .white
@@ -157,67 +156,73 @@ struct RewardCoinBadge: View {
     var motion: RewardCoinMotion = .none
 
     var body: some View {
-        ZStack {
-            Image("RewardCoinIcon")
-                .resizable()
-                .scaledToFit()
-                .colorMultiply(tint)
-                .brightness(brightness)
-                .shadow(
-                    color: glowRadius > 0
-                        ? glowColor.opacity(0.44)
-                        : .clear,
-                    radius: glowRadius
-                )
-                .offset(
-                    y: motion == .bounce && isAnimating
-                        ? -max(0.75, size * 0.025)
-                        : 0
-                )
-                .scaleEffect(
-                    motion == .bounce && isAnimating
-                        ? 1.012
-                        : 1
-                )
-                .rotation3DEffect(
-                    .degrees(
-                        motion == .spin && isAnimating
-                            ? 360
-                            : 0
-                    ),
-                    axis: (x: 0, y: 1, z: 0),
-                    perspective: 0.55
-                )
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: accessibilityReduceMotion || motion == .none
+            )
+        ) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+            let bounceY = motion == .bounce && !accessibilityReduceMotion
+                ? sin(seconds * .pi * 2 / 1.15) * 2.5
+                : 0
+            let spinDegrees = motion == .spin && !accessibilityReduceMotion
+                ? seconds.truncatingRemainder(dividingBy: 3.2) / 3.2 * 360
+                : 0
+
+            ZStack {
+                Image("RewardCoinIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .colorMultiply(tint)
+                    .brightness(brightness)
+                    .shadow(
+                        color: glowRadius > 0
+                            ? glowColor.opacity(0.44)
+                            : .clear,
+                        radius: glowRadius
+                    )
+                    .offset(y: bounceY)
+                    .rotation3DEffect(
+                        .degrees(spinDegrees),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.55
+                    )
+            }
         }
         .frame(width: size, height: size)
         .contentShape(Rectangle())
-        .animation(
-            accessibilityReduceMotion
-                ? nil
-                : motionAnimation,
-            value: isAnimating
-        )
-        .onAppear {
-            isAnimating = motion != .none
-                && !accessibilityReduceMotion
-        }
-        .onChange(of: accessibilityReduceMotion) { _, reduceMotion in
-            isAnimating = motion != .none && !reduceMotion
-        }
         .accessibilityHidden(true)
     }
+}
 
-    private var motionAnimation: Animation? {
-        switch motion {
-        case .none:
-            return nil
-        case .bounce:
-            return .easeInOut(duration: 1.15)
-                .repeatForever(autoreverses: true)
-        case .spin:
-            return .linear(duration: 3.2)
-                .repeatForever(autoreverses: false)
+/// “今日可赚”入口使用的金币 + 红色倾斜奖励角标。
+struct RewardEarnableBadge: View {
+    let value: Int
+
+    var body: some View {
+        ZStack {
+            RewardCoinBadge(
+                size: 24,
+                glowColor: DT.coinGold,
+                glowRadius: 1,
+                motion: .bounce
+            )
+            .offset(x: -10, y: 4)
+
+            Text("+\(value)")
+                .font(.system(size: 7, weight: .heavy))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 3)
+                .background(DT.hotTag)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .rotationEffect(.degrees(38))
+                .offset(x: 10, y: -7)
         }
+        .frame(width: 58, height: 40)
+        .accessibilityLabel("今日可赚 \(value) 金币")
     }
 }
 

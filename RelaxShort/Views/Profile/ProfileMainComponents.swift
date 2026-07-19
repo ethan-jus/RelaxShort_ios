@@ -391,7 +391,7 @@ struct ProfileMenuRow: View {
     let subtitleIconColor: Color
     let usesRewardCoinIcon: Bool
     let rewardCoinMotion: RewardCoinMotion
-    let usesCompactRewardValue: Bool
+    let promoRewardValue: Int?
     let showsDivider: Bool
     let onTap: () -> Void
 
@@ -404,7 +404,7 @@ struct ProfileMenuRow: View {
         subtitleIconColor: Color = DT.coinGold,
         usesRewardCoinIcon: Bool = false,
         rewardCoinMotion: RewardCoinMotion = .none,
-        usesCompactRewardValue: Bool = false,
+        promoRewardValue: Int? = nil,
         showsDivider: Bool = true,
         onTap: @escaping () -> Void
     ) {
@@ -416,7 +416,7 @@ struct ProfileMenuRow: View {
         self.subtitleIconColor = subtitleIconColor
         self.usesRewardCoinIcon = usesRewardCoinIcon
         self.rewardCoinMotion = rewardCoinMotion
-        self.usesCompactRewardValue = usesCompactRewardValue
+        self.promoRewardValue = promoRewardValue
         self.showsDivider = showsDivider
         self.onTap = onTap
     }
@@ -437,7 +437,9 @@ struct ProfileMenuRow: View {
 
                 Spacer()
 
-                if let sub = subtitle {
+                if let promoRewardValue {
+                    RewardEarnableBadge(value: promoRewardValue)
+                } else if let sub = subtitle {
                     HStack(spacing: 5) {
                         if usesRewardCoinIcon {
                             RewardCoinBadge(
@@ -453,11 +455,7 @@ struct ProfileMenuRow: View {
                         }
                         Text(sub)
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(
-                                usesCompactRewardValue
-                                    ? DT.coinGold
-                                    : .white
-                            )
+                            .foregroundColor(.white)
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                     }
