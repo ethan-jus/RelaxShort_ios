@@ -12,6 +12,7 @@ final class AppStore: ObservableObject {
     @Published var isShowingMembership = false
     @Published var isShowingRewards = false
     @Published var pendingInviteCode: String?
+    @Published var requestedMyListSegment: MyListSegment?
     @Published var isBottomTabBarHidden = false
     @Published var isFirstLaunch: Bool
     @Published var themeMode: ThemeMode = ThemeManager.shared.themeMode {

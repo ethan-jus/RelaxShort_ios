@@ -7,7 +7,6 @@ enum ProfileSheet: Identifiable, Hashable {
     case recharge
     case wallet
     case welfare
-    case watchHistory
     case downloads
     case language
     case theme
@@ -20,7 +19,6 @@ enum ProfileSheet: Identifiable, Hashable {
         case .recharge: return "recharge"
         case .wallet: return "wallet"
         case .welfare: return "welfare"
-        case .watchHistory: return "watchHistory"
         case .downloads: return "downloads"
         case .language: return "language"
         case .theme: return "theme"
@@ -35,7 +33,6 @@ enum ProfileSheet: Identifiable, Hashable {
         case .recharge: return L10n.rechargeNow
         case .wallet: return L10n.myWallet
         case .welfare: return L10n.welfareCenter
-        case .watchHistory: return L10n.watchHistory
         case .downloads: return L10n.download
         case .language: return L10n.language
         case .theme: return L10n.themeMenuTitle
@@ -98,7 +95,12 @@ struct ProfileView: View {
                             ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
                             ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: "\(rewardSummaryStore.coinBalance)", usesRewardCoinIcon: true, onTap: { selectedDestination = .wallet })
                             ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, promoRewardValue: rewardSummaryStore.remainingEarnableCoins, onTap: { selectedDestination = .welfare })
-                            ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
+                            ProfileMenuRow(
+                                icon: "clock",
+                                iconColor: .white,
+                                title: "profile.history".localized,
+                                onTap: openWatchHistory
+                            )
                             ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
                         }
                         .padding(.top, DT.Space.sm)
@@ -214,8 +216,6 @@ struct ProfileView: View {
             PlaceholderView(title: sheet.title)
         case .welfare:
             CoinRewardView(mode: .pushed)
-        case .watchHistory:
-            PlaceholderView(title: sheet.title)
         case .downloads:
             PlaceholderView(title: sheet.title)
         case .language:
@@ -230,6 +230,11 @@ struct ProfileView: View {
             TopUpView()
                 .environmentObject(StoreKitManager())
         }
+    }
+
+    private func openWatchHistory() {
+        appStore.requestedMyListSegment = .history
+        appStore.selectedTab = .myList
     }
 }
 

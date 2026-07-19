@@ -1,6 +1,11 @@
 import SwiftUI
 import Combine
 
+enum MyListSegment: CaseIterable {
+    case following
+    case history
+}
+
 // MARK: - Favorites ViewModel
 
 /// My List 页面状态机：管理 bookmarks/history 独立分页、trending、编辑和多选删除。
@@ -10,8 +15,7 @@ final class FavoritesViewModel: ObservableObject {
 
     // MARK: - Segment
 
-    enum Segment: CaseIterable { case following, history }
-    @Published var selectedSegment: Segment = .following
+    @Published var selectedSegment: MyListSegment = .following
 
     // MARK: - Bookmarks
 

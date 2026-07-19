@@ -25,10 +25,15 @@ struct FavoritesView: View {
                 }
             }
         }
-        .onAppear { handleAppear() }
+        .onAppear {
+            applyRequestedSegment()
+            handleAppear()
+        }
         .onDisappear { handleDisappear() }
         .onChange(of: appStore.selectedTab) { _, tab in
-            guard tab == .myList, authStore.hasSession else { return }
+            guard tab == .myList else { return }
+            applyRequestedSegment()
+            guard authStore.hasSession else { return }
             Task { await viewModel.refreshUserData() }
         }
         .onChange(of: viewModel.isEditing) { _, editing in
@@ -90,7 +95,7 @@ struct FavoritesView: View {
                     .font(.system(size: 16)).foregroundColor(.white)
                     .frame(minWidth: 44, minHeight: 44)
             } else {
-                ForEach(FavoritesViewModel.Segment.allCases, id: \.self) { seg in
+                ForEach(MyListSegment.allCases, id: \.self) { seg in
                     Button { viewModel.selectedSegment = seg } label: {
                         VStack(spacing: 6) {
                             Text(seg == .following ? L10n.myListFollowing : L10n.myListHistory)
@@ -389,6 +394,12 @@ struct FavoritesView: View {
         if authStore.isLoggedIn {
             Task { await viewModel.loadAll() }
         }
+    }
+
+    private func applyRequestedSegment() {
+        guard let segment = appStore.requestedMyListSegment else { return }
+        viewModel.selectedSegment = segment
+        appStore.requestedMyListSegment = nil
     }
 
     private func handleDisappear() {
