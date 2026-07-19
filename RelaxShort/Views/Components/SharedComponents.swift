@@ -196,7 +196,7 @@ struct RewardCoinBadge: View {
     }
 }
 
-/// “今日可赚”入口使用的金币 + 同高红色奖励标签，整体轻微跳动。
+/// “今日可赚”入口使用的红色金币奖励胶囊，整体轻微跳动。
 struct RewardEarnableBadge: View {
     @Environment(\.accessibilityReduceMotion)
     private var accessibilityReduceMotion
@@ -215,28 +215,29 @@ struct RewardEarnableBadge: View {
                 ? 0
                 : sin(seconds * .pi * 2 / 1.15) * 2.5
 
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 RewardCoinBadge(
-                    size: 24,
+                    size: 20,
                     glowColor: DT.coinGold,
-                    glowRadius: 1
+                    glowRadius: 0
                 )
 
                 Text("+\(value)")
-                    .font(.system(size: 10, weight: .heavy))
+                    .font(.system(size: 12, weight: .heavy))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                    .padding(.horizontal, 5)
-                    .frame(height: 24)
-                    .background(DT.hotTag)
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    )
             }
+            .padding(.leading, 5)
+            .padding(.trailing, 8)
+            .frame(height: 28)
+            .background(DT.hotTag)
+            .clipShape(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+            )
             .offset(y: bounceY)
         }
-        .frame(height: 30)
+        .frame(height: 34)
         .accessibilityLabel("今日可赚 \(value) 金币")
     }
 }
