@@ -100,6 +100,7 @@ struct ProfileIdentityHeader: View {
                 Spacer(minLength: 44)
             }
             .padding(.horizontal, DT.Space.xl)
+            .padding(.top, 20)
 
             Button(action: onSettings) {
                 Image(systemName: "gearshape")
@@ -112,7 +113,7 @@ struct ProfileIdentityHeader: View {
             .accessibilityLabel("profile.settings".localized)
             .padding(.trailing, DT.Space.xl)
         }
-        .frame(height: 114)
+        .frame(height: 149)
         .clipped()
     }
 }
