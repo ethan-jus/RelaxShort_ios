@@ -150,7 +150,7 @@ struct MemberView: View {
 
     // MARK: - Layout Constants
 
-    private let heroHeight: CGFloat = 286
+    private let heroHeight: CGFloat = 258
     private let headerHeight: CGFloat = 54
     private let pageInset: CGFloat = 16
     private let planCardGap: CGFloat = 8
@@ -379,7 +379,7 @@ extension MemberView {
                 .padding(.horizontal, 34)
 
             Color.clear
-                .frame(height: 12)
+                .frame(height: 6)
 
             Spacer(minLength: 0)
         }
