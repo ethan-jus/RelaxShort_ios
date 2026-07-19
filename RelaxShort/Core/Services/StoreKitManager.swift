@@ -15,10 +15,9 @@ enum ProductID: String, CaseIterable, Hashable {
     // VIP 订阅
     case vipWeekly    = "com.relaxshort.vip.weekly"
     case vipMonthly   = "com.relaxshort.vip.monthly"
-    case vipQuarterly = "com.relaxshort.vip.quarterly"
     case vipYearly    = "com.relaxshort.vip.yearly"
 
-    /// 当前 RelaxShort 对外销售的 VIP 套餐。季度套餐保留旧标识，但不进入购买界面。
+    /// 当前 RelaxShort 对外销售的 VIP 套餐。
     static let supportedVIPSubscriptions: [ProductID] = [
         .vipWeekly,
         .vipMonthly,
@@ -36,7 +35,7 @@ enum ProductID: String, CaseIterable, Hashable {
     /// 是否为 VIP 订阅
     var isVIPSubscription: Bool {
         switch self {
-        case .vipWeekly, .vipMonthly, .vipQuarterly, .vipYearly: return true
+        case .vipWeekly, .vipMonthly, .vipYearly: return true
         default: return false
         }
     }
@@ -82,7 +81,7 @@ struct CoinPackage: Identifiable, Equatable {
 struct VIPSubscription: Identifiable, Equatable {
     let id: String
     let productID: ProductID
-    let period: String          // "周" / "月" / "季" / "年"
+    let period: String          // "周" / "月" / "年"
     let price: String
     let dailyEquivalent: String // "¥1.86/天"
 }
@@ -682,7 +681,6 @@ final class StoreKitManager: ObservableObject {
         case .coinsXLarge:   return "$49.99"
         case .vipWeekly:     return "$12.99"
         case .vipMonthly:    return "$29.99"
-        case .vipQuarterly:  return "$68.99"
         case .vipYearly:     return "$149.99"
         }
     }

@@ -171,7 +171,6 @@ enum MockData {
     static let vipPlans: [VIPPlan] = [
         VIPPlan(id: "weekly",    title: "周会员", price: "$12.99",  originalPrice: nil,   period: "/周", isRecommended: false, description: nil, dailyPrice: nil, discountPercent: nil),
         VIPPlan(id: "monthly",   title: "月会员", price: "$29.99",  originalPrice: nil,   period: "/月", isRecommended: true,  description: nil, dailyPrice: nil, discountPercent: nil),
-        VIPPlan(id: "quarterly", title: "季会员", price: "$68.99",  originalPrice: "$89.99", period: "/季", isRecommended: false, description: nil, dailyPrice: nil, discountPercent: nil),
         VIPPlan(id: "yearly",    title: "年会员", price: "$199.99", originalPrice: "$299.99", period: "/年", isRecommended: false, description: nil, dailyPrice: nil, discountPercent: nil),
     ]
 

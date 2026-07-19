@@ -599,7 +599,7 @@ struct EpisodeUnlockPurchaseSheet: View {
     }
 
     private var vipPlans: [VIPSubscription] {
-        storeKit.vipSubscriptions.filter { $0.productID != .vipQuarterly }
+        storeKit.vipSubscriptions
     }
 
     private var purchaseFooter: some View {
