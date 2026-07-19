@@ -61,7 +61,7 @@
          </BuildableReference>
       </BuildableProductRunnable>
       <StoreKitConfigurationFileReference
-         identifier = "../../RelaxShortTests/RelaxShort.storekit">
+         identifier = "../../../RelaxShortTests/RelaxShort.storekit">
       </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction

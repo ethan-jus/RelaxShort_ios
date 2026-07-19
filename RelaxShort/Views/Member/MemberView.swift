@@ -150,7 +150,7 @@ struct MemberView: View {
 
     // MARK: - Layout Constants
 
-    private let heroHeight: CGFloat = 320
+    private let heroHeight: CGFloat = 286
     private let headerHeight: CGFloat = 54
     private let pageInset: CGFloat = 16
     private let planCardGap: CGFloat = 8
@@ -173,7 +173,7 @@ struct MemberView: View {
                 ? DramaBoxBottomTabBar.totalHeight + bottomInset
                 : 0
             let pinProgress = min(
-                max((scrollOffsetY - 94) / 42, 0),
+                max((scrollOffsetY - 4) / 28, 0),
                 1
             )
             let viewportFrame = geo.frame(in: .global)
@@ -225,11 +225,6 @@ struct MemberView: View {
                     .padding(.bottom, tabClearance + 20)
                 }
                 .ignoresSafeArea(edges: .top)
-
-                pinnedHeaderBackground(
-                    topInset: topInset,
-                    opacity: pinProgress
-                )
 
                 memberHeader
                     .frame(height: headerHeight)
@@ -352,13 +347,11 @@ extension MemberView {
     ) -> some View {
         VStack(spacing: 0) {
             Color.clear
-                .frame(height: topInset + headerHeight + 4)
-
-            Spacer(minLength: 4)
+                .frame(height: topInset + headerHeight + 8)
 
             VIPCrownView(
-                width: 116,
-                height: 84,
+                width: 132,
+                height: 99,
                 glowColor: memberGold,
                 glowRadius: 3
             )
@@ -381,22 +374,16 @@ extension MemberView {
                 .padding(.horizontal, 34)
 
             Color.clear
-                .frame(height: 18)
-        }
-        .frame(width: width, height: heroHeight + topInset)
-        .accessibilityElement(children: .contain)
-    }
+                .frame(height: 12)
 
-    private func pinnedHeaderBackground(
-        topInset: CGFloat,
-        opacity: CGFloat
-    ) -> some View {
-        Color.black
-            .opacity(opacity)
-            .frame(height: topInset + headerHeight)
-            .ignoresSafeArea(edges: .top)
-            .allowsHitTesting(false)
-            .zIndex(2)
+            Spacer(minLength: 0)
+        }
+        .frame(
+            width: width,
+            height: heroHeight + topInset,
+            alignment: .top
+        )
+        .accessibilityElement(children: .contain)
     }
 
     private var memberHeader: some View {
@@ -484,7 +471,7 @@ extension MemberView {
                     }
                 }
 
-                if viewModel.plans.allSatisfy({
+                if viewModel.plans.contains(where: {
                     storeKit.storeDisplayPrice(for: $0.productID) == nil
                 }) {
                     Button {
@@ -518,9 +505,10 @@ extension MemberView {
 
     @ViewBuilder
     private func planCard(for plan: MemberPlanDisplayOption) -> some View {
-        let standardPrice = storeKit.storeDisplayPrice(
+        let storePrice = storeKit.storeDisplayPrice(
             for: plan.productID
         )
+        let standardPrice = planDisplayPrice(for: plan.productID)
         let offer = activeOffer(for: plan)
         let isAvailable = standardPrice != nil || offer != nil
         let isSelected =
@@ -558,8 +546,8 @@ extension MemberView {
                     .lineLimit(1)
                     .minimumScaleFactor(0.64)
 
-                if offer != nil, let standardPrice {
-                    Text(standardPrice)
+                if offer != nil, let storePrice {
+                    Text(storePrice)
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.5))
                         .strikethrough(true, color: .white.opacity(0.5))
@@ -676,6 +664,22 @@ extension MemberView {
         )
         return "\(plan.titleKey.localized), \(offerDisclosure), \("member.standard_price".localized) \(standardPrice)"
     }
+
+    /// Debug 环境在 StoreKit 尚未连通时保留套餐价格，便于先验收页面布局。
+    /// 购买入口仍只认真实 StoreKit 产品，不会把测试价格当成可购买状态。
+    private func planDisplayPrice(
+        for productID: ProductID
+    ) -> String? {
+        if let storePrice = storeKit.storeDisplayPrice(for: productID) {
+            return storePrice
+        }
+
+        #if DEBUG
+        return storeKit.displayPrice(for: productID)
+        #else
+        return nil
+        #endif
+    }
 }
 
 // MARK: - Benefits Section
@@ -791,29 +795,31 @@ extension MemberView {
         index: Int,
         count: Int
     ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
+        HStack(alignment: .top, spacing: 11) {
             memberBenefitIcon(for: benefit)
 
-            Text(benefit.titleKey.localized)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(benefit.titleKey.localized)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
 
-            if let detailKey = benefit.detailKey {
-                Text(detailKey.localized)
-                    .font(.system(size: 12.5))
-                    .foregroundColor(.white.opacity(0.58))
-                    .lineSpacing(2)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
+                if let detailKey = benefit.detailKey {
+                    Text(detailKey.localized)
+                        .font(.system(size: 11.5))
+                        .foregroundColor(.white.opacity(0.58))
+                        .lineSpacing(1.5)
+                        .lineLimit(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .topLeading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .overlay(alignment: .trailing) {
             if index.isMultiple(of: 2), index + 1 < count {
                 Rectangle()
