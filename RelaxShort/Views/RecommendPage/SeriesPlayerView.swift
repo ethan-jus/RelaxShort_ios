@@ -126,6 +126,8 @@ struct SeriesPlayerView: View {
     @State private var playbackTraceReason = "open"
     /// 锁集状态独占 Series 页面交互；出现后不得继续切集或触发播放器手势。
     @State private var unlockState: EpisodeUnlockFlowState?
+    /// 同一解锁结果只允许恢复一次播放器，防止购买、账户刷新等回调并发重复提交。
+    @State private var activeUnlockResumeEpisode: Int?
     /// 顶部返回动作已提前完成 Series → For You 所有权交接，onDisappear 不再重复释放。
     @State private var hasPreparedReturn = false
     /// 首次 AVPlayer/AVPlayerLayer 创建不得与 NavigationStack 的横向转场竞争主线程。
@@ -902,8 +904,29 @@ struct SeriesPlayerView: View {
 
     @MainActor
     private func resumeEpisodeAfterUnlock(_ episodeNumber: Int) async {
+        guard let state = unlockState,
+              state.playbackTargetEpisode == episodeNumber else {
+            Logger.player.debug("忽略失效的解锁恢复回调 集数=\(episodeNumber)")
+            return
+        }
+        guard activeUnlockResumeEpisode == nil else {
+            Logger.player.debug("忽略重复的解锁恢复回调 集数=\(episodeNumber)")
+            return
+        }
+        activeUnlockResumeEpisode = episodeNumber
+        defer {
+            if activeUnlockResumeEpisode == episodeNumber {
+                activeUnlockResumeEpisode = nil
+            }
+        }
+
         let resumeStartedAt = CACurrentMediaTime()
         currentEpisode = episodeNumber
+        episodeSwitchTask?.cancel()
+        episodeSwitchTask = nil
+        episodePrefetchTask?.cancel()
+        episodePrefetchTask = nil
+        episodePrefetchTarget = nil
         initialPlayAssetTask?.cancel()
         initialPlayAssetTask = nil
 
@@ -940,13 +963,14 @@ struct SeriesPlayerView: View {
         }
 
         let targetEpisodeID = episodeID(for: episodeNumber)
-        let backendResume = targetEpisodeID.flatMap { episodeResumeTimes[$0] }
         let committed = playerCoordinator.commitSeriesEpisodeTransition(
             drama: drama,
             items: playable.map(\.item),
             startIndex: playableIndex,
             handoff: nil,
-            backendResumeTime: backendResume,
+            // 本次权益刚刚解锁，必须从头连续起播。若传入 /play 返回的历史 resumeTime，
+            // Coordinator 会先自动播放再异步 seek，形成“播一下、重新缓冲、再播放”。
+            backendResumeTime: nil,
             token: transitionToken
         )
         guard committed else {
@@ -1151,8 +1175,10 @@ struct SeriesPlayerView: View {
             currentEpisode = matched.episodeNumber
         }
         // Task36B-2 返工：播放源标记移到 ensurePlayAsset 内部，成功/锁集/失败分别标记
-        _ = await ensurePlayAsset(for: currentEpisode)
-        guard !Task.isCancelled else { return }
+        let hasPlayAsset = await ensurePlayAsset(for: currentEpisode)
+        guard !Task.isCancelled,
+              hasPlayAsset,
+              unlockState == nil else { return }
         initializeEpisodePlayer()
     }
 
@@ -1176,7 +1202,8 @@ struct SeriesPlayerView: View {
             Logger.player.info("SeriesTrace 首屏播放源并行请求成功 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             playerCoordinator.engine.markTrace("播放源")
 
-            guard playerCoordinator.owner == .series(dramaID: drama.id) else { return true }
+            guard playerCoordinator.owner == .series(dramaID: drama.id),
+                  unlockState == nil else { return true }
             let item = PlayerMediaItem(
                 id: PlayerMediaItem.stableID(dramaID: drama.id, episodeNumber: episodeNumber),
                 title: drama.title,
