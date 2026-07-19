@@ -1,4 +1,343 @@
 import SwiftUI
+import UIKit
+
+// MARK: - Navigation Gesture
+
+/// 在隐藏系统导航栏或系统返回按钮的二级页上恢复 iOS 原生屏幕边缘返回手势。
+private struct InteractivePopGestureConfigurator:
+    UIViewControllerRepresentable {
+    let isEnabled: Bool
+
+    func makeUIViewController(
+        context: Context
+    ) -> GestureProbeViewController {
+        GestureProbeViewController(isEnabled: isEnabled)
+    }
+
+    func updateUIViewController(
+        _ controller: GestureProbeViewController,
+        context: Context
+    ) {
+        controller.update(isEnabled: isEnabled)
+    }
+
+    static func dismantleUIViewController(
+        _ controller: GestureProbeViewController,
+        coordinator: Void
+    ) {
+        controller.restore()
+    }
+
+    final class GestureProbeViewController:
+        UIViewController,
+        UIGestureRecognizerDelegate {
+        private var isGestureEnabled: Bool
+        private var isPageVisible = false
+        private weak var configuredNavigationController:
+            UINavigationController?
+        private weak var previousDelegate:
+            (any UIGestureRecognizerDelegate)?
+        private var ownsGestureDelegate = false
+
+        init(isEnabled: Bool) {
+            isGestureEnabled = isEnabled
+            super.init(nibName: nil, bundle: nil)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            isPageVisible = true
+            configureIfNeeded()
+        }
+
+        override func viewWillDisappear(_ animated: Bool) {
+            super.viewWillDisappear(animated)
+            isPageVisible = false
+            restore()
+        }
+
+        func update(isEnabled: Bool) {
+            isGestureEnabled = isEnabled
+            configureIfNeeded()
+        }
+
+        private func configureIfNeeded() {
+            guard isPageVisible,
+                  isGestureEnabled,
+                  let navigationController,
+                  let gesture =
+                    navigationController.interactivePopGestureRecognizer else {
+                restore()
+                return
+            }
+
+            if configuredNavigationController !== navigationController {
+                restore()
+                configuredNavigationController = navigationController
+            }
+
+            if !ownsGestureDelegate {
+                previousDelegate = gesture.delegate
+                gesture.delegate = self
+                ownsGestureDelegate = true
+            }
+
+            gesture.isEnabled =
+                navigationController.viewControllers.count > 1
+        }
+
+        func restore() {
+            guard ownsGestureDelegate,
+                  let gesture =
+                    configuredNavigationController?
+                    .interactivePopGestureRecognizer else {
+                configuredNavigationController = nil
+                previousDelegate = nil
+                ownsGestureDelegate = false
+                return
+            }
+
+            if gesture.delegate === self {
+                gesture.delegate = previousDelegate
+            }
+            configuredNavigationController = nil
+            previousDelegate = nil
+            ownsGestureDelegate = false
+        }
+
+        func gestureRecognizerShouldBegin(
+            _ gestureRecognizer: UIGestureRecognizer
+        ) -> Bool {
+            guard let navigationController =
+                    configuredNavigationController else {
+                return false
+            }
+            return navigationController.viewControllers.count > 1
+                && navigationController.transitionCoordinator == nil
+        }
+    }
+}
+
+extension View {
+    /// 保留自定义导航栏视觉，同时恢复系统交互式返回动画与取消手势。
+    func interactivePopGestureEnabled(
+        _ isEnabled: Bool = true
+    ) -> some View {
+        background {
+            InteractivePopGestureConfigurator(isEnabled: isEnabled)
+                .frame(width: 0, height: 0)
+        }
+    }
+}
+
+// MARK: - Rewards Visuals
+
+enum RewardCoinMotion: Equatable {
+    case none
+    case bounce
+    case spin
+}
+
+/// Rewards 页面统一使用的立体 R 金币素材。
+struct RewardCoinBadge: View {
+    @Environment(\.accessibilityReduceMotion)
+    private var accessibilityReduceMotion
+
+    let size: CGFloat
+    var tint: Color = .white
+    var glowColor: Color = DT.coinGold
+    var glowRadius: CGFloat = 0
+    var brightness: Double = 0
+    var motion: RewardCoinMotion = .none
+
+    var body: some View {
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: accessibilityReduceMotion || motion == .none
+            )
+        ) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+            let bounceY = motion == .bounce && !accessibilityReduceMotion
+                ? sin(seconds * .pi * 2 / 1.15) * 2.5
+                : 0
+            let spinDegrees = motion == .spin && !accessibilityReduceMotion
+                ? seconds.truncatingRemainder(dividingBy: 3.2) / 3.2 * 360
+                : 0
+
+            ZStack {
+                Image("RewardCoinIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .colorMultiply(tint)
+                    .brightness(brightness)
+                    .shadow(
+                        color: glowRadius > 0
+                            ? glowColor.opacity(0.44)
+                            : .clear,
+                        radius: glowRadius
+                    )
+                    .offset(y: bounceY)
+                    .rotation3DEffect(
+                        .degrees(spinDegrees),
+                        axis: (x: 0, y: 1, z: 0),
+                        perspective: 0.55
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .contentShape(Rectangle())
+        .accessibilityHidden(true)
+    }
+}
+
+/// “今日可赚”入口使用的暗酒红金币奖励胶囊，整体轻微跳动。
+struct RewardEarnableBadge: View {
+    @Environment(\.accessibilityReduceMotion)
+    private var accessibilityReduceMotion
+
+    let value: Int
+
+    var body: some View {
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: accessibilityReduceMotion
+            )
+        ) { timeline in
+            let seconds = timeline.date.timeIntervalSinceReferenceDate
+            let bounceY = accessibilityReduceMotion
+                ? 0
+                : sin(seconds * .pi * 2 / 1.5) * 2.5
+
+            HStack(spacing: 5) {
+                RewardCoinBadge(
+                    size: 20,
+                    glowColor: DT.coinGold,
+                    glowRadius: 0
+                )
+
+                Text("+\(value)")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(DT.rewardBadgeText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.leading, 5)
+            .padding(.trailing, 8)
+            .frame(height: 28)
+            .background {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(DT.rewardBadgeBackground)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .stroke(DT.rewardBadgeBorder.opacity(0.65), lineWidth: 0.75)
+            }
+            .offset(y: bounceY)
+        }
+        .frame(height: 34)
+        .accessibilityLabel("今日可赚 \(value) 金币")
+    }
+}
+
+/// 三枚金币叠放图标，用于购买金币等入口。
+struct RewardCoinStackIcon: View {
+    let size: CGFloat
+    var tint: Color = .white
+    var glowColor: Color = DT.coinGold
+
+    var body: some View {
+        ZStack {
+            RewardCoinBadge(
+                size: size * 0.7,
+                tint: tint,
+                glowColor: glowColor
+            )
+            .offset(x: -size * 0.25, y: size * 0.14)
+
+            RewardCoinBadge(
+                size: size * 0.7,
+                tint: tint,
+                glowColor: glowColor
+            )
+            .offset(x: size * 0.25, y: size * 0.14)
+
+            RewardCoinBadge(
+                size: size * 0.78,
+                tint: tint,
+                glowColor: glowColor,
+                glowRadius: 1
+            )
+            .offset(y: -size * 0.12)
+        }
+        .frame(width: size * 1.3, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Rewards 首屏右侧的金色播放圆环与黑红舞台氛围素材。
+struct RewardsHeroArtwork: View {
+    let width: CGFloat
+    let height: CGFloat
+    var opacity: Double = 1
+    var alignment: Alignment = .trailing
+
+    var body: some View {
+        Image("RewardsHeroArtwork")
+            .resizable()
+            .scaledToFill()
+            .frame(width: width, height: height, alignment: alignment)
+            .clipped()
+            .blendMode(.screen)
+            .opacity(opacity)
+            .accessibilityHidden(true)
+    }
+}
+
+// MARK: - VIP Crown
+
+/// 可复用的会员皇冠素材。
+///
+/// 黑色背景通过 `.screen` 混合模式自然融入深色界面；可按使用场景调整尺寸、颜色与光晕。
+struct VIPCrownView: View {
+    let width: CGFloat
+    var height: CGFloat? = nil
+    var tint: Color = .white
+    var opacity: Double = 1
+    var glowColor: Color? = nil
+    var glowRadius: CGFloat = 0
+
+    var body: some View {
+        ZStack {
+            if glowRadius > 0 {
+                crownImage(color: glowColor ?? tint)
+                    .blur(radius: glowRadius)
+                    .opacity(0.55)
+                    .blendMode(.screen)
+            }
+
+            crownImage(color: tint)
+                .blendMode(.screen)
+        }
+        .frame(width: width, height: height)
+        .opacity(opacity)
+        .accessibilityHidden(true)
+    }
+
+    private func crownImage(color: Color) -> some View {
+        Image("ProfileVIPCrown")
+            .resizable()
+            .scaledToFit()
+            .frame(width: width, height: height)
+            .colorMultiply(color)
+    }
+}
 
 // MARK: - Cover Image View
 /// 封面图片异步加载组件，使用项目共享 ImageLoader 内存缓存
@@ -296,6 +635,32 @@ struct DramaBadgeTagView: View {
             .padding(.horizontal, 8).padding(.vertical, 4)
             .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+/// 会员权益统一使用的 HD 徽章；尺寸和颜色可由不同页面按需调整。
+struct HDBadgeIconView: View {
+    let color: Color
+    let width: CGFloat
+    let height: CGFloat
+    let lineWidth: CGFloat
+    let textSize: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .stroke(color, lineWidth: lineWidth)
+                .frame(width: width, height: height)
+
+            Text("HD")
+                .font(.system(
+                    size: textSize,
+                    weight: .bold,
+                    design: .rounded
+                ))
+                .foregroundColor(color)
+        }
+        .frame(width: width, height: height)
     }
 }
 

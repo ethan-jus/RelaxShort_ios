@@ -20,6 +20,12 @@ enum DT {
     static let memberGold     = SwiftUI.Color(hex: "#D6B46A")
     /// 金币色（耀眼金） #F5C842
     static let coinGold       = SwiftUI.Color(hex: "#F5C842")
+    /// 待领取奖励胶囊背景（暗酒红）
+    static let rewardBadgeBackground = SwiftUI.Color(hex: "#281516")
+    /// 待领取奖励胶囊描边
+    static let rewardBadgeBorder = SwiftUI.Color(hex: "#7A3434")
+    /// 待领取奖励胶囊文字（暖金）
+    static let rewardBadgeText = SwiftUI.Color(hex: "#E7BE69")
     
     /// 功能色
     /// 爆款角标 #FF3B30

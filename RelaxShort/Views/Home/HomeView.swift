@@ -94,6 +94,7 @@ private extension UIView {
 struct HomeView: View {
     @EnvironmentObject private var appStore: AppStore
     @EnvironmentObject private var dependencies: DependencyContainer
+    @EnvironmentObject private var rewardSummaryStore: RewardSummaryStore
     @ObservedObject private var viewModel: HomeViewModel
     private let rankingRepository: HomeRepositoryProtocol
     @State private var showVIP = false
@@ -127,7 +128,8 @@ struct HomeView: View {
                     DramaBoxSearchHeaderView(
                         onSearchTap: { NotificationCenter.default.post(name: .showSearch, object: nil) },
                         onVIPTap: { showVIP = true },
-                        onRewardTap: { showReward = true }
+                        onRewardTap: { showReward = true },
+                        rewardBadge: "+\(rewardSummaryStore.remainingEarnableCoins)"
                     )
                         .padding(.top, HomeMetrics.chromeTopGap)
                     tabBar.padding(.vertical, HomeMetrics.tabVerticalPadding)
@@ -159,6 +161,11 @@ struct HomeView: View {
             CoinRewardView(mode: .pushed)
         }
         .task { await viewModel.loadData() }
+        .task { await rewardSummaryStore.refresh() }
+        .onChange(of: appStore.selectedTab) { _, tab in
+            guard tab == .home else { return }
+            Task { await rewardSummaryStore.refresh() }
+        }
     }
 
     /// Home 卡片直接发起全局播放页路由，避免中转 State 的写入和清空在 push 动画期间重复重建首页。
@@ -849,6 +856,7 @@ private struct DramaBoxSearchHeaderView: View {
     var onSearchTap: () -> Void = {}
     var onVIPTap: () -> Void = {}
     var onRewardTap: () -> Void = {}
+    var rewardBadge: String = "+0"
 
     var body: some View {
         HStack(spacing: 8) {
@@ -868,14 +876,27 @@ private struct DramaBoxSearchHeaderView: View {
             Button {
                 onVIPTap()
             } label: {
-                AnimatedPromoButton(symbol: "crown.fill", badge: "-25%", tint: Color(red: 1, green: 0.82, blue: 0.15), delay: 0)
+                AnimatedPromoButton(badge: "-25%", delay: 0) {
+                    VIPCrownView(
+                        width: 40,
+                        height: 30,
+                        tint: Color(red: 1, green: 0.82, blue: 0.15),
+                        glowColor: Color(red: 1, green: 0.36, blue: 0.12),
+                        glowRadius: 3
+                    )
+                }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("vip.tab.title".localized)
 
             Button {
                 onRewardTap()
             } label: {
-                AnimatedPromoButton(symbol: "gift.fill", badge: "+150", tint: Color(red: 0.9, green: 0.2, blue: 0.2), delay: 0.3)
+                AnimatedPromoButton(badge: rewardBadge, delay: 0.3) {
+                    Image(systemName: "gift.fill")
+                        .font(.system(size: 23, weight: .semibold))
+                        .foregroundColor(Color(red: 0.9, green: 0.2, blue: 0.2))
+                }
             }
             .buttonStyle(.plain)
         }
@@ -887,29 +908,32 @@ private struct DramaBoxSearchHeaderView: View {
 
 // MARK: - Animated Promo Button (pure decoration, tap handled by parent)
 
-private struct AnimatedPromoButton: View {
-    let symbol: String
+private struct AnimatedPromoButton<Icon: View>: View {
     let badge: String
-    var tint: Color = DT.brandGold
     var delay: Double = 0
+    @ViewBuilder let icon: () -> Icon
     @State private var anim = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Image(systemName: symbol)
-                .font(.system(size: 23, weight: .semibold))
-                .foregroundColor(tint)
-                .frame(width: 36, height: 36)
-
-            Text(badge)
-                .font(.system(size: 7, weight: .heavy))
-                .foregroundColor(.white)
-                .padding(.horizontal, 3)
-                .padding(.vertical, 2)
-                .background(DT.hotTag)
-                .cornerRadius(3)
-                .offset(x: 2, y: 2)
-        }
+        icon()
+            .frame(width: 36, height: 36)
+            .overlay(alignment: .topTrailing) {
+                Text(badge)
+                    .font(.system(size: 7, weight: .heavy))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 3)
+                    .padding(.vertical, 2)
+                    .background(DT.hotTag)
+                    .cornerRadius(3)
+                    .rotationEffect(.degrees(45))
+                    .alignmentGuide(.trailing) { dimensions in
+                        dimensions[HorizontalAlignment.center]
+                    }
+                    .alignmentGuide(.top) { dimensions in
+                        dimensions[VerticalAlignment.center]
+                    }
+                    .offset(x: -2, y: 10)
+            }
         .frame(width: 42, height: 42, alignment: .center)
         .scaleEffect(anim ? 1.1 : 1.0)
         .onAppear {

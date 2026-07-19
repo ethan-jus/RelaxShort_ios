@@ -1323,32 +1323,32 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googleads/swift-package-manager-google-mobile-ads";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 13.4.0;
+				kind = exactVersion;
+				version = 13.6.0;
 			};
 		};
 		C40000000000000000000005 /* XCRemoteSwiftPackageReference "swift-package-manager-google-user-messaging-platform" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googleads/swift-package-manager-google-user-messaging-platform";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.0.0;
+				kind = exactVersion;
+				version = 2.7.0;
 			};
 		};
 		C41000000000000000000005 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-meta" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googleads/googleads-mobile-ios-mediation-meta";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = 4553121feb88d1f29a2d097587649ecc0afb8806;
 			};
 		};
 		C41000000000000000000006 /* XCRemoteSwiftPackageReference "googleads-mobile-ios-mediation-pangle" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/googleads/googleads-mobile-ios-mediation-pangle";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = 36bbfd567fe57e8e2a10e3f0e96f82fdc903fa98;
 			};
 		};
 		A34E00000000000000000001 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {

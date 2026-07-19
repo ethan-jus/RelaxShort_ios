@@ -69,7 +69,11 @@ struct RecommendView: View {
             .ignoresSafeArea()
             .task { await loadAndInit() }
             .sheet(isPresented: $showShare) {
-                ShareSheet(dramaTitle: currentDrama?.title ?? "")
+                ShareSheet(
+                    dramaTitle: currentDrama?.title ?? "",
+                    seriesID: currentDrama?.id ?? "",
+                    episodeNumber: currentDrama?.currentEpisode
+                )
                     .shareSheetPresentationStyle()
             }
             .onChange(of: session.currentIndex) { oldValue, newValue in

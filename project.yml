@@ -8,16 +8,16 @@ options:
 packages:
   GoogleMobileAds:
     url: https://github.com/googleads/swift-package-manager-google-mobile-ads
-    from: "13.4.0"
+    exactVersion: "13.6.0"
   GoogleUserMessagingPlatform:
     url: https://github.com/googleads/swift-package-manager-google-user-messaging-platform
-    from: "2.0.0"
+    exactVersion: "2.7.0"
   MetaAdapter:
     url: https://github.com/googleads/googleads-mobile-ios-mediation-meta
-    branch: main
+    revision: 4553121feb88d1f29a2d097587649ecc0afb8806
   PangleAdapter:
     url: https://github.com/googleads/googleads-mobile-ios-mediation-pangle
-    branch: main
+    revision: 36bbfd567fe57e8e2a10e3f0e96f82fdc903fa98
 
 settings:
   base:

@@ -38,6 +38,16 @@
 				<string>fb503961409429514</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>com.relaxshort.app.share</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>relaxshort</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>

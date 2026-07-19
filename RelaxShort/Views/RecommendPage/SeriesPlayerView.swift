@@ -255,6 +255,7 @@ struct SeriesPlayerView: View {
         .preferredColorScheme(.dark)
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
+        .interactivePopGestureEnabled()
         .background {
             NavigationTransitionCompletionObserver {
                 hasCompletedNavigationTransition = true
@@ -264,7 +265,11 @@ struct SeriesPlayerView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .share:
-                ShareSheet(dramaTitle: drama.title)
+                ShareSheet(
+                    dramaTitle: drama.title,
+                    seriesID: drama.id,
+                    episodeNumber: currentEpisode
+                )
                     .shareSheetPresentationStyle()
             case .speed:
                 PlayerSpeedSheet(

@@ -75,6 +75,9 @@ struct MainTabView: View {
                     repository: dependencies.memberRepository
                 )
             }
+            .navigationDestination(isPresented: $appStore.isShowingRewards) {
+                CoinRewardView(mode: .pushed)
+            }
         }
         .persistentSystemOverlays(appStore.selectedTab == .forYou ? .hidden : .visible)
         .onReceive(NotificationCenter.default.publisher(for: .showSearch)) { _ in

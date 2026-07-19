@@ -51,7 +51,6 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/googleads/googleads-mobile-ios-mediation-meta",
       "state" : {
-        "branch" : "main",
         "revision" : "4553121feb88d1f29a2d097587649ecc0afb8806"
       }
     },
@@ -60,7 +59,6 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/googleads/googleads-mobile-ios-mediation-pangle",
       "state" : {
-        "branch" : "main",
         "revision" : "36bbfd567fe57e8e2a10e3f0e96f82fdc903fa98"
       }
     },

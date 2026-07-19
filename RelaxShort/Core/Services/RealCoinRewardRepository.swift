@@ -16,10 +16,35 @@ final class RealCoinRewardRepository: CoinRewardRepositoryProtocol {
         return Self.map(dto)
     }
 
+    func recordShare(
+        seriesID: String,
+        episodeID: String?,
+        channel: String,
+        idempotencyKey: String
+    ) async throws -> RewardCenterState {
+        let dto: RewardCenterResponseDTO = try await client.requestData(
+            .rewardShareComplete(
+                seriesID: seriesID,
+                episodeID: episodeID,
+                channel: channel,
+                idempotencyKey: idempotencyKey
+            )
+        )
+        return Self.map(dto)
+    }
+
+    func applyInviteCode(_ code: String) async throws -> RewardCenterState {
+        let dto: RewardCenterResponseDTO = try await client.requestData(
+            .rewardApplyInviteCode(code: code)
+        )
+        return Self.map(dto)
+    }
+
     private static func map(_ dto: RewardCenterResponseDTO) -> RewardCenterState {
         RewardCenterState(
             coinBalance: int(dto.coinBalance),
             firstCoinPurchaseBonusAvailable: dto.firstCoinPurchaseBonusAvailable,
+            remainingEarnableCoins: int(dto.remainingEarnableCoins),
             claimedCheckInToday: dto.checkIn.claimedToday,
             completedCheckInDays: dto.checkIn.completedDays,
             nextCheckInReward: dto.checkIn.nextRewardCoins.map(int),
@@ -42,7 +67,31 @@ final class RealCoinRewardRepository: CoinRewardRepositoryProtocol {
                     completed: $0.completed,
                     current: $0.current
                 )
-            }
+            },
+            tasks: dto.tasks.map {
+                MarketingRewardTask(
+                    code: $0.code,
+                    title: $0.title,
+                    description: $0.description,
+                    currentValue: $0.currentValue,
+                    targetValue: $0.targetValue,
+                    rewardCoins: int($0.rewardCoins),
+                    resetCycle: $0.resetCycle,
+                    completed: $0.completed,
+                    action: $0.action
+                )
+            },
+            referral: ReferralRewardState(
+                inviteCode: dto.referral.inviteCode,
+                inviterRewardCoins: dto.referral.inviterRewardCoins,
+                inviteeRewardCoins: dto.referral.inviteeRewardCoins,
+                qualifiedFriends: dto.referral.qualifiedFriends,
+                weeklyRemaining: dto.referral.weeklyRemaining,
+                lifetimeRemaining: dto.referral.lifetimeRemaining,
+                codeApplied: dto.referral.codeApplied,
+                appliedCode: dto.referral.appliedCode,
+                appliedStatus: dto.referral.appliedStatus
+            )
         )
     }
 
