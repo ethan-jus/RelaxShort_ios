@@ -82,6 +82,7 @@ struct PlayerMediaItem: Identifiable, Hashable {
     let episodeNumber: Int?
     let coverURL: String
     let source: PlayerMediaSource
+    let externalSubtitles: [PlayerSubtitleTrack]
     let resumeTime: TimeInterval?
     /// 只有公开且已授权的媒体允许写入普通磁盘缓存。VIP 离线下载使用独立 DRM 流程。
     let allowsPersistentCache: Bool
@@ -92,6 +93,7 @@ struct PlayerMediaItem: Identifiable, Hashable {
         episodeNumber: Int?,
         coverURL: String,
         source: PlayerMediaSource,
+        externalSubtitles: [PlayerSubtitleTrack] = [],
         resumeTime: TimeInterval?,
         allowsPersistentCache: Bool = false
     ) {
@@ -100,6 +102,7 @@ struct PlayerMediaItem: Identifiable, Hashable {
         self.episodeNumber = episodeNumber
         self.coverURL = coverURL
         self.source = source
+        self.externalSubtitles = externalSubtitles
         self.resumeTime = resumeTime
         self.allowsPersistentCache = allowsPersistentCache
     }

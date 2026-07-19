@@ -101,6 +101,8 @@ struct SeriesPlayerView: View {
     @State private var autoHideTask: Task<Void, Never>?
     /// 缓存播放接口返回的媒体源（key = episodeId），避免切回已访问剧集时重复请求。
     @State private var episodeMediaSources: [String: PlayerMediaSource] = [:]
+    /// 保留完整播放合同，清晰度和字幕菜单必须以当前集真实返回为准。
+    @State private var episodePlayContracts: [String: PlaybackMediaSourceDTO] = [:]
     /// 单一 sheet router，避免多 .sheet 互抢。
     @State private var activeSheet: PlayerSheet?
     /// 购买中心使用播放器内全宽 Overlay，避免系统 Sheet 在新 iOS 上自动产生两侧留白。
@@ -113,6 +115,7 @@ struct SeriesPlayerView: View {
     @State private var playbackProgress = PlayerProgress()
     @State private var selectedPlaybackRate: Float = 1.0
     @State private var selectedQualityID = "auto"
+    @State private var selectedSubtitleID: String?
     @State private var hasTrackedImpression = false
     @State private var qualifiedEpisodeIDs: Set<String> = []
     @State private var completedEpisodeIDs: Set<String> = []
@@ -147,13 +150,14 @@ struct SeriesPlayerView: View {
     }
 
     private enum PlayerSheet: Identifiable {
-        case share, speed, quality
+        case share, speed, quality, subtitles
 
         var id: String {
             switch self {
             case .share: "share"
             case .speed: "speed"
             case .quality: "quality"
+            case .subtitles: "subtitles"
             }
         }
     }
@@ -284,8 +288,17 @@ struct SeriesPlayerView: View {
                 PlayerQualitySheet(
                     qualities: qualityOptions(),
                     currentQuality: selectedQualityID,
-                    onSelect: { qualityID in
-                        selectedQualityID = qualityID
+                    onSelect: applyQuality
+                )
+                .presentationDetents([.fraction(0.4)])
+                .presentationDragIndicator(.hidden)
+            case .subtitles:
+                PlayerSubtitleSheet(
+                    subtitles: subtitleOptions(),
+                    selectedSubtitleID: selectedSubtitleID,
+                    onSelect: { subtitleID in
+                        selectedSubtitleID = subtitleID
+                        playerCoordinator.engine.selectSubtitle(subtitleID)
                         resetAutoHide()
                     }
                 )
@@ -308,6 +321,7 @@ struct SeriesPlayerView: View {
             let elapsed = (CACurrentMediaTime() - playbackTraceStartedAt) * 1000
             Logger.player.info("SeriesTrace 首帧可见 原因=\(playbackTraceReason) 当前集=\(currentEpisode) 总耗时=\(Int(elapsed))ms")
         }
+        .onReceive(playerCoordinator.engine.$selectedSubtitleID) { selectedSubtitleID = $0 }
         .onReceive(playerCoordinator.engine.$progress) { progress in
             playbackProgress = progress
             trackPlaybackMilestones(progress)
@@ -1194,6 +1208,7 @@ struct SeriesPlayerView: View {
             guard !Task.isCancelled,
                   let source = dto.toPlayerMediaSource() else { return false }
             episodeMediaSources[episodeID] = source
+            episodePlayContracts[episodeID] = dto
             episodeLoadError = nil
             if let resume = dto.resumeTime, resume > 0 {
                 episodeResumeTimes[episodeID] = TimeInterval(resume)
@@ -1210,6 +1225,7 @@ struct SeriesPlayerView: View {
                 episodeNumber: episodeNumber,
                 coverURL: drama.coverURL,
                 source: source,
+                externalSubtitles: dto.toPlayerSubtitleTracks(),
                 resumeTime: dto.resumeTime.map(TimeInterval.init)
             )
             playerCoordinator.claimSeries(
@@ -1516,12 +1532,81 @@ struct SeriesPlayerView: View {
     // MARK: - Quality Helpers
 
     private func qualityOptions() -> [PlayerQualitySheet.QualityOption] {
-        [
-            .init(id: "auto", label: "Auto", isVIP: false, isSelected: selectedQualityID == "auto"),
-            .init(id: "1080p", label: "1080P", isVIP: true, isSelected: selectedQualityID == "1080p"),
-            .init(id: "720p", label: "720P", isVIP: false, isSelected: selectedQualityID == "720p"),
-            .init(id: "540p", label: "540P", isVIP: false, isSelected: selectedQualityID == "540p")
-        ]
+        let auto = PlayerQualitySheet.QualityOption(
+            id: "auto",
+            label: "Auto",
+            isVIP: false,
+            isSelected: selectedQualityID == "auto"
+        )
+        guard let contract = currentPlayContract else { return [auto] }
+        let renditions = contract.qualities.compactMap { quality -> PlayerQualitySheet.QualityOption? in
+            guard let id = quality.quality?.lowercased(),
+                  !id.isEmpty,
+                  let rawURL = quality.url,
+                  URL(string: rawURL) != nil else { return nil }
+            return .init(
+                id: id,
+                label: quality.quality?.uppercased() ?? id.uppercased(),
+                isVIP: quality.vipRequired == true,
+                isSelected: selectedQualityID == id
+            )
+        }
+        return [auto] + renditions
+    }
+
+    private func subtitleOptions() -> [PlayerSubtitleOption] {
+        currentPlayContract?.toPlayerSubtitleTracks().map {
+            PlayerSubtitleOption(id: $0.id, displayName: $0.displayName, languageCode: $0.languageCode)
+        } ?? []
+    }
+
+    private var currentPlayContract: PlaybackMediaSourceDTO? {
+        guard let episodeID = currentBackendEpisodeID else { return nil }
+        return episodePlayContracts[episodeID]
+    }
+
+    private func applyQuality(_ qualityID: String) {
+        guard let episodeID = currentBackendEpisodeID,
+              let contract = episodePlayContracts[episodeID],
+              let currentItem = playerCoordinator.engine.currentItem else { return }
+
+        let source: PlayerMediaSource
+        if qualityID == "auto" {
+            guard let automaticSource = contract.toPlayerMediaSource() else { return }
+            source = automaticSource
+            playerCoordinator.engine.selectQuality(nil)
+        } else {
+            guard let rendition = contract.qualities.first(where: {
+                $0.quality?.caseInsensitiveCompare(qualityID) == .orderedSame
+            }),
+            let rawURL = rendition.url,
+            let url = URL(string: rawURL) else { return }
+
+            if rendition.vipRequired == true,
+               !storeKitManager.vipPurchaseState.hasActiveSubscription {
+                appStore.isShowingMembership = true
+                return
+            }
+            source = url.pathExtension.lowercased() == "m3u8"
+                ? .hls(masterURL: url)
+                : .mp4(url)
+        }
+
+        let updatedItem = PlayerMediaItem(
+            id: currentItem.id,
+            title: currentItem.title,
+            episodeNumber: currentItem.episodeNumber,
+            coverURL: currentItem.coverURL,
+            source: source,
+            externalSubtitles: contract.toPlayerSubtitleTracks(),
+            resumeTime: currentItem.resumeTime,
+            allowsPersistentCache: currentItem.allowsPersistentCache
+        )
+        selectedQualityID = qualityID
+        if playerCoordinator.engine.upgradeCurrentSource(to: updatedItem) {
+            playerCoordinator.engine.setRate(selectedPlaybackRate)
+        }
+        resetAutoHide()
     }
 
     private func applyPlaybackRate(_ rate: Float) {
@@ -1542,6 +1627,7 @@ struct SeriesPlayerView: View {
         guard target != currentEpisode, target >= 1, target <= totalEpisodes else { return false }
         episodeLoadError = nil
         let previous = currentEpisode
+        selectedQualityID = "auto"
         episodeSwitchTask?.cancel()
 
         playbackTraceStartedAt = CACurrentMediaTime()
@@ -1781,6 +1867,7 @@ struct SeriesPlayerView: View {
             }
             if let source = dto.toPlayerMediaSource() {
                 episodeMediaSources[episodeId] = source
+                episodePlayContracts[episodeId] = dto
                 if let resume = dto.resumeTime, resume > 0 {
                     episodeResumeTimes[episodeId] = TimeInterval(resume)
                 }
@@ -1851,6 +1938,7 @@ struct SeriesPlayerView: View {
                     episodeNumber: ep.episodeNumber,
                     coverURL: drama.coverURL,
                     source: source,
+                    externalSubtitles: episodePlayContracts[ep.id]?.toPlayerSubtitleTracks() ?? [],
                     resumeTime: resume,
                     // 普通免费集与 For You 共用公开 MP4 Range 缓存；付费/VIP 内容不落普通缓存。
                     allowsPersistentCache: !ep.isLocked && !ep.requiresVIP
@@ -1941,6 +2029,15 @@ struct SeriesPlayerView: View {
                     activeSheet = .quality
                 } label: {
                     Label("Quality", systemImage: "4k.tv")
+                }
+                .disabled(qualityOptions().count <= 1)
+
+                if !subtitleOptions().isEmpty {
+                    Button {
+                        activeSheet = .subtitles
+                    } label: {
+                        Label("Subtitles", systemImage: "captions.bubble")
+                    }
                 }
             } label: {
                 Image(systemName: "ellipsis")

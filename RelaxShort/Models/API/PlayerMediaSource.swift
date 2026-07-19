@@ -83,6 +83,40 @@ struct PlaybackMediaSourceDTO {
         }
     }
 
+    func toPlayerSubtitleTracks() -> [PlayerSubtitleTrack] {
+        subtitleTracks.compactMap { subtitle in
+            guard let rawURL = subtitle.url,
+                  let url = URL(string: rawURL),
+                  let languageCode = subtitle.lang?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !languageCode.isEmpty else {
+                return nil
+            }
+
+            let format: PlayerSubtitleFormat
+            switch subtitle.type?.lowercased() {
+            case "vtt", "webvtt":
+                format = .vtt
+            case "srt":
+                format = .srt
+            default:
+                // ASS 等格式由服务端统一转成 WebVTT 后再下发，客户端不猜测解析。
+                return nil
+            }
+
+            let displayName = Locale.current.localizedString(forLanguageCode: languageCode)
+                ?? languageCode
+            return PlayerSubtitleTrack(
+                id: "\(languageCode)|\(url.absoluteString)",
+                languageCode: languageCode,
+                displayName: displayName,
+                url: url,
+                format: format,
+                isDefault: subtitle.isDefault == true
+                    || languageCode.caseInsensitiveCompare(defaultSubtitleLanguage ?? "") == .orderedSame
+            )
+        }
+    }
+
     private func fallbackMP4Source() -> PlayerMediaSource? {
         guard let mp4 = fallbackMp4Url ?? qualities.first?.url,
               let mp4URL = URL(string: mp4) else { return nil }

@@ -38,6 +38,9 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var timeObserver: Any?
     private var itemEndObserver: Any?
     private var subtitleCues: [PlayerSubtitleCue] = []
+    private var desiredPlaybackRate: Float = 1
+    private let subtitleLanguagePreferenceKey = "player.preferredSubtitleLanguage"
+    private let subtitlesDisabledPreferenceKey = "player.subtitlesDisabled"
     private let recoveryController = PlayerRecoveryController()
     private var preloadTasks: [Task<Void, Never>] = []
     private var subtitleTask: Task<Void, Never>?
@@ -285,7 +288,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         log("play: wantsPlayback=\(wantsPlayback) hasPlayer=\(currentPlayer != nil)")
 
         if let player = currentPlayer {
-            player.play()
+            startPlayback(player)
             state = .playing
             log("play: player.play() called rate=\(player.rate) status=\(statusString(player.currentItem?.status))")
         }
@@ -299,7 +302,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
         wantsPlayback = true
         if let player = currentPlayer {
-            player.play()
+            startPlayback(player)
             state = .playing
             log("playFromSystemResume: 恢复播放")
         }
@@ -361,7 +364,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
     }
 
     func setRate(_ rate: Float) {
-        currentPlayer?.rate = rate
+        desiredPlaybackRate = rate
+        if wantsPlayback {
+            currentPlayer?.rate = rate
+        }
         log("setRate: \(rate)")
     }
 
@@ -401,6 +407,20 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     func selectSubtitle(_ id: String?) {
         selectedSubtitleID = id
+        if let tracks = currentItem?.externalSubtitles, !tracks.isEmpty {
+            guard let id,
+                  let track = tracks.first(where: { $0.id == id }) else {
+                UserDefaults.standard.set(true, forKey: subtitlesDisabledPreferenceKey)
+                subtitleTask?.cancel()
+                subtitleCues.removeAll()
+                subtitleText = nil
+                return
+            }
+            UserDefaults.standard.set(false, forKey: subtitlesDisabledPreferenceKey)
+            UserDefaults.standard.set(track.languageCode, forKey: subtitleLanguagePreferenceKey)
+            loadExternalSubtitle(track)
+            return
+        }
         guard let item = currentPlayer?.currentItem else { return }
         Task {
             if let group = try? await item.asset.loadMediaSelectionGroup(for: .legible) {
@@ -503,14 +523,31 @@ final class ShortVideoPlayerEngine: ObservableObject {
         setupItemStatusKVO(player)
 
         if autoplay, wantsPlayback {
-            player.play()
+            startPlayback(player)
             state = .playing
             log("rebuildItem: 恢复播放")
         }
     }
 
     func loadExternalSubtitles(_ tracks: [PlayerSubtitleTrack]) {
-        guard let track = tracks.first(where: { $0.isDefault }) ?? tracks.first else { return }
+        availableSubtitles = tracks.map {
+            PlayerSubtitleOption(id: $0.id, displayName: $0.displayName, languageCode: $0.languageCode)
+        }
+        if UserDefaults.standard.bool(forKey: subtitlesDisabledPreferenceKey) {
+            selectedSubtitleID = nil
+            subtitleCues.removeAll()
+            subtitleText = nil
+            return
+        }
+        let preferredLanguage = UserDefaults.standard.string(forKey: subtitleLanguagePreferenceKey)
+        guard let track = tracks.first(where: {
+            $0.languageCode.caseInsensitiveCompare(preferredLanguage ?? "") == .orderedSame
+        }) ?? tracks.first(where: { $0.isDefault }) ?? tracks.first else { return }
+        selectedSubtitleID = track.id
+        loadExternalSubtitle(track)
+    }
+
+    private func loadExternalSubtitle(_ track: PlayerSubtitleTrack) {
         subtitleTask?.cancel()
         subtitleTask = Task { [weak self] in
             let cues = await SubtitleParser().parse(url: track.url, format: track.format)
@@ -584,19 +621,23 @@ final class ShortVideoPlayerEngine: ObservableObject {
         player.currentItem?.preferredForwardBufferDuration = 0
         player.automaticallyWaitsToMinimizeStalling = false
 
-        // 自动加载字幕（按 source 类型）
+        // 自动加载字幕。播放合同中的外挂字幕优先于媒体内封字幕。
         if let item = currentItem {
-            switch item.source {
-            case .mp4WithExternalSubtitles(_, let subtitles):
-                loadExternalSubtitles(subtitles)
-            case .mp4WithEmbeddedSubtitles, .hls, .hlsWithFallback:
-                if let asset = player.currentItem?.asset {
-                    Task { [weak self] in
-                        let subs = await PlayerItemFactory.embeddedSubtitles(from: asset)
-                        self?.availableSubtitles = subs
+            if !item.externalSubtitles.isEmpty {
+                loadExternalSubtitles(item.externalSubtitles)
+            } else {
+                switch item.source {
+                case .mp4WithExternalSubtitles(_, let subtitles):
+                    loadExternalSubtitles(subtitles)
+                case .mp4WithEmbeddedSubtitles, .hls, .hlsWithFallback:
+                    if let asset = player.currentItem?.asset {
+                        Task { [weak self] in
+                            let subs = await PlayerItemFactory.embeddedSubtitles(from: asset)
+                            self?.availableSubtitles = subs
+                        }
                     }
+                default: break
                 }
-            default: break
             }
         }
 
@@ -607,7 +648,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         if let pendingItem = pendingCurrentSourceUpgrade {
             replaceCurrentItemForSourceUpgrade(pendingItem, on: player)
         } else if wantsPlayback {
-            player.play()
+            startPlayback(player)
             state = .playing
             log("attach: 自动播放（wantsPlayback=true）")
         }
@@ -638,10 +679,13 @@ final class ShortVideoPlayerEngine: ObservableObject {
         startObserving()
 
         state = .preparing
+        if !item.externalSubtitles.isEmpty {
+            loadExternalSubtitles(item.externalSubtitles)
+        }
         markTrace("正式播放源升级")
         log("正式播放源升级: id=\(item.id) 保留进度=\(String(format: "%.2f", sourceUpgradeResumeTime))s")
         if wantsPlayback {
-            player.play()
+            startPlayback(player)
         }
     }
 
@@ -661,7 +705,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                     self.progress = nextProgress
                 }
                 if self.wantsPlayback {
-                    player.play()
+                    self.startPlayback(player)
                     self.state = .playing
                 }
                 self.log("正式播放源升级完成: 续播=\(String(format: "%.2f", resumeTime))s 成功=\(finished)")
@@ -700,7 +744,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                     self.recoveryController.detachObservers()
                     self.recoveryController.attachObservers(to: player)
                     self.setupItemStatusKVO(player)
-                    if self.wantsPlayback { player.play(); self.state = .playing }
+                    if self.wantsPlayback { self.startPlayback(player); self.state = .playing }
                 } else {
                     if !self.directFallbackMediaIDs.contains(cur.id) {
                         self.directFallbackMediaIDs.insert(cur.id)
@@ -714,6 +758,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 }
             }
         }
+    }
+
+    private func startPlayback(_ player: AVPlayer) {
+        player.playImmediately(atRate: desiredPlaybackRate)
     }
 
     private func preloadAdjacent(gen: Int) {

@@ -148,6 +148,65 @@ struct PlayerQualitySheet: View {
     }
 }
 
+// MARK: - Player Subtitle Sheet
+
+struct PlayerSubtitleSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let subtitles: [PlayerSubtitleOption]
+    let selectedSubtitleID: String?
+    let onSelect: (String?) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Spacer().frame(width: 36)
+                Spacer()
+                Text("Subtitles")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                        .frame(width: 36, height: 36)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
+
+            subtitleRow(id: nil, title: "Off")
+            ForEach(subtitles) { option in
+                subtitleRow(id: option.id, title: option.displayName)
+            }
+            Spacer(minLength: 30)
+        }
+        .background(DB.panelElevated)
+    }
+
+    private func subtitleRow(id: String?, title: String) -> some View {
+        Button {
+            onSelect(id)
+            dismiss()
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(.white)
+                Spacer()
+                if selectedSubtitleID == id {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(DB.pink)
+                }
+            }
+            .padding(.horizontal, 20)
+            .frame(height: 50)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Player More Sheet
 
 /// 更多选项底部面板（清晰度/字幕/反馈）
