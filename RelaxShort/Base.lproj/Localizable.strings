@@ -248,6 +248,9 @@
 "membership.monthly_detail" = "Billed monthly.";
 "member.plan.yearly_detail" = "Billed yearly.";
 "member.why_join" = "Why Join?";
+"member.more_benefits" = "More for Members";
+"member.simple_title" = "Membership made simple";
+"member.subscription_details" = "Subscription Details";
 "member.benefit.unlimited" = "Unlimited Access";
 "member.benefit.unlimited_detail" = "Watch paid and members-only episodes while your subscription is active.";
 "member.benefit.download" = "Download";

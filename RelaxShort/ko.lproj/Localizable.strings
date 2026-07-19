@@ -242,6 +242,9 @@
 "membership.monthly_detail" = "매월 결제됩니다.";
 "member.plan.yearly_detail" = "매년 결제됩니다.";
 "member.why_join" = "멤버십 혜택";
+"member.more_benefits" = "더 많은 회원 혜택";
+"member.simple_title" = "간편한 멤버십";
+"member.subscription_details" = "구독 세부 정보";
 "member.benefit.unlimited" = "무제한 시청";
 "member.benefit.unlimited_detail" = "구독 기간 동안 유료 및 회원 전용 에피소드를 시청할 수 있습니다.";
 "member.benefit.download" = "다운로드";

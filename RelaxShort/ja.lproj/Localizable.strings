@@ -242,6 +242,9 @@
 "membership.monthly_detail" = "月ごとに請求されます。";
 "member.plan.yearly_detail" = "年ごとに請求されます。";
 "member.why_join" = "メンバー特典";
+"member.more_benefits" = "その他の会員特典";
+"member.simple_title" = "かんたんメンバーシップ";
+"member.subscription_details" = "サブスクリプションの詳細";
 "member.benefit.unlimited" = "見放題";
 "member.benefit.unlimited_detail" = "登録期間中、有料エピソードと会員限定エピソードを視聴できます。";
 "member.benefit.download" = "ダウンロード";

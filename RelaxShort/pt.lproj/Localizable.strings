@@ -242,6 +242,9 @@
 "membership.monthly_detail" = "Cobrança mensal.";
 "member.plan.yearly_detail" = "Cobrança anual.";
 "member.why_join" = "Por que Assinar?";
+"member.more_benefits" = "Mais benefícios para membros";
+"member.simple_title" = "Assinatura sem complicações";
+"member.subscription_details" = "Detalhes da assinatura";
 "member.benefit.unlimited" = "Acesso Ilimitado";
 "member.benefit.unlimited_detail" = "Assista a episódios pagos e exclusivos enquanto a assinatura estiver ativa.";
 "member.benefit.download" = "Download";

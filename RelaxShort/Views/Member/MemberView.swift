@@ -123,7 +123,6 @@ struct MemberView: View {
     @Environment(\.dismiss) private var dismiss
 
     @StateObject private var viewModel: MemberViewModel
-    @State private var scrollOffsetY: CGFloat = 0
     @State private var purchaseMessage: String?
     @State private var showsPurchaseMessage = false
     @State private var purchaseAlertOffersProfile = false
@@ -138,16 +137,11 @@ struct MemberView: View {
 
     // MARK: - Layout Constants
 
-    private let backgroundHeight: CGFloat = 260
-    private let titleInitialTop: CGFloat = 64
-    @ScaledMetric(relativeTo: .largeTitle)
-    private var titleHeight: CGFloat = 52
+    private let heroHeight: CGFloat = 410
     private let pageInset: CGFloat = 16
-    private let planCardGap: CGFloat = 12
-    private let planRadius: CGFloat = 6
-    private let selectedRailWidth: CGFloat = 54
-    private let benefitIconSize: CGFloat = 30
-    private let benefitRowSpacing: CGFloat = 24
+    private let planCardGap: CGFloat = 8
+    private let planRadius: CGFloat = 12
+    private var memberGold: Color { DT.memberGold }
 
     // MARK: - Body
 
@@ -164,56 +158,31 @@ struct MemberView: View {
             let tabClearance = mode == .tab
                 ? DramaBoxBottomTabBar.totalHeight + bottomInset
                 : 0
-            let titleOffsetY = max(
-                titleInitialTop - scrollOffsetY,
-                0
-            )
-            let pinProgress = min(
-                max(
-                    (scrollOffsetY - titleInitialTop + 12) / 12,
-                    0
-                ),
-                1
-            )
 
-            ZStack(alignment: .top) {
+            ZStack {
                 Color.black.ignoresSafeArea()
-
-                fixedBackground(
-                    width: geo.size.width,
-                    topInset: topInset
-                )
-                .opacity(1 - pinProgress)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
-                        MemberScrollOffsetReader(offsetY: $scrollOffsetY)
-                            .frame(width: 1, height: 1)
-
-                        Color.clear.frame(
-                            height: titleInitialTop + titleHeight - 1
+                        heroSection(
+                            width: geo.size.width,
+                            topInset: topInset
                         )
 
                         plansSection
-                            .padding(.top, DT.Space.md)
+                            .padding(.top, DT.Space.sm)
                         benefitsSection
-                            .padding(.top, DT.Space.xxl)
+                            .padding(.top, 36)
                         memberDramasSection(width: geo.size.width)
-                            .padding(.top, DT.Space.xxl)
+                            .padding(.top, 36)
+                        membershipSimpleSection
+                            .padding(.top, 36)
                         termsSection
-                            .padding(.top, DT.Space.xl)
+                            .padding(.top, 28)
                     }
-                    .padding(.bottom, DT.Space.xl)
+                    .padding(.bottom, 28)
                 }
-
-                pinnedTitleMask
-                    .opacity(pinProgress)
-                    .zIndex(2)
-
-                memberTitle
-                    .offset(y: titleOffsetY)
-                    .zIndex(3)
-
+                .ignoresSafeArea(edges: .top)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 fixedCTA(
@@ -250,86 +219,120 @@ struct MemberView: View {
     }
 }
 
-// MARK: - Fixed Background + Sticky Title
+// MARK: - Hero
 extension MemberView {
 
-    @ViewBuilder
-    private func fixedBackground(width: CGFloat, topInset: CGFloat) -> some View {
+    private func heroSection(width: CGFloat, topInset: CGFloat) -> some View {
         ZStack(alignment: .top) {
             if let poster = viewModel.backgroundPosters.first {
                 CoverImageView(
                     url: poster.coverURL,
-                    aspectRatio: DT.Layout.bannerAspectRatio,
+                    aspectRatio: 0.9,
                     cornerRadius: 0,
                     width: width,
-                    height: backgroundHeight + topInset
+                    height: heroHeight + topInset
                 )
-                .frame(width: width, height: backgroundHeight + topInset)
+                .frame(width: width, height: heroHeight + topInset)
                 .clipped()
             } else {
-                Color(hex: "#0D0D0D")
+                LinearGradient(
+                    colors: [
+                        Color(hex: "#260705"),
+                        Color(hex: "#090303"),
+                        .black
+                    ],
+                    startPoint: .topTrailing,
+                    endPoint: .bottom
+                )
             }
 
-            // 固定封面只承担氛围背景，渐变保证前景内容始终可读。
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.18),
-                    Color.black.opacity(0.34),
-                    Color.black.opacity(0.68),
+                    Color.black.opacity(0.24),
+                    Color.black.opacity(0.46),
+                    Color.black.opacity(0.84),
                     Color.black
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
 
+            RadialGradient(
+                colors: [
+                    DT.logoRed.opacity(0.24),
+                    Color.clear
+                ],
+                center: .topTrailing,
+                startRadius: 8,
+                endRadius: 280
+            )
+
+            VStack(spacing: 0) {
+                memberHeader
+
+                Spacer(minLength: 8)
+
+                VIPCrownView(
+                    width: 128,
+                    height: 94,
+                    glowColor: memberGold,
+                    glowRadius: 3
+                )
+
+                Text("vip.unlock_all".localized)
+                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .foregroundColor(memberGold)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
+                    .padding(.top, 6)
+
+                Text("member.benefit.unlimited_detail".localized)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(.white.opacity(0.68))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 6)
+                    .padding(.horizontal, 34)
+
+                Spacer(minLength: 24)
+            }
+            .padding(.top, topInset)
+            .padding(.horizontal, pageInset)
         }
-        .frame(width: width, height: backgroundHeight + topInset)
-        .offset(y: -topInset)
-        .ignoresSafeArea(edges: .top)
-        .accessibilityHidden(true)
+        .frame(width: width, height: heroHeight + topInset)
+        .accessibilityElement(children: .contain)
     }
 
-    /// 标题和恢复购买始终使用同一个视图，仅连续改变纵向位置，避免吸附时闪切。
-    private var memberTitle: some View {
-        HStack(spacing: DT.Space.xs) {
+    private var memberHeader: some View {
+        HStack(spacing: 4) {
             if mode == .push {
                 Button(action: { dismiss() }) {
                     Image(systemName: "chevron.left")
                         .font(.headline.weight(.semibold))
                         .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
+                        .frame(width: 40, height: 44)
                 }
                 .accessibilityLabel("common.back".localized)
             }
 
             Text("member.title".localized)
-                .font(.largeTitle.weight(.heavy))
+                .font(.system(size: 27, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.7)
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Button(action: restorePurchase) {
                 Text("member.restore".localized)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.white)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
                     .frame(minWidth: 44, minHeight: 44)
             }
             .disabled(storeKit.isPurchasing)
         }
-        .frame(height: titleHeight)
-        .padding(.horizontal, mode == .push ? DT.Space.sm : pageInset)
-    }
-
-    /// 接近吸附点时连续渐入，覆盖状态栏和标题区域，滚动内容不会透出。
-    private var pinnedTitleMask: some View {
-        Color.black
-            .frame(height: titleHeight)
-            .background(
-                Color.black
-                    .ignoresSafeArea(edges: .top)
-            )
     }
 
     private func restorePurchase() {
@@ -381,8 +384,10 @@ extension MemberView {
                     .frame(maxWidth: .infinity, minHeight: 88)
                 }
             } else {
-                ForEach(viewModel.plans) { plan in
-                    planCard(for: plan)
+                HStack(alignment: .bottom, spacing: planCardGap) {
+                    ForEach(viewModel.plans) { plan in
+                        planCard(for: plan)
+                    }
                 }
 
                 if viewModel.plans.allSatisfy({
@@ -425,99 +430,94 @@ extension MemberView {
                 viewModel.selectedPlanID = plan.id
             }
         }) {
-            HStack(spacing: 0) {
-                // 左侧选中栏
-                ZStack {
-                    Rectangle()
-                        .fill(isSelected ? DT.logoRed : DT.Color.textTertiary.opacity(0.3))
-                        .frame(width: selectedRailWidth)
-                        .cornerRadius(planRadius, corners: [.topLeft, .bottomLeft])
+            VStack(spacing: 7) {
+                HStack(spacing: 4) {
+                    Text(plan.titleKey.localized)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
 
-                    // 选中标记
                     if isSelected {
-                        Image(systemName: "checkmark")
-                            .font(.headline.weight(.bold))
-                            .foregroundColor(.white)
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(memberGold)
                             .accessibilityHidden(true)
                     }
                 }
-                .frame(width: selectedRailWidth)
 
-                HStack {
-                    VStack(alignment: .leading, spacing: DT.Space.sm) {
-                        Text(plan.titleKey.localized)
-                            .font(.headline)
-                            .foregroundColor(.white)
+                Text(displayedPrice)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.64)
 
-                        if let promotion = plan.promotion,
-                           offer != nil,
-                           let countdown = viewModel
-                            .formattedPromotionCountdown(for: promotion) {
-                            Text(
-                                "\(promotion.badgeKey.localized) \(countdown)"
-                            )
-                            .font(.caption.weight(.bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, DT.Space.sm)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule().fill(Color.purple.opacity(0.9))
-                            )
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        HStack(alignment: .lastTextBaseline, spacing: DT.Space.xs) {
-                            Text(displayedPrice)
-                                .font(.title2.weight(.bold))
-                                .foregroundColor(.white)
-
-                            if offer != nil, let standardPrice {
-                                Text(standardPrice)
-                                    .font(.subheadline)
-                                    .foregroundColor(.white.opacity(0.68))
-                                    .strikethrough(
-                                        true,
-                                        color: .white.opacity(0.68)
-                                    )
-                            }
-                        }
-
-                        if let offer,
-                           let promotion = plan.promotion {
-                            Text(
-                                String(
-                                    format: promotion.titleKey.localized,
-                                    offer.displayPrice,
-                                    offer.periodCount
-                                )
-                            )
-                            .font(.footnote)
-                            .foregroundColor(.white.opacity(0.76))
-                            .fixedSize(horizontal: false, vertical: true)
-                        } else {
-                            Text(plan.detailKey.localized)
-                                .font(.footnote)
-                                .foregroundColor(.white.opacity(0.76))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-
-                    Spacer()
+                if offer != nil, let standardPrice {
+                    Text(standardPrice)
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.5))
+                        .strikethrough(true, color: .white.opacity(0.5))
+                        .lineLimit(1)
                 }
-                .padding(.horizontal, DT.Space.md)
-                .padding(.vertical, DT.Space.lg)
+
+                Group {
+                    if let promotion = plan.promotion,
+                       offer != nil,
+                       let countdown = viewModel
+                        .formattedPromotionCountdown(for: promotion) {
+                        Text(
+                            "\(promotion.badgeKey.localized) · \(countdown)"
+                        )
+                    } else {
+                        Text(plan.detailKey.localized)
+                    }
+                }
+                .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? memberGold : .white.opacity(0.48))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+                .frame(minHeight: 26, alignment: .top)
             }
-            .frame(minHeight: 112)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: isSelected ? 142 : 132)
             .background(
                 RoundedRectangle(cornerRadius: planRadius)
-                    .fill(DT.Color.bgCard)
+                    .fill(
+                        isSelected
+                            ? LinearGradient(
+                                colors: [
+                                    Color(hex: "#510D0B"),
+                                    Color(hex: "#220706")
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            : LinearGradient(
+                                colors: [
+                                    Color(hex: "#101010"),
+                                    Color(hex: "#070707")
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: planRadius)
                     .stroke(
-                        isSelected ? DT.logoRed : DT.Color.textTertiary.opacity(0.3),
-                        lineWidth: isSelected ? 1 : 0.5
+                        isSelected
+                            ? memberGold
+                            : Color.white.opacity(0.14),
+                        lineWidth: isSelected ? 1.2 : 0.7
                     )
+            )
+            .shadow(
+                color: isSelected ? DT.logoRed.opacity(0.2) : .clear,
+                radius: 12,
+                y: 5
             )
         }
         .buttonStyle(.plain)
@@ -573,47 +573,154 @@ extension MemberView {
     private var benefitsSection: some View {
         Group {
             if !viewModel.benefits.isEmpty {
-                VStack(alignment: .leading, spacing: DT.Space.lg) {
+                let primaryBenefits = Array(viewModel.benefits.prefix(4))
+                let moreBenefits = Array(viewModel.benefits.dropFirst(4))
+
+                VStack(alignment: .leading, spacing: 16) {
                     Text("member.why_join".localized)
                         .font(.title2.weight(.bold))
                         .foregroundColor(.white)
-                        .padding(.horizontal, pageInset)
 
-                    VStack(spacing: benefitRowSpacing) {
-                        ForEach(viewModel.benefits) { benefit in
-                            benefitRow(for: benefit)
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: 0),
+                            GridItem(.flexible(), spacing: 0)
+                        ],
+                        spacing: 0
+                    ) {
+                        ForEach(
+                            Array(primaryBenefits.enumerated()),
+                            id: \.element.id
+                        ) { index, benefit in
+                            primaryBenefitCell(
+                                benefit,
+                                index: index,
+                                count: primaryBenefits.count
+                            )
                         }
                     }
-                    .padding(.horizontal, pageInset)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(hex: "#0B0B0B"))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                    )
+
+                    if !moreBenefits.isEmpty {
+                        Text("member.more_benefits".localized)
+                            .font(.title3.weight(.bold))
+                            .foregroundColor(.white)
+                            .padding(.top, 8)
+
+                        VStack(spacing: 0) {
+                            ForEach(
+                                Array(moreBenefits.enumerated()),
+                                id: \.element.id
+                            ) { index, benefit in
+                                secondaryBenefitRow(benefit)
+
+                                if index < moreBenefits.count - 1 {
+                                    Divider()
+                                        .overlay(Color.white.opacity(0.1))
+                                        .padding(.leading, 58)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color(hex: "#0B0B0B"))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+                        )
+                    }
                 }
+                .padding(.horizontal, pageInset)
             }
         }
     }
 
-    private func benefitRow(
-        for benefit: MemberBenefitDisplayItem
+    private func primaryBenefitCell(
+        _ benefit: MemberBenefitDisplayItem,
+        index: Int,
+        count: Int
     ) -> some View {
-        HStack(spacing: DT.Space.md) {
+        VStack(alignment: .leading, spacing: 8) {
             Image(systemName: benefit.icon)
-                .font(.headline.weight(.medium))
-                .foregroundColor(.white)
-                .frame(width: benefitIconSize)
+                .font(.system(size: 25, weight: .regular))
+                .foregroundColor(memberGold)
+                .frame(width: 34, height: 30, alignment: .leading)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(benefit.titleKey.localized)
-                    .font(.body)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
+                    .lineLimit(2)
 
                 if let detailKey = benefit.detailKey {
                     Text(detailKey.localized)
-                        .font(.footnote)
-                        .foregroundColor(.white.opacity(0.76))
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.56))
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 118, alignment: .topLeading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 16)
+        .overlay(alignment: .trailing) {
+            if index.isMultiple(of: 2), index + 1 < count {
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 0.5)
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if index < 2, count > 2 {
+                Rectangle()
+                    .fill(Color.white.opacity(0.1))
+                    .frame(height: 0.5)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func secondaryBenefitRow(
+        _ benefit: MemberBenefitDisplayItem
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: benefit.icon)
+                .font(.system(size: 24, weight: .regular))
+                .foregroundColor(memberGold)
+                .frame(width: 34)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(benefit.titleKey.localized)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                if let detailKey = benefit.detailKey {
+                    Text(detailKey.localized)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.56))
+                        .lineLimit(2)
                 }
             }
 
-            Spacer()
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.58))
+                .accessibilityHidden(true)
         }
+        .frame(minHeight: 76)
         .accessibilityElement(children: .combine)
     }
 }
@@ -629,7 +736,7 @@ extension MemberView {
         case .loaded where viewModel.memberOnlyDramas.isEmpty:
             EmptyView()
         case .loading, .loaded, .failed:
-            VStack(alignment: .leading, spacing: DT.Space.md) {
+            VStack(alignment: .leading, spacing: 16) {
                 Text("member.dramas.title".localized)
                     .font(.title2.weight(.bold))
                     .foregroundColor(.white)
@@ -655,7 +762,7 @@ extension MemberView {
         let cardHeight = cardWidth / DT.Layout.cardAspectRatio
         let columns: [GridItem] = Array(repeating: .init(.flexible(), spacing: columnSpacing), count: 3)
 
-        return LazyVGrid(columns: columns, spacing: DT.Space.md) {
+        return LazyVGrid(columns: columns, spacing: 18) {
             ForEach(viewModel.memberOnlyDramas) { drama in
                 Button {
                     appStore.navigationTarget = SeriesPlayerNav(
@@ -665,17 +772,33 @@ extension MemberView {
                     )
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
-                        CoverImageView(
-                            url: drama.coverURL,
-                            aspectRatio: DT.Layout.cardAspectRatio,
-                            cornerRadius: 2,
-                            width: cardWidth,
-                            height: cardHeight
-                        )
+                        ZStack(alignment: .topLeading) {
+                            CoverImageView(
+                                url: drama.coverURL,
+                                aspectRatio: DT.Layout.cardAspectRatio,
+                                cornerRadius: 8,
+                                width: cardWidth,
+                                height: cardHeight
+                            )
+
+                            Text("VIP")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(Color(hex: "#2A1603"))
+                                .padding(.horizontal, 7)
+                                .frame(height: 20)
+                                .background(memberGold)
+                                .clipShape(
+                                    UnevenRoundedRectangle(
+                                        topLeadingRadius: 8,
+                                        bottomTrailingRadius: 5
+                                    )
+                                )
+                        }
                         Text(drama.title)
-                            .font(.caption.weight(.medium))
+                            .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white)
                             .lineLimit(2)
+                            .multilineTextAlignment(.leading)
                     }
                     .frame(width: cardWidth)
                 }
@@ -691,9 +814,9 @@ extension MemberView {
         let cardHeight = cardWidth / DT.Layout.cardAspectRatio
         let columns: [GridItem] = Array(repeating: .init(.flexible(), spacing: columnSpacing), count: 3)
 
-        return LazyVGrid(columns: columns, spacing: DT.Space.md) {
-            ForEach(0..<3, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: 2)
+        return LazyVGrid(columns: columns, spacing: 18) {
+            ForEach(0..<6, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 8)
                     .fill(DT.Color.bgCard)
                     .frame(width: cardWidth, height: cardHeight)
                     .shimmer(true)
@@ -732,67 +855,216 @@ extension MemberView {
     }
 }
 
+// MARK: - Membership Guidance
+extension MemberView {
+
+    private var membershipSimpleSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("member.simple_title".localized)
+                .font(.title2.weight(.bold))
+                .foregroundColor(.white)
+
+            VStack(spacing: 0) {
+                membershipSimpleRow(
+                    icon: "bolt",
+                    title: "member.benefit.unlimited".localized,
+                    detail: "member.benefit.unlimited_detail".localized
+                )
+
+                membershipGuideDivider
+
+                membershipSimpleRow(
+                    icon: "arrow.triangle.2.circlepath",
+                    title: "member.auto_renew".localized,
+                    detail: "member.disclosure.renewal".localized
+                )
+
+                membershipGuideDivider
+
+                membershipSimpleRow(
+                    icon: "arrow.clockwise",
+                    title: "member.restore".localized,
+                    detail: "member.disclosure.restore".localized,
+                    actionTitle: "member.restore".localized,
+                    action: restorePurchase
+                )
+            }
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(hex: "#0B0B0B"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+            )
+        }
+        .padding(.horizontal, pageInset)
+    }
+
+    private var membershipGuideDivider: some View {
+        Divider()
+            .overlay(Color.white.opacity(0.1))
+            .padding(.leading, 50)
+    }
+
+    private func membershipSimpleRow(
+        icon: String,
+        title: String,
+        detail: String,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .regular))
+                .foregroundColor(memberGold)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(detail)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.56))
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 8)
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(memberGold)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .disabled(storeKit.isPurchasing)
+            }
+        }
+        .padding(.vertical, 12)
+        .frame(minHeight: 76)
+        .accessibilityElement(children: action == nil ? .combine : .contain)
+    }
+}
+
 // MARK: - Terms Section
 extension MemberView {
 
     private var termsSection: some View {
-        VStack(alignment: .leading, spacing: DT.Space.md) {
-            Text("member.tips.title".localized)
-                .font(.headline)
-                .foregroundColor(.white.opacity(0.82))
+        VStack(alignment: .leading, spacing: 16) {
+            Text("member.subscription_details".localized)
+                .font(.title2.weight(.bold))
+                .foregroundColor(.white)
 
-            VStack(alignment: .leading, spacing: DT.Space.sm) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach([
                     "member.disclosure.access",
                     "member.disclosure.renewal",
                     "member.disclosure.restore"
                 ], id: \.self) { key in
-                    Text(key.localized)
-                        .font(.footnote)
-                        .foregroundColor(.white.opacity(0.76))
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .top, spacing: 8) {
+                        Circle()
+                            .fill(Color.white.opacity(0.42))
+                            .frame(width: 4, height: 4)
+                            .padding(.top, 7)
+
+                        Text(key.localized)
+                            .font(.system(size: 13))
+                            .foregroundColor(.white.opacity(0.58))
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
 
-            VStack(alignment: .leading, spacing: DT.Space.xs) {
+            VStack(spacing: 0) {
                 if let links = viewModel.legalLinks {
                     Link(
-                        "member.terms".localized,
                         destination: links.termsURL
-                    )
-                    .frame(minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-                    Link(
-                        "member.privacy".localized,
-                        destination: links.privacyURL
-                    )
-                    .frame(minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
-                } else {
-                    Text("member.legal_unavailable".localized)
-                        .font(.footnote)
-                        .foregroundColor(.white.opacity(0.76))
-                    Button(L10n.commonRetry) {
-                        viewModel.retry()
+                    ) {
+                        legalRow(
+                            icon: "doc.text",
+                            title: "member.terms".localized
+                        )
                     }
-                    .frame(minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+
+                    legalDivider
+
+                    Link(
+                        destination: links.privacyURL
+                    ) {
+                        legalRow(
+                            icon: "shield",
+                            title: "member.privacy".localized
+                        )
+                    }
+                } else {
+                    VStack(spacing: 6) {
+                        Text("member.legal_unavailable".localized)
+                            .font(.footnote)
+                            .foregroundColor(.white.opacity(0.62))
+                        Button(L10n.commonRetry) {
+                            viewModel.retry()
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                    }
+                    .padding(.vertical, 8)
                 }
 
-                Button(
-                    "member.manage_subscription".localized,
-                    action: manageSubscription
-                )
-                .frame(minHeight: 44, alignment: .leading)
-                .contentShape(Rectangle())
+                legalDivider
+
+                Button(action: manageSubscription) {
+                    legalRow(
+                        icon: "person.crop.circle",
+                        title: "member.manage_subscription".localized
+                    )
+                }
             }
-            .font(.footnote.weight(.semibold))
-            .foregroundColor(.white)
-            .tint(.white)
-            .frame(minHeight: 44, alignment: .leading)
+            .buttonStyle(.plain)
+            .tint(memberGold)
+            .padding(.horizontal, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(hex: "#0B0B0B"))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.12), lineWidth: 0.8)
+            )
         }
         .padding(.horizontal, pageInset)
+    }
+
+    private var legalDivider: some View {
+        Divider()
+            .overlay(Color.white.opacity(0.1))
+            .padding(.leading, 44)
+    }
+
+    private func legalRow(icon: String, title: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(memberGold)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(memberGold)
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(memberGold.opacity(0.82))
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 48)
+        .contentShape(Rectangle())
     }
 
     private func manageSubscription() {
@@ -822,7 +1094,7 @@ extension MemberView {
         bottomClearance: CGFloat,
         availableWidth: CGFloat
     ) -> some View {
-        let buttonWidth = max(272, min(availableWidth - 48, 340))
+        let buttonWidth = max(272, availableWidth - pageInset * 2)
         let plan = viewModel.plans.first {
             $0.id == viewModel.selectedPlanID
         }
@@ -866,10 +1138,19 @@ extension MemberView {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(minHeight: 52)
+                .frame(minHeight: 50)
                 .background(
-                    RoundedRectangle(cornerRadius: DB.posterRadius)
-                        .fill(DT.logoRed)
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "#F02E31"),
+                                    Color(hex: "#D70F1D")
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                 )
             }
             .buttonStyle(.plain)
@@ -889,7 +1170,11 @@ extension MemberView {
         .padding(.bottom, bottomClearance + DT.Space.sm)
         .background(
             LinearGradient(
-                colors: [Color.black.opacity(0), Color.black],
+                colors: [
+                    Color.black.opacity(0),
+                    Color.black.opacity(0.94),
+                    Color.black
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )

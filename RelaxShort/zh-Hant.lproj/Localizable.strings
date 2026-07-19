@@ -242,6 +242,9 @@
 "membership.monthly_detail" = "按月自動續訂。";
 "member.plan.yearly_detail" = "按年自動續訂。";
 "member.why_join" = "為什麼加入會員？";
+"member.more_benefits" = "更多會員權益";
+"member.simple_title" = "會員訂閱很簡單";
+"member.subscription_details" = "訂閱說明";
 "member.benefit.unlimited" = "無限暢看";
 "member.benefit.unlimited_detail" = "訂閱有效期內暢看付費劇集和會員專屬劇集。";
 "member.benefit.download" = "離線下載";

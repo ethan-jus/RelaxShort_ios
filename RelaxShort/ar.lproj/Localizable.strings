@@ -242,6 +242,9 @@
 "membership.monthly_detail" = "تتم الفوترة شهريًا.";
 "member.plan.yearly_detail" = "تتم الفوترة سنويًا.";
 "member.why_join" = "لماذا تنضم؟";
+"member.more_benefits" = "مزايا أكثر للأعضاء";
+"member.simple_title" = "عضوية بكل سهولة";
+"member.subscription_details" = "تفاصيل الاشتراك";
 "member.benefit.unlimited" = "وصول غير محدود";
 "member.benefit.unlimited_detail" = "شاهد الحلقات المدفوعة والحصرية أثناء سريان الاشتراك.";
 "member.benefit.download" = "تنزيل";

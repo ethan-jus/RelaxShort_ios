@@ -242,6 +242,9 @@
 "membership.monthly_detail" = "Facturación mensual.";
 "member.plan.yearly_detail" = "Facturación anual.";
 "member.why_join" = "¿Por qué unirse?";
+"member.more_benefits" = "Más ventajas para miembros";
+"member.simple_title" = "Membresía sin complicaciones";
+"member.subscription_details" = "Detalles de la suscripción";
 "member.benefit.unlimited" = "Acceso Ilimitado";
 "member.benefit.unlimited_detail" = "Mira episodios de pago y exclusivos mientras la suscripción esté activa.";
 "member.benefit.download" = "Descargar";

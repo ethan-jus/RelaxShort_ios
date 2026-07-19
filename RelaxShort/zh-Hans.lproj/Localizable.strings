@@ -247,6 +247,9 @@
 "membership.monthly_detail" = "按月自动续费。";
 "member.plan.yearly_detail" = "按年自动续费。";
 "member.why_join" = "为什么加入会员？";
+"member.more_benefits" = "更多会员权益";
+"member.simple_title" = "会员订阅很简单";
+"member.subscription_details" = "订阅说明";
 "member.benefit.unlimited" = "无限畅看";
 "member.benefit.unlimited_detail" = "订阅有效期内畅看付费剧集和会员专属剧集。";
 "member.benefit.download" = "离线下载";
