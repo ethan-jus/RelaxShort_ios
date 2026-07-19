@@ -18,7 +18,7 @@ struct PlayerSpeedSheet: View {
             HStack {
                 Spacer().frame(width: 36)
                 Spacer()
-                Text("Speed")
+                Text("player.speed".localized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
@@ -85,7 +85,7 @@ struct PlayerQualitySheet: View {
             HStack {
                 Spacer().frame(width: 36)
                 Spacer()
-                Text("Current Quality")
+                Text("player.current_resolution".localized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
@@ -161,7 +161,7 @@ struct PlayerSubtitleSheet: View {
             HStack {
                 Spacer().frame(width: 36)
                 Spacer()
-                Text("Subtitles")
+                Text("player.subtitles".localized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
@@ -176,7 +176,7 @@ struct PlayerSubtitleSheet: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
 
-            subtitleRow(id: nil, title: "Off")
+            subtitleRow(id: nil, title: "player.subtitles_off".localized)
             ForEach(subtitles) { option in
                 subtitleRow(id: option.id, title: option.displayName)
             }
@@ -226,22 +226,22 @@ struct PlayerMoreSheet: View {
                 .padding(.bottom, 16)
 
             VStack(spacing: 0) {
-                moreRow(icon: "timer", title: "Speed", disabled: false) {
+                moreRow(icon: "timer", title: "player.speed".localized, disabled: false) {
                     dismiss(); onSpeed()
                 }
                 Divider().background(Color.white.opacity(0.08)).padding(.leading, 56)
 
-                moreRow(icon: "4k.tv", title: "Quality", disabled: false) {
+                moreRow(icon: "4k.tv", title: L10n.quality, disabled: false) {
                     dismiss(); onQuality()
                 }
                 Divider().background(Color.white.opacity(0.08)).padding(.leading, 56)
 
-                moreRow(icon: "captions.bubble", title: "Subtitles", disabled: true) {
+                moreRow(icon: "captions.bubble", title: "player.subtitles".localized, disabled: false) {
                     dismiss(); onSubtitles()
                 }
                 Divider().background(Color.white.opacity(0.08)).padding(.leading, 56)
 
-                moreRow(icon: "exclamationmark.bubble", title: "Report subtitle issue", disabled: true) {
+                moreRow(icon: "exclamationmark.bubble", title: "player.report_subtitle_issue".localized, disabled: false) {
                     dismiss(); onReport()
                 }
             }

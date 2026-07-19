@@ -30,9 +30,17 @@ final class HomeViewModel: ObservableObject {
     /// 分类错误信息
     @Published var categoryErrorMessage: String?
 
-    let tabs: [String] = [
-        "Popular", "New", "Rankings", "Categories", "Anime", "VIP", "Original+"
-    ]
+    var tabs: [String] {
+        [
+            "home.tab.popular".localized,
+            "home.tab.new".localized,
+            "home.tab.rankings".localized,
+            "home.tab.categories".localized,
+            "home.tab.anime".localized,
+            "VIP",
+            "Original+"
+        ]
+    }
 
     var hasContent: Bool { !fixedDramas.isEmpty }
 
@@ -116,7 +124,7 @@ final class HomeViewModel: ObservableObject {
            !description.isEmpty {
             return description
         }
-        return "加载失败，请检查网络后重试"
+        return "network.load_failed_retry".localized
     }
 
     // MARK: - Category Drama Loading

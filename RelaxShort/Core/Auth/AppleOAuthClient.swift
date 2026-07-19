@@ -32,13 +32,13 @@ enum AppleOAuthError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingIdentityToken:
-            return "Apple 登录未返回身份令牌。"
+            return "auth.apple_missing_token".localized
         case .missingAuthorizationCode:
-            return "Apple 登录未返回授权码。"
+            return "auth.apple_missing_code".localized
         case .randomGenerationFailed:
-            return "安全随机数生成失败，请重试。"
+            return "auth.nonce_failed".localized
         case .unexpectedCredentialType:
-            return "Apple 登录返回了意外的凭据类型。"
+            return "auth.apple_unexpected_credential".localized
         }
     }
 }

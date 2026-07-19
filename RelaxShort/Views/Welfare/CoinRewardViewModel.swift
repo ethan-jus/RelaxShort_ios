@@ -120,7 +120,7 @@ final class CoinRewardViewModel: ObservableObject {
             guard placement.enabled,
                   placement.format == .rewarded,
                   remainingAdWatchCount > 0 else {
-                throw APIError(code: "ADS_NOT_AVAILABLE", message: "激励广告暂不可用")
+                throw APIError(code: "ADS_NOT_AVAILABLE", message: "reward.ad_unavailable".localized)
             }
 
             let session = try await adRewardRepository.startSession(
@@ -129,7 +129,7 @@ final class CoinRewardViewModel: ObservableObject {
                 targetEpisodeID: nil
             )
             guard session.placement.format == .rewarded else {
-                throw APIError(code: "AD_FORMAT_MISMATCH", message: "广告配置不一致，请稍后重试")
+                throw APIError(code: "AD_FORMAT_MISMATCH", message: "reward.ad_config_mismatch".localized)
             }
 
             let result = await adService.showRewardedAd(
@@ -139,19 +139,19 @@ final class CoinRewardViewModel: ObservableObject {
             guard case .rewarded = result else {
                 await adRewardRepository.cancelSession(session)
                 if case .failed = result {
-                    errorMessage = "广告加载失败，请稍后重试"
+                    errorMessage = "reward.ad_load_failed".localized
                 }
                 return
             }
 
             guard try await waitForDelivery(of: session) else {
-                throw APIError(code: "AD_REWARD_PENDING", message: "奖励确认中，请稍后刷新")
+                throw APIError(code: "AD_REWARD_PENDING", message: "reward.ad_pending".localized)
             }
             apply(try await repository.fetchRewardCenter())
         } catch let error as APIError {
             errorMessage = error.localizedDescription
         } catch {
-            errorMessage = "广告暂不可用，请检查网络后重试"
+            errorMessage = "reward.ad_network_unavailable".localized
         }
     }
 
@@ -196,7 +196,7 @@ final class CoinRewardViewModel: ObservableObject {
         guard config.adsEnabled,
               placement.enabled,
               placement.format == .rewarded else {
-            throw APIError(code: "ADS_NOT_AVAILABLE", message: "激励广告暂不可用")
+            throw APIError(code: "ADS_NOT_AVAILABLE", message: "reward.ad_unavailable".localized)
         }
         rewardedCoinPlacement = placement
         await adService.preloadRewardedAd(placement: placement)

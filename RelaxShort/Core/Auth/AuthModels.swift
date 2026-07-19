@@ -51,15 +51,15 @@ enum AuthError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingGoogleIDToken:
-            return "Google 未返回有效身份令牌，请重试。"
+            return "auth.missing_google_token".localized
         case .missingFacebookAuthenticationToken:
-            return "未获取到 Facebook 认证令牌"
+            return "auth.missing_facebook_token".localized
         case .noPresentingViewController:
-            return "暂时无法打开登录页面，请重试。"
+            return "auth.cannot_open_login".localized
         case .invalidSession:
-            return "登录状态已失效，请重新登录。"
+            return "auth.invalid_session".localized
         case .keychain:
-            return "无法安全保存登录状态。"
+            return "auth.keychain_failed".localized
         }
     }
 }

@@ -23,12 +23,12 @@ struct Bookmark: Codable, Identifiable {
     var relativeTime: String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = AppLocalization.locale
         return formatter.localizedString(for: bookmarkedAt, relativeTo: Date())
     }
 
     /// 收藏状态文案
     var statusText: String {
-        isBookmarked ? "已收藏" : "已取消收藏"
+        isBookmarked ? "favorites.added_toast".localized : "favorites.removed_toast".localized
     }
 }

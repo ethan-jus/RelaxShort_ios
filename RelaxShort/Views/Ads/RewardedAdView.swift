@@ -242,7 +242,7 @@ struct RewardedAdView: View {
             Button {
                 onDismiss?()
             } label: {
-                Text("Got it")
+                Text("general.got_it".localized)
                     .font(DT.Font.button)
                     .foregroundColor(DT.Color.textPrimary)
                     .frame(maxWidth: .infinity)

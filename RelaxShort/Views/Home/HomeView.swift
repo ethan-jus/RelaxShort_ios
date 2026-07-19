@@ -282,7 +282,7 @@ struct HomeView: View {
     }
 
     private func newDateBadge(for index: Int) -> String {
-        if index < 2 { return "Today" }
+        if index < 2 { return "general.today".localized }
         return index < 5 ? "06/21" : "06/20"
     }
 
@@ -308,21 +308,26 @@ struct HomeView: View {
     /// 语言行：All + 常用语言码映射
     private var languageOptions: [CategoryFilterOption] {
         [
-            CategoryFilterOption(id: "All", title: "All"),
-            CategoryFilterOption(id: "local", title: "Local"),
-            CategoryFilterOption(id: "zh-Hans", title: "Chinese"),
-            CategoryFilterOption(id: "ko", title: "Korean"),
-            CategoryFilterOption(id: "ja", title: "Japanese"),
-            CategoryFilterOption(id: "es", title: "Spanish"),
-            CategoryFilterOption(id: "others", title: "Others"),
-            CategoryFilterOption(id: "en", title: "English")
+            CategoryFilterOption(id: "All", title: "filter.all".localized),
+            CategoryFilterOption(id: "local", title: "filter.local".localized),
+            CategoryFilterOption(id: "zh-Hans", title: "lang.zh_hans".localized),
+            CategoryFilterOption(id: "ko", title: "lang.ko".localized),
+            CategoryFilterOption(id: "ja", title: "lang.ja".localized),
+            CategoryFilterOption(id: "es", title: "lang.es".localized),
+            CategoryFilterOption(id: "others", title: "filter.others".localized),
+            CategoryFilterOption(id: "en", title: "lang.en".localized)
         ]
     }
 
     private var genreOptions: [CategoryFilterOption] {
-        var opts = [CategoryFilterOption(id: "All", title: "All")]
+        var opts = [CategoryFilterOption(id: "All", title: "filter.all".localized)]
         for cat in viewModel.categories {
-            opts.append(CategoryFilterOption(id: cat.code, title: cat.title))
+            opts.append(
+                CategoryFilterOption(
+                    id: cat.code,
+                    title: L10n.categoryDisplayName(cat.title)
+                )
+            )
         }
         return opts
     }
@@ -330,10 +335,10 @@ struct HomeView: View {
     /// 付费行：All / Paid / Members Only / Free（前端过滤）
     private var paymentOptions: [CategoryFilterOption] {
         [
-            CategoryFilterOption(id: "All", title: "All"),
-            CategoryFilterOption(id: "paid", title: "Paid"),
-            CategoryFilterOption(id: "member", title: "Members Only"),
-            CategoryFilterOption(id: "free", title: "Free")
+            CategoryFilterOption(id: "All", title: "filter.all".localized),
+            CategoryFilterOption(id: "paid", title: "filter.paid".localized),
+            CategoryFilterOption(id: "member", title: "filter.members_only".localized),
+            CategoryFilterOption(id: "free", title: "filter.free".localized)
         ]
     }
 
@@ -366,11 +371,13 @@ struct HomeView: View {
             selectedPayment == "All" ? nil : title(for: selectedPayment, in: paymentOptions)
         ].compactMap { $0 }
 
-        return selectedTitles.isEmpty ? "Categories" : selectedTitles.joined(separator: " · ")
+        return selectedTitles.isEmpty
+            ? "home.tab.categories".localized
+            : selectedTitles.joined(separator: " · ")
     }
 
     private func title(for id: String, in options: [CategoryFilterOption]) -> String {
-        options.first(where: { $0.id == id })?.title ?? "All"
+        options.first(where: { $0.id == id })?.title ?? "filter.all".localized
     }
 
     private var categoriesTabContent: some View {
@@ -452,7 +459,7 @@ struct HomeView: View {
                 }
             } label: {
                 HStack(spacing: 6) {
-                    Text("Collapse")
+                    Text(L10n.collapse)
                     Image(systemName: "chevron.up")
                 }
                 .font(.system(size: 15, weight: .semibold))
@@ -493,7 +500,7 @@ struct HomeView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
                             Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                            Text("\(drama.episodeCount) EP").font(.system(size: 10)).foregroundColor(DB.mutedText)
+                            Text("home.episode_short".localizedFormat(drama.episodeCount)).font(.system(size: 10)).foregroundColor(DB.mutedText)
                         }
                     }.buttonStyle(.plain)
                 }
@@ -610,7 +617,7 @@ struct HomeView: View {
                                     if let languageTag = drama.languageTag, !languageTag.isEmpty {
                                         Text(languageTag).font(.system(size: 12)).foregroundColor(DB.mutedText)
                                     }
-                                    Text("\(drama.episodeCount) EP").font(.system(size: 12)).foregroundColor(DB.mutedText)
+                                    Text("home.episode_short".localizedFormat(drama.episodeCount)).font(.system(size: 12)).foregroundColor(DB.mutedText)
                                 }
                             }
                             Spacer(minLength: 0)
@@ -637,7 +644,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 28) {
                     if !weeklyItems.isEmpty {
                         HomePosterRailSection(
-                            title: weeklySection?.titleKey ?? "Weekly Featured",
+                            title: (weeklySection?.titleKey ?? "home.weekly_featured").localized,
                             dramas: weeklyItems,
                             playerDrama: seriesNavigationBinding,
                             containerW: containerW
@@ -645,7 +652,7 @@ struct HomeView: View {
                     }
                     if !classicsItems.isEmpty {
                         HomeDramaListSection(
-                            title: classicsSection?.titleKey ?? "VIP Classics",
+                            title: (classicsSection?.titleKey ?? "home.vip_classics").localized,
                             dramas: classicsItems,
                             playerDrama: seriesNavigationBinding,
                             containerW: containerW
@@ -653,7 +660,7 @@ struct HomeView: View {
                     }
                 }
             } else {
-                Text("No VIP content yet").font(.system(size: 14)).foregroundColor(DB.mutedText).padding(.top, 80)
+                Text("home.no_vip_content".localized).font(.system(size: 14)).foregroundColor(DB.mutedText).padding(.top, 80)
             }
             Color.clear.frame(height: 64)
         }
@@ -665,15 +672,15 @@ struct HomeView: View {
     private func originalPlusTabContent(containerW: CGFloat) -> some View {
         let heroItems = Array((viewModel.section("original_hero", in: "original_plus")?.items ?? []).prefix(3))
         let railSections = [
-            ("original_exclusive", "Exclusive Originals"),
-            ("original_new_releases", "New Releases"),
-            ("original_nextgen", "NextGen Stories"),
-            ("original_hidden_identity", "Hidden Identity"),
-            ("original_sweet_love", "Sweet Love"),
-            ("original_werewolf_mafia", "Werewolf & Mafia")
+            ("original_exclusive", "home.exclusive_originals"),
+            ("original_new_releases", "search.tab.new_releases"),
+            ("original_nextgen", "home.nextgen_stories"),
+            ("original_hidden_identity", "home.hidden_identity"),
+            ("original_sweet_love", "home.sweet_love"),
+            ("original_werewolf_mafia", "home.werewolf_mafia")
         ].compactMap { code, fallbackTitle -> (String, [DramaItem])? in
             guard let section = viewModel.section(code, in: "original_plus"), !section.items.isEmpty else { return nil }
-            return (section.titleKey ?? fallbackTitle, section.items)
+            return ((section.titleKey ?? fallbackTitle).localized, section.items)
         }
         let topCharts = viewModel.section("original_top_charts", in: "original_plus")?.items ?? []
         let hasContent = !heroItems.isEmpty || !railSections.isEmpty || !topCharts.isEmpty
@@ -698,7 +705,7 @@ struct HomeView: View {
                     }
                     if !topCharts.isEmpty {
                         HomeDramaListSection(
-                            title: "Top Charts",
+                            title: "home.top_charts".localized,
                             dramas: topCharts,
                             playerDrama: seriesNavigationBinding,
                             containerW: containerW
@@ -706,7 +713,7 @@ struct HomeView: View {
                     }
                 }
             } else {
-                Text("No Original+ content yet").font(.system(size: 14)).foregroundColor(DB.mutedText).padding(.top, 80)
+                Text("home.no_original_content".localized).font(.system(size: 14)).foregroundColor(DB.mutedText).padding(.top, 80)
             }
             Color.clear.frame(height: 64)
         }
@@ -772,7 +779,7 @@ private struct NewDramaRow: View {
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(drama.synopsis.isEmpty ? "A short drama imported from legacy playable media." : drama.synopsis)
+                    Text(drama.synopsis.isEmpty ? "home.synopsis_unavailable".localized : drama.synopsis)
                         .font(.system(size: 14, weight: .regular))
                         .foregroundColor(DB.mutedText)
                         .lineLimit(2)
@@ -781,14 +788,14 @@ private struct NewDramaRow: View {
                     Spacer(minLength: 0)
 
                     HStack(spacing: 10) {
-                        Text(drama.category.isEmpty ? "Drama" : drama.category)
+                        Text(drama.category.isEmpty ? "profile.drama".localized : L10n.categoryDisplayName(drama.category))
                             .lineLimit(1)
                         if let tag = drama.tags.first, !tag.isEmpty {
                             Text(tag)
                                 .lineLimit(1)
                         }
                         Spacer(minLength: 8)
-                        Text("\(drama.episodeCount) Episodes")
+                        Text("favorites.total_episodes".localizedFormat(drama.episodeCount))
                             .lineLimit(1)
                     }
                     .font(.system(size: 15, weight: .regular))

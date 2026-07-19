@@ -26,19 +26,19 @@ enum NetworkError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "无效的请求地址"
+            return "network.invalid_url".localized
         case .invalidResponse:
-            return "服务器响应异常"
+            return "network.invalid_response".localized
         case .badStatus(let code):
-            return "请求失败（状态码：\(code)）"
+            return "network.bad_status".localizedFormat(code)
         case .decodingFailed(let error):
-            return "数据解析失败：\(error.localizedDescription)"
+            return "network.decoding_failed".localizedFormat(error.localizedDescription)
         case .networkTimeout:
-            return "请求超时，请检查网络后重试"
+            return "network.timeout".localized
         case .unauthorized:
-            return "登录已过期，请重新登录"
+            return "network.unauthorized".localized
         case .noConnection:
-            return "网络连接不可用，请检查网络设置"
+            return "network.no_connection".localized
         case .serverMessage(let message):
             return message
         }

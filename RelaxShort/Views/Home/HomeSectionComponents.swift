@@ -215,10 +215,10 @@ struct HomeDramaListSection: View {
                                         .lineLimit(2)
                                 }
                                 HStack(spacing: 8) {
-                                    Text(drama.category)
+                                    Text(L10n.categoryDisplayName(drama.category))
                                         .font(.system(size: 12))
                                         .foregroundColor(DB.mutedText)
-                                    Text("\(drama.episodeCount) EP")
+                                    Text("home.episode_short".localizedFormat(drama.episodeCount))
                                         .font(.system(size: 12))
                                         .foregroundColor(DB.mutedText)
                                 }

@@ -445,7 +445,7 @@ extension MemberView {
                 for receipt in receipts where receipt.requiresBackendVerification {
                     let account = try await dependencies.detailRepository.verifyVIPPurchase(receipt)
                     guard account.isVIP else {
-                        throw APIError(code: "VIP_NOT_ACTIVE", message: "会员权益尚未生效，请稍后重试")
+                        throw APIError(code: "VIP_NOT_ACTIVE", message: "store.error_membership_pending".localized)
                     }
                     await storeKit.completeVIPDelivery(receipt)
                 }
@@ -1428,7 +1428,7 @@ extension MemberView {
                 if receipt.requiresBackendVerification {
                     let account = try await dependencies.detailRepository.verifyVIPPurchase(receipt)
                     guard account.isVIP else {
-                        throw APIError(code: "VIP_NOT_ACTIVE", message: "会员权益尚未生效，请稍后重试")
+                        throw APIError(code: "VIP_NOT_ACTIVE", message: "store.error_membership_pending".localized)
                     }
                     await storeKit.completeVIPDelivery(receipt)
                 }

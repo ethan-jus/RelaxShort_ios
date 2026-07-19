@@ -171,7 +171,7 @@ struct CoinRewardView: View {
             .presentationDragIndicator(.visible)
         }
         .alert(
-            "奖励暂不可用",
+            "reward.unavailable".localized,
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
@@ -193,7 +193,7 @@ private extension CoinRewardView {
             Color.black.opacity(0.96)
                 .ignoresSafeArea(edges: .top)
 
-            Text("奖励中心")
+            Text("reward.center".localized)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
 
@@ -206,7 +206,7 @@ private extension CoinRewardView {
                             .frame(width: 40, height: 40)
                             .contentShape(Rectangle())
                     }
-                    .accessibilityLabel("返回")
+                    .accessibilityLabel("common.back".localized)
                 } else {
                     Color.clear.frame(width: 40, height: 40)
                 }
@@ -311,7 +311,7 @@ private extension CoinRewardView {
         VStack(alignment: .leading, spacing: 18) {
             rewardSectionHeader(
                 title: L10n.coinDailyCheckIn,
-                subtitle: "连续签到7天，金币奖励逐步提升",
+                subtitle: "reward.check_in_subtitle".localized,
                 completed: viewModel.checkedInCount,
                 total: 7,
                 color: rewardGold
@@ -374,12 +374,12 @@ private extension CoinRewardView {
 
     var checkInButtonTitle: String {
         if viewModel.claimedCheckInToday {
-            return "今日已签到"
+            return "reward.checked_in_today".localized
         }
         if let reward = viewModel.nextCheckInReward {
-            return "立即签到  +\(reward)"
+            return "reward.check_in_now_amount".localizedFormat(reward)
         }
-        return viewModel.isLoading ? L10n.loading : "立即签到"
+        return viewModel.isLoading ? L10n.loading : "reward.check_in_now".localized
     }
 }
 
@@ -389,8 +389,8 @@ private extension CoinRewardView {
     var watchAndEarnSection: some View {
         VStack(alignment: .leading, spacing: 18) {
             rewardSectionHeader(
-                title: "看视频赚金币",
-                subtitle: "完整观看视频，领取金币奖励",
+                title: "reward.watch_video_title".localized,
+                subtitle: "reward.watch_video_subtitle".localized,
                 completed: viewModel.dailyAdWatchCount,
                 total: max(
                     viewModel.maxDailyAdWatchCount,
@@ -446,7 +446,7 @@ private extension CoinRewardView {
             HStack(spacing: 5) {
                 Image(systemName: "exclamationmark.circle")
                     .font(.system(size: 11, weight: .medium))
-                Text("完整观看后发放奖励，每日 UTC 00:00 重置")
+                Text("reward.ad_reset_notice".localized)
                     .font(.system(size: 11))
             }
             .foregroundColor(.white.opacity(0.4))
@@ -457,12 +457,12 @@ private extension CoinRewardView {
 
     var watchAdButtonTitle: String {
         guard viewModel.remainingAdWatchCount > 0 else {
-            return "今日奖励已全部领取"
+            return "reward.all_claimed_today".localized
         }
         guard !viewModel.adRewardSteps.isEmpty else {
-            return viewModel.isLoading ? L10n.loading : "奖励暂不可用"
+            return viewModel.isLoading ? L10n.loading : "reward.unavailable".localized
         }
-        return "观看视频  +\(viewModel.adWatchCoinReward)"
+        return "reward.watch_video_amount".localizedFormat(viewModel.adWatchCoinReward)
     }
 }
 
@@ -472,10 +472,10 @@ private extension CoinRewardView {
     var moreRewardsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("做任务赚金币")
+                Text("reward.tasks_title".localized)
                     .font(.system(size: 21, weight: .bold))
                     .foregroundColor(.white)
-                Text("完成任务后，金币自动到账")
+                Text("reward.tasks_subtitle".localized)
                     .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.42))
             }
@@ -509,12 +509,12 @@ private extension CoinRewardView {
                 .frame(width: 24, height: 30)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
+                Text(taskTitle(task))
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white.opacity(0.92))
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
-                Text(task.description)
+                Text(taskDescription(task))
                     .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.42))
                     .lineLimit(2)
@@ -528,7 +528,7 @@ private extension CoinRewardView {
                 Button {
                     performTaskAction(task)
                 } label: {
-                    Text(task.completed ? "已完成" : taskButtonTitle(task))
+                    Text(task.completed ? "reward.completed".localized : taskButtonTitle(task))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(task.completed ? .white.opacity(0.38) : rewardGold)
                         .lineLimit(1)
@@ -585,10 +585,22 @@ private extension CoinRewardView {
 
     func taskButtonTitle(_ task: MarketingRewardTask) -> String {
         switch task.action {
-        case "login": return "去登录"
-        case "share": return "去分享"
-        default: return "去完成"
+        case "login": return "reward.go_login".localized
+        case "share": return "reward.go_share".localized
+        default: return "reward.go_complete".localized
         }
+    }
+
+    func taskTitle(_ task: MarketingRewardTask) -> String {
+        let key = "reward.task.\(task.code).title"
+        let localized = key.localized
+        return localized == key ? task.title : localized
+    }
+
+    func taskDescription(_ task: MarketingRewardTask) -> String {
+        let key = "reward.task.\(task.code).description"
+        let localized = key.localized
+        return localized == key ? task.description : localized
     }
 
     func performTaskAction(_ task: MarketingRewardTask) {
@@ -650,10 +662,10 @@ private extension CoinRewardView {
                     }
 
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("邀请好友，一起追剧")
+                        Text("reward.invite_title".localized)
                             .font(.system(size: 18, weight: .bold))
                             .foregroundColor(.white)
-                        Text("好友完成注册并观看 3 集后，双方获得奖励")
+                        Text("reward.invite_card_subtitle".localized)
                             .font(.system(size: 12))
                             .foregroundColor(.white.opacity(0.52))
                     }
@@ -661,7 +673,7 @@ private extension CoinRewardView {
 
                 HStack(alignment: .center, spacing: 0) {
                     inviteRewardColumn(
-                        title: "你可获得",
+                        title: "reward.you_can_get".localized,
                         amount: viewModel.referral.inviterRewardCoins
                     )
 
@@ -670,7 +682,7 @@ private extension CoinRewardView {
                         .frame(width: 1, height: 44)
 
                     inviteRewardColumn(
-                        title: "好友可获得",
+                        title: "reward.friend_can_get".localized,
                         amount: viewModel.referral.inviteeRewardCoins
                     )
 
@@ -682,7 +694,7 @@ private extension CoinRewardView {
                                 showLogin = true
                             }
                         } label: {
-                            Text("邀请好友")
+                            Text("reward.invite_friend".localized)
                                 .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.black)
                                 .lineLimit(1)
@@ -735,10 +747,10 @@ private extension CoinRewardView {
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("首充金币翻倍")
+                    Text("reward.first_purchase_title".localized)
                         .font(.system(size: 16, weight: .bold))
                         .foregroundColor(.white)
-                    Text("指定首充档位可享等额赠币，到账以购买页为准")
+                    Text("reward.first_purchase_subtitle".localized)
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.42))
                 }
@@ -747,8 +759,8 @@ private extension CoinRewardView {
 
                 Text(
                     viewModel.firstCoinPurchaseBonusAvailable
-                        ? "去购买"
-                        : "已享受"
+                        ? "reward.go_buy".localized
+                        : "reward.used".localized
                 )
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(
@@ -891,7 +903,7 @@ private extension CoinRewardView {
     ) -> some View {
         VStack(spacing: 6) {
             if style == .checkIn {
-                Text(item.current ? "今天" : " ")
+                Text(item.current ? "reward.today".localized : " ")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(color)
                     .frame(height: 8)
@@ -931,7 +943,7 @@ private extension CoinRewardView {
             }
 
             if style == .checkIn {
-                Text("第\(item.label)天")
+                Text("reward.day_number".localizedFormat(item.label))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(.white.opacity(0.32))
                     .lineLimit(1)
@@ -976,7 +988,7 @@ private extension CoinRewardView {
 
     var bottomLegalDisclaimer: some View {
         VStack(spacing: 7) {
-            Text("奖励到账、有效期及每日上限以奖励规则和服务端记录为准。")
+            Text("reward.legal_notice".localized)
             Text(L10n.appleDisclaimer)
         }
         .font(.system(size: 10))
@@ -1034,22 +1046,22 @@ private struct InviteRewardsSheet: View {
                 )
 
                 VStack(spacing: 6) {
-                    Text("邀请好友，一起追剧")
+                    Text("reward.invite_title".localized)
                         .font(.system(size: 23, weight: .bold))
                         .foregroundColor(.white)
-                    Text("好友完成登录并在 7 天内看完 3 集后，奖励自动到账")
+                    Text("reward.invite_sheet_subtitle".localized)
                         .font(.system(size: 13))
                         .foregroundColor(.white.opacity(0.5))
                         .multilineTextAlignment(.center)
                 }
 
                 HStack(spacing: 12) {
-                    inviteReward(title: "你获得", amount: state.inviterRewardCoins)
-                    inviteReward(title: "好友获得", amount: state.inviteeRewardCoins)
+                    inviteReward(title: "reward.you_get".localized, amount: state.inviterRewardCoins)
+                    inviteReward(title: "reward.friend_gets".localized, amount: state.inviteeRewardCoins)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("我的邀请码")
+                    Text("reward.my_invite_code".localized)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(.white.opacity(0.52))
                     HStack {
@@ -1057,7 +1069,7 @@ private struct InviteRewardsSheet: View {
                             .font(.system(size: 24, weight: .bold, design: .monospaced))
                             .foregroundColor(DT.coinGold)
                         Spacer()
-                        Button(copied ? "已复制" : "复制") {
+                        Button(copied ? "reward.copied".localized : "reward.copy".localized) {
                             UIPasteboard.general.string = state.inviteCode
                             copied = true
                         }
@@ -1071,11 +1083,11 @@ private struct InviteRewardsSheet: View {
 
                     Button {
                         activityItems = [
-                            "来 RelaxShort 一起追短剧！完成登录并看完 3 集，你得 \(state.inviteeRewardCoins) 金币。邀请码：\(state.inviteCode)",
+                            "reward.invite_message".localizedFormat(state.inviteeRewardCoins, state.inviteCode),
                             RewardDeepLink.inviteURL(code: state.inviteCode)
                         ]
                     } label: {
-                        Label("邀请好友", systemImage: "square.and.arrow.up")
+                        Label("reward.invite_friend".localized, systemImage: "square.and.arrow.up")
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
@@ -1086,16 +1098,23 @@ private struct InviteRewardsSheet: View {
                 }
 
                 if state.codeApplied {
-                    Text("已绑定邀请码 \(state.appliedCode ?? "") · \(state.appliedStatus == "qualified" ? "奖励已到账" : "完成 3 集后到账")")
+                    Text(
+                        "reward.applied_code_status".localizedFormat(
+                            state.appliedCode ?? "",
+                            state.appliedStatus == "qualified"
+                                ? "reward.received".localized
+                                : "reward.after_three_episodes".localized
+                        )
+                    )
                         .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.48))
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("我有邀请码")
+                        Text("reward.have_invite_code".localized)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.52))
                         HStack(spacing: 10) {
-                            TextField("输入好友邀请码", text: $inputCode)
+                            TextField("reward.enter_invite_code".localized, text: $inputCode)
                                 .textInputAutocapitalization(.characters)
                                 .autocorrectionDisabled()
                                 .font(.system(size: 15, weight: .semibold))
@@ -1105,7 +1124,7 @@ private struct InviteRewardsSheet: View {
                                 .background(Color.white.opacity(0.07))
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                            Button("绑定") {
+                            Button("reward.bind".localized) {
                                 isApplying = true
                                 Task {
                                     if await onApply(inputCode) {
@@ -1124,7 +1143,7 @@ private struct InviteRewardsSheet: View {
                     }
                 }
 
-                Text("累计最多 20 位有效好友；同账号或同设备不计奖励。")
+                Text("reward.invite_limit_notice".localized)
                     .font(.system(size: 11))
                     .foregroundColor(.white.opacity(0.34))
                     .multilineTextAlignment(.center)

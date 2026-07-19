@@ -80,22 +80,12 @@ final class AppStore: ObservableObject {
 // MARK: - 字符串本地化扩展
 
 extension String {
-    /// 便捷本地化方法 — 优先从资源包读取本地化文案，若返回原始键则回退到硬编码中文
+    /// 便捷本地化方法。当前语言缺键时统一回退英文。
     var localized: String {
-        let bundleValue = Bundle.main.localizedString(forKey: self, value: "\u{0010}FALLBACK\u{0010}", table: nil)
-        if bundleValue != "\u{0010}FALLBACK\u{0010}" {
-            return bundleValue
-        }
-        // 回退：使用 L10n 枚举内部的硬编码字典
-        return L10nFallback.value(for: self) ?? self
-    }
-}
-
-/// 本地化回退字典的公开暴露（供字符串本地化扩展使用）
-enum L10nFallback {
-    fileprivate static func value(for key: String) -> String? {
-        return fallbackDict[key]
+        AppLocalization.text(self)
     }
 
-    private static let fallbackDict: [String: String] = [:]
+    func localizedFormat(_ arguments: CVarArg...) -> String {
+        AppLocalization.text(self, arguments: arguments)
+    }
 }

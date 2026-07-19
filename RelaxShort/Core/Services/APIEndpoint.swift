@@ -263,7 +263,7 @@ extension APIEndpoint {
             "Content-Type": "application/json",
             "X-Platform": "ios",
             "X-Client-Version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0",
-            "Accept-Language": Locale.preferredLanguages.first ?? "en"
+            "Accept-Language": AppLocalization.currentLanguage.rawValue
         ]
 
         // App 启动后保存的语言上下文

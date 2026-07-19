@@ -15,18 +15,19 @@ struct RoundedCorner: Shape {
 // MARK: - Helpers
 private func rankText(rank: Int) -> String? {
     guard rank <= 10 else { return nil }
-    let o = rank == 1 ? "1st" : rank == 2 ? "2nd" : rank == 3 ? "3rd" : "\(rank)th"
-    return rank % 2 == 1 ? "\(o) in Most Popular" : "\(o) in Top Searched"
+    return rank % 2 == 1
+        ? "home.rank_most_popular".localizedFormat(rank)
+        : "home.rank_top_searched".localizedFormat(rank)
 }
 
 // MARK: - Category Themes
 struct CategoryTheme { let name: String; let bg: Color; let subBg: Color }
 let categoryThemes: [CategoryTheme] = [
-    CategoryTheme(name:"Counterattack",     bg:Color(red:0.35,green:0.15,blue:0.55),subBg:Color(red:0.45,green:0.25,blue:0.65)),
-    CategoryTheme(name:"Forbidden Love",    bg:Color(red:0.55,green:0.10,blue:0.20),subBg:Color(red:0.65,green:0.20,blue:0.30)),
-    CategoryTheme(name:"Young Adult",       bg:Color(red:0.08,green:0.35,blue:0.38),subBg:Color(red:0.12,green:0.45,blue:0.48)),
-    CategoryTheme(name:"Billionaire's Game",bg:Color(red:0.45,green:0.30,blue:0.08),subBg:Color(red:0.55,green:0.40,blue:0.14)),
-    CategoryTheme(name:"Fantasy Realm",     bg:Color(red:0.18,green:0.15,blue:0.45),subBg:Color(red:0.25,green:0.22,blue:0.55)),
+    CategoryTheme(name:"home.theme_counterattack", bg:Color(red:0.35,green:0.15,blue:0.55),subBg:Color(red:0.45,green:0.25,blue:0.65)),
+    CategoryTheme(name:"home.theme_forbidden_love", bg:Color(red:0.55,green:0.10,blue:0.20),subBg:Color(red:0.65,green:0.20,blue:0.30)),
+    CategoryTheme(name:"home.theme_young_adult", bg:Color(red:0.08,green:0.35,blue:0.38),subBg:Color(red:0.12,green:0.45,blue:0.48)),
+    CategoryTheme(name:"home.theme_billionaire_game",bg:Color(red:0.45,green:0.30,blue:0.08),subBg:Color(red:0.55,green:0.40,blue:0.14)),
+    CategoryTheme(name:"home.theme_fantasy_realm", bg:Color(red:0.18,green:0.15,blue:0.45),subBg:Color(red:0.25,green:0.22,blue:0.55)),
 ]
 
 // MARK: - Marketing Grid (3×3)
@@ -65,7 +66,7 @@ struct YouMightLikeSection: View {
 
     var body: some View {
         VStack(alignment:.leading,spacing:12){
-            Text("You Might Like").font(.system(size:16,weight:.bold)).foregroundColor(DT.Color.textPrimary).padding(.horizontal,margin)
+            Text("home.you_might_like".localized).font(.system(size:16,weight:.bold)).foregroundColor(DT.Color.textPrimary).padding(.horizontal,margin)
             twoColumnLayout
         }
     }
@@ -104,7 +105,7 @@ struct CategoryCard: View {
     let theme:CategoryTheme;let dramas:[DramaItem];let colW:CGFloat;@Binding var playerDrama:DramaItem?
     var body: some View {
         VStack(alignment:.leading,spacing:0){
-            HStack(spacing:0){Text(theme.name).font(.system(size:16,weight:.bold)).foregroundColor(.white);Spacer();Image(systemName:"chevron.right").font(.system(size:14,weight:.bold)).foregroundColor(.white).padding(.trailing,8)}
+            HStack(spacing:0){Text(theme.name.localized).font(.system(size:16,weight:.bold)).foregroundColor(.white);Spacer();Image(systemName:"chevron.right").font(.system(size:14,weight:.bold)).foregroundColor(.white).padding(.trailing,8)}
                 .padding(.bottom,10).padding(.top,2)
             ForEach(Array(dramas.prefix(4).enumerated()),id:\.element.id){idx,drama in
                 Button{playerDrama=drama}label:{

@@ -192,7 +192,7 @@ final class RealAuthRepository: RealAuthRepositoryProtocol {
         }
         let envelope = try decoder.decode(APIResponseEnvelope<T>.self, from: data)
         if let detail = envelope.error {
-            throw APIError(code: detail.code, message: detail.message ?? "请求失败")
+            throw APIError(code: detail.code, message: detail.message ?? "network.request_failed".localized)
         }
         guard let value = envelope.data else { throw NetworkError.invalidResponse }
         return value

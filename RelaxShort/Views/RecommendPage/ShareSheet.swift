@@ -87,7 +87,7 @@ struct ShareSheet: View {
             HStack {
                 Color.clear.frame(width: 40, height: 40)
                 Spacer()
-                Text("分享短剧")
+                Text("share.title".localized)
                     .font(.system(size: 21, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
@@ -104,10 +104,10 @@ struct ShareSheet: View {
             HStack(spacing: 10) {
                 RewardCoinBadge(size: 28, motion: .bounce)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("每日首次成功分享 +20 金币")
+                    Text("share.daily_reward".localized)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
-                    Text("取消、复制链接或保存到本地不计入奖励")
+                    Text("share.reward_exclusions".localized)
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.46))
                 }
@@ -122,11 +122,11 @@ struct ShareSheet: View {
 
             Button {
                 activityItems = [
-                    "正在看《\(dramaTitle)》，点开直接续看：",
+                    "share.message".localizedFormat(dramaTitle),
                     shareURL
                 ]
             } label: {
-                Label("选择好友或应用分享", systemImage: "square.and.arrow.up")
+                Label("share.choose_app".localized, systemImage: "square.and.arrow.up")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
@@ -139,9 +139,9 @@ struct ShareSheet: View {
 
             Button {
                 UIPasteboard.general.url = shareURL
-                statusText = "链接已复制"
+                statusText = "share.link_copied".localized
             } label: {
-                Label("复制链接", systemImage: "link")
+                Label("player.copy_link".localized, systemImage: "link")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white.opacity(0.72))
                     .frame(maxWidth: .infinity)
@@ -179,11 +179,11 @@ struct ShareSheet: View {
                             )
                             rewardSummaryStore.apply(state)
                             await MainActor.run {
-                                statusText = "分享成功，奖励已自动到账"
+                                statusText = "share.reward_received".localized
                             }
                         } catch {
                             await MainActor.run {
-                                statusText = "分享已完成，奖励状态稍后刷新"
+                                statusText = "share.reward_pending".localized
                             }
                         }
                     }

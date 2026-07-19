@@ -242,7 +242,7 @@ struct RewardEarnableBadge: View {
             .offset(y: bounceY)
         }
         .frame(height: 34)
-        .accessibilityLabel("今日可赚 \(value) 金币")
+        .accessibilityLabel("reward.earnable_accessibility".localizedFormat(value))
     }
 }
 

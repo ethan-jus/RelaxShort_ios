@@ -360,7 +360,7 @@ struct SeriesPlayerView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
                 .multilineTextAlignment(.center)
-            Button("Retry") {
+            Button(L10n.retry) {
                 retryCurrentEpisodePlayback()
             }
             .font(.system(size: 14, weight: .semibold))
@@ -368,7 +368,7 @@ struct SeriesPlayerView: View {
             .padding(.horizontal, 24)
             .frame(height: 42)
             .background(.white, in: Capsule())
-            Text("You can also swipe to another episode")
+            Text("player.swipe_another_episode".localized)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.62))
         }
@@ -505,7 +505,7 @@ struct SeriesPlayerView: View {
                 if !state.vipOnly {
                     unlockMetadata(state)
                 } else {
-                    Label("VIP 专享", systemImage: "crown.fill")
+                    Label("player.vip_exclusive".localized, systemImage: "crown.fill")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(unlockPaleGold)
                 }
@@ -517,13 +517,13 @@ struct SeriesPlayerView: View {
                         .frame(width: 34, height: 34)
                         .background(.white.opacity(0.09), in: Circle())
                 }
-                .accessibilityLabel("关闭")
+                .accessibilityLabel("general.close".localized)
             }
 
             VStack(spacing: isCompact ? 8 : 10) {
                 unlockChoice(
-                    title: "VIP 全剧畅看",
-                    subtitle: "无限畅看 · 1080P · 离线下载",
+                    title: "player.vip_all_access".localized,
+                    subtitle: "player.vip_all_access_detail".localized,
                     icon: "crown.fill",
                     selected: state.selection == .vip,
                     height: choiceHeight
@@ -531,8 +531,8 @@ struct SeriesPlayerView: View {
 
                 if state.canUnlockWithCoins {
                     unlockChoice(
-                        title: "金币解锁",
-                        subtitle: "按集解锁 · 永久观看",
+                        title: "player.coin_unlock".localized,
+                        subtitle: "player.coin_unlock_detail".localized,
                         icon: "bitcoinsign.circle.fill",
                         selected: state.selection == .coins,
                         height: choiceHeight
@@ -578,7 +578,7 @@ struct SeriesPlayerView: View {
             Group {
                 if state.canUnlockWithAd {
                     Button { Task { await performUnlock(method: .ads) } } label: {
-                        Text("看广告免费解锁")
+                        Text("player.ad_unlock".localized)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.62))
                             .underline(color: .white.opacity(0.28))
@@ -612,9 +612,9 @@ struct SeriesPlayerView: View {
 
     private func unlockMetadata(_ state: EpisodeUnlockFlowState) -> some View {
         HStack(spacing: 13) {
-            unlockMetadataItem(label: "本集：", value: state.coinCost)
+            unlockMetadataItem(label: "player.this_episode".localized, value: state.coinCost)
             Rectangle().fill(.white.opacity(0.14)).frame(width: 1, height: 18)
-            unlockMetadataItem(label: "余额：", value: state.balance)
+            unlockMetadataItem(label: "player.balance".localized, value: state.balance)
         }
     }
 
@@ -665,7 +665,7 @@ struct SeriesPlayerView: View {
     private func unlockRetentionDialog(_ state: EpisodeUnlockFlowState) -> some View {
         VStack(spacing: 12) {
             HStack {
-                Text(state.vipOnly ? "继续观看" : "选择解锁方式")
+                Text(state.vipOnly ? "player.continue_watching".localized : "player.choose_unlock_method".localized)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(unlockPaleGold)
                 Spacer()
@@ -676,11 +676,11 @@ struct SeriesPlayerView: View {
                         .frame(width: 34, height: 34)
                         .background(.white.opacity(0.09), in: Circle())
                 }
-                .accessibilityLabel("关闭")
+                .accessibilityLabel("general.close".localized)
             }
 
             retentionActionButton(
-                title: state.vipOnly ? "开通 VIP 继续观看" : "继续解锁",
+                title: state.vipOnly ? "player.join_vip_continue".localized : "player.continue_unlock".localized,
                 icon: state.vipOnly ? "crown.fill" : "lock.fill",
                 selected: true,
                 disabled: state.isProcessing,
@@ -689,7 +689,7 @@ struct SeriesPlayerView: View {
 
             if state.canUnlockWithAd {
                 retentionActionButton(
-                    title: "看广告免费解锁",
+                    title: "player.ad_unlock".localized,
                     icon: "play.rectangle.fill",
                     selected: false,
                     disabled: state.isProcessing
@@ -753,11 +753,11 @@ struct SeriesPlayerView: View {
             Image(systemName: "lock.fill")
                 .font(.system(size: 24, weight: .bold))
                 .foregroundStyle(unlockGold)
-            Text("本集未解锁")
+            Text("player.episode_not_unlocked".localized)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.82))
             Button(action: { dismiss() }) {
-                Text("退出播放")
+                Text("player.exit_playback".localized)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(unlockPaleGold)
                     .padding(.horizontal, 28)
@@ -835,7 +835,7 @@ struct SeriesPlayerView: View {
                 unlockState = state
             } catch {
                 guard var state = unlockState, state.episodeNumber == episodeNumber else { return }
-                state.errorMessage = "余额加载失败，请稍后重试"
+                state.errorMessage = "player.balance_load_failed".localized
                 unlockState = state
             }
         }
@@ -859,7 +859,7 @@ struct SeriesPlayerView: View {
             }
             let result = try await dependencies.detailRepository.unlockEpisode(episodeId: episodeID, method: method)
             guard result.unlocked else {
-                throw APIError(code: "UNLOCK_FAILED", message: "解锁失败，请重试")
+                throw APIError(code: "UNLOCK_FAILED", message: "player.unlock_failed".localized)
             }
             if let balance = result.balanceAfter {
                 coinStore.synchronize(balance: balance)
@@ -868,12 +868,14 @@ struct SeriesPlayerView: View {
         } catch let error as APIError {
             guard var latest = unlockState else { return }
             latest.isProcessing = false
-            latest.errorMessage = error.code == "INSUFFICIENT_COINS" ? "金币余额不足，请先充值" : error.localizedDescription
+            latest.errorMessage = error.code == "INSUFFICIENT_COINS"
+                ? "player.insufficient_balance".localized
+                : error.localizedDescription
             unlockState = latest
         } catch {
             guard var latest = unlockState else { return }
             latest.isProcessing = false
-            latest.errorMessage = "解锁失败，请检查网络后重试"
+            latest.errorMessage = "player.unlock_network_failed".localized
             unlockState = latest
         }
     }
@@ -888,7 +890,7 @@ struct SeriesPlayerView: View {
             targetEpisodeID: episodeID
         )
         guard session.placement.format == .rewardedInterstitial else {
-            throw APIError(code: "AD_FORMAT_MISMATCH", message: "广告配置不一致，请稍后重试")
+            throw APIError(code: "AD_FORMAT_MISMATCH", message: "reward.ad_config_mismatch".localized)
         }
 
         let result = await dependencies.adService.showRewardedAd(
@@ -899,9 +901,9 @@ struct SeriesPlayerView: View {
         case .rewarded:
             break
         case .cancelled:
-            throw APIError(code: "AD_NOT_COMPLETED", message: "完整观看广告后才能解锁")
+            throw APIError(code: "AD_NOT_COMPLETED", message: "player.ad_not_completed".localized)
         case .failed:
-            throw APIError(code: "AD_LOAD_FAILED", message: "广告加载失败，请稍后重试")
+            throw APIError(code: "AD_LOAD_FAILED", message: "reward.ad_load_failed".localized)
         }
 
         for attempt in 0..<12 {
@@ -913,7 +915,7 @@ struct SeriesPlayerView: View {
                 try await Task.sleep(for: .milliseconds(500))
             }
         }
-        throw APIError(code: "AD_REWARD_PENDING", message: "解锁确认中，请稍后重试")
+        throw APIError(code: "AD_REWARD_PENDING", message: "player.unlock_pending".localized)
     }
 
     @MainActor
@@ -949,7 +951,7 @@ struct SeriesPlayerView: View {
         ) else {
             guard var state = unlockState else { return }
             state.isProcessing = false
-            state.errorMessage = "播放器状态已变化，请重新进入本集"
+            state.errorMessage = "player.state_changed_reenter".localized
             unlockState = state
             return
         }
@@ -959,7 +961,7 @@ struct SeriesPlayerView: View {
         guard await ensurePlayAsset(for: episodeNumber) else {
             guard var state = unlockState else { return }
             state.isProcessing = false
-            state.errorMessage = "权益已更新，但播放地址加载失败，请重试"
+            state.errorMessage = "player.entitlement_source_failed".localized
             unlockState = state
             return
         }
@@ -971,7 +973,7 @@ struct SeriesPlayerView: View {
             playerCoordinator.engine.endContentTransitionWithoutMedia()
             guard var state = unlockState else { return }
             state.isProcessing = false
-            state.errorMessage = "权益已更新，但当前剧集暂时无法播放"
+            state.errorMessage = "player.entitlement_episode_unavailable".localized
             unlockState = state
             return
         }
@@ -990,7 +992,7 @@ struct SeriesPlayerView: View {
         guard committed else {
             guard var state = unlockState else { return }
             state.isProcessing = false
-            state.errorMessage = "播放器状态已变化，请重试"
+            state.errorMessage = "player.state_changed_retry".localized
             unlockState = state
             return
         }
@@ -1069,7 +1071,7 @@ struct SeriesPlayerView: View {
                 unlockState = state
             }
         } catch {
-            state.errorMessage = "会员状态刷新失败，请重试"
+            state.errorMessage = "player.membership_refresh_failed".localized
             unlockState = state
         }
     }
@@ -1173,7 +1175,7 @@ struct SeriesPlayerView: View {
                 dramaID: drama.id,
                 episodeNumber: currentEpisode
             ) {
-                episodeLoadError = "Unable to load episodes. Please try again."
+                episodeLoadError = "player.load_failed_retry".localized
                 playerCoordinator.engine.deactivate()
             }
             return
@@ -1399,7 +1401,7 @@ struct SeriesPlayerView: View {
                 }
             }
 
-            (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
+            (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
             + Text(drama.synopsis).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
             .lineLimit(2)
             .lineSpacing(3)
@@ -1413,7 +1415,7 @@ struct SeriesPlayerView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 12, weight: .semibold))
-                    Text("Join membership")
+                    Text("membership.join".localized)
                         .font(.system(size: 13, weight: .semibold))
                 }
                 .foregroundColor(DB.gold)
@@ -1429,7 +1431,7 @@ struct SeriesPlayerView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "arrow.down.circle")
                         .font(.system(size: 14, weight: .medium))
-                    Text("Download")
+                    Text(L10n.download)
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(.white.opacity(0.72))
@@ -1748,7 +1750,7 @@ struct SeriesPlayerView: View {
                 guard unlockState == nil else { return }
                 playerCoordinator.engine.endContentTransitionWithoutMedia()
                 if episodeLoadError == nil {
-                    episodeLoadError = "Unable to load this episode. Please try again."
+                    episodeLoadError = "player.episode_load_failed_retry".localized
                 }
                 return
             }
@@ -1779,7 +1781,7 @@ struct SeriesPlayerView: View {
         guard config.adsEnabled,
               placement.enabled,
               placement.format == .rewardedInterstitial else {
-            throw APIError(code: "ADS_NOT_AVAILABLE", message: "广告解锁暂不可用")
+            throw APIError(code: "ADS_NOT_AVAILABLE", message: "player.ad_unlock_unavailable".localized)
         }
         episodeUnlockAdPlacement = placement
         await dependencies.adService.preloadRewardedAd(placement: placement)
@@ -1851,7 +1853,7 @@ struct SeriesPlayerView: View {
             }
             // 同一次请求已经明确失败或被权益拦截，本轮不再立即重试相同接口。
             if recordTrace, unlockState == nil {
-                episodeLoadError = "Unable to load this episode. Please try again."
+                episodeLoadError = "player.episode_load_failed_retry".localized
             }
             return false
         }
@@ -1879,7 +1881,7 @@ struct SeriesPlayerView: View {
             }
             Logger.player.warning("SeriesTrace 播放源为空 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
             if recordTrace {
-                episodeLoadError = "This episode is temporarily unavailable."
+                episodeLoadError = "player.episode_unavailable".localized
                 playerCoordinator.engine.markTrace("播放源失败-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "播放源失败")
             }
@@ -1900,7 +1902,7 @@ struct SeriesPlayerView: View {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
             if recordTrace {
-                episodeLoadError = "Unable to load this episode. Please try again."
+                episodeLoadError = "player.episode_load_failed_retry".localized
                 playerCoordinator.engine.markTrace("网络失败-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "网络失败")
             }
@@ -2085,7 +2087,11 @@ struct SeriesPlayerView: View {
         }
         .id(String(describing: playbackState))
         .buttonStyle(.plain)
-        .accessibilityLabel(playbackState == .playing ? "Pause" : "Play")
+        .accessibilityLabel(
+            playbackState == .playing
+                ? "player.pause".localized
+                : "player.play".localized
+        )
     }
 
     // MARK: - Episode Pager
@@ -2314,11 +2320,11 @@ private struct EpisodePickerSheet: View {
                     CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: 72, height: 96)
                     VStack(alignment: .leading, spacing: 6) {
                         Text(drama.title).font(.system(size: 20, weight: .bold)).foregroundColor(.white).lineLimit(1)
-                        Text("\(drama.formattedViewCount) Views").font(.system(size: 16)).foregroundColor(.white.opacity(0.5))
+                        Text("player.views_count".localizedFormat(drama.formattedViewCount)).font(.system(size: 16)).foregroundColor(.white.opacity(0.5))
                         HStack(spacing: 4) {
                             Image(systemName: "star").font(.system(size: 12))
                             Text(String(format: "%.1f(5.5K)", drama.rating))
-                            Text("Rate").font(.system(size: 12))
+                            Text("player.rate".localized).font(.system(size: 12))
                         }.foregroundColor(.white.opacity(0.5))
                     }
                     Spacer()

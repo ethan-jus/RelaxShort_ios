@@ -56,6 +56,75 @@ enum AppLanguage: String, CaseIterable {
     var isRTL: Bool {
         self == .ar
     }
+
+    /// 首次启动跟随设备的首选语言；不支持的语言统一回退英文。
+    static func preferred(from identifiers: [String] = Locale.preferredLanguages) -> AppLanguage {
+        for identifier in identifiers {
+            let normalized = identifier.replacingOccurrences(of: "_", with: "-").lowercased()
+            if normalized.hasPrefix("zh") {
+                let usesTraditionalChinese =
+                    normalized.contains("hant")
+                    || normalized.contains("-tw")
+                    || normalized.contains("-hk")
+                    || normalized.contains("-mo")
+                return usesTraditionalChinese ? .zhHant : .zhHans
+            }
+            if normalized.hasPrefix("en") { return .en }
+            if normalized.hasPrefix("ko") { return .ko }
+            if normalized.hasPrefix("ja") { return .ja }
+            if normalized.hasPrefix("pt") { return .pt }
+            if normalized.hasPrefix("es") { return .es }
+            if normalized.hasPrefix("ar") { return .ar }
+        }
+        return .en
+    }
+}
+
+// MARK: - Localization Runtime
+
+/// 全 App 唯一的文案查找入口。
+/// 用户选择优先于设备语言，目标语言缺键时只回退英文，避免中英文混杂。
+enum AppLocalization {
+    private static let fallbackMarker = "\u{0010}RELAXSHORT_MISSING\u{0010}"
+
+    static var currentLanguage: AppLanguage {
+        if let saved = UserDefaults.standard.string(forKey: ThemeManager.languageDefaultsKey),
+           let language = AppLanguage(rawValue: saved) {
+            return language
+        }
+        return AppLanguage.preferred()
+    }
+
+    static var locale: Locale {
+        Locale(identifier: currentLanguage.rawValue)
+    }
+
+    static func text(_ key: String, arguments: [CVarArg] = []) -> String {
+        let selected = localizedBundle(for: currentLanguage)
+        let selectedValue = selected?.localizedString(
+            forKey: key,
+            value: fallbackMarker,
+            table: nil
+        ) ?? fallbackMarker
+
+        let template: String
+        if selectedValue != fallbackMarker {
+            template = selectedValue
+        } else {
+            let english = localizedBundle(for: .en)
+            template = english?.localizedString(forKey: key, value: key, table: nil) ?? key
+        }
+
+        guard !arguments.isEmpty else { return template }
+        return String(format: template, locale: locale, arguments: arguments)
+    }
+
+    private static func localizedBundle(for language: AppLanguage) -> Bundle? {
+        guard let path = Bundle.main.path(forResource: language.rawValue, ofType: "lproj") else {
+            return nil
+        }
+        return Bundle(path: path)
+    }
 }
 
 // MARK: - Theme Manager
@@ -65,6 +134,7 @@ enum AppLanguage: String, CaseIterable {
 @MainActor
 final class ThemeManager: ObservableObject {
     static let shared = ThemeManager()
+    static let languageDefaultsKey = "app.language"
 
     @Published var themeMode: ThemeMode {
         didSet { save() }
@@ -76,7 +146,7 @@ final class ThemeManager: ObservableObject {
     private let defaults = UserDefaults.standard
     private enum Keys {
         static let themeMode = "app.themeMode"
-        static let language = "app.language"
+        static let language = ThemeManager.languageDefaultsKey
     }
 
     private init() {
@@ -84,7 +154,8 @@ final class ThemeManager: ObservableObject {
         self.themeMode = savedTheme.flatMap(ThemeMode.init(rawValue:)) ?? .dark
 
         let savedLang = defaults.string(forKey: Keys.language)
-        self.language = savedLang.flatMap(AppLanguage.init(rawValue:)) ?? .zhHans
+        self.language = savedLang.flatMap(AppLanguage.init(rawValue:)) ?? AppLanguage.preferred()
+        applyRTLLayout()
     }
 
     private func save() {

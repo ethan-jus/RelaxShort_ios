@@ -35,7 +35,7 @@ struct Episode: Codable, Identifiable {
     
     /// 解锁条件描述
     var lockDescription: String {
-        isLocked ? "需解锁观看" : "免费观看"
+        isLocked ? "episode.locked_watch".localized : "episode.free_watch".localized
     }
 }
 
@@ -97,8 +97,10 @@ struct EpisodeUnlockFlowState: Equatable {
     var playbackTargetEpisode: Int { episodeNumber }
 
     var primaryButtonTitle: String {
-        if selection == .vip { return "开通 VIP 并解锁" }
-        return hasEnoughCoins ? "使用 \(coinCost) 金币解锁" : "充值并解锁"
+        if selection == .vip { return "player.join_vip_unlock".localized }
+        return hasEnoughCoins
+            ? "episode.unlock_with_coins".localizedFormat(coinCost)
+            : "player.top_up_unlock".localized
     }
 
     mutating func close() {

@@ -59,7 +59,7 @@ struct RightActionBar: View {
                 }
                 .buttonStyle(.plain)
 
-                Text("Share")
+                Text(L10n.share)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(.white)
             }

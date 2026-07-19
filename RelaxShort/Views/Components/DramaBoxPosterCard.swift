@@ -50,12 +50,12 @@ struct DramaBoxPosterCard: View {
 
                 // Subtitle (category + episodes)
                 HStack(spacing: 4) {
-                    Text(drama.category)
+                    Text(L10n.categoryDisplayName(drama.category))
                         .font(.system(size: 11))
                         .foregroundColor(DB.mutedText)
                     Text("·")
                         .foregroundColor(DB.mutedText)
-                    Text("\(drama.episodeCount) EP")
+                    Text("home.episode_short".localizedFormat(drama.episodeCount))
                         .font(.system(size: 11))
                         .foregroundColor(DB.mutedText)
                 }
@@ -70,7 +70,7 @@ struct DramaBoxPosterCard: View {
     private func badgeView(for badge: BadgeType) -> some View {
         switch badge {
         case .hot:
-            Text("HOT")
+            Text("badge.hot".localized)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 6)
@@ -78,7 +78,7 @@ struct DramaBoxPosterCard: View {
                 .background(DB.pink)
                 .cornerRadius(DB.ctaRadius)
         case .new:
-            Text("NEW")
+            Text("badge.new".localized)
                 .font(.system(size: 9, weight: .bold))
                 .foregroundColor(.white)
                 .padding(.horizontal, 6)

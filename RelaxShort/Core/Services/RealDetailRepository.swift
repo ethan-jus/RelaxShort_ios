@@ -101,7 +101,7 @@ final class RealDetailRepository: DetailRepositoryProtocol {
             )
         )
         guard response.status == "completed", let balance = response.wallet?.balance else {
-            throw APIError(code: "PAYMENT_DELIVERY_FAILED", message: "金币尚未到账，请稍后重试")
+            throw APIError(code: "PAYMENT_DELIVERY_FAILED", message: "store.error_coins_pending".localized)
         }
         return Int(truncating: balance as NSNumber)
     }
@@ -114,11 +114,11 @@ final class RealDetailRepository: DetailRepositoryProtocol {
             )
         )
         guard response.status == "completed" else {
-            throw APIError(code: "PAYMENT_DELIVERY_FAILED", message: "会员权益尚未生效，请稍后重试")
+            throw APIError(code: "PAYMENT_DELIVERY_FAILED", message: "store.error_membership_pending".localized)
         }
         let account = try await fetchUnlockAccount()
         guard account.isVIP else {
-            throw APIError(code: "VIP_NOT_ACTIVE", message: "会员权益尚未生效，请稍后重试")
+            throw APIError(code: "VIP_NOT_ACTIVE", message: "store.error_membership_pending".localized)
         }
         return account
     }
@@ -126,7 +126,7 @@ final class RealDetailRepository: DetailRepositoryProtocol {
     func fetchAppleAccountToken() async throws -> UUID {
         let response: AppleAccountTokenResponseDTO = try await client.requestData(.appleAccountToken)
         guard let token = UUID(uuidString: response.appAccountToken) else {
-            throw APIError(code: "INVALID_APP_ACCOUNT_TOKEN", message: "支付账号标识无效，请稍后重试")
+            throw APIError(code: "INVALID_APP_ACCOUNT_TOKEN", message: "store.error_account_token".localized)
         }
         return token
     }

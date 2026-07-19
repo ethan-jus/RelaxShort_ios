@@ -44,12 +44,12 @@ struct SettingsView: View {
                         value: email
                     )
                 }
-                settingRow(title: "Appearance", systemImage: "paintpalette.fill", color: .blue)
+                settingRow(title: "settings.appearance".localized, systemImage: "paintpalette.fill", color: .blue)
                 Button {
                     showClearCacheAlert = true
                 } label: {
                     settingRowWithValue(
-                        title: "Clear Video Cache",
+                        title: "settings.clear_video_cache".localized,
                         systemImage: "trash",
                         color: .gray,
                         value: ByteCountFormatter.string(fromByteCount: cachedVideoBytes, countStyle: .file)
@@ -61,7 +61,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             settingRow(
-                                title: "Account Deletion",
+                                title: "settings.delete_account".localized,
                                 systemImage: "person.crop.circle.badge.minus",
                                 color: .red
                             )
@@ -75,15 +75,15 @@ struct SettingsView: View {
             }
 
             Section {
-                toggleRow(title: "Download with mobile data allowed", isOn: $downloadWithMobileData)
-                toggleRow(title: "Video cache", isOn: $videoCacheEnabled)
-                Picker("Video cache limit", selection: $videoCacheMaximumBytes) {
+                toggleRow(title: "settings.mobile_data_download".localized, isOn: $downloadWithMobileData)
+                toggleRow(title: "settings.video_cache".localized, isOn: $videoCacheEnabled)
+                Picker("settings.video_cache_limit".localized, selection: $videoCacheMaximumBytes) {
                     Text("1 GB").tag(1 * 1024 * 1024 * 1024)
                     Text("2 GB").tag(2 * 1024 * 1024 * 1024)
                     Text("4 GB").tag(4 * 1024 * 1024 * 1024)
                 }
                 .disabled(!videoCacheEnabled)
-                settingRow(title: "About", systemImage: "info.circle", color: .gray)
+                settingRow(title: "settings.about".localized, systemImage: "info.circle", color: .gray)
             }
 
             if authStore.isLoggedIn {
@@ -98,7 +98,7 @@ struct SettingsView: View {
             }
 
             Section {
-                toggleRow(title: "Personalized Recommendations", isOn: $personalizedRecs)
+                toggleRow(title: "settings.personalized_recommendations".localized, isOn: $personalizedRecs)
                 if privacyConsent.isPrivacyOptionsRequired {
                     Button {
                         Task { await privacyConsent.presentPrivacyOptions() }
@@ -110,7 +110,7 @@ struct SettingsView: View {
                         )
                     }
                 }
-                toggleRow(title: "Marketing Communications", isOn: $marketingComms)
+                toggleRow(title: "settings.marketing_communications".localized, isOn: $marketingComms)
             }
 
 #if DEBUG
@@ -139,7 +139,7 @@ struct SettingsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(DB.black)
-        .navigationTitle("Settings")
+        .navigationTitle("profile.settings".localized)
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { refreshCachedVideoBytes() }
         .onChange(of: videoCacheMaximumBytes) { _, _ in
@@ -159,13 +159,13 @@ struct SettingsView: View {
         } message: {
             Text(L10n.logoutConfirmMessage)
         }
-        .alert("Delete Account?", isPresented: $showDeleteAccountAlert) {
+        .alert("settings.delete_account_question".localized, isPresented: $showDeleteAccountAlert) {
             Button(L10n.cancel, role: .cancel) {}
-            Button("Delete Permanently", role: .destructive) {
+            Button("settings.delete_permanently".localized, role: .destructive) {
                 deleteAccount()
             }
         } message: {
-            Text("Your profile, viewing history, bookmarks and account access will be permanently removed. Active App Store subscriptions are not automatically cancelled.")
+            Text("settings.delete_account_message".localized)
         }
         .alert(
             accountDeletionMessage ?? "",
@@ -174,18 +174,18 @@ struct SettingsView: View {
                 set: { if !$0 { accountDeletionMessage = nil } }
             )
         ) {
-            Button("OK") {
+            Button(L10n.generalOk) {
                 if !authStore.isLoggedIn { dismiss() }
             }
         }
-        .alert("Clear video cache?", isPresented: $showClearCacheAlert) {
+        .alert("settings.clear_cache_question".localized, isPresented: $showClearCacheAlert) {
             Button(L10n.cancel, role: .cancel) {}
-            Button("Clear", role: .destructive) {
+            Button("settings.clear".localized, role: .destructive) {
                 HTTPRangeMediaCache.shared.clear()
                 refreshCachedVideoBytes()
             }
         } message: {
-            Text("Cached public videos will be removed. VIP downloads are not affected.")
+            Text("settings.clear_cache_message".localized)
         }
         .alert(
             subscriptionManagementError ?? "",
@@ -220,14 +220,12 @@ struct SettingsView: View {
             do {
                 let manualAppleRevocationRequired = try await authStore.deleteAccount()
                 if manualAppleRevocationRequired {
-                    accountDeletionMessage = """
-                    Your RelaxShort account was deleted. To finish revoking the previous Apple authorization, open Settings > your name > Sign-In & Security > Sign in with Apple, then remove RelaxShort.
-                    """
+                    accountDeletionMessage = "settings.delete_success_apple".localized
                 } else {
-                    accountDeletionMessage = "Your account and personal data were deleted."
+                    accountDeletionMessage = "settings.delete_success".localized
                 }
             } catch {
-                accountDeletionMessage = "Account deletion failed: \(error.localizedDescription)"
+                accountDeletionMessage = "settings.delete_failed".localizedFormat(error.localizedDescription)
             }
             isDeletingAccount = false
         }
@@ -295,13 +293,13 @@ struct TopUpView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: DT.Space.xl) {
-                Text("DramaBox Store")
+                Text("store.title".localized)
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, DT.Space.pageH)
                     .padding(.top, DT.Space.lg)
 
-                Text("Coin Packages")
+                Text("store.coin_packages".localized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, DT.Space.pageH)
@@ -313,7 +311,7 @@ struct TopUpView: View {
                 }
                 .padding(.horizontal, DT.Space.pageH)
 
-                Text("Membership Packages")
+                Text("store.membership_packages".localized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, DT.Space.pageH)
@@ -326,7 +324,7 @@ struct TopUpView: View {
                 }
                 .padding(.horizontal, DT.Space.pageH)
 
-                Text("Payment will be charged to your Apple ID account. Subscriptions automatically renew unless canceled at least 24 hours before the end of the current period. Manage your subscriptions in App Store settings.")
+                Text("store.subscription_notice".localized)
                     .font(.system(size: 11))
                     .foregroundColor(DB.mutedText)
                     .padding(.horizontal, DT.Space.pageH)
@@ -334,7 +332,7 @@ struct TopUpView: View {
             }
         }
         .background(DB.black)
-        .navigationTitle("Top Up")
+        .navigationTitle("profile.top_up".localized)
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -345,8 +343,8 @@ struct TopUpView: View {
                 Image(systemName: "bitcoinsign.circle.fill").font(.system(size: 22)).foregroundColor(DB.gold)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(pkg.amount) Coins").font(.system(size: 16, weight: .medium)).foregroundColor(.white)
-                if let label = pkg.label { Text(label).font(.system(size: 12)).foregroundColor(DB.gold) }
+                Text("store.coins_amount".localizedFormat(pkg.amount)).font(.system(size: 16, weight: .medium)).foregroundColor(.white)
+                if let label = pkg.label { Text(label.localized).font(.system(size: 12)).foregroundColor(DB.gold) }
             }
             Spacer()
             Text(pkg.displayPrice)
@@ -364,8 +362,8 @@ struct TopUpView: View {
                 Image(systemName: "crown.fill").font(.system(size: 20)).foregroundColor(DB.gold)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(plan.title).font(.system(size: 16, weight: .medium)).foregroundColor(.white)
-                if plan.isRecommended { Text("Best Value").font(.system(size: 12)).foregroundColor(DB.pink) }
+                Text(plan.title.localized).font(.system(size: 16, weight: .medium)).foregroundColor(.white)
+                if plan.isRecommended { Text("store.best_value".localized).font(.system(size: 12)).foregroundColor(DB.pink) }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {

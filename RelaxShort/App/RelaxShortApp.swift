@@ -76,6 +76,12 @@ struct RelaxShortApp: App {
                 }
 
             }
+            .id(appStore.language)
+            .environment(\.locale, Locale(identifier: appStore.language.rawValue))
+            .environment(
+                \.layoutDirection,
+                appStore.language.isRTL ? .rightToLeft : .leftToRight
+            )
             .preferredColorScheme(appStore.preferredColorScheme)
             .statusBarHidden(true)
             // 挂在稳定根视图上，避免 Splash 退出时取消尚未完成的 app/init。

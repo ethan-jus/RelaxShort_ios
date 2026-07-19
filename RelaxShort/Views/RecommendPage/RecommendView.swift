@@ -145,7 +145,9 @@ struct RecommendView: View {
                 if showBookmarkToast, let drama = currentDrama {
                     let isBk = dependencies.bookmarkStore.isBookmarked(drama.id)
                     CollectToastView(
-                        message: isBk ? "Added to 'My List'" : "Removed from 'My List'",
+                        message: isBk
+                            ? "favorites.added_toast".localized
+                            : "favorites.removed_toast".localized,
                         systemImage: isBk ? "bookmark.fill" : "bookmark.slash.fill"
                     )
                     .position(x: geo.size.width / 2, y: geo.size.height * 0.65)
@@ -239,10 +241,10 @@ struct RecommendView: View {
 
     private var unavailablePreviewOverlay: some View {
         VStack(spacing: 12) {
-            Text("Preview unavailable")
+            Text("player.preview_unavailable".localized)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
-            Button("Refresh feed") {
+            Button("recommend.refresh_feed".localized) {
                 Task { await viewModel.loadData() }
             }
             .font(.system(size: 14, weight: .semibold))
@@ -250,7 +252,7 @@ struct RecommendView: View {
             .padding(.horizontal, 20)
             .frame(height: 42)
             .background(.white, in: Capsule())
-            Text("Swipe to keep browsing")
+            Text("recommend.swipe_to_browse".localized)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.62))
         }
@@ -260,10 +262,10 @@ struct RecommendView: View {
 
     private var playbackFailureOverlay: some View {
         VStack(spacing: 12) {
-            Text("Video failed to load")
+            Text("player.video_load_failed".localized)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(.white)
-            Button("Retry") {
+            Button(L10n.retry) {
                 session.retryCurrentPlayback()
             }
             .font(.system(size: 14, weight: .semibold))
@@ -271,7 +273,7 @@ struct RecommendView: View {
             .padding(.horizontal, 24)
             .frame(height: 42)
             .background(.white, in: Capsule())
-            Text("You can also swipe to the next video")
+            Text("recommend.swipe_next_video".localized)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.62))
         }
@@ -364,7 +366,7 @@ struct RecommendView: View {
                     Button {
                         navigateToSeries(drama)
                     } label: {
-                        Text("Watch Full Series")
+                        Text(L10n.watchFullSeries)
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                             .frame(width: contentWidth, height: 38)
@@ -395,14 +397,14 @@ struct RecommendView: View {
     private func synopsisView(_ text: String, contentWidth: CGFloat) -> some View {
         Group {
             if isExpanded {
-                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
+                (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
                 + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.82)))
             } else if shouldShowMore(for: text, contentWidth: contentWidth) {
-                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
+                (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
                 + Text(truncatedSynopsis(text, contentWidth: contentWidth)).font(.system(size: 13)).foregroundColor(.white.opacity(0.82))
-                + Text("... more").font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.96)))
+                + Text("player.more_suffix".localized).font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.96)))
             } else {
-                (Text("Trailer | ").font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
+                (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
                 + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.82)))
             }
         }
@@ -410,7 +412,7 @@ struct RecommendView: View {
     }
 
     private func shouldShowMore(for text: String, contentWidth: CGFloat) -> Bool {
-        synopsisTextHeight("Trailer | \(text.trimmedForSynopsis)", width: contentWidth) > twoLineSynopsisHeight
+        synopsisTextHeight("\("player.trailer_prefix".localized)\(text.trimmedForSynopsis)", width: contentWidth) > twoLineSynopsisHeight
     }
 
     private func truncatedSynopsis(_ text: String, contentWidth: CGFloat) -> String {
@@ -425,7 +427,7 @@ struct RecommendView: View {
         while low <= high {
             let mid = (low + high) / 2
             let candidate = String(characters.prefix(mid)).trimmedForSynopsis
-            let displayText = "Trailer | \(candidate)... more"
+            let displayText = "\("player.trailer_prefix".localized)\(candidate)\("player.more_suffix".localized)"
 
             if synopsisTextHeight(displayText, width: contentWidth) <= twoLineSynopsisHeight {
                 best = candidate
@@ -866,7 +868,7 @@ private struct DramaAboutSheet: View {
                     .foregroundColor(.white)
                     .lineLimit(2)
 
-                Text("\(drama.formattedViewCount) Views")
+                Text("player.views_count".localizedFormat(drama.formattedViewCount))
                     .font(.system(size: 20, weight: .medium))
                     .foregroundColor(.white.opacity(0.42))
 
@@ -874,7 +876,7 @@ private struct DramaAboutSheet: View {
                     Image(systemName: "star")
                         .font(.system(size: 14, weight: .regular))
                     Text(String(format: "%.1f(5.5K)", drama.rating))
-                    Text("Rate")
+                    Text("player.rate".localized)
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .bold))
                 }
@@ -890,8 +892,8 @@ private struct DramaAboutSheet: View {
 
     private var tabBar: some View {
         HStack(alignment: .bottom, spacing: 32) {
-            tabButton("Synopsis", tab: .synopsis)
-            tabButton("Episodes", tab: .episodes)
+            tabButton(L10n.synopsis, tab: .synopsis)
+            tabButton(L10n.tabEpisodes, tab: .episodes)
             Spacer()
         }
         .padding(.horizontal, 24)
@@ -925,7 +927,7 @@ private struct DramaAboutSheet: View {
             tagCloud
 
             VStack(alignment: .leading, spacing: 16) {
-                Text("Cast")
+                Text("player.cast".localized)
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
 
@@ -937,7 +939,7 @@ private struct DramaAboutSheet: View {
                 VStack(spacing: 16) {
                     HStack {
                         Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-                        Text("More Like This")
+                        Text("player.more_similar".localized)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white.opacity(0.42))
                             .fixedSize()
@@ -956,9 +958,9 @@ private struct DramaAboutSheet: View {
 
     private var tagCloud: some View {
         HStack(spacing: 8) {
-            aboutTag("Revenge")
-            aboutTag("Counterattack")
-            aboutTag("Hidden Identity")
+            aboutTag("tag.revenge".localized)
+            aboutTag("home.theme_counterattack".localized)
+            aboutTag("home.hidden_identity".localized)
             aboutTag(L10n.categoryDisplayName(drama.category))
         }
     }

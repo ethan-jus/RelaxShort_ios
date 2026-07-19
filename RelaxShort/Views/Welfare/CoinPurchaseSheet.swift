@@ -142,7 +142,7 @@ struct CoinPurchaseSheet: View {
                     if let bonus = displayedBonus(for: package), bonus > 0 {
                         Text(
                             package.productID == .coinsSmall
-                                ? "First purchase bonus +\(bonus)"
+                                ? "store.first_purchase_bonus".localizedFormat(bonus)
                                 : L10n.bonusCoins(bonus)
                         )
                             .font(DT.Font.small)
@@ -273,7 +273,7 @@ struct CoinPurchaseSheet: View {
         Task {
             do {
                 guard let fetchAppleAccountToken else {
-                    throw APIError(code: "PAYMENT_ACCOUNT_UNAVAILABLE", message: "支付账号暂不可用，请稍后重试")
+                    throw APIError(code: "PAYMENT_ACCOUNT_UNAVAILABLE", message: "store.error_account_unavailable".localized)
                 }
                 let token = try await storeKit.resolveAppAccountToken(using: fetchAppleAccountToken)
                 let receipt = try await storeKit.purchaseCoinPackage(
@@ -285,7 +285,7 @@ struct CoinPurchaseSheet: View {
                     verifiedBalance = try await verifyPurchase(receipt)
                     await storeKit.completeCoinDelivery(receipt)
                 } else if receipt.requiresBackendVerification {
-                    throw APIError(code: "PAYMENT_VERIFY_UNAVAILABLE", message: "支付验单暂不可用，请稍后重试")
+                    throw APIError(code: "PAYMENT_VERIFY_UNAVAILABLE", message: "store.error_verification_unavailable".localized)
                 } else {
                     verifiedBalance = coinStore.coinBalance + receipt.coins
                 }
@@ -326,8 +326,15 @@ struct CoinPurchaseSheet: View {
 // MARK: - Episode Unlock Purchase Center
 
 enum EpisodeUnlockPurchaseTab: String, CaseIterable {
-    case coins = "金币充值"
-    case vip = "VIP 会员"
+    case coins
+    case vip
+
+    var title: String {
+        switch self {
+        case .coins: return "store.coin_top_up".localized
+        case .vip: return "store.vip_membership".localized
+        }
+    }
 }
 
 /// 锁集专用购买中心。金币和 VIP 分页展示，购买成功必须经过服务端验单后才通知播放器。
@@ -435,7 +442,7 @@ struct EpisodeUnlockPurchaseSheet: View {
             if selectedTab == .coins {
                 coinMetadata
             } else {
-                Text("VIP 全剧畅看")
+                Text("player.vip_all_access".localized)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundStyle(paleGold)
             }
@@ -447,7 +454,7 @@ struct EpisodeUnlockPurchaseSheet: View {
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.08), in: Circle())
             }
-            .accessibilityLabel("关闭")
+            .accessibilityLabel("general.close".localized)
         }
         .padding(.horizontal, 20)
         .padding(.top, 18)
@@ -462,7 +469,7 @@ struct EpisodeUnlockPurchaseSheet: View {
                     withAnimation(.easeInOut(duration: 0.18)) { selectedTab = tab }
                 } label: {
                     VStack(spacing: 10) {
-                        Text(tab.rawValue)
+                        Text(tab.title)
                             .font(.system(size: 15, weight: selectedTab == tab ? .bold : .medium))
                             .foregroundStyle(selectedTab == tab ? paleGold : .white.opacity(0.42))
                         Capsule()
@@ -479,9 +486,9 @@ struct EpisodeUnlockPurchaseSheet: View {
 
     private var coinMetadata: some View {
         HStack(spacing: 13) {
-            metadataItem(label: "本集：", value: coinCost)
+            metadataItem(label: "player.this_episode".localized, value: coinCost)
             Rectangle().fill(.white.opacity(0.14)).frame(width: 1, height: 18)
-            metadataItem(label: "余额：", value: balance)
+            metadataItem(label: "player.balance".localized, value: balance)
         }
     }
 
@@ -547,11 +554,11 @@ struct EpisodeUnlockPurchaseSheet: View {
                     HStack(spacing: 15) {
                         VStack(alignment: .leading, spacing: 5) {
                             HStack(spacing: 8) {
-                                Text("\(plan.period)卡")
+                                Text("store.period_plan".localizedFormat(plan.period))
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundStyle(.white)
                                 if plan.productID == .vipMonthly {
-                                    Text("推荐")
+                                    Text("vip.recommended".localized)
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundStyle(.black)
                                         .padding(.horizontal, 7)
@@ -581,9 +588,9 @@ struct EpisodeUnlockPurchaseSheet: View {
             }
 
             HStack(spacing: 20) {
-                Label("无限观看", systemImage: "infinity")
-                Label("高清画质", systemImage: "4k.tv")
-                Label("离线下载", systemImage: "arrow.down.circle")
+                Label("member.benefit.unlimited".localized, systemImage: "infinity")
+                Label("member.benefit.quality".localized, systemImage: "4k.tv")
+                Label("member.benefit.download".localized, systemImage: "arrow.down.circle")
             }
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(paleGold.opacity(0.72))
@@ -621,20 +628,20 @@ struct EpisodeUnlockPurchaseSheet: View {
             .disabled(isPurchasing || (selectedTab == .coins ? selectedPackage == nil : selectedSubscription == nil))
 
             Text(selectedTab == .coins
-                 ? "购买成功后将自动使用 \(coinCost) 金币解锁本集"
-                 : "订阅将自动续订，可随时在 App Store 账户设置中取消")
+                 ? "store.auto_unlock_notice".localizedFormat(coinCost)
+                 : "member.auto_renew".localized)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.white.opacity(0.42))
 
             if selectedTab == .vip {
                 Button(action: restorePurchase) {
-                    Text("恢复购买  ·  使用条款  ·  隐私政策")
+                    Text("store.restore_terms_privacy".localized)
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.white.opacity(0.48))
                 }
                 .disabled(isPurchasing)
             } else {
-                Text("由 App Store 安全支付")
+                Text("store.secure_payment".localized)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.34))
             }
@@ -647,10 +654,12 @@ struct EpisodeUnlockPurchaseSheet: View {
 
     private var purchaseButtonTitle: String {
         if selectedTab == .coins, let selectedPackage {
-            return "购买 \(selectedPackage.amount) 金币并解锁"
+            return "store.buy_coins_unlock".localizedFormat(selectedPackage.amount)
         }
-        if let selectedSubscription { return "开通\(selectedSubscription.period) VIP 并解锁" }
-        return "继续"
+        if let selectedSubscription {
+            return "store.subscribe_unlock".localizedFormat(selectedSubscription.period)
+        }
+        return "general.continue".localized
     }
 
     private func performPurchase() {
@@ -724,7 +733,7 @@ struct EpisodeUnlockPurchaseSheet: View {
                     }
                 }
                 guard let account = restoredAccount, account.isVIP else {
-                    throw APIError(code: "VIP_NOT_ACTIVE", message: "未发现可恢复的会员权益")
+                    throw APIError(code: "VIP_NOT_ACTIVE", message: "store.error_no_subscription".localized)
                 }
                 await MainActor.run {
                     coinStore.synchronize(balance: account.balance)

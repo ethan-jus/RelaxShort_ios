@@ -69,5 +69,5 @@ private func withTimeout<T>(seconds: UInt64, _ operation: @escaping () async thr
 }
 
 private struct TimeoutError: LocalizedError {
-    var errorDescription: String? { "App init 请求超时" }
+    var errorDescription: String? { "app.init_timeout".localized }
 }

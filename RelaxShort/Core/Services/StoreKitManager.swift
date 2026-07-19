@@ -66,9 +66,9 @@ struct CoinPackage: Identifiable, Equatable {
 
     /// 显示标签（如 "最受欢迎"）
     var label: String? {
-        if productID == .coinsSmall { return "首充双倍" }
-        if isPopular { return "最受欢迎" }
-        if let bonus, bonus > 0 { return "加赠\(bonus)金币" }
+        if productID == .coinsSmall { return "store.first_purchase_double".localized }
+        if isPopular { return "store.most_popular".localized }
+        if let bonus, bonus > 0 { return L10n.bonusCoins(bonus) }
         return nil
     }
 
@@ -130,14 +130,14 @@ enum StoreKitPurchaseError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .userCancelled: return "用户取消购买"
-        case .pending:       return "购买等待处理中"
-        case .unverified:    return "交易验证失败"
+        case .userCancelled: return "store.error_cancelled".localized
+        case .pending:       return "store.error_pending".localized
+        case .unverified:    return "store.error_unverified".localized
         case .productUnavailable(let productID):
-            return "App Store 商品暂不可用：\(productID.rawValue)"
+            return "store.error_unavailable".localizedFormat(productID.rawValue)
         case .noActiveSubscription:
-            return "未发现可恢复的有效会员订阅"
-        case .unknown:       return "未知错误"
+            return "store.error_no_subscription".localized
+        case .unknown:       return "store.error_unknown".localized
         }
     }
 }
@@ -260,9 +260,9 @@ final class StoreKitManager: ObservableObject {
     /// VIP 订阅列表。价格优先使用 StoreKit 本地化价格。
     var vipSubscriptions: [VIPSubscription] {
         [
-            VIPSubscription(id: "vip_weekly",  productID: .vipWeekly,  period: "周", price: displayPrice(for: .vipWeekly),  dailyEquivalent: "$1.86/天"),
-            VIPSubscription(id: "vip_monthly", productID: .vipMonthly, period: "月", price: displayPrice(for: .vipMonthly), dailyEquivalent: "$1.00/天"),
-            VIPSubscription(id: "vip_yearly",  productID: .vipYearly,  period: "年", price: displayPrice(for: .vipYearly),  dailyEquivalent: "$0.41/天")
+            VIPSubscription(id: "vip_weekly", productID: .vipWeekly, period: "member.period.week".localized, price: displayPrice(for: .vipWeekly), dailyEquivalent: "member.plan.weekly_detail".localized),
+            VIPSubscription(id: "vip_monthly", productID: .vipMonthly, period: "member.period.month".localized, price: displayPrice(for: .vipMonthly), dailyEquivalent: "membership.monthly_detail".localized),
+            VIPSubscription(id: "vip_yearly", productID: .vipYearly, period: "member.period.year".localized, price: displayPrice(for: .vipYearly), dailyEquivalent: "member.plan.yearly_detail".localized)
         ]
     }
 

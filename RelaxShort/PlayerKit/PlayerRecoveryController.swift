@@ -137,7 +137,7 @@ final class PlayerRecoveryController {
     private func onFailed() {
         snapshot()
         print("[PlayerKit] item failed at time=\(lastTime)")
-        engine?.updateState(.failed(message: "播放失败"))
+        engine?.updateState(.failed(message: "player.playback_failed".localized))
         if let e = engine, e.wantsPlayback, !wasUserPaused {
             attemptRecovery(reason: .itemFailed)
         } else {
@@ -199,7 +199,9 @@ final class PlayerRecoveryController {
         failureCounts[item.id] = count
         if count > maxRecoveryAttempts {
             print("[PlayerKit] recovery capped id=\(item.id) failures=\(count) max=\(maxRecoveryAttempts)")
-            engine.updateState(.failed(message: "连续恢复失败(\(count)次)"))
+            engine.updateState(
+                .failed(message: "player.recovery_failed".localizedFormat(count))
+            )
             return
         }
 

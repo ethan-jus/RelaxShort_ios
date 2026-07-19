@@ -71,7 +71,7 @@ final class APIClient {
     func requestData<T: Decodable>(_ endpoint: APIEndpoint) async throws -> T {
         let envelope: APIResponseEnvelope<T> = try await requestRaw(endpoint)
         if let apiError = envelope.error {
-            throw APIError(code: apiError.code, message: apiError.message ?? "未知错误")
+            throw APIError(code: apiError.code, message: apiError.message ?? "general.unknown_error".localized)
         }
         guard let data = envelope.data else {
             throw NetworkError.invalidResponse
@@ -161,7 +161,7 @@ final class APIClient {
            let detail = envelope.error {
             return APIError(
                 code: detail.code,
-                message: detail.message ?? "请求失败",
+                message: detail.message ?? "network.request_failed".localized,
                 statusCode: statusCode
             )
         }
