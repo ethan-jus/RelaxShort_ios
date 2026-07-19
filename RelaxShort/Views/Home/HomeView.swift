@@ -94,6 +94,7 @@ private extension UIView {
 struct HomeView: View {
     @EnvironmentObject private var appStore: AppStore
     @EnvironmentObject private var dependencies: DependencyContainer
+    @EnvironmentObject private var rewardSummaryStore: RewardSummaryStore
     @ObservedObject private var viewModel: HomeViewModel
     private let rankingRepository: HomeRepositoryProtocol
     @State private var showVIP = false
@@ -127,7 +128,8 @@ struct HomeView: View {
                     DramaBoxSearchHeaderView(
                         onSearchTap: { NotificationCenter.default.post(name: .showSearch, object: nil) },
                         onVIPTap: { showVIP = true },
-                        onRewardTap: { showReward = true }
+                        onRewardTap: { showReward = true },
+                        rewardBadge: "+\(rewardSummaryStore.remainingEarnableCoins)"
                     )
                         .padding(.top, HomeMetrics.chromeTopGap)
                     tabBar.padding(.vertical, HomeMetrics.tabVerticalPadding)
@@ -159,6 +161,11 @@ struct HomeView: View {
             CoinRewardView(mode: .pushed)
         }
         .task { await viewModel.loadData() }
+        .task { await rewardSummaryStore.refresh() }
+        .onChange(of: appStore.selectedTab) { _, tab in
+            guard tab == .home else { return }
+            Task { await rewardSummaryStore.refresh() }
+        }
     }
 
     /// Home 卡片直接发起全局播放页路由，避免中转 State 的写入和清空在 push 动画期间重复重建首页。
@@ -849,6 +856,7 @@ private struct DramaBoxSearchHeaderView: View {
     var onSearchTap: () -> Void = {}
     var onVIPTap: () -> Void = {}
     var onRewardTap: () -> Void = {}
+    var rewardBadge: String = "+0"
 
     var body: some View {
         HStack(spacing: 8) {
@@ -884,7 +892,7 @@ private struct DramaBoxSearchHeaderView: View {
             Button {
                 onRewardTap()
             } label: {
-                AnimatedPromoButton(badge: "+150", delay: 0.3) {
+                AnimatedPromoButton(badge: rewardBadge, delay: 0.3) {
                     Image(systemName: "gift.fill")
                         .font(.system(size: 23, weight: .semibold))
                         .foregroundColor(Color(red: 0.9, green: 0.2, blue: 0.2))

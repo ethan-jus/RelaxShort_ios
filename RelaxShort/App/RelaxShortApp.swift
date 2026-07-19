@@ -19,6 +19,7 @@ struct RelaxShortApp: App {
     @StateObject private var appStore = AppStore()
     @StateObject private var authStore = AuthStore()
     @StateObject private var coinStore = CoinStore()
+    @StateObject private var rewardSummaryStore = RewardSummaryStore()
     @StateObject private var storeKit = StoreKitManager()
     @StateObject private var dependencies = DependencyContainer()
     @StateObject private var playerCoordinator = PlayerCoordinator()
@@ -82,6 +83,7 @@ struct RelaxShortApp: App {
                         .environmentObject(appStore)
                         .environmentObject(authStore)
                         .environmentObject(coinStore)
+                        .environmentObject(rewardSummaryStore)
                         .environmentObject(storeKit)
                         .environmentObject(dependencies)
                         .environmentObject(themeManager)
@@ -106,7 +108,9 @@ struct RelaxShortApp: App {
                 await synchronizePendingStoreKitTransactions()
             }
             .onOpenURL { url in
-                _ = GIDSignIn.sharedInstance.handle(url)
+                if !GIDSignIn.sharedInstance.handle(url) {
+                    handleDeepLink(url)
+                }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active && !showSplash {
@@ -121,6 +125,29 @@ struct RelaxShortApp: App {
                         await dependencies.watchProgressReporter.finalize(completed: false)
                     }
                 }
+            }
+        }
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        if let inviteCode = RewardDeepLink.parseInviteCode(url) {
+            appStore.pendingInviteCode = inviteCode
+            appStore.selectedTab = .home
+            appStore.isShowingRewards = true
+            return
+        }
+        guard let route = RewardDeepLink.parse(url) else { return }
+        Task { @MainActor in
+            do {
+                let drama = try await dependencies.detailRepository.fetchDramaDetail(id: route.seriesID)
+                appStore.selectedTab = .home
+                appStore.navigationTarget = SeriesPlayerNav(
+                    drama: drama,
+                    startEpisode: route.episodeNumber ?? 1,
+                    sourceScene: "shared_link"
+                )
+            } catch {
+                Logger.viewModel.warning("Deep link failed: \(error.localizedDescription)")
             }
         }
     }

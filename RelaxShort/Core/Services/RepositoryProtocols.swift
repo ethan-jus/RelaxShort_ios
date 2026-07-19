@@ -147,6 +147,13 @@ protocol MemberRepositoryProtocol {
 protocol CoinRewardRepositoryProtocol {
     func fetchRewardCenter() async throws -> RewardCenterState
     func checkIn() async throws -> RewardCenterState
+    func recordShare(
+        seriesID: String,
+        episodeID: String?,
+        channel: String,
+        idempotencyKey: String
+    ) async throws -> RewardCenterState
+    func applyInviteCode(_ code: String) async throws -> RewardCenterState
 }
 
 // MARK: - Ads

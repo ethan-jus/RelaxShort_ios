@@ -55,6 +55,7 @@ struct ProfileView: View {
     @StateObject private var viewModel: ProfileViewModel
     @EnvironmentObject var authStore: AuthStore
     @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject private var rewardSummaryStore: RewardSummaryStore
 
     @State private var selectedDestination: ProfileSheet?
     @State private var showLoginSheet = false
@@ -95,8 +96,8 @@ struct ProfileView: View {
                         // 核心入口
                         ProfileMenuCard {
                             ProfileMenuRow(icon: "dollarsign.circle", iconColor: DT.logoRed, title: "profile.top_up".localized, onTap: { selectedDestination = .topUp })
-                            ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: viewModel.profile.map { "\($0.coinBalance)" }, subtitleIcon: "dollarsign.circle", subtitleIconColor: DT.coinGold, onTap: { selectedDestination = .wallet })
-                            ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, onTap: { selectedDestination = .welfare })
+                            ProfileMenuRow(icon: "creditcard", iconColor: .white, title: L10n.myWallet, subtitle: "\(rewardSummaryStore.coinBalance)", usesRewardCoinIcon: true, onTap: { selectedDestination = .wallet })
+                            ProfileMenuRow(icon: "gift.fill", iconColor: DT.logoRed, title: "profile.earn_rewards".localized, subtitle: "今日可赚 \(rewardSummaryStore.remainingEarnableCoins)", usesRewardCoinIcon: true, rewardCoinMotion: .bounce, onTap: { selectedDestination = .welfare })
                             ProfileMenuRow(icon: "clock", iconColor: .white, title: "profile.history".localized, onTap: { selectedDestination = .watchHistory })
                             ProfileMenuRow(icon: "arrow.down.to.line", iconColor: .white, title: "profile.membership_benefit_download".localized, onTap: { selectedDestination = .downloads })
                         }
@@ -120,7 +121,9 @@ struct ProfileView: View {
         .navigationBarHidden(true)
         .task(id: authStore.account?.publicID) {
             guard authStore.hasSession else { return }
-            await viewModel.loadProfile()
+            async let profile: Void = viewModel.loadProfile()
+            async let rewards: Void = rewardSummaryStore.refresh()
+            _ = await (profile, rewards)
         }
         .onChange(of: viewModel.profile) { _, user in
             guard let user else { return }

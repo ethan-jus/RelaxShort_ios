@@ -389,9 +389,23 @@ struct MockCoinRewardRepository: CoinRewardRepositoryProtocol {
         return Self.state
     }
 
+    func recordShare(
+        seriesID: String,
+        episodeID: String?,
+        channel: String,
+        idempotencyKey: String
+    ) async throws -> RewardCenterState {
+        Self.state
+    }
+
+    func applyInviteCode(_ code: String) async throws -> RewardCenterState {
+        Self.state
+    }
+
     private static let state = RewardCenterState(
         coinBalance: MockData.profile.coinBalance,
         firstCoinPurchaseBonusAvailable: true,
+        remainingEarnableCoins: 480,
         claimedCheckInToday: false,
         completedCheckInDays: 0,
         nextCheckInReward: 10,
@@ -404,6 +418,18 @@ struct MockCoinRewardRepository: CoinRewardRepositoryProtocol {
         nextAdReward: 20,
         adSteps: [20, 30, 50, 80, 120].enumerated().map {
             AdRewardStep(stepNumber: $0.offset + 1, rewardCoins: $0.element, completed: false, current: $0.offset == 0)
-        }
+        },
+        tasks: [],
+        referral: ReferralRewardState(
+            inviteCode: "RS8K2M9Q",
+            inviterRewardCoins: 200,
+            inviteeRewardCoins: 100,
+            qualifiedFriends: 0,
+            weeklyRemaining: 3,
+            lifetimeRemaining: 20,
+            codeApplied: false,
+            appliedCode: nil,
+            appliedStatus: nil
+        )
     )
 }

@@ -14,6 +14,9 @@ struct CoinRewardView: View {
     @EnvironmentObject var coinStore: CoinStore
     @EnvironmentObject var storeKitManager: StoreKitManager
     @EnvironmentObject private var dependencies: DependencyContainer
+    @EnvironmentObject private var appStore: AppStore
+    @EnvironmentObject private var authStore: AuthStore
+    @EnvironmentObject private var rewardSummaryStore: RewardSummaryStore
     @StateObject private var viewModel: CoinRewardViewModel
 
     private let mode: CoinRewardPresentationMode
@@ -24,6 +27,8 @@ struct CoinRewardView: View {
 
     @State private var showRules = false
     @State private var showCoinPurchase = false
+    @State private var showLogin = false
+    @State private var showInvite = false
 
     init(
         mode: CoinRewardPresentationMode = .tab,
@@ -139,6 +144,39 @@ struct CoinRewardView: View {
         .onChange(of: viewModel.coinBalance) { _, balance in
             coinStore.synchronize(balance: balance)
         }
+        .onChange(of: viewModel.remainingEarnableCoins) { _, _ in
+            rewardSummaryStore.apply(
+                balance: viewModel.coinBalance,
+                remainingEarnableCoins: viewModel.remainingEarnableCoins
+            )
+        }
+        .onAppear {
+            if appStore.pendingInviteCode != nil {
+                showInvite = true
+            }
+        }
+        .sheet(isPresented: $showLogin) {
+            LoginView()
+        }
+        .sheet(isPresented: $showInvite) {
+            InviteRewardsSheet(
+                state: viewModel.referral,
+                initialCode: appStore.pendingInviteCode,
+                onApply: { code in
+                    let success = await viewModel.applyInviteCode(code)
+                    if success {
+                        appStore.pendingInviteCode = nil
+                        rewardSummaryStore.apply(
+                            balance: viewModel.coinBalance,
+                            remainingEarnableCoins: viewModel.remainingEarnableCoins
+                        )
+                    }
+                    return success
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .alert(
             "奖励暂不可用",
             isPresented: Binding(
@@ -151,6 +189,7 @@ struct CoinRewardView: View {
             Text(viewModel.errorMessage ?? "")
         }
     }
+
 }
 
 // MARK: - Header & Hero
@@ -414,7 +453,7 @@ private extension CoinRewardView {
             HStack(spacing: 5) {
                 Image(systemName: "exclamationmark.circle")
                     .font(.system(size: 11, weight: .medium))
-                Text("完整观看后发放奖励，每日00:00重置")
+                Text("完整观看后发放奖励，每日 UTC 00:00 重置")
                     .font(.system(size: 11))
             }
             .foregroundColor(.white.opacity(0.4))
@@ -439,39 +478,23 @@ private extension CoinRewardView {
 private extension CoinRewardView {
     var moreRewardsSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("更多赚币方式")
-                .font(.system(size: 21, weight: .bold))
-                .foregroundColor(.white)
-                .padding(.horizontal, pageInset)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("做任务赚金币")
+                    .font(.system(size: 21, weight: .bold))
+                    .foregroundColor(.white)
+                Text("完成任务后，金币自动到账")
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.42))
+            }
+            .padding(.horizontal, pageInset)
 
             VStack(spacing: 0) {
-                plannedTaskRow(
-                    icon: "person.crop.circle.badge.checkmark",
-                    title: "登录账号",
-                    subtitle: "首次登录并完成账号绑定",
-                    reward: 30
-                )
-                taskDivider
-                plannedTaskRow(
-                    icon: "play.rectangle.on.rectangle",
-                    title: "连续观看 3 集",
-                    subtitle: "当天完整观看任意短剧 3 集",
-                    reward: 20
-                )
-                taskDivider
-                plannedTaskRow(
-                    icon: "bookmark",
-                    title: "收藏喜欢的短剧",
-                    subtitle: "首次收藏任意一部短剧",
-                    reward: 10
-                )
-                taskDivider
-                plannedTaskRow(
-                    icon: "square.and.arrow.up",
-                    title: "分享精彩内容",
-                    subtitle: "分享短剧给好友，每日限 1 次",
-                    reward: 10
-                )
+                ForEach(Array(viewModel.marketingTasks.enumerated()), id: \.element.id) { index, task in
+                    marketingTaskRow(task)
+                    if index < viewModel.marketingTasks.count - 1 {
+                        taskDivider
+                    }
+                }
             }
             .background(Color(hex: "#111111"))
             .clipShape(
@@ -485,23 +508,18 @@ private extension CoinRewardView {
         }
     }
 
-    func plannedTaskRow(
-        icon: String,
-        title: String,
-        subtitle: String,
-        reward: Int
-    ) -> some View {
+    func marketingTaskRow(_ task: MarketingRewardTask) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: icon)
+            Image(systemName: taskIcon(task.code))
                 .font(.system(size: 19, weight: .regular))
                 .foregroundColor(rewardGold)
                 .frame(width: 30, height: 30)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
+                Text(task.title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white.opacity(0.92))
-                Text(subtitle)
+                Text(task.description)
                     .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.42))
                     .lineLimit(2)
@@ -509,17 +527,80 @@ private extension CoinRewardView {
 
             Spacer(minLength: 8)
 
-            VStack(alignment: .trailing, spacing: 5) {
-                rewardAmount(reward)
-                Text("即将开放")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.36))
+            HStack(spacing: 10) {
+                rewardAmount(task.rewardCoins)
+                Button {
+                    performTaskAction(task)
+                } label: {
+                    Text(task.completed ? "已完成" : taskButtonTitle(task))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(task.completed ? .white.opacity(0.38) : rewardGold)
+                        .padding(.horizontal, 12)
+                        .frame(height: 30)
+                        .background(
+                            Capsule().fill(
+                                task.completed
+                                    ? Color.white.opacity(0.06)
+                                    : rewardGold.opacity(0.12)
+                            )
+                        )
+                        .overlay {
+                            Capsule().stroke(
+                                task.completed ? .clear : rewardGold.opacity(0.34),
+                                lineWidth: 1
+                            )
+                        }
+                }
+                .disabled(task.completed)
             }
         }
         .padding(.horizontal, 16)
         .frame(minHeight: 76)
         .accessibilityElement(children: .combine)
-        .accessibilityHint("该任务尚未开放")
+    }
+
+    func taskIcon(_ code: String) -> String {
+        switch code {
+        case "complete_login": return "person.crop.circle.badge.checkmark"
+        case "unlock_5_episodes": return "lock.open"
+        case "bookmark_first": return "bookmark"
+        case "share_daily": return "square.and.arrow.up"
+        case "watch_30_minutes": return "clock"
+        default: return "sparkles"
+        }
+    }
+
+    func taskButtonTitle(_ task: MarketingRewardTask) -> String {
+        switch task.action {
+        case "login": return "去登录"
+        case "share": return "去分享"
+        default: return "去完成"
+        }
+    }
+
+    func performTaskAction(_ task: MarketingRewardTask) {
+        switch task.action {
+        case "login":
+            if authStore.isLoggedIn {
+                Task { await viewModel.loadData() }
+            } else {
+                showLogin = true
+            }
+        case "bookmark":
+            appStore.selectedTab = .myList
+            dismissIfNeeded()
+        case "watch", "share":
+            appStore.selectedTab = .forYou
+            dismissIfNeeded()
+        default:
+            break
+        }
+    }
+
+    func dismissIfNeeded() {
+        if mode == .pushed {
+            dismiss()
+        }
     }
 
     var inviteFriendsSection: some View {
@@ -568,7 +649,7 @@ private extension CoinRewardView {
                 HStack(spacing: 0) {
                     inviteRewardColumn(
                         title: "你可获得",
-                        amount: 100
+                        amount: viewModel.referral.inviterRewardCoins
                     )
 
                     Rectangle()
@@ -577,18 +658,30 @@ private extension CoinRewardView {
 
                     inviteRewardColumn(
                         title: "好友可获得",
-                        amount: 50
+                        amount: viewModel.referral.inviteeRewardCoins
                     )
                 }
 
-                HStack {
-                    Text("每周最多奖励 3 位有效好友")
+                HStack(spacing: 10) {
+                    Text("本周还可邀请 \(viewModel.referral.weeklyRemaining) 位")
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.4))
                     Spacer()
-                    Text("即将开放")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(rewardGold.opacity(0.72))
+                    Button {
+                        if authStore.isLoggedIn {
+                            showInvite = true
+                        } else {
+                            showLogin = true
+                        }
+                    } label: {
+                        Text("邀请好友")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 16)
+                            .frame(height: 34)
+                            .background(rewardGold)
+                            .clipShape(Capsule())
+                    }
                 }
             }
             .padding(18)
@@ -904,6 +997,168 @@ private enum RewardProgressStyle {
     case video
 }
 
+private struct InviteRewardsSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let state: ReferralRewardState
+    let initialCode: String?
+    let onApply: (String) async -> Bool
+
+    @State private var inputCode: String
+    @State private var isApplying = false
+    @State private var activityItems: [Any]?
+    @State private var copied = false
+
+    init(
+        state: ReferralRewardState,
+        initialCode: String?,
+        onApply: @escaping (String) async -> Bool
+    ) {
+        self.state = state
+        self.initialCode = initialCode
+        self.onApply = onApply
+        _inputCode = State(initialValue: initialCode ?? "")
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                RewardCoinBadge(
+                    size: 64,
+                    glowColor: DT.coinGold,
+                    glowRadius: 7,
+                    motion: .bounce
+                )
+
+                VStack(spacing: 6) {
+                    Text("邀请好友，一起追剧")
+                        .font(.system(size: 23, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("好友完成登录并在 7 天内看完 3 集后，奖励自动到账")
+                        .font(.system(size: 13))
+                        .foregroundColor(.white.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                }
+
+                HStack(spacing: 12) {
+                    inviteReward(title: "你获得", amount: state.inviterRewardCoins)
+                    inviteReward(title: "好友获得", amount: state.inviteeRewardCoins)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("我的邀请码")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.52))
+                    HStack {
+                        Text(state.inviteCode)
+                            .font(.system(size: 24, weight: .bold, design: .monospaced))
+                            .foregroundColor(DT.coinGold)
+                        Spacer()
+                        Button(copied ? "已复制" : "复制") {
+                            UIPasteboard.general.string = state.inviteCode
+                            copied = true
+                        }
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(height: 56)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+                    Button {
+                        activityItems = [
+                            "来 RelaxShort 一起追短剧！完成登录并看完 3 集，你得 \(state.inviteeRewardCoins) 金币。邀请码：\(state.inviteCode)",
+                            RewardDeepLink.inviteURL(code: state.inviteCode)
+                        ]
+                    } label: {
+                        Label("邀请好友", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.black)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(DT.coinGold)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    }
+                }
+
+                if state.codeApplied {
+                    Text("已绑定邀请码 \(state.appliedCode ?? "") · \(state.appliedStatus == "qualified" ? "奖励已到账" : "完成 3 集后到账")")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.48))
+                } else {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("我有邀请码")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.52))
+                        HStack(spacing: 10) {
+                            TextField("输入好友邀请码", text: $inputCode)
+                                .textInputAutocapitalization(.characters)
+                                .autocorrectionDisabled()
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 14)
+                                .frame(height: 46)
+                                .background(Color.white.opacity(0.07))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                            Button("绑定") {
+                                isApplying = true
+                                Task {
+                                    if await onApply(inputCode) {
+                                        dismiss()
+                                    }
+                                    isApplying = false
+                                }
+                            }
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(width: 72, height: 46)
+                            .background(DT.logoRed)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .disabled(inputCode.trimmingCharacters(in: .whitespaces).isEmpty || isApplying)
+                        }
+                    }
+                }
+
+                Text("每周最多 3 位、累计最多 20 位有效好友；同账号或同设备不计奖励。")
+                    .font(.system(size: 11))
+                    .foregroundColor(.white.opacity(0.34))
+                    .multilineTextAlignment(.center)
+            }
+            .padding(24)
+        }
+        .background(Color(hex: "#0A0A0A").ignoresSafeArea())
+        .sheet(isPresented: Binding(
+            get: { activityItems != nil },
+            set: { if !$0 { activityItems = nil } }
+        )) {
+            if let activityItems {
+                SystemActivitySheet(items: activityItems) { _, _ in
+                    self.activityItems = nil
+                }
+            }
+        }
+    }
+
+    private func inviteReward(title: String, amount: Int) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundColor(.white.opacity(0.48))
+            HStack(spacing: 4) {
+                Text("+\(amount)")
+                    .font(.system(size: 23, weight: .bold, design: .rounded))
+                    .foregroundColor(DT.coinGold)
+                RewardCoinBadge(size: 22)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 82)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -911,5 +1166,8 @@ private enum RewardProgressStyle {
         .environmentObject(CoinStore())
         .environmentObject(StoreKitManager())
         .environmentObject(DependencyContainer())
+        .environmentObject(AppStore())
+        .environmentObject(AuthStore())
+        .environmentObject(RewardSummaryStore(repository: MockCoinRewardRepository()))
         .preferredColorScheme(.dark)
 }

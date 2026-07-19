@@ -10,6 +10,8 @@ final class AppStore: ObservableObject {
     @Published var navigationTarget: SeriesPlayerNav?
     @Published var isShowingSearch = false
     @Published var isShowingMembership = false
+    @Published var isShowingRewards = false
+    @Published var pendingInviteCode: String?
     @Published var isBottomTabBarHidden = false
     @Published var isFirstLaunch: Bool
     @Published var themeMode: ThemeMode = ThemeManager.shared.themeMode {

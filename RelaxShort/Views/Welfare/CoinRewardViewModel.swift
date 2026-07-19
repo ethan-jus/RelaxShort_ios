@@ -13,6 +13,19 @@ final class CoinRewardViewModel: ObservableObject {
     @Published var adRewardSteps: [AdRewardStep] = []
     @Published var claimedCheckInToday = false
     @Published var nextCheckInReward: Int?
+    @Published var remainingEarnableCoins = 0
+    @Published var marketingTasks: [MarketingRewardTask] = []
+    @Published var referral = ReferralRewardState(
+        inviteCode: "",
+        inviterRewardCoins: 200,
+        inviteeRewardCoins: 100,
+        qualifiedFriends: 0,
+        weeklyRemaining: 3,
+        lifetimeRemaining: 20,
+        codeApplied: false,
+        appliedCode: nil,
+        appliedStatus: nil
+    )
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
 
@@ -142,6 +155,20 @@ final class CoinRewardViewModel: ObservableObject {
         }
     }
 
+    func applyInviteCode(_ code: String) async -> Bool {
+        guard !isLoading else { return false }
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+        do {
+            apply(try await repository.applyInviteCode(code))
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     /// 剩余可观看广告次数
     var remainingAdWatchCount: Int {
         max(0, self.maxDailyAdWatchCount - self.dailyAdWatchCount)
@@ -179,6 +206,9 @@ final class CoinRewardViewModel: ObservableObject {
     private func apply(_ state: RewardCenterState) {
         coinBalance = state.coinBalance
         firstCoinPurchaseBonusAvailable = state.firstCoinPurchaseBonusAvailable
+        remainingEarnableCoins = state.remainingEarnableCoins
+        marketingTasks = state.tasks
+        referral = state.referral
         checkInDays = state.checkInDays
         claimedCheckInToday = state.claimedCheckInToday
         nextCheckInReward = state.nextCheckInReward

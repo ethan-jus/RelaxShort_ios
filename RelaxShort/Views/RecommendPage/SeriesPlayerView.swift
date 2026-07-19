@@ -265,7 +265,11 @@ struct SeriesPlayerView: View {
         .sheet(item: $activeSheet) { sheet in
             switch sheet {
             case .share:
-                ShareSheet(dramaTitle: drama.title)
+                ShareSheet(
+                    dramaTitle: drama.title,
+                    seriesID: drama.id,
+                    episodeNumber: currentEpisode
+                )
                     .shareSheetPresentationStyle()
             case .speed:
                 PlayerSpeedSheet(

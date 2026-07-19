@@ -389,6 +389,8 @@ struct ProfileMenuRow: View {
     let subtitle: String?
     let subtitleIcon: String?
     let subtitleIconColor: Color
+    let usesRewardCoinIcon: Bool
+    let rewardCoinMotion: RewardCoinMotion
     let showsDivider: Bool
     let onTap: () -> Void
 
@@ -399,6 +401,8 @@ struct ProfileMenuRow: View {
         subtitle: String? = nil,
         subtitleIcon: String? = nil,
         subtitleIconColor: Color = DT.coinGold,
+        usesRewardCoinIcon: Bool = false,
+        rewardCoinMotion: RewardCoinMotion = .none,
         showsDivider: Bool = true,
         onTap: @escaping () -> Void
     ) {
@@ -408,6 +412,8 @@ struct ProfileMenuRow: View {
         self.subtitle = subtitle
         self.subtitleIcon = subtitleIcon
         self.subtitleIconColor = subtitleIconColor
+        self.usesRewardCoinIcon = usesRewardCoinIcon
+        self.rewardCoinMotion = rewardCoinMotion
         self.showsDivider = showsDivider
         self.onTap = onTap
     }
@@ -429,7 +435,14 @@ struct ProfileMenuRow: View {
                 Spacer()
 
                 if let sub = subtitle {
-                    if let sIcon = subtitleIcon {
+                    if usesRewardCoinIcon {
+                        RewardCoinBadge(
+                            size: 19,
+                            glowColor: DT.coinGold,
+                            glowRadius: rewardCoinMotion == .none ? 0 : 2,
+                            motion: rewardCoinMotion
+                        )
+                    } else if let sIcon = subtitleIcon {
                         Image(systemName: sIcon)
                             .font(.system(size: 14))
                             .foregroundColor(subtitleIconColor)

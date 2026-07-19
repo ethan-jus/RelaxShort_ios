@@ -3,8 +3,35 @@ import Foundation
 struct RewardCenterResponseDTO: Decodable {
     let coinBalance: Decimal
     let firstCoinPurchaseBonusAvailable: Bool
+    let remainingEarnableCoins: Decimal
     let checkIn: CheckInStatusDTO
     let adRewards: AdRewardStatusDTO
+    let tasks: [MarketingTaskDTO]
+    let referral: ReferralStatusDTO
+}
+
+struct MarketingTaskDTO: Decodable {
+    let code: String
+    let title: String
+    let description: String
+    let currentValue: Int
+    let targetValue: Int
+    let rewardCoins: Decimal
+    let resetCycle: String
+    let completed: Bool
+    let action: String
+}
+
+struct ReferralStatusDTO: Decodable {
+    let inviteCode: String
+    let inviterRewardCoins: Int
+    let inviteeRewardCoins: Int
+    let qualifiedFriends: Int
+    let weeklyRemaining: Int
+    let lifetimeRemaining: Int
+    let codeApplied: Bool
+    let appliedCode: String?
+    let appliedStatus: String?
 }
 
 struct CheckInStatusDTO: Decodable {
