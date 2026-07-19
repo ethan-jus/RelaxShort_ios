@@ -21,11 +21,15 @@ final class RealAdConfigRepository: AdConfigRepositoryProtocol {
         _ dto: AdPlacementConfigDTO?,
         placementCode: String
     ) -> AdPlacementConfig {
-        AdPlacementConfig(
+        let format = AdFormat(rawValue: dto?.adFormat ?? "") ?? .unknown
+        return AdPlacementConfig(
             placementCode: placementCode,
             enabled: dto?.enabled ?? false,
-            adUnitID: dto?.adUnitId ?? "",
-            format: AdFormat(rawValue: dto?.adFormat ?? "") ?? .unknown,
+            adUnitID: AdConfig.adUnitID(
+                remoteID: dto?.adUnitId ?? "",
+                format: format
+            ),
+            format: format,
             rewardCoins: dto?.rewardCoins.map { Int(truncating: $0 as NSNumber) } ?? 0,
             maxPerUserPerDay: dto?.maxPerUserPerDay ?? 0,
             cooldownSeconds: dto?.cooldownSeconds ?? 0
@@ -50,14 +54,18 @@ final class RealAdRewardRepository: AdRewardRepositoryProtocol {
                 idempotencyKey: key
             )
         )
+        let format = AdFormat(rawValue: dto.adFormat) ?? .unknown
         return AdRewardSession(
             id: dto.sessionId,
             idempotencyKey: key,
             placement: AdPlacementConfig(
                 placementCode: dto.placementCode,
                 enabled: true,
-                adUnitID: dto.adUnitId,
-                format: AdFormat(rawValue: dto.adFormat) ?? .unknown,
+                adUnitID: AdConfig.adUnitID(
+                    remoteID: dto.adUnitId,
+                    format: format
+                ),
+                format: format,
                 rewardCoins: dto.rewardCoins.map { Int(truncating: $0 as NSNumber) } ?? 0,
                 maxPerUserPerDay: 0,
                 cooldownSeconds: 0

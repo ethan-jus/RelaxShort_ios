@@ -1,6 +1,6 @@
 import Foundation
 
-/// 开屏广告配置（编译时配置，不用 UserDefaults）
+/// 广告运行时配置（编译时配置，不用 UserDefaults）
 enum AdConfig {
     /// 品牌展示后额外等待广告的最长时间（秒）。总最长等待 = brandingDuration + coldStartLoadTimeout
     static let coldStartLoadTimeout: TimeInterval = 2.5
@@ -17,23 +17,35 @@ enum AdConfig {
     /// 激励广告缓存最多保留一小时，超时后重新请求，避免展示陈旧竞价结果。
     static let rewardedAdExpiryInterval: TimeInterval = 3600
 
-    /// 开屏广告单元 ID — 自动区分正式/开发环境
-    /// 判断依据：App Store 分发的包 receipt 不是 sandbox
-    /// 开发构建 / TestFlight / 模拟器 → 测试广告
-    /// App Store 正式包 → 正式广告
-    static let appOpenAdUnitID: String = {
+    /// 开发构建、模拟器和 TestFlight 必须使用 Google 官方测试广告位。
+    /// 只有 App Store 正式包使用后端下发的正式广告位。
+    static func adUnitID(remoteID: String, format: AdFormat) -> String {
+        guard shouldUseTestAdUnits else { return remoteID }
+
+        switch format {
+        case .appOpen:
+            return "ca-app-pub-3940256099942544/5575463023"
+        case .rewarded:
+            return "ca-app-pub-3940256099942544/1712485313"
+        case .rewardedInterstitial:
+            return "ca-app-pub-3940256099942544/6978759866"
+        case .interstitial:
+            return "ca-app-pub-3940256099942544/4411468910"
+        case .unknown:
+            return ""
+        }
+    }
+
+    private static let shouldUseTestAdUnits: Bool = {
         #if targetEnvironment(simulator)
-        return "ca-app-pub-3940256099942544/5575463023"
+        return true
+        #elseif DEBUG
+        return true
         #else
         if let url = Bundle.main.appStoreReceiptURL {
             return url.lastPathComponent == "sandboxReceipt"
-                ? "ca-app-pub-3940256099942544/5575463023"
-                : "ca-app-pub-1181692914441160/2847542268"
         }
-        return "ca-app-pub-3940256099942544/5575463023"
+        return true
         #endif
     }()
-
-    /// AdMob 应用 ID
-    static let appID = "ca-app-pub-1181692914441160~7575609396"
 }
