@@ -7,325 +7,847 @@ enum CoinRewardPresentationMode {
     case pushed
 }
 
-// MARK: - 赚金币 / 福利中心主视图
+// MARK: - 奖励中心
+
 struct CoinRewardView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var coinStore: CoinStore
     @EnvironmentObject var storeKitManager: StoreKitManager
     @EnvironmentObject private var dependencies: DependencyContainer
     @StateObject private var viewModel: CoinRewardViewModel
+
     private let mode: CoinRewardPresentationMode
+    private let pageInset: CGFloat = 20
+    private let headerHeight: CGFloat = 54
+    private let sectionGap: CGFloat = 30
+    private let rewardGold = Color(hex: "#E4BA66")
+
+    @State private var showRules = false
+    @State private var showCoinPurchase = false
 
     init(
         mode: CoinRewardPresentationMode = .tab,
         viewModel: CoinRewardViewModel? = nil
     ) {
         self.mode = mode
-        let vm = viewModel ?? CoinRewardViewModel(repository: RealCoinRewardRepository())
+        let vm = viewModel ?? CoinRewardViewModel(
+            repository: RealCoinRewardRepository()
+        )
         _viewModel = StateObject(wrappedValue: vm)
     }
-    @State private var showRules = false
-    @State private var showCoinPurchase = false
 
     var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
-                contentScrollView
-            }
-            .background(DT.Color.bgPrimary.ignoresSafeArea())
-            .navigationTitle(mode == .pushed ? "Rewards" : "")
-            .navigationBarTitleDisplayMode(mode == .pushed ? .inline : .automatic)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { withAnimation(.easeInOut(duration: 0.2)) { showRules = true } }) {
-                        Text(L10n.rules)
-                            .font(DT.Font.small)
-                            .foregroundColor(DT.Color.textSecondary)
-                            .padding(.horizontal, DT.Space.sm)
-                            .padding(.vertical, 2)
-                            .background(DT.Color.textPrimary.opacity(0.1))
-                            .cornerRadius(DT.Radius.full)
+        GeometryReader { geo in
+            let topInset = max(
+                geo.safeAreaInsets.top,
+                UIApplication.safeAreaInsets.top
+            )
+            let bottomInset = max(
+                geo.safeAreaInsets.bottom,
+                UIApplication.safeAreaInsets.bottom
+            )
+            let tabClearance = mode == .tab
+                ? DramaBoxBottomTabBar.totalHeight + bottomInset
+                : bottomInset
+
+            ZStack(alignment: .top) {
+                Color.black.ignoresSafeArea()
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Color.clear
+                            .frame(height: topInset + headerHeight)
+
+                        heroSection(width: geo.size.width)
+
+                        dailyCheckInSection
+                            .padding(.top, 14)
+
+                        sectionDivider
+                            .padding(.top, sectionGap)
+
+                        watchAndEarnSection
+                            .padding(.top, sectionGap)
+
+                        sectionDivider
+                            .padding(.top, sectionGap)
+
+                        moreRewardsSection
+                            .padding(.top, sectionGap)
+
+                        inviteFriendsSection
+                            .padding(.top, 24)
+
+                        firstPurchaseSection
+                            .padding(.top, 16)
+
+                        rewardRulesRow
+                            .padding(.top, 20)
+
+                        bottomLegalDisclaimer
+                            .padding(.bottom, tabClearance + 20)
                     }
                 }
-            }
+                .ignoresSafeArea(edges: .top)
+                .refreshable { await viewModel.loadData() }
 
-            // 规则弹窗
-            if showRules {
-                RulePopupView(isPresented: $showRules)
-            }
+                header(topInset: topInset)
+                    .zIndex(2)
 
-            // 金币购买弹窗
-            if showCoinPurchase {
-                CoinPurchaseSheet(
-                    coinStore: coinStore,
-                    storeKit: storeKitManager,
-                    firstPurchaseBonusAvailable: viewModel.firstCoinPurchaseBonusAvailable,
-                    onDismiss: { withAnimation(.easeInOut(duration: 0.25)) { showCoinPurchase = false } },
-                    fetchAppleAccountToken: {
-                        try await dependencies.detailRepository.fetchAppleAccountToken()
-                    },
-                    verifyPurchase: { receipt in
-                        try await dependencies.detailRepository.verifyCoinPurchase(receipt)
-                    }
-                )
-                .transition(.move(edge: .bottom))
-                .zIndex(100)
+                if showRules {
+                    RulePopupView(isPresented: $showRules)
+                        .zIndex(50)
+                }
+
+                if showCoinPurchase {
+                    CoinPurchaseSheet(
+                        coinStore: coinStore,
+                        storeKit: storeKitManager,
+                        firstPurchaseBonusAvailable:
+                            viewModel.firstCoinPurchaseBonusAvailable,
+                        onDismiss: {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showCoinPurchase = false
+                            }
+                        },
+                        fetchAppleAccountToken: {
+                            try await dependencies.detailRepository
+                                .fetchAppleAccountToken()
+                        },
+                        verifyPurchase: { receipt in
+                            try await dependencies.detailRepository
+                                .verifyCoinPurchase(receipt)
+                        }
+                    )
+                    .transition(.move(edge: .bottom))
+                    .zIndex(100)
+                }
             }
         }
-        .animation(.easeInOut(duration: 0.28), value: showCoinPurchase)
+        .preferredColorScheme(.dark)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .interactivePopGestureEnabled(mode == .pushed)
-        .onReceive(NotificationCenter.default.publisher(for: .showCoinPurchase)) { _ in
-            withAnimation(.easeInOut(duration: 0.25)) { showCoinPurchase = true }
+        .animation(.easeInOut(duration: 0.28), value: showCoinPurchase)
+        .onReceive(
+            NotificationCenter.default.publisher(for: .showCoinPurchase)
+        ) { _ in
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showCoinPurchase = true
+            }
         }
         .onChange(of: viewModel.coinBalance) { _, balance in
             coinStore.synchronize(balance: balance)
         }
         .alert(
-            "Ad unavailable",
+            "奖励暂不可用",
             isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
             )
         ) {
-            Button("OK", role: .cancel) {}
+            Button(L10n.generalOk, role: .cancel) {}
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
     }
+}
 
-    private var contentScrollView: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: DT.Space.xl) {
-                coinOverviewSection
-                checkInCard
-                adRewardCard
-                bottomLegalDisclaimer
-            }
-            .padding(.top, DT.Space.sm)
-        }
-        .refreshable { await viewModel.loadData() }
-    }
+// MARK: - Header & Hero
 
-    // MARK: - ① 金币总览
-    private var coinOverviewSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: DT.Space.xs) {
-                Text("\(coinStore.coinBalance)")
-                    .font(DT.Font.largeTitle(40))
-                    .foregroundColor(DT.brandGold)
-                Text(L10n.myCoins)
-                    .font(DT.Font.caption)
-                    .foregroundColor(DT.Color.textSecondary)
-            }
-            Spacer()
+private extension CoinRewardView {
+    func header(topInset: CGFloat) -> some View {
+        ZStack {
+            Color.black.opacity(0.96)
+                .ignoresSafeArea(edges: .top)
 
-            // 购买金币按钮
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) { showCoinPurchase = true }
-            } label: {
-                HStack(spacing: DT.Space.xs) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(DT.Font.body(14))
-                    Text(L10n.buyCoins)
-                        .font(DT.Font.body(13, weight: .medium))
-                }
-                .foregroundColor(DT.brandGold)
-                .padding(.horizontal, DT.Space.md)
-                .padding(.vertical, DT.Space.sm)
-                .background(DT.brandGold.opacity(0.12))
-                .cornerRadius(DT.Radius.full)
-            }
-        }
-        .padding(.horizontal, DT.Space.pageH)
-        .padding(.top, DT.Space.sm)
-    }
+            Text("奖励中心")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
 
-    // MARK: - ② 签到卡片
-    private var checkInCard: some View {
-        VStack(alignment: .leading, spacing: DT.Space.lg) {
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Daily Check-in")
-                        .font(DT.Font.body(17, weight: .bold))
-                        .foregroundColor(DT.Color.textPrimary)
-                    Text("Check in daily. Missing a day won't reset your progress.")
-                        .font(DT.Font.caption)
-                        .foregroundColor(DT.Color.textSecondary)
+                if mode == .pushed {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 40, height: 40)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("返回")
+                } else {
+                    Color.clear.frame(width: 40, height: 40)
                 }
+
                 Spacer()
-                Text("\(viewModel.checkedInCount)/7")
-                    .font(DT.Font.body(13, weight: .bold))
-                    .foregroundColor(DT.brandGold)
-            }
 
-            // 7天签到行
-            HStack(spacing: 6) {
-                ForEach(viewModel.checkInDays) { day in
-                    checkInDayCell(day)
-                        .frame(maxWidth: .infinity)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showRules = true
+                    }
+                } label: {
+                    Text(L10n.rules)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.78))
+                        .frame(minWidth: 40, minHeight: 40)
+                        .contentShape(Rectangle())
                 }
             }
+            .padding(.horizontal, 10)
+        }
+        .frame(height: headerHeight)
+        .padding(.top, topInset)
+        .frame(maxWidth: .infinity)
+        .ignoresSafeArea(edges: .top)
+    }
 
-            // 签到按钮
+    func heroSection(width: CGFloat) -> some View {
+        ZStack(alignment: .leading) {
+            RewardsHeroArtwork(
+                width: width,
+                height: 224,
+                opacity: 0.92
+            )
+
+            LinearGradient(
+                colors: [
+                    .black,
+                    .black.opacity(0.9),
+                    .black.opacity(0.16),
+                    .clear
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(L10n.myCoins)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.68))
+
+                HStack(alignment: .center, spacing: 10) {
+                    Text("\(coinStore.coinBalance)")
+                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .contentTransition(.numericText())
+
+                    RewardCoinBadge(
+                        size: 30,
+                        color: rewardGold,
+                        lineWidth: 1.5,
+                        fillOpacity: 0.08
+                    )
+                    .accessibilityLabel(L10n.coinsUnit)
+                }
+                .padding(.top, 4)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showCoinPurchase = true
+                    }
+                } label: {
+                    HStack(spacing: 7) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                        Text(L10n.buyCoins)
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(rewardGold)
+                    .padding(.horizontal, 15)
+                    .frame(height: 34)
+                    .overlay {
+                        Capsule()
+                            .stroke(rewardGold.opacity(0.72), lineWidth: 1)
+                    }
+                }
+                .padding(.top, 12)
+            }
+            .padding(.leading, pageInset)
+        }
+        .frame(width: width, height: 224)
+        .clipped()
+    }
+}
+
+// MARK: - Daily Check-in
+
+private extension CoinRewardView {
+    var dailyCheckInSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            rewardSectionHeader(
+                title: L10n.coinDailyCheckIn,
+                progress: "\(viewModel.checkedInCount)/7",
+                color: rewardGold
+            )
+
+            if viewModel.checkInDays.isEmpty {
+                rewardLoadingRow
+            } else {
+                progressTrack(
+                    items: viewModel.checkInDays.map {
+                        RewardProgressItem(
+                            id: $0.id,
+                            amount: $0.rewardCoins,
+                            completed: $0.completed,
+                            current: $0.current,
+                            symbol: $0.completed ? "checkmark" : "gift.fill",
+                            label: "第\($0.dayNumber)天"
+                        )
+                    },
+                    color: rewardGold
+                )
+            }
+
             Button {
                 Task { await viewModel.performCheckIn() }
             } label: {
-                HStack(spacing: DT.Space.sm) {
-                    Image(systemName: "checkmark.seal.fill")
+                HStack(spacing: 7) {
+                    Image(
+                        systemName: viewModel.claimedCheckInToday
+                            ? "checkmark.circle.fill"
+                            : "calendar.badge.plus"
+                    )
                     Text(checkInButtonTitle)
-                        .font(DT.Font.body(15, weight: .bold))
                 }
-                .foregroundColor(viewModel.claimedCheckInToday ? DT.Color.textSecondary : .black)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(
+                    viewModel.claimedCheckInToday
+                        ? .white.opacity(0.42)
+                        : .black
+                )
                 .frame(maxWidth: .infinity)
-                .frame(height: DT.Layout.ctaButtonHeight)
-                .background(viewModel.claimedCheckInToday ? DT.Color.textPrimary.opacity(0.08) : DT.brandGold)
-                .cornerRadius(DT.Radius.md)
+                .frame(height: 46)
+                .background(
+                    viewModel.claimedCheckInToday
+                        ? Color.white.opacity(0.08)
+                        : rewardGold
+                )
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
             }
-            .disabled(viewModel.claimedCheckInToday || viewModel.isLoading)
-            .padding(.top, DT.Space.xs)
+            .disabled(
+                viewModel.claimedCheckInToday
+                    || viewModel.isLoading
+                    || viewModel.checkInDays.isEmpty
+            )
         }
-        .padding(DT.Space.lg)
-        .background(DT.Color.bgCard)
-        .cornerRadius(DT.Radius.lg)
-        .padding(.horizontal, DT.Space.pageH)
+        .padding(.horizontal, pageInset)
     }
 
-    // MARK: - 签到日单元格
-    private func checkInDayCell(_ day: CheckInDay) -> some View {
-        VStack(spacing: DT.Space.sm) {
-            Text("+\(day.rewardCoins)")
-                .font(DT.Font.body(11, weight: .bold))
-                .foregroundColor(day.completed ? DT.Color.textSecondary : DT.brandGold)
-
-            ZStack {
-                Circle()
-                    .fill(day.completed ? DT.brandGold.opacity(0.18) : DT.Color.textPrimary.opacity(0.06))
-                    .frame(width: 32, height: 32)
-                if day.completed {
-                    Image(systemName: "checkmark")
-                        .font(DT.Font.body(12, weight: .bold))
-                        .foregroundColor(DT.brandGold)
-                } else {
-                    Image(systemName: day.current ? "sparkles" : "bitcoinsign.circle.fill")
-                        .font(DT.Font.body(18))
-                        .foregroundColor(DT.brandGold)
-                }
-            }
-
-            Text("Day \(day.dayNumber)")
-                .font(DT.Font.tabLabel)
-                .foregroundColor(day.current ? DT.Color.textPrimary : DT.Color.textSecondary)
+    var checkInButtonTitle: String {
+        if viewModel.claimedCheckInToday {
+            return "今日已签到"
         }
-        .padding(.vertical, DT.Space.sm)
-        .background(day.current ? DT.brandGold.opacity(0.08) : DT.Color.textPrimary.opacity(0.03))
-        .overlay {
-            RoundedRectangle(cornerRadius: DT.Radius.sm)
-                .stroke(day.current ? DT.brandGold.opacity(0.65) : .clear, lineWidth: 1)
+        if let reward = viewModel.nextCheckInReward {
+            return "立即签到  +\(reward)"
         }
-        .cornerRadius(DT.Radius.sm)
+        return viewModel.isLoading ? L10n.loading : "立即签到"
     }
+}
 
-    private var adRewardCard: some View {
-        VStack(alignment: .leading, spacing: DT.Space.lg) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Watch & Earn")
-                        .font(DT.Font.body(17, weight: .bold))
-                        .foregroundColor(DT.Color.textPrimary)
-                    Text("Rewards grow with each completed video today.")
-                        .font(DT.Font.caption)
-                        .foregroundColor(DT.Color.textSecondary)
-                }
-                Spacer()
-                Text("\(viewModel.dailyAdWatchCount)/\(viewModel.maxDailyAdWatchCount)")
-                    .font(DT.Font.body(13, weight: .bold))
-                    .foregroundColor(DT.brandPink)
-            }
+// MARK: - Watch & Earn
 
-            HStack(spacing: 8) {
-                ForEach(viewModel.adRewardSteps) { step in
-                    adRewardStepCell(step)
-                        .frame(maxWidth: .infinity)
-                }
+private extension CoinRewardView {
+    var watchAndEarnSection: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            rewardSectionHeader(
+                title: "看视频赚金币",
+                subtitle: "完整观看激励视频即可领取金币",
+                progress:
+                    "\(viewModel.dailyAdWatchCount)/\(viewModel.maxDailyAdWatchCount)",
+                color: DT.logoRed
+            )
+
+            if viewModel.adRewardSteps.isEmpty {
+                rewardLoadingRow
+            } else {
+                progressTrack(
+                    items: viewModel.adRewardSteps.map {
+                        RewardProgressItem(
+                            id: $0.id,
+                            amount: $0.rewardCoins,
+                            completed: $0.completed,
+                            current: $0.current,
+                            symbol: $0.completed ? "checkmark" : "play.fill",
+                            label: "第\($0.stepNumber)次"
+                        )
+                    },
+                    color: DT.logoRed
+                )
             }
 
             Button {
                 Task { await viewModel.watchAdForCoins() }
             } label: {
-                HStack(spacing: DT.Space.sm) {
+                HStack(spacing: 8) {
                     Image(systemName: "play.fill")
-                    if viewModel.remainingAdWatchCount > 0 {
-                        Text("Watch video  +\(viewModel.adWatchCoinReward) coins")
-                    } else {
-                        Text("All rewards claimed today")
-                    }
+                    Text(watchAdButtonTitle)
                 }
-                .font(DT.Font.body(15, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .frame(height: DT.Layout.ctaButtonHeight)
-                .background(viewModel.remainingAdWatchCount > 0 ? DT.brandPink : DT.Color.textPrimary.opacity(0.08))
-                .cornerRadius(DT.Radius.md)
+                .frame(height: 46)
+                .background(
+                    viewModel.remainingAdWatchCount > 0
+                        ? DT.logoRed
+                        : Color.white.opacity(0.08)
+                )
+                .clipShape(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
             }
-            .disabled(viewModel.remainingAdWatchCount == 0 || viewModel.isLoading)
+            .disabled(
+                viewModel.remainingAdWatchCount == 0
+                    || viewModel.isLoading
+                    || viewModel.adRewardSteps.isEmpty
+            )
 
-            Text("Only completed rewarded videos count. Rewards reset daily at 00:00 UTC.")
-                .font(DT.Font.small)
-                .foregroundColor(DT.Color.textTertiary)
+            Text("仅完整观看的视频计入次数，每日奖励按服务端时间刷新。")
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.36))
         }
-        .padding(DT.Space.lg)
-        .background(DT.Color.bgCard)
-        .cornerRadius(DT.Radius.lg)
-        .padding(.horizontal, DT.Space.pageH)
+        .padding(.horizontal, pageInset)
     }
 
-    private func adRewardStepCell(_ step: AdRewardStep) -> some View {
-        VStack(spacing: 7) {
-            ZStack {
-                Circle()
-                    .fill(step.completed ? DT.brandPink.opacity(0.18) : DT.Color.textPrimary.opacity(0.06))
-                    .frame(width: 34, height: 34)
-                Image(systemName: step.completed ? "checkmark" : "play.fill")
-                    .font(DT.Font.body(12, weight: .bold))
-                    .foregroundColor(step.completed || step.current ? DT.brandPink : DT.Color.textSecondary)
-            }
-            Text("+\(step.rewardCoins)")
-                .font(DT.Font.body(12, weight: .bold))
-                .foregroundColor(step.current ? DT.Color.textPrimary : DT.Color.textSecondary)
+    var watchAdButtonTitle: String {
+        guard viewModel.remainingAdWatchCount > 0 else {
+            return "今日奖励已全部领取"
         }
-        .padding(.vertical, DT.Space.sm)
-        .background(step.current ? DT.brandPink.opacity(0.1) : .clear)
-        .overlay {
-            RoundedRectangle(cornerRadius: DT.Radius.sm)
-                .stroke(step.current ? DT.brandPink.opacity(0.65) : .clear, lineWidth: 1)
+        guard !viewModel.adRewardSteps.isEmpty else {
+            return viewModel.isLoading ? L10n.loading : "奖励暂不可用"
         }
-        .cornerRadius(DT.Radius.sm)
-    }
-
-    private var checkInButtonTitle: String {
-        if viewModel.claimedCheckInToday {
-            return "Checked in today"
-        }
-        if let reward = viewModel.nextCheckInReward {
-            return "Check in  +\(reward) coins"
-        }
-        return "Check in"
-    }
-
-    // MARK: - ⑤ 底部合规声明
-    private var bottomLegalDisclaimer: some View {
-        HStack {
-            Spacer()
-            Text(L10n.appleDisclaimer)
-                .font(DT.Font.small)
-                .foregroundColor(DT.Color.textPrimary.opacity(0.3))
-                .padding(.vertical, DT.Space.xl)
-            Spacer()
-        }
+        return "观看视频  +\(viewModel.adWatchCoinReward)"
     }
 }
 
+// MARK: - Marketing rewards
+
+private extension CoinRewardView {
+    var moreRewardsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("更多赚币方式")
+                .font(.system(size: 21, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, pageInset)
+
+            VStack(spacing: 0) {
+                plannedTaskRow(
+                    icon: "person.crop.circle.badge.checkmark",
+                    title: "登录账号",
+                    subtitle: "首次登录并完成账号绑定",
+                    reward: 30
+                )
+                taskDivider
+                plannedTaskRow(
+                    icon: "play.rectangle.on.rectangle",
+                    title: "连续观看 3 集",
+                    subtitle: "当天完整观看任意短剧 3 集",
+                    reward: 20
+                )
+                taskDivider
+                plannedTaskRow(
+                    icon: "bookmark",
+                    title: "收藏喜欢的短剧",
+                    subtitle: "首次收藏任意一部短剧",
+                    reward: 10
+                )
+                taskDivider
+                plannedTaskRow(
+                    icon: "square.and.arrow.up",
+                    title: "分享精彩内容",
+                    subtitle: "分享短剧给好友，每日限 1 次",
+                    reward: 10
+                )
+            }
+            .background(Color(hex: "#111111"))
+            .clipShape(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.07), lineWidth: 1)
+            }
+            .padding(.horizontal, pageInset)
+        }
+    }
+
+    func plannedTaskRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        reward: Int
+    ) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 19, weight: .regular))
+                .foregroundColor(rewardGold)
+                .frame(width: 30, height: 30)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.92))
+                Text(subtitle)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.42))
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 5) {
+                rewardAmount(reward)
+                Text("即将开放")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.white.opacity(0.36))
+            }
+        }
+        .padding(.horizontal, 16)
+        .frame(minHeight: 76)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("该任务尚未开放")
+    }
+
+    var inviteFriendsSection: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(hex: "#241307"),
+                    Color(hex: "#150A07"),
+                    Color(hex: "#160506")
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            RadialGradient(
+                colors: [
+                    rewardGold.opacity(0.2),
+                    .clear
+                ],
+                center: .topTrailing,
+                startRadius: 2,
+                endRadius: 180
+            )
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top, spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(rewardGold.opacity(0.14))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundColor(rewardGold)
+                    }
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("邀请好友，一起追剧")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("好友完成注册并观看 3 集后，双方获得奖励")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.52))
+                    }
+                }
+
+                HStack(spacing: 0) {
+                    inviteRewardColumn(
+                        title: "你可获得",
+                        amount: 100
+                    )
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.1))
+                        .frame(width: 1, height: 44)
+
+                    inviteRewardColumn(
+                        title: "好友可获得",
+                        amount: 50
+                    )
+                }
+
+                HStack {
+                    Text("每周最多奖励 3 位有效好友")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.4))
+                    Spacer()
+                    Text("即将开放")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(rewardGold.opacity(0.72))
+                }
+            }
+            .padding(18)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(rewardGold.opacity(0.22), lineWidth: 1)
+        }
+        .padding(.horizontal, pageInset)
+    }
+
+    func inviteRewardColumn(
+        title: String,
+        amount: Int
+    ) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.system(size: 11))
+                .foregroundColor(.white.opacity(0.44))
+            rewardAmount(amount)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    var firstPurchaseSection: some View {
+        Button {
+            guard viewModel.firstCoinPurchaseBonusAvailable else { return }
+            withAnimation(.easeInOut(duration: 0.25)) {
+                showCoinPurchase = true
+            }
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(DT.logoRed.opacity(0.15))
+                        .frame(width: 48, height: 48)
+                    Image(systemName: "gift.fill")
+                        .font(.system(size: 21))
+                        .foregroundColor(DT.logoRed)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("首充金币翻倍")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("指定首充档位可享等额赠币，到账以购买页为准")
+                        .font(.system(size: 11))
+                        .foregroundColor(.white.opacity(0.42))
+                }
+
+                Spacer(minLength: 8)
+
+                Text(
+                    viewModel.firstCoinPurchaseBonusAvailable
+                        ? "去购买"
+                        : "已享受"
+                )
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(
+                    viewModel.firstCoinPurchaseBonusAvailable
+                        ? .white
+                        : .white.opacity(0.35)
+                )
+                .padding(.horizontal, 13)
+                .frame(height: 32)
+                .background(
+                    viewModel.firstCoinPurchaseBonusAvailable
+                        ? DT.logoRed
+                        : Color.white.opacity(0.08)
+                )
+                .clipShape(Capsule())
+            }
+            .padding(14)
+            .background(Color(hex: "#111111"))
+            .clipShape(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.white.opacity(0.07), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!viewModel.firstCoinPurchaseBonusAvailable)
+        .padding(.horizontal, pageInset)
+    }
+
+    var rewardRulesRow: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showRules = true
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 17))
+                    .foregroundColor(rewardGold)
+                    .frame(width: 26)
+                Text(L10n.rewardRules)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.72))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.28))
+            }
+            .padding(.horizontal, 16)
+            .frame(height: 54)
+            .background(Color(hex: "#0E0E0E"))
+            .clipShape(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, pageInset)
+    }
+}
+
+// MARK: - Shared layout
+
+private extension CoinRewardView {
+    func rewardSectionHeader(
+        title: String,
+        subtitle: String? = nil,
+        progress: String,
+        color: Color
+    ) -> some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(title)
+                    .font(.system(size: 21, weight: .bold))
+                    .foregroundColor(.white)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.42))
+                }
+            }
+            Spacer()
+            Text(progress)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundColor(color)
+                .padding(.top, 4)
+        }
+    }
+
+    func progressTrack(
+        items: [RewardProgressItem],
+        color: Color
+    ) -> some View {
+        ZStack(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.1))
+                .frame(height: 1)
+                .padding(.horizontal, 22)
+                .offset(y: 18)
+
+            HStack(spacing: 0) {
+                ForEach(items) { item in
+                    VStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    item.completed || item.current
+                                        ? Color.black
+                                        : Color(hex: "#151515")
+                                )
+                                .frame(width: 36, height: 36)
+
+                            Circle()
+                                .stroke(
+                                    item.completed || item.current
+                                        ? color
+                                        : Color.white.opacity(0.14),
+                                    lineWidth: item.current ? 1.6 : 1
+                                )
+                                .frame(width: 36, height: 36)
+
+                            Image(systemName: item.symbol)
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(
+                                    item.completed || item.current
+                                        ? color
+                                        : .white.opacity(0.34)
+                                )
+                        }
+
+                        Text("+\(item.amount)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(
+                                item.current
+                                    ? color
+                                    : .white.opacity(
+                                        item.completed ? 0.5 : 0.68
+                                    )
+                            )
+
+                        Text(item.label)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(.white.opacity(0.32))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+    }
+
+    func rewardAmount(_ amount: Int) -> some View {
+        HStack(spacing: 4) {
+            Text("+\(amount)")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundColor(rewardGold)
+            RewardCoinBadge(
+                size: 16,
+                color: rewardGold,
+                lineWidth: 0.9,
+                fillOpacity: 0.06
+            )
+        }
+    }
+
+    var rewardLoadingRow: some View {
+        HStack {
+            Spacer()
+            ProgressView()
+                .tint(rewardGold)
+            Spacer()
+        }
+        .frame(height: 74)
+    }
+
+    var taskDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.065))
+            .frame(height: 0.5)
+            .padding(.leading, 60)
+    }
+
+    var sectionDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.055))
+            .frame(height: 8)
+    }
+
+    var bottomLegalDisclaimer: some View {
+        VStack(spacing: 7) {
+            Text("奖励到账、有效期及每日上限以奖励规则和服务端记录为准。")
+            Text(L10n.appleDisclaimer)
+        }
+        .font(.system(size: 10))
+        .foregroundColor(.white.opacity(0.24))
+        .multilineTextAlignment(.center)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 30)
+        .padding(.top, 22)
+    }
+}
+
+private struct RewardProgressItem: Identifiable {
+    let id: Int
+    let amount: Int
+    let completed: Bool
+    let current: Bool
+    let symbol: String
+    let label: String
+}
+
 // MARK: - Preview
+
 #Preview {
     CoinRewardView()
         .environmentObject(CoinStore())

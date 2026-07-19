@@ -135,6 +135,63 @@ extension View {
     }
 }
 
+// MARK: - Rewards Visuals
+
+/// Rewards 页面统一使用的可缩放 R 金币徽标。
+struct RewardCoinBadge: View {
+    let size: CGFloat
+    var color: Color = DT.memberGold
+    var lineWidth: CGFloat = 1.4
+    var fillOpacity: Double = 0.1
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(fillOpacity))
+
+            Circle()
+                .stroke(color, lineWidth: lineWidth)
+
+            Circle()
+                .stroke(
+                    color.opacity(0.46),
+                    lineWidth: max(0.6, lineWidth * 0.5)
+                )
+                .padding(size * 0.15)
+
+            Text("R")
+                .font(.system(
+                    size: size * 0.46,
+                    weight: .bold,
+                    design: .serif
+                ))
+                .foregroundColor(color)
+                .offset(y: -size * 0.01)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Rewards 首屏右侧的金色播放圆环与黑红舞台氛围素材。
+struct RewardsHeroArtwork: View {
+    let width: CGFloat
+    let height: CGFloat
+    var opacity: Double = 1
+    var alignment: Alignment = .trailing
+
+    var body: some View {
+        Image("RewardsHeroArtwork")
+            .resizable()
+            .scaledToFill()
+            .frame(width: width, height: height, alignment: alignment)
+            .clipped()
+            .blendMode(.screen)
+            .opacity(opacity)
+            .accessibilityHidden(true)
+    }
+}
+
 // MARK: - VIP Crown
 
 /// 可复用的会员皇冠素材。
