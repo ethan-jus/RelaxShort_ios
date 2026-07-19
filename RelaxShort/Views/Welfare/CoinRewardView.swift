@@ -22,7 +22,6 @@ struct CoinRewardView: View {
     private let mode: CoinRewardPresentationMode
     private let pageInset: CGFloat = 20
     private let headerHeight: CGFloat = 54
-    private let sectionGap: CGFloat = 30
     private let rewardGold = Color(hex: "#E4BA66")
 
     @State private var showRules = false
@@ -68,20 +67,12 @@ struct CoinRewardView: View {
                         dailyCheckInSection
                             .padding(.top, 14)
 
-                        sectionDivider
-                            .padding(.top, sectionGap)
-
                         watchAndEarnSection
-                            .padding(.top, sectionGap)
-
-                        sectionDivider
-                            .padding(.top, sectionGap)
 
                         moreRewardsSection
-                            .padding(.top, sectionGap)
 
                         inviteFriendsSection
-                            .padding(.top, 24)
+                            .padding(.top, 16)
 
                         firstPurchaseSection
                             .padding(.top, 16)
@@ -509,34 +500,38 @@ private extension CoinRewardView {
     }
 
     func marketingTaskRow(_ task: MarketingRewardTask) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 10) {
             Image(systemName: taskIcon(task.code))
-                .font(.system(size: 19, weight: .regular))
+                .font(.system(size: 18, weight: .regular))
                 .foregroundColor(rewardGold)
-                .frame(width: 30, height: 30)
+                .frame(width: 24, height: 30)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(task.title)
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white.opacity(0.92))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
                 Text(task.description)
                     .font(.system(size: 12))
                     .foregroundColor(.white.opacity(0.42))
                     .lineLimit(2)
             }
+            .layoutPriority(1)
 
-            Spacer(minLength: 8)
+            Spacer(minLength: 4)
 
-            HStack(spacing: 10) {
-                rewardAmount(task.rewardCoins)
+            HStack(spacing: 5) {
+                compactTaskRewardAmount(task.rewardCoins)
                 Button {
                     performTaskAction(task)
                 } label: {
                     Text(task.completed ? "已完成" : taskButtonTitle(task))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundColor(task.completed ? .white.opacity(0.38) : rewardGold)
-                        .padding(.horizontal, 12)
-                        .frame(height: 30)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.88)
+                        .frame(width: 62, height: 30)
                         .background(
                             Capsule().fill(
                                 task.completed
@@ -553,10 +548,26 @@ private extension CoinRewardView {
                 }
                 .disabled(task.completed)
             }
+            .frame(width: 116, alignment: .trailing)
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 76)
+        .padding(.horizontal, 12)
+        .frame(minHeight: 72)
         .accessibilityElement(children: .combine)
+    }
+
+    func compactTaskRewardAmount(_ amount: Int) -> some View {
+        HStack(spacing: 2) {
+            Text("+\(amount)")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundColor(rewardGold)
+                .lineLimit(1)
+            RewardCoinBadge(
+                size: 16,
+                glowColor: rewardGold,
+                glowRadius: 1
+            )
+        }
+        .frame(width: 49, alignment: .trailing)
     }
 
     func taskIcon(_ code: String) -> String {
@@ -646,7 +657,7 @@ private extension CoinRewardView {
                     }
                 }
 
-                HStack(spacing: 0) {
+                HStack(alignment: .center, spacing: 0) {
                     inviteRewardColumn(
                         title: "你可获得",
                         amount: viewModel.referral.inviterRewardCoins
@@ -660,31 +671,34 @@ private extension CoinRewardView {
                         title: "好友可获得",
                         amount: viewModel.referral.inviteeRewardCoins
                     )
-                }
 
-                HStack(spacing: 10) {
-                    Text("本周还可邀请 \(viewModel.referral.weeklyRemaining) 位")
-                        .font(.system(size: 11))
-                        .foregroundColor(.white.opacity(0.4))
-                    Spacer()
-                    Button {
-                        if authStore.isLoggedIn {
-                            showInvite = true
-                        } else {
-                            showLogin = true
+                    VStack(spacing: 5) {
+                        Button {
+                            if authStore.isLoggedIn {
+                                showInvite = true
+                            } else {
+                                showLogin = true
+                            }
+                        } label: {
+                            Text("邀请好友")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.black)
+                                .lineLimit(1)
+                                .frame(width: 76, height: 32)
+                                .background(rewardGold)
+                                .clipShape(Capsule())
                         }
-                    } label: {
-                        Text("邀请好友")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 16)
-                            .frame(height: 34)
-                            .background(rewardGold)
-                            .clipShape(Capsule())
+
+                        Text("本周还可邀请\n\(viewModel.referral.weeklyRemaining) 位")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.38))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
                     }
+                    .frame(width: 86)
                 }
             }
-            .padding(18)
+            .padding(16)
         }
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
@@ -704,7 +718,7 @@ private extension CoinRewardView {
                 .foregroundColor(.white.opacity(0.44))
             rewardAmount(amount)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 48)
     }
 
     var firstPurchaseSection: some View {
@@ -962,12 +976,6 @@ private extension CoinRewardView {
             .fill(Color.white.opacity(0.065))
             .frame(height: 0.5)
             .padding(.leading, 60)
-    }
-
-    var sectionDivider: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.055))
-            .frame(height: 8)
     }
 
     var bottomLegalDisclaimer: some View {

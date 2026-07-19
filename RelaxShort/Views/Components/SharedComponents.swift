@@ -157,51 +157,54 @@ struct RewardCoinBadge: View {
     var motion: RewardCoinMotion = .none
 
     var body: some View {
-        Image("RewardCoinIcon")
-            .resizable()
-            .scaledToFit()
-            .colorMultiply(tint)
-            .brightness(brightness)
-            .shadow(
-                color: glowRadius > 0
-                    ? glowColor.opacity(0.44)
-                    : .clear,
-                radius: glowRadius
-            )
-            .offset(
-                y: motion == .bounce && isAnimating
-                    ? -size * 0.08
-                    : 0
-            )
-            .scaleEffect(
-                motion == .bounce && isAnimating
-                    ? 1.025
-                    : 1
-            )
-            .rotation3DEffect(
-                .degrees(
-                    motion == .spin && isAnimating
-                        ? 360
+        ZStack {
+            Image("RewardCoinIcon")
+                .resizable()
+                .scaledToFit()
+                .colorMultiply(tint)
+                .brightness(brightness)
+                .shadow(
+                    color: glowRadius > 0
+                        ? glowColor.opacity(0.44)
+                        : .clear,
+                    radius: glowRadius
+                )
+                .offset(
+                    y: motion == .bounce && isAnimating
+                        ? -max(0.75, size * 0.025)
                         : 0
-                ),
-                axis: (x: 0, y: 1, z: 0),
-                perspective: 0.55
-            )
-            .frame(width: size, height: size)
-            .animation(
-                accessibilityReduceMotion
-                    ? nil
-                    : motionAnimation,
-                value: isAnimating
-            )
-            .onAppear {
-                isAnimating = motion != .none
-                    && !accessibilityReduceMotion
-            }
-            .onChange(of: accessibilityReduceMotion) { _, reduceMotion in
-                isAnimating = motion != .none && !reduceMotion
-            }
-            .accessibilityHidden(true)
+                )
+                .scaleEffect(
+                    motion == .bounce && isAnimating
+                        ? 1.012
+                        : 1
+                )
+                .rotation3DEffect(
+                    .degrees(
+                        motion == .spin && isAnimating
+                            ? 360
+                            : 0
+                    ),
+                    axis: (x: 0, y: 1, z: 0),
+                    perspective: 0.55
+                )
+        }
+        .frame(width: size, height: size)
+        .contentShape(Rectangle())
+        .animation(
+            accessibilityReduceMotion
+                ? nil
+                : motionAnimation,
+            value: isAnimating
+        )
+        .onAppear {
+            isAnimating = motion != .none
+                && !accessibilityReduceMotion
+        }
+        .onChange(of: accessibilityReduceMotion) { _, reduceMotion in
+            isAnimating = motion != .none && !reduceMotion
+        }
+        .accessibilityHidden(true)
     }
 
     private var motionAnimation: Animation? {
@@ -209,7 +212,7 @@ struct RewardCoinBadge: View {
         case .none:
             return nil
         case .bounce:
-            return .easeInOut(duration: 0.9)
+            return .easeInOut(duration: 1.15)
                 .repeatForever(autoreverses: true)
         case .spin:
             return .linear(duration: 3.2)

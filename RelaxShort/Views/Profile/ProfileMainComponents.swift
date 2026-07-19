@@ -391,6 +391,7 @@ struct ProfileMenuRow: View {
     let subtitleIconColor: Color
     let usesRewardCoinIcon: Bool
     let rewardCoinMotion: RewardCoinMotion
+    let usesCompactRewardValue: Bool
     let showsDivider: Bool
     let onTap: () -> Void
 
@@ -403,6 +404,7 @@ struct ProfileMenuRow: View {
         subtitleIconColor: Color = DT.coinGold,
         usesRewardCoinIcon: Bool = false,
         rewardCoinMotion: RewardCoinMotion = .none,
+        usesCompactRewardValue: Bool = false,
         showsDivider: Bool = true,
         onTap: @escaping () -> Void
     ) {
@@ -414,6 +416,7 @@ struct ProfileMenuRow: View {
         self.subtitleIconColor = subtitleIconColor
         self.usesRewardCoinIcon = usesRewardCoinIcon
         self.rewardCoinMotion = rewardCoinMotion
+        self.usesCompactRewardValue = usesCompactRewardValue
         self.showsDivider = showsDivider
         self.onTap = onTap
     }
@@ -435,21 +438,29 @@ struct ProfileMenuRow: View {
                 Spacer()
 
                 if let sub = subtitle {
-                    if usesRewardCoinIcon {
-                        RewardCoinBadge(
-                            size: 19,
-                            glowColor: DT.coinGold,
-                            glowRadius: rewardCoinMotion == .none ? 0 : 2,
-                            motion: rewardCoinMotion
-                        )
-                    } else if let sIcon = subtitleIcon {
-                        Image(systemName: sIcon)
-                            .font(.system(size: 14))
-                            .foregroundColor(subtitleIconColor)
+                    HStack(spacing: 5) {
+                        if usesRewardCoinIcon {
+                            RewardCoinBadge(
+                                size: 19,
+                                glowColor: DT.coinGold,
+                                glowRadius: rewardCoinMotion == .none ? 0 : 1,
+                                motion: rewardCoinMotion
+                            )
+                        } else if let sIcon = subtitleIcon {
+                            Image(systemName: sIcon)
+                                .font(.system(size: 14))
+                                .foregroundColor(subtitleIconColor)
+                        }
+                        Text(sub)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(
+                                usesCompactRewardValue
+                                    ? DT.coinGold
+                                    : .white
+                            )
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                     }
-                    Text(sub)
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.white)
                 }
 
                 Image(systemName: "chevron.right")
