@@ -57,13 +57,25 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         do {
             let config = try await adConfigRepository.fetchAdsConfig()
             cachedConfig = config
-            guard config.adsEnabled else { return }
-            async let appOpen: Bool = loadAppOpenAd(using: config.appOpen)
-            async let rewarded: Void = preloadRewardedAd(placement: config.rewardedEarnCoins)
-            async let rewardedInterstitial: Void = preloadRewardedAd(
-                placement: config.interstitialUnlockEpisode
-            )
-            _ = await (appOpen, rewarded, rewardedInterstitial)
+            guard config.adsEnabled else {
+                print("🦐 [AdService] 全局广告开关已关闭")
+                return
+            }
+
+            // 冷启动的关键路径只抢占开屏广告。激励广告随后并行预热，
+            // 避免三个全屏广告请求同时竞争首次网络与 SDK 初始化资源。
+            let appOpenLoaded = await loadAppOpenAd(using: config.appOpen)
+            print("🦐 [AdService] 冷启动开屏广告准备结果: \(appOpenLoaded)")
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                async let rewarded: Void = self.preloadRewardedAd(
+                    placement: config.rewardedEarnCoins
+                )
+                async let rewardedInterstitial: Void = self.preloadRewardedAd(
+                    placement: config.interstitialUnlockEpisode
+                )
+                _ = await (rewarded, rewardedInterstitial)
+            }
         } catch {
             print("🦐 [AdService] 广告配置加载失败: \(error.localizedDescription)")
         }

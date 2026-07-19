@@ -2008,6 +2008,7 @@ struct SeriesPlayerView: View {
                     player: isCurrent ? playerForEpisode(episodeNumber) : nil,
                     coverURL: drama.coverURL,
                     engine: playerCoordinator.engine,
+                    isActive: isCurrent,
                     showsSystemPlaybackButton: false
                 )
                 .allowsHitTesting(false)
@@ -2029,7 +2030,9 @@ struct SeriesPlayerView: View {
 
                     seriesChromeOverlay(in: geo, isCurrent: isCurrent)
 
-                    if isCurrent, playerCoordinator.engine.currentPlayer != nil {
+                    if isCurrent,
+                       playerCoordinator.engine.currentPlayer != nil,
+                       playerCoordinator.engine.hasVisiblePlaybackStarted {
                         centerPlaybackButton
                             .zIndex(40)
                     }

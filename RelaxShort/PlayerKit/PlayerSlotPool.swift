@@ -167,7 +167,10 @@ final class PlayerSlotPool {
             return nil
         }
 
-        guard let source = slots[sourceSlot.rawValue], source.preloadState != .failed else {
+        guard let source = slots[sourceSlot.rawValue], source.preloadState == .ready else {
+            if slots[sourceSlot.rawValue] != nil {
+                print("[PlayerKit] 相邻预加载尚未完成，放弃缓存代理并改用当前直连 mediaID=\(item.id)")
+            }
             cancel(sourceSlot)
             return nil
         }

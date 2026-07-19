@@ -40,13 +40,20 @@ struct ShortVideoPlayerView: View {
                 coverView
             }
 
-            // loading 状态
-            if engine.state == .preparing
-                || engine.state == .waitingNetwork
-                || engine.state == .recovering {
-                ProgressView()
-                    .tint(.white)
-                    .scaleEffect(1.2)
+            // 真实首帧出现前持续显示加载反馈。Engine 会在 AVPlayer 调用 play() 后立即进入
+            // .playing，但此时网络仍可能没有出画，不能因此提前撤掉加载动画。
+            if shouldShowLoading {
+                VStack(spacing: 10) {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(1.25)
+                    Text(L10n.loading)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.86))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(.black.opacity(0.38), in: RoundedRectangle(cornerRadius: 14))
             }
 
             // 用户暂停：显示播放按钮，不显示封面
@@ -98,6 +105,19 @@ struct ShortVideoPlayerView: View {
     private var showCover: Bool {
         if player == nil { return true }
         return !engine.hasVisiblePlaybackStarted
+    }
+
+    private var shouldShowLoading: Bool {
+        guard isActive else { return false }
+        switch engine.state {
+        case .failed, .idle, .pausedByUser, .pausedBySystem:
+            return false
+        case .preparing, .ready, .playing, .waitingNetwork, .stalled, .recovering:
+            return !engine.hasVisiblePlaybackStarted
+                || engine.state == .waitingNetwork
+                || engine.state == .stalled
+                || engine.state == .recovering
+        }
     }
 
     @ViewBuilder

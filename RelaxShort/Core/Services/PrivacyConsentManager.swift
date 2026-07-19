@@ -29,9 +29,12 @@ final class PrivacyConsentManager: ObservableObject {
         let updateError = await requestConsentInfoUpdate(with: parameters)
         refreshPrivacyOptionsRequirement()
 
+        // UMP 可能已持有上一次会话的有效同意。官方建议在 consent info 更新完成后
+        // 立即检查一次，避免每次冷启动都等到表单流程结束才开始加载广告。
+        startMobileAdsIfAllowed()
+
         if let updateError {
             Logger.store.warning("UMP consent update failed: \(updateError.localizedDescription)")
-            startMobileAdsIfAllowed()
             return
         }
 

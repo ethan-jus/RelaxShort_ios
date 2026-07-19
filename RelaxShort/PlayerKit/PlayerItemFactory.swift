@@ -22,13 +22,14 @@ enum PlayerPreloadPolicy {
 // MARK: - 播放器 Item 工厂
 
 enum PlayerItemFactory {
-    /// 公开 MP4 使用资源加载代理，已读取的 Range 会被写入 2GB LRU 磁盘缓存。
-    /// HLS 与受保护内容不走普通文件缓存。
+    /// 当前可见播放必须使用 AVPlayer 原生流式加载；后台预加载才允许使用磁盘 Range 缓存。
+    /// completion 型资源代理只有收到完整响应块后才能回复 AVPlayer，不能放在首帧热路径。
     static func makePlaybackItem(
         from item: PlayerMediaItem,
         intent: PlayerItemLoadIntent = .playback
     ) -> PlayerManagedItem {
-        guard item.allowsPersistentCache,
+        guard intent == .preload,
+              item.allowsPersistentCache,
               PlayerMediaCacheSettings.isEnabled,
               let url = mp4URL(from: item.source) else {
             return makeDirectItem(from: item.source)

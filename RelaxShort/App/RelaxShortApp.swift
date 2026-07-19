@@ -142,6 +142,7 @@ struct RelaxShortApp: App {
     }
 
     private func runColdStartAdFlow() async {
+        let startedAt = CACurrentMediaTime()
         try? await Task.sleep(for: .seconds(AdConfig.brandingDuration))
 
         let deadline = Date().addingTimeInterval(AdConfig.coldStartLoadTimeout)
@@ -150,12 +151,18 @@ struct RelaxShortApp: App {
         }
 
         guard showSplash, scenePhase == .active else {
+            let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+            Logger.store.info("冷启动结束：页面或场景已变化，耗时=\(Int(elapsed))ms")
             finishColdStart()
             return
         }
         if adService.isAppOpenAdReady {
+            let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+            Logger.store.info("冷启动展示开屏广告，准备耗时=\(Int(elapsed))ms")
             adService.showAppOpenAd(onDismiss: finishColdStart)
         } else {
+            let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+            Logger.store.info("冷启动广告未在预算内就绪，直接进入首页，耗时=\(Int(elapsed))ms")
             finishColdStart()
         }
     }
