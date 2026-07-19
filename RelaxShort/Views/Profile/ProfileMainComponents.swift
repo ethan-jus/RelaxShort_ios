@@ -344,14 +344,13 @@ struct ProfileMembershipCard: View {
 private struct HDBenefitView: View {
     var body: some View {
         VStack(spacing: 4) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .stroke(DT.memberGold, lineWidth: 1.5)
-                    .frame(width: 30, height: 20)
-                Text("HD")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(DT.memberGold)
-            }
+            HDBadgeIconView(
+                color: DT.memberGold,
+                width: 30,
+                height: 20,
+                lineWidth: 1.5,
+                textSize: 11
+            )
             Text("profile.membership_benefit_quality".localized)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(Color(hex: "#E3C98B"))

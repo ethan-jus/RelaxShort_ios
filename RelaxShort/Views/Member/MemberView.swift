@@ -150,7 +150,7 @@ struct MemberView: View {
 
     // MARK: - Layout Constants
 
-    private let heroHeight: CGFloat = 350
+    private let heroHeight: CGFloat = 320
     private let headerHeight: CGFloat = 54
     private let pageInset: CGFloat = 16
     private let planCardGap: CGFloat = 8
@@ -173,7 +173,7 @@ struct MemberView: View {
                 ? DramaBoxBottomTabBar.totalHeight + bottomInset
                 : 0
             let pinProgress = min(
-                max((scrollOffsetY - 54) / 44, 0),
+                max((scrollOffsetY - 94) / 42, 0),
                 1
             )
             let viewportFrame = geo.frame(in: .global)
@@ -185,7 +185,11 @@ struct MemberView: View {
                     width: geo.size.width,
                     topInset: topInset
                 )
-                .opacity(1 - pinProgress)
+                .overlay {
+                    Color.black
+                        .opacity(pinProgress)
+                        .allowsHitTesting(false)
+                }
 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
@@ -680,27 +684,32 @@ extension MemberView {
     private var benefitsForDisplay: [MemberBenefitDisplayItem] {
         guard !viewModel.benefits.isEmpty else { return [] }
 
-        var items = viewModel.benefits
-        let implementedBenefits = [
+        return [
+            MemberBenefitDisplayItem(
+                id: "exclusive",
+                icon: "play.rectangle",
+                titleKey: "member.benefit.exclusive",
+                detailKey: "member.benefit.exclusive_detail"
+            ),
+            MemberBenefitDisplayItem(
+                id: "ad_unlock_free",
+                icon: "nosign",
+                titleKey: "member.benefit.ad_unlock_free",
+                detailKey: "member.benefit.ad_unlock_free_detail"
+            ),
+            MemberBenefitDisplayItem(
+                id: "quality",
+                icon: "hd",
+                titleKey: "member.benefit.quality",
+                detailKey: "member.benefit.quality_detail"
+            ),
             MemberBenefitDisplayItem(
                 id: "download",
                 icon: "arrow.down.to.line",
                 titleKey: "member.benefit.download",
-                detailKey: nil
-            ),
-            MemberBenefitDisplayItem(
-                id: "quality",
-                icon: "rectangle.badge.hd",
-                titleKey: "member.benefit.quality",
-                detailKey: nil
+                detailKey: "member.benefit.download_detail"
             )
         ]
-
-        for benefit in implementedBenefits
-        where !items.contains(where: { $0.id == benefit.id }) {
-            items.append(benefit)
-        }
-        return items
     }
 
     private var benefitsSection: some View {
@@ -782,24 +791,29 @@ extension MemberView {
         index: Int,
         count: Int
     ) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: benefit.icon)
-                .font(.system(size: 23, weight: .regular))
-                .foregroundColor(memberGold)
-                .frame(width: 32, height: 30)
-                .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 9) {
+            memberBenefitIcon(for: benefit)
 
             Text(benefit.titleKey.localized)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
 
+            if let detailKey = benefit.detailKey {
+                Text(detailKey.localized)
+                    .font(.system(size: 12.5))
+                    .foregroundColor(.white.opacity(0.58))
+                    .lineSpacing(2)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 138, alignment: .topLeading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
         .overlay(alignment: .trailing) {
             if index.isMultiple(of: 2), index + 1 < count {
                 Rectangle()
@@ -815,6 +829,29 @@ extension MemberView {
             }
         }
         .accessibilityElement(children: .combine)
+    }
+
+    @ViewBuilder
+    private func memberBenefitIcon(
+        for benefit: MemberBenefitDisplayItem
+    ) -> some View {
+        if benefit.id == "quality" {
+            HDBadgeIconView(
+                color: memberGold,
+                width: 39,
+                height: 26,
+                lineWidth: 1.6,
+                textSize: 13
+            )
+            .frame(width: 42, height: 36, alignment: .leading)
+            .accessibilityHidden(true)
+        } else {
+            Image(systemName: benefit.icon)
+                .font(.system(size: 30, weight: .regular))
+                .foregroundColor(memberGold)
+                .frame(width: 42, height: 36, alignment: .leading)
+                .accessibilityHidden(true)
+        }
     }
 
     private func secondaryBenefitRow(

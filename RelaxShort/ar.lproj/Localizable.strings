@@ -248,9 +248,14 @@
 "member.benefit.unlimited" = "وصول غير محدود";
 "member.benefit.unlimited_detail" = "شاهد الحلقات المدفوعة والحصرية أثناء سريان الاشتراك.";
 "member.benefit.download" = "تنزيل";
+"member.benefit.download_detail" = "نزّل الحلقات وشاهدها دون اتصال.";
 "member.benefit.points" = "نقاط العضوية";
 "member.benefit.exclusive" = "مسلسلات حصرية للأعضاء";
+"member.benefit.exclusive_detail" = "شاهد جميع المسلسلات بما فيها المحتوى الحصري للأعضاء.";
+"member.benefit.ad_unlock_free" = "فتح بلا إعلانات";
+"member.benefit.ad_unlock_free_detail" = "تجاوز إعلانات الفتح وشاهد الحلقات المدفوعة مباشرة.";
 "member.benefit.quality" = "جودة 1080p";
+"member.benefit.quality_detail" = "استمتع بتشغيل حصري بدقة 1080p.";
 "member.benefit.gift_drama" = "إهداء مسلسلات للأصدقاء";
 "member.benefit.gift_membership" = "إهداء عضويات";
 "member.benefit.themes" = "سمات حصرية VIP";

@@ -248,9 +248,14 @@
 "member.benefit.unlimited" = "Acceso Ilimitado";
 "member.benefit.unlimited_detail" = "Mira episodios de pago y exclusivos mientras la suscripción esté activa.";
 "member.benefit.download" = "Descargar";
+"member.benefit.download_detail" = "Descarga episodios y míralos sin conexión.";
 "member.benefit.points" = "Puntos de Miembro";
 "member.benefit.exclusive" = "Series Exclusivas";
+"member.benefit.exclusive_detail" = "Mira todas las series, incluidas las exclusivas para miembros.";
+"member.benefit.ad_unlock_free" = "Desbloqueo sin anuncios";
+"member.benefit.ad_unlock_free_detail" = "Omite los anuncios de desbloqueo y mira episodios de pago.";
 "member.benefit.quality" = "Calidad 1080p";
+"member.benefit.quality_detail" = "Disfruta de reproducción exclusiva en 1080p.";
 "member.benefit.gift_drama" = "Regalar Series a Amigos";
 "member.benefit.gift_membership" = "Regalar Membresías";
 "member.benefit.themes" = "Temas Exclusivos VIP";

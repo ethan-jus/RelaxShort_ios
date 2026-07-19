@@ -248,9 +248,14 @@
 "member.benefit.unlimited" = "見放題";
 "member.benefit.unlimited_detail" = "登録期間中、有料エピソードと会員限定エピソードを視聴できます。";
 "member.benefit.download" = "ダウンロード";
+"member.benefit.download_detail" = "エピソードをダウンロードしてオフラインで視聴できます。";
 "member.benefit.points" = "メンバーポイント";
 "member.benefit.exclusive" = "メンバー限定ドラマ";
+"member.benefit.exclusive_detail" = "会員限定作品を含むすべてのドラマを視聴できます。";
+"member.benefit.ad_unlock_free" = "広告なしでロック解除";
+"member.benefit.ad_unlock_free_detail" = "解除広告を見ずに有料エピソードを視聴できます。";
 "member.benefit.quality" = "1080p 高画質";
+"member.benefit.quality_detail" = "会員限定の1080p画質で再生できます。";
 "member.benefit.gift_drama" = "友達にドラマをプレゼント";
 "member.benefit.gift_membership" = "友達にメンバーシップをプレゼント";
 "member.benefit.themes" = "VIP限定テーマ";

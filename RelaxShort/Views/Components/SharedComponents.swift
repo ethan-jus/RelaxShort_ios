@@ -338,6 +338,32 @@ struct DramaBadgeTagView: View {
     }
 }
 
+/// 会员权益统一使用的 HD 徽章；尺寸和颜色可由不同页面按需调整。
+struct HDBadgeIconView: View {
+    let color: Color
+    let width: CGFloat
+    let height: CGFloat
+    let lineWidth: CGFloat
+    let textSize: CGFloat
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .stroke(color, lineWidth: lineWidth)
+                .frame(width: width, height: height)
+
+            Text("HD")
+                .font(.system(
+                    size: textSize,
+                    weight: .bold,
+                    design: .rounded
+                ))
+                .foregroundColor(color)
+        }
+        .frame(width: width, height: height)
+    }
+}
+
 private extension Color {
     static let goldVipBadgeBg = Color(red: 0.85, green: 0.72, blue: 0.38).opacity(0.25)
     static let goldVipBadgeFg = Color(red: 0.85, green: 0.72, blue: 0.38)
