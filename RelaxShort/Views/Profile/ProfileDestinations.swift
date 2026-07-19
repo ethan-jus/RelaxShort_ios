@@ -12,6 +12,9 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var authStore: AuthStore
     @State private var showLogoutAlert = false
+    @State private var showDeleteAccountAlert = false
+    @State private var isDeletingAccount = false
+    @State private var accountDeletionMessage: String?
     @State private var cachedVideoBytes: Int64 = 0
     @State private var showClearCacheAlert = false
     @State private var subscriptionManagementError: String?
@@ -52,7 +55,23 @@ struct SettingsView: View {
                         value: ByteCountFormatter.string(fromByteCount: cachedVideoBytes, countStyle: .file)
                     )
                 }
-                settingRow(title: "Account Deletion", systemImage: "person.crop.circle.badge.minus", color: .red)
+                if authStore.isLoggedIn {
+                    Button {
+                        showDeleteAccountAlert = true
+                    } label: {
+                        HStack {
+                            settingRow(
+                                title: "Account Deletion",
+                                systemImage: "person.crop.circle.badge.minus",
+                                color: .red
+                            )
+                            if isDeletingAccount {
+                                ProgressView().tint(.white)
+                            }
+                        }
+                    }
+                    .disabled(isDeletingAccount)
+                }
             }
 
             Section {
@@ -140,6 +159,25 @@ struct SettingsView: View {
         } message: {
             Text(L10n.logoutConfirmMessage)
         }
+        .alert("Delete Account?", isPresented: $showDeleteAccountAlert) {
+            Button(L10n.cancel, role: .cancel) {}
+            Button("Delete Permanently", role: .destructive) {
+                deleteAccount()
+            }
+        } message: {
+            Text("Your profile, viewing history, bookmarks and account access will be permanently removed. Active App Store subscriptions are not automatically cancelled.")
+        }
+        .alert(
+            accountDeletionMessage ?? "",
+            isPresented: Binding(
+                get: { accountDeletionMessage != nil },
+                set: { if !$0 { accountDeletionMessage = nil } }
+            )
+        ) {
+            Button("OK") {
+                if !authStore.isLoggedIn { dismiss() }
+            }
+        }
         .alert("Clear video cache?", isPresented: $showClearCacheAlert) {
             Button(L10n.cancel, role: .cancel) {}
             Button("Clear", role: .destructive) {
@@ -173,6 +211,26 @@ struct SettingsView: View {
 
     private func refreshCachedVideoBytes() {
         cachedVideoBytes = HTTPRangeMediaCache.shared.totalCachedBytes()
+    }
+
+    private func deleteAccount() {
+        guard !isDeletingAccount else { return }
+        isDeletingAccount = true
+        Task {
+            do {
+                let manualAppleRevocationRequired = try await authStore.deleteAccount()
+                if manualAppleRevocationRequired {
+                    accountDeletionMessage = """
+                    Your RelaxShort account was deleted. To finish revoking the previous Apple authorization, open Settings > your name > Sign-In & Security > Sign in with Apple, then remove RelaxShort.
+                    """
+                } else {
+                    accountDeletionMessage = "Your account and personal data were deleted."
+                }
+            } catch {
+                accountDeletionMessage = "Account deletion failed: \(error.localizedDescription)"
+            }
+            isDeletingAccount = false
+        }
     }
 
     private func manageSubscription() {

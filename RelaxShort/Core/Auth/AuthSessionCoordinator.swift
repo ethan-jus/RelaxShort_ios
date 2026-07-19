@@ -212,6 +212,27 @@ final class AuthSessionCoordinator: ObservableObject {
         }
     }
 
+    /// 服务端完成账号匿名化并撤销全部会话后，清除本机凭据并创建全新匿名账户。
+    /// 返回值表示老 Apple 账号仍需要用户在 Apple Account 中人工撤销授权。
+    func deleteAccount() async throws -> Bool {
+        guard isRegistered else { throw AuthError.invalidSession }
+        let accessToken = try await validAccessToken()
+        let response = try await repository.deleteAccount(accessToken: accessToken)
+        guard response.deleted else { throw AuthError.invalidSession }
+
+        session = nil
+        state = .restoring
+        try? tokenStore.deleteRefreshToken()
+        googleClient.signOut()
+        facebookClient.signOut()
+        UserDefaults.standard.removeObject(forKey: bootstrapKeyName)
+        UserDefaults.standard.removeObject(forKey: googleMergeRequestKeyName)
+        UserDefaults.standard.removeObject(forKey: facebookMergeRequestKeyName)
+        UserDefaults.standard.removeObject(forKey: appleMergeRequestKeyName)
+        await bootstrap()
+        return response.manualAppleRevocationRequired
+    }
+
     private func refreshSession() async throws -> AuthSession {
         if let refreshTask { return try await refreshTask.value }
         guard let refreshToken = session?.refreshToken ?? (try? tokenStore.readRefreshToken()) else {

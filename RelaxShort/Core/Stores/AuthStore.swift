@@ -70,6 +70,15 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    func deleteAccount() async throws -> Bool {
+        let manualAppleRevocationRequired = try await coordinator.deleteAccount()
+        currentUser = nil
+        isVip = false
+        vipExpireDate = nil
+        coinBalance = 0
+        return manualAppleRevocationRequired
+    }
+
     func applyLoadedProfile(_ user: User) {
         currentUser = user
         isVip = user.isVipValid

@@ -26,6 +26,13 @@ protocol RealAuthRepositoryProtocol {
         mergeRequestID: UUID
     ) async throws -> AuthSession
     func logout(_ refreshToken: String) async throws
+    func deleteAccount(accessToken: String) async throws -> AccountDeletionResponseDTO
+}
+
+extension RealAuthRepositoryProtocol {
+    func deleteAccount(accessToken: String) async throws -> AccountDeletionResponseDTO {
+        throw AuthError.invalidSession
+    }
 }
 
 /// 认证接口使用独立请求路径，避免 401 自动刷新与 refresh 接口形成递归。
@@ -127,6 +134,15 @@ final class RealAuthRepository: RealAuthRepositoryProtocol {
         )
     }
 
+    func deleteAccount(accessToken: String) async throws -> AccountDeletionResponseDTO {
+        try await requestData(
+            path: "/api/v2/users/me",
+            body: [:],
+            bearerToken: accessToken,
+            method: "DELETE"
+        )
+    }
+
     private func requestSession(
         path: String,
         body: [String: String],
@@ -143,13 +159,14 @@ final class RealAuthRepository: RealAuthRepositoryProtocol {
     private func requestData<T: Decodable>(
         path: String,
         body: [String: String],
-        bearerToken: String? = nil
+        bearerToken: String? = nil,
+        method: String = "POST"
     ) async throws -> T {
         guard let url = URL(string: APIConfig.baseURL + path) else {
             throw NetworkError.invalidURL
         }
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("ios", forHTTPHeaderField: "X-Platform")
@@ -157,7 +174,9 @@ final class RealAuthRepository: RealAuthRepositoryProtocol {
         if let bearerToken {
             request.setValue("Bearer \(bearerToken)", forHTTPHeaderField: "Authorization")
         }
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        if !body.isEmpty {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        }
 
         let (data, response): (Data, URLResponse)
         do {

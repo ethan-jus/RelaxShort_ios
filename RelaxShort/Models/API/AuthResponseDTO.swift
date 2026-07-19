@@ -16,6 +16,11 @@ struct AuthAccountDTO: Decodable {
     let provider: String?
 }
 
+struct AccountDeletionResponseDTO: Decodable {
+    let deleted: Bool
+    let manualAppleRevocationRequired: Bool
+}
+
 extension AuthSessionResponseDTO {
     func toDomain(now: Date = Date()) throws -> AuthSession {
         guard let type = AccountType(rawValue: account.accountType) else {
