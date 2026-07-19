@@ -68,8 +68,10 @@ struct CoinRewardView: View {
                             .padding(.top, 14)
 
                         watchAndEarnSection
+                            .padding(.top, 24)
 
                         moreRewardsSection
+                            .padding(.top, 24)
 
                         inviteFriendsSection
                             .padding(.top, 16)
