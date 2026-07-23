@@ -45,3 +45,22 @@ struct WalletVipDTO: Decodable {
     let vipLevel: Int?
     let expiresAt: String?   // ISO 8601 日期字符串，nullable
 }
+
+// MARK: - Wallet Transactions Response DTO
+
+/// 对应后端 `GET /api/v2/users/me/wallet/transactions` 响应 data 字段
+struct WalletTransactionsResponseDTO: Decodable {
+    let items: [WalletTransactionDTO]?
+    let nextCursor: String?
+    let hasMore: Bool?
+}
+
+struct WalletTransactionDTO: Decodable {
+    let id: Int64
+    let transactionType: String
+    let amount: Decimal
+    let balanceAfter: Decimal?
+    let source: String
+    let description: String?
+    let createdAt: String?
+}

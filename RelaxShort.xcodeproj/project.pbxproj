@@ -155,6 +155,10 @@
 		T31A00500000000000000005 /* RealFavoritesRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00600000000000000006 /* RealFavoritesRepository.swift */; };
 		T31A00700000000000000007 /* BookmarkStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A00800000000000000008 /* BookmarkStore.swift */; };
 		T31A00900000000000000009 /* WatchProgressReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = T31A01000000000000000010 /* WatchProgressReporter.swift */; };
+		WLTB00000000000000000001 /* RealWalletRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000001 /* RealWalletRepository.swift */; };
+		WLTB00000000000000000002 /* WalletModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000002 /* WalletModels.swift */; };
+		WLTB00000000000000000003 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000003 /* WalletViewModel.swift */; };
+		WLTB00000000000000000004 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000004 /* WalletView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -325,6 +329,10 @@
 		T31A00600000000000000006 /* RealFavoritesRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealFavoritesRepository.swift; sourceTree = "<group>"; };
 		T31A00800000000000000008 /* BookmarkStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkStore.swift; sourceTree = "<group>"; };
 		T31A01000000000000000010 /* WatchProgressReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProgressReporter.swift; sourceTree = "<group>"; };
+		WLTF00000000000000000001 /* RealWalletRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealWalletRepository.swift; sourceTree = "<group>"; };
+		WLTF00000000000000000002 /* WalletModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletModels.swift; sourceTree = "<group>"; };
+		WLTF00000000000000000003 /* WalletViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
+		WLTF00000000000000000004 /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -395,6 +403,7 @@
 				F62A13729B07323D111A15BA /* RankViewModel.swift */,
 				C2ECC6D89B539AE9E9C77C64 /* SearchDefaultViewModel.swift */,
 				E1C554E2B8C118B0AF09D99C /* SearchViewModel.swift */,
+				WLTF00000000000000000003 /* WalletViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -525,6 +534,7 @@
 				F1A23B000000000000000004 /* RealProfileRepository.swift */,
 				CF9FFC0A7E27520F831C0B29 /* RealAPISmokeRunner.swift */,
 				T31A00600000000000000006 /* RealFavoritesRepository.swift */,
+				WLTF00000000000000000001 /* RealWalletRepository.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -642,6 +652,7 @@
 			isa = PBXGroup;
 			children = (
 				BFF861F910EFAE987BF1A60D /* ProfileView.swift */,
+				WLTF00000000000000000004 /* WalletView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -731,6 +742,7 @@
 				73824753A11CF56629020B18 /* API */,
 				1C914768BFFF4524641958E9 /* RankingEntry.swift */,
 				T31A00200000000000000002 /* WatchProgressReport.swift */,
+				WLTF00000000000000000002 /* WalletModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -1049,6 +1061,10 @@
 				4F313EAE05D04C59865E1629 /* FacebookAppDelegate.swift in Sources */,
 				CE78B51CA94E42878A2D380B /* FacebookOAuthClient.swift in Sources */,
 				71B9DFD83EFB4C6FB1351396 /* AppleOAuthClient.swift in Sources */,
+				WLTB00000000000000000001 /* RealWalletRepository.swift in Sources */,
+				WLTB00000000000000000002 /* WalletModels.swift in Sources */,
+				WLTB00000000000000000003 /* WalletViewModel.swift in Sources */,
+				WLTB00000000000000000004 /* WalletView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

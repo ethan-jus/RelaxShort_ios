@@ -111,6 +111,13 @@ protocol ProfileRepositoryProtocol {
     func fetchUserProfile() async throws -> User
 }
 
+// MARK: - Wallet
+
+/// 钱包首页数据仓库协议。Repository 负责把钱包 DTO 转为页面领域模型。
+protocol WalletRepositoryProtocol {
+    func fetchOverview(limit: Int) async throws -> WalletOverview
+}
+
 // MARK: - VIP
 
 /// VIP 会员数据仓库协议

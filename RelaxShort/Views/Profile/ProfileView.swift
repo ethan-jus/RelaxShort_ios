@@ -213,7 +213,7 @@ struct ProfileView: View {
         case .recharge:
             PlaceholderView(title: sheet.title)
         case .wallet:
-            PlaceholderView(title: sheet.title)
+            WalletView()
         case .welfare:
             CoinRewardView(mode: .pushed)
         case .downloads:

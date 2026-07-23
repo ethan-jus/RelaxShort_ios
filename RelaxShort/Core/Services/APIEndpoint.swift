@@ -47,6 +47,7 @@ enum APIEndpoint {
 
     case userMe
     case userWallet
+    case walletTransactions(cursor: String?, limit: Int)
     case updateUserPreferences(uiLanguage: String?, contentLanguage: String?, subtitleLanguage: String?, defaultQuality: String?)
     // Task30 R4B-1
     case discoveryEvents(DiscoveryEventBatchRequest)
@@ -127,7 +128,7 @@ extension APIEndpoint {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
-             .userMe, .userWallet, .updateUserPreferences,
+             .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
              .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
              .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
@@ -159,6 +160,7 @@ extension APIEndpoint {
         // ── Task23 v2 ──
         case .userMe:                           return "/api/v2/users/me"
         case .userWallet:                       return "/api/v2/users/me/wallet"
+        case .walletTransactions:               return "/api/v2/users/me/wallet/transactions"
         case .updateUserPreferences:            return "/api/v2/users/me/preferences"
         case .discoveryEvents:                  return "/api/v2/events/discovery/batch"
         // ── Task31 v2 ──
@@ -206,7 +208,7 @@ extension APIEndpoint {
         case .appInit:              return .post
         case .forYou, .seriesEpisodes, .episodePlay, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
-             .userMe, .userWallet: return .get
+             .userMe, .userWallet, .walletTransactions: return .get
         case .updateUserPreferences: return .patch
         case .episodeUnlock, .applePaymentVerify: return .post
         case .discoveryEvents:     return .post
@@ -233,7 +235,7 @@ extension APIEndpoint {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
-             .userMe, .userWallet, .updateUserPreferences, .discoveryEvents,
+             .userMe, .userWallet, .walletTransactions, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
              .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
              .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode:
@@ -245,7 +247,7 @@ extension APIEndpoint {
     /// 后端必须从 Bearer 会话解析用户的端点；匿名账户也属于有效会话。
     var requiresAuthenticatedSession: Bool {
         switch self {
-        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .updateUserPreferences,
+        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark,
              .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
@@ -452,6 +454,10 @@ extension APIEndpoint {
         case .watchHistoryV2(let cursor, let limit):
             var items = [URLQueryItem(name: "limit", value: "\(limit)")]
             if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
+            components?.queryItems = items
+        case .walletTransactions(let cursor, let limit):
+            var items = [URLQueryItem(name: "limit", value: "\(limit)")]
+            if let cursor { items.append(URLQueryItem(name: "cursor", value: cursor)) }
             components?.queryItems = items
         case .bookmarksV2(let cursor, let limit):
             var items = [URLQueryItem(name: "limit", value: "\(limit)")]
