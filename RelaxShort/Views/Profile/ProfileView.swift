@@ -228,7 +228,6 @@ struct ProfileView: View {
             SettingsView()
         case .topUp:
             TopUpView()
-                .environmentObject(StoreKitManager())
         }
     }
 
