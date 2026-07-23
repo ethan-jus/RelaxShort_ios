@@ -47,7 +47,7 @@ enum APIEndpoint {
 
     case userMe
     case userWallet
-    case walletTransactions(cursor: String?, limit: Int)
+    case walletTransactions(cursor: String?, limit: Int, month: String, category: String)
     case updateUserPreferences(uiLanguage: String?, contentLanguage: String?, subtitleLanguage: String?, defaultQuality: String?)
     // Task30 R4B-1
     case discoveryEvents(DiscoveryEventBatchRequest)
@@ -455,8 +455,12 @@ extension APIEndpoint {
             var items = [URLQueryItem(name: "limit", value: "\(limit)")]
             if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
             components?.queryItems = items
-        case .walletTransactions(let cursor, let limit):
-            var items = [URLQueryItem(name: "limit", value: "\(limit)")]
+        case .walletTransactions(let cursor, let limit, let month, let category):
+            var items = [
+                URLQueryItem(name: "limit", value: "\(limit)"),
+                URLQueryItem(name: "month", value: month),
+                URLQueryItem(name: "category", value: category)
+            ]
             if let cursor { items.append(URLQueryItem(name: "cursor", value: cursor)) }
             components?.queryItems = items
         case .bookmarksV2(let cursor, let limit):

@@ -159,6 +159,8 @@
 		WLTB00000000000000000002 /* WalletModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000002 /* WalletModels.swift */; };
 		WLTB00000000000000000003 /* WalletViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000003 /* WalletViewModel.swift */; };
 		WLTB00000000000000000004 /* WalletView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000004 /* WalletView.swift */; };
+		WLTB00000000000000000005 /* WalletTransactionsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000005 /* WalletTransactionsViewModel.swift */; };
+		WLTB00000000000000000006 /* WalletTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000006 /* WalletTransactionsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -333,6 +335,8 @@
 		WLTF00000000000000000002 /* WalletModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletModels.swift; sourceTree = "<group>"; };
 		WLTF00000000000000000003 /* WalletViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletViewModel.swift; sourceTree = "<group>"; };
 		WLTF00000000000000000004 /* WalletView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletView.swift; sourceTree = "<group>"; };
+		WLTF00000000000000000005 /* WalletTransactionsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletTransactionsViewModel.swift; sourceTree = "<group>"; };
+		WLTF00000000000000000006 /* WalletTransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletTransactionsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -404,6 +408,7 @@
 				C2ECC6D89B539AE9E9C77C64 /* SearchDefaultViewModel.swift */,
 				E1C554E2B8C118B0AF09D99C /* SearchViewModel.swift */,
 				WLTF00000000000000000003 /* WalletViewModel.swift */,
+				WLTF00000000000000000005 /* WalletTransactionsViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -653,6 +658,7 @@
 			children = (
 				BFF861F910EFAE987BF1A60D /* ProfileView.swift */,
 				WLTF00000000000000000004 /* WalletView.swift */,
+				WLTF00000000000000000006 /* WalletTransactionsView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -1065,6 +1071,8 @@
 				WLTB00000000000000000002 /* WalletModels.swift in Sources */,
 				WLTB00000000000000000003 /* WalletViewModel.swift in Sources */,
 				WLTB00000000000000000004 /* WalletView.swift in Sources */,
+				WLTB00000000000000000005 /* WalletTransactionsViewModel.swift in Sources */,
+				WLTB00000000000000000006 /* WalletTransactionsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

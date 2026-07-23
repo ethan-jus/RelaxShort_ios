@@ -3,9 +3,10 @@ import SwiftUI
 /// 钱包首页：图片 1 的余额背景 + 图片 3 的双操作按钮和流水布局。
 struct WalletView: View {
     @StateObject private var viewModel: WalletViewModel
-    @State private var showsAllTransactions = false
+    private let repository: WalletRepositoryProtocol
 
     init(repository: WalletRepositoryProtocol = RealWalletRepository()) {
+        self.repository = repository
         _viewModel = StateObject(wrappedValue: WalletViewModel(repository: repository))
     }
 
@@ -32,7 +33,7 @@ struct WalletView: View {
         .toolbarBackground(DB.black, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .onAppear {
-            Task { await viewModel.load(limit: showsAllTransactions ? 30 : 4) }
+            Task { await viewModel.load(limit: 4) }
         }
     }
 
@@ -142,14 +143,13 @@ struct WalletView: View {
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
-                if viewModel.overview?.hasMore == true || showsAllTransactions {
-                    Button {
-                        showsAllTransactions.toggle()
-                        Task { await viewModel.load(limit: showsAllTransactions ? 30 : 4) }
+                if !(viewModel.overview?.transactions.isEmpty ?? true) {
+                    NavigationLink {
+                        WalletTransactionsView(repository: repository)
                     } label: {
                         HStack(spacing: 6) {
-                            Text(showsAllTransactions ? "wallet.show_less".localized : "wallet.view_all".localized)
-                            Image(systemName: showsAllTransactions ? "chevron.up" : "chevron.right")
+                            Text("wallet.view_all".localized)
+                            Image(systemName: "chevron.right")
                                 .font(.system(size: 12, weight: .semibold))
                         }
                         .font(.system(size: 15, weight: .medium))
@@ -182,7 +182,7 @@ struct WalletView: View {
                     Text("wallet.load_failed".localized)
                         .foregroundColor(DB.mutedText)
                     Button("wallet.retry".localized) {
-                        Task { await viewModel.load(limit: showsAllTransactions ? 30 : 4) }
+                        Task { await viewModel.load(limit: 4) }
                     }
                     .foregroundColor(DT.logoRed)
                     .accessibilityHint(error)

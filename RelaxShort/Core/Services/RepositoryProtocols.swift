@@ -116,6 +116,12 @@ protocol ProfileRepositoryProtocol {
 /// 钱包首页数据仓库协议。Repository 负责把钱包 DTO 转为页面领域模型。
 protocol WalletRepositoryProtocol {
     func fetchOverview(limit: Int) async throws -> WalletOverview
+    func fetchTransactions(
+        cursor: String?,
+        limit: Int,
+        month: String,
+        category: WalletTransactionCategory
+    ) async throws -> WalletTransactionPage
 }
 
 // MARK: - VIP

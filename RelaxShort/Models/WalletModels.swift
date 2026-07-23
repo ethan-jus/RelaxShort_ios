@@ -15,3 +15,21 @@ struct WalletTransaction: Identifiable, Sendable {
     let source: String
     let createdAt: Date?
 }
+
+enum WalletTransactionCategory: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case purchase
+    case reward
+    case unlock
+
+    var id: String { rawValue }
+}
+
+struct WalletTransactionPage: Sendable {
+    let period: String
+    let totalEarned: Int
+    let totalSpent: Int
+    let transactions: [WalletTransaction]
+    let nextCursor: String?
+    let hasMore: Bool
+}

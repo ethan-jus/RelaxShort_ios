@@ -50,6 +50,9 @@ struct WalletVipDTO: Decodable {
 
 /// 对应后端 `GET /api/v2/users/me/wallet/transactions` 响应 data 字段
 struct WalletTransactionsResponseDTO: Decodable {
+    let period: String?
+    let totalEarned: Decimal?
+    let totalSpent: Decimal?
     let items: [WalletTransactionDTO]?
     let nextCursor: String?
     let hasMore: Bool?

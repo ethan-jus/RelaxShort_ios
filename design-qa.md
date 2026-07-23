@@ -1,57 +1,49 @@
-# Wallet Product Design QA
+# Wallet Transaction History Product Design QA
 
 ## Evidence
 
-- Source visual truth:
-  - `/Users/ethan/.codex/generated_images/019f79a3-b347-7671-ab45-21c816edd61d/exec-dd975ce6-cc11-4d29-a229-5aeaad171f9a.png` (图片 1：余额背景与充值明细)
-  - `/Users/ethan/.codex/generated_images/019f79a3-b347-7671-ab45-21c816edd61d/exec-ab0d8cd8-f2c2-4edb-a9a7-2ab89a582d9c.png` (图片 3：其余布局)
-- Implementation screenshot: `/tmp/relaxshort-wallet-final.png`
-- Combined comparison: `/tmp/wallet-design-comparison.png`
+- Source visual truth: `/Users/ethan/.codex/generated_images/019f79a3-b347-7671-ab45-21c816edd61d/exec-c7092503-1011-4829-81d2-b07ee13aa292.png`
+- Implementation screenshot: `/tmp/relaxshort-wallet-transactions-blocked.png`
 - Viewport: iPhone 17 Simulator, 402 × 874 pt, dark mode, English.
-- Source pixels: 853 × 1844 each. Implementation pixels: 1206 × 2622 at 3× density.
-- Normalization: all three images normalized to 426 × 922 pixels for the comparison board.
-- State: wallet request error state because the already-running backend process has not been restarted with the new transactions endpoint.
+- Source pixels: 853 × 1844. Implementation pixels: 1206 × 2622 at 3× density.
+- State: the source is the populated Transaction History screen. The implementation capture is the wallet error state because port 8080 is still served by the backend process started on 2026-07-20, before the new monthly transaction API existed.
 
 ## Full-view comparison
 
-- The native navigation bar, red-light balance background, gold coin, two-column actions, section hierarchy, black canvas, red/gold accents, radii, and spacing follow the selected combination.
-- The implementation correctly uses the existing `ProfileRedLight` and `RewardCoinIcon` raster assets plus SF Symbols for standard controls.
-- The source transaction rows and purchase detail cannot be visually compared in the current runtime state because the stale backend process returns HTTP 500 for the newly added endpoint.
+- The source target was opened and the compiled iOS app was installed and captured on the simulator.
+- A valid same-state comparison could not be produced: the selected target contains month totals, filters, day groups, and populated transaction rows, while the running app cannot navigate to that screen until the current backend source is restarted.
+- The implementation screenshot therefore proves the build and runtime blocker, but it is not accepted as visual fidelity evidence for the selected populated state.
 
 ## Focused comparison
 
-- Hero: visual hierarchy, raster quality, red-light crop, gold label, coin scale, and balance position were checked. The missing numeric balance is an API-state difference, not a layout substitute.
-- Actions: both buttons fit the 402 pt viewport after the width fix; Top Up and Earn Coins navigation were opened successfully.
-- Activity: heading and error state fit the viewport. Row typography, icon treatment, separators, amounts, dates, View All, and the Coin purchase row remain blocked from rendered comparison.
+- Not performed. Typography, row density, amount alignment, icon treatment, dividers, and filter spacing require the populated Transaction History state; judging those from source and code alone would not be valid visual QA.
 
 ## Findings
 
-- [P1] Target transaction state is unavailable.
-  - Location: Recent Activity.
-  - Evidence: the target shows invitation, unlock, ad reward, and coin purchase rows; the implementation screenshot shows the explicit load-error state.
-  - Impact: row fidelity and the requested recharge detail cannot be visually accepted yet.
-  - Fix: restart the local backend from the current source, reopen the wallet with an account that has ledger records, and capture the same viewport.
+- [P1] Populated transaction state is unavailable for rendered comparison.
+  - Location: Wallet → View All → Transaction History.
+  - Evidence: the source shows month totals, filters, date groups, and six transaction rows; the runtime capture shows `Unable to load wallet activity` on the wallet home screen.
+  - Impact: the selected option 2 cannot yet receive visual acceptance despite successful compilation.
+  - Fix: restart the backend from the current branch, reopen My Wallet, tap View All, and recapture the iPhone 17 screen with real ledger data.
 
 ## Comparison history
 
-1. First capture: the root content expanded wider than the screen, clipping the leading text in `Recent Activity`.
-2. Fix: constrained the wallet scroll content to the `GeometryReader` viewport width.
-3. Post-fix capture: hero, actions, heading, and error state no longer clip or overflow. The P1 data-state blocker remains.
+1. Current pass: implementation built and launched successfully, but the stale backend returns the wallet error state.
+2. No visual fix was applied because the mismatch is runtime state, not a layout defect.
 
 ## Interaction checks
 
-- Profile → My Wallet navigation: passed.
-- Wallet → Top Up navigation: passed.
-- Wallet → Earn Coins navigation: passed.
-- Back navigation: passed.
-- Transaction list, View All, empty/loading/error states: error state rendered; real list and View All blocked by stale backend runtime.
+- Profile → My Wallet: passed.
+- Wallet request error state and retry affordance: passed.
+- Wallet → Transaction History: blocked because View All is intentionally hidden when no transaction response is available.
+- Month menu, type filter, pagination, and populated rows: blocked by the stale backend runtime.
 
 ## Required fidelity surfaces
 
-- Fonts and typography: native system type hierarchy matches the design direction; transaction text remains unverified.
-- Spacing and layout rhythm: passed for navigation, hero, actions, and heading after the width fix.
-- Colors and visual tokens: passed for black, logo red, warm gold, white, muted text, and divider palette.
-- Image quality and asset fidelity: passed for the existing red-light and coin raster assets; no placeholder or code-drawn custom art is used.
-- Copy and content: eight language files contain wallet and transaction copy; rendered transaction copy remains unverified.
+- Fonts and typography: implemented with native system hierarchy; populated screen remains visually unverified.
+- Spacing and layout rhythm: implemented from the selected target; populated screen remains visually unverified.
+- Colors and visual tokens: black canvas, logo red, warm coin gold, muted text, and dividers use existing app tokens.
+- Image quality and asset fidelity: the existing `RewardCoinIcon` raster asset is used for purchases; standard controls use SF Symbols; no placeholder art was added.
+- Copy and content: all new transaction-history copy is localized in eight supported languages; populated rendering remains unverified.
 
 final result: blocked
