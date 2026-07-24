@@ -713,5 +713,7 @@
 "support.faq.playback.a" = "Comprueba la conexión, vuelve a abrir el episodio y prueba una calidad menor. Si continúa, crea una solicitud con la serie y el episodio.";
 "support.faq.coins.q" = "No recibí las monedas compradas";
 "support.faq.coins.a" = "La verificación de App Store puede tardar unos minutos. Si el saldo no cambia, crea una solicitud con la hora y el producto.";
+"support.faq.vip.q" = "Mi compra VIP no se ha activado";
+"support.faq.vip.a" = "La verificación de App Store puede tardar unos minutos. Confirma el cobro y vuelve a abrir la página de membresía. Si VIP sigue inactivo, crea una solicitud con la hora y el plan. Nunca envíes contraseñas ni datos completos de pago.";
 "support.faq.login.q" = "No puedo iniciar sesión";
 "support.faq.login.a" = "Confirma que usas el método de inicio original. Si continúa, crea una solicitud con el mensaje de error.";

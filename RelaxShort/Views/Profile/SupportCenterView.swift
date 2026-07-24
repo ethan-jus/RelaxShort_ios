@@ -115,9 +115,7 @@ struct SupportCenterView: View {
                     showNewTicket = true
                 } label: {
                     VStack(spacing: 9) {
-                        Image(systemName: category.icon)
-                            .font(.system(size: 23, weight: .medium))
-                            .foregroundColor(DT.brandGold)
+                        SupportCategoryIcon(category: category)
                         Text(category.title)
                             .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(.white)
@@ -252,6 +250,32 @@ struct SupportCenterView: View {
             $0.question.localizedCaseInsensitiveContains(query)
                 || $0.answer.localizedCaseInsensitiveContains(query)
         }
+    }
+}
+
+private struct SupportCategoryIcon: View {
+    let category: SupportCategory
+
+    private let designGold = Color(hex: "#E6B84E")
+
+    var body: some View {
+        Group {
+            if category == .playbackDownload {
+                ZStack {
+                    Image(systemName: "play.rectangle")
+                        .font(.system(size: 27, weight: .regular))
+                        .offset(x: -3, y: -2)
+                    Image(systemName: "arrow.down")
+                        .font(.system(size: 15, weight: .medium))
+                        .offset(x: 12, y: 6)
+                }
+            } else {
+                Image(systemName: category.icon)
+                    .font(.system(size: 27, weight: .regular))
+            }
+        }
+        .foregroundColor(designGold)
+        .frame(width: 36, height: 34)
     }
 }
 
@@ -832,6 +856,11 @@ private struct SupportFAQ: Identifiable {
                 id: "coins",
                 question: "support.faq.coins.q".localized,
                 answer: "support.faq.coins.a".localized
+            ),
+            SupportFAQ(
+                id: "vip",
+                question: "support.faq.vip.q".localized,
+                answer: "support.faq.vip.a".localized
             ),
             SupportFAQ(
                 id: "login",

@@ -3,34 +3,43 @@
 ## Evidence
 
 - Source visual truth: `/Users/ethan/.codex/generated_images/019f79a3-b347-7671-ab45-21c816edd61d/call_wfqE1B2XvlHhNR2zXCpCeZlt.png`
-- Language implementation: `/tmp/relaxshort-support-qa/language.png`
-- Help center implementation: `/tmp/relaxshort-support-qa/help-center.png`
-- New ticket implementation: `/tmp/relaxshort-support-qa/new-ticket.png`
+- Final help center: `/tmp/relaxshort-support-color-qa/help-final.png`
+- VIP FAQ search state: `/tmp/relaxshort-support-color-qa/vip-faq-final.png`
+- Combined comparison: `/tmp/relaxshort-support-color-qa/design-comparison.png`
 - Viewport: iPhone 17 Simulator, 402 × 874 pt, dark mode, English.
+- Source pixels: 1563 × 1006 composite image.
+- Implementation pixels: 1206 × 2622 at 3× density.
+- The middle source panel was cropped and normalized to the same 402 × 874 visual slot as the implementation for the combined comparison.
 
-## Comparison
+## State and comparison scope
 
-- The language page follows the selected compact hierarchy: shared circular back control, follow-device card, native language names, restrained selection controls, and persistent-save note.
-- The help center follows the selected support funnel: FAQ search, three high-frequency categories, primary ticket CTA, and ticket history area.
-- The ticket form uses real categories, subject and details fields, diagnostic consent, validation, and asynchronous submission.
-- The conversation implementation follows the confirmed alignment: support avatar and messages on the left; current-user avatar and messages on the right.
-- Runtime values and localized English copy intentionally differ from the Chinese concept copy.
+- The source contains seeded ticket rows; the local simulator had no tickets. Ticket-list contents were therefore not treated as a fidelity comparison.
+- The full-view comparison covers navigation, search, quick categories, CTA, ticket-section hierarchy, spacing, typography, and color.
+- The focused comparison uses the quick-category region because the requested change concerned the playback/download icon and gold color.
 
-## Findings
+## Comparison history
 
-- No P0, P1, or P2 visual defects were found at the tested viewport.
-- All language options fit without clipping; Arabic remains visible and uses its native label.
-- Help center hierarchy, card borders, icon scale, CTA, and safe-area spacing match the selected design direction.
-- The local backend was not running during visual QA, so the ticket list correctly rendered its retry state. Ticket conversation rendering was verified from the compiled view implementation rather than a live backend response.
+1. Initial implementation used the global `#C29852` gold and a standalone `play.rectangle` symbol.
+   - Finding: P2 visual drift from the source, which uses a brighter warm gold and a combined playback/download glyph.
+2. Updated the quick-category icons to scoped design gold `#E6B84E`.
+   - Rebuilt the playback/download glyph from SF Symbols using the source-aligned playback frame plus downward arrow.
+3. Final simulator capture shows the complete downward arrow, matching color family, line weight, and visual scale.
+   - No actionable P0, P1, or P2 differences remain for the requested region.
+
+## Required fidelity surfaces
+
+- Typography: system weights, hierarchy, wrapping, and labels remain consistent with the selected design; localized copy intentionally differs from the Chinese source.
+- Spacing: search, quick-category card, CTA, and ticket heading retain the source rhythm without clipping.
+- Colors: category icons now use the brighter source-aligned warm gold; black panels, grey borders, white text, and red CTA remain consistent.
+- Image and icon quality: all controls use native vector SF Symbols. The playback/download entry now contains both required meanings and remains sharp at 3× density.
+- Copy and content: the VIP purchase-not-activated FAQ is present in all eight localization files and appears when searching `VIP`.
 
 ## Interaction checks
 
-- Profile → Language navigation: passed.
-- Language follow-device selected state: passed.
-- Profile → Help & Feedback navigation: passed.
-- Help center → Create Ticket: passed.
-- Disabled submit state before valid input: passed.
-- Live ticket creation, reply delivery, and resolution: not run because the backend was intentionally not started.
+- Profile → Help & Feedback: passed.
+- VIP FAQ search: passed.
+- Empty ticket state: passed.
+- Live ticket creation and server reply: not run because the backend was intentionally not started.
 
 ## Verification
 

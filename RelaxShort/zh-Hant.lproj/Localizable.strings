@@ -713,5 +713,7 @@
 "support.faq.playback.a" = "請檢查網路、重新開啟劇集並嘗試較低畫質。若仍無法播放，請提交工單並註明短劇與集數。";
 "support.faq.coins.q" = "儲值金幣沒有到帳";
 "support.faq.coins.a" = "App Store 驗單可能需要幾分鐘。若餘額仍未更新，請提交工單並提供購買時間與方案。";
+"support.faq.vip.q" = "購買 VIP 後沒有到帳";
+"support.faq.vip.a" = "App Store 驗單可能需要幾分鐘。請先確認扣款成功並重新開啟會員頁面；若 VIP 仍未生效，請提交工單並提供購買時間與方案。請勿傳送帳號密碼或完整付款憑證。";
 "support.faq.login.q" = "無法登入帳號";
 "support.faq.login.a" = "請確認使用原本的登入方式。若仍失敗，請提交工單並附上錯誤提示。";

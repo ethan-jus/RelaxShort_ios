@@ -730,5 +730,7 @@
 "support.faq.playback.a" = "Check your connection, reopen the episode, and try a lower quality. If it continues, create a ticket with the drama and episode.";
 "support.faq.coins.q" = "My purchased coins haven’t arrived";
 "support.faq.coins.a" = "Allow a few minutes for App Store verification. If the balance still does not update, create a ticket with the purchase time and product.";
+"support.faq.vip.q" = "My VIP purchase hasn’t been activated";
+"support.faq.vip.a" = "App Store verification may take a few minutes. Confirm that the charge succeeded and reopen the Membership page. If VIP is still inactive, create a ticket with the purchase time and plan. Never send passwords or full payment credentials.";
 "support.faq.login.q" = "I can’t sign in";
 "support.faq.login.a" = "Confirm you are using the original sign-in method. If the problem continues, create a ticket and include the error message.";
