@@ -1,37 +1,40 @@
-# Wallet and Top-Up Product Design QA
+# Language and Support Product Design QA
 
 ## Evidence
 
-- Source visual truth: `/Users/ethan/.codex/generated_images/019f79a3-b347-7671-ab45-21c816edd61d/call_rweKprh9T3b6gjlYnhSCqVPs.png`
-- Wallet implementation: `/tmp/relaxshort-wallet-refined.png`
-- Top-Up implementation, first package selected: `/tmp/relaxshort-topup-refined.png`
-- Top-Up interaction state, third package selected: `/tmp/relaxshort-topup-selected-1200.png`
+- Source visual truth: `/Users/ethan/.codex/generated_images/019f79a3-b347-7671-ab45-21c816edd61d/call_wfqE1B2XvlHhNR2zXCpCeZlt.png`
+- Language implementation: `/tmp/relaxshort-support-qa/language.png`
+- Help center implementation: `/tmp/relaxshort-support-qa/help-center.png`
+- New ticket implementation: `/tmp/relaxshort-support-qa/new-ticket.png`
 - Viewport: iPhone 17 Simulator, 402 × 874 pt, dark mode, English.
-- State: first-purchase-eligible user, 0 balance, no recent wallet activity.
 
 ## Comparison
 
-- Wallet follows the selected compact hierarchy: centered title, slim balance card, two restrained action buttons, and reduced transaction-row scale.
-- Top-Up follows the selected compact conversion layout: balance hero, first-purchase value strip, four horizontal packages, persistent purchase CTA, and low-emphasis trust copy.
-- The implementation deliberately uses live localized copy and runtime values, so the English simulator text differs from the Chinese concept copy.
-- The revised package ladder is progressive: 400 + 400 for $3.99, 500 + 50 for $4.99, 1,000 + 200 for $9.99, and 2,000 + 600 for $19.99.
+- The language page follows the selected compact hierarchy: shared circular back control, follow-device card, native language names, restrained selection controls, and persistent-save note.
+- The help center follows the selected support funnel: FAQ search, three high-frequency categories, primary ticket CTA, and ticket history area.
+- The ticket form uses real categories, subject and details fields, diagnostic consent, validation, and asynchronous submission.
+- The conversation implementation follows the confirmed alignment: support avatar and messages on the left; current-user avatar and messages on the right.
+- Runtime values and localized English copy intentionally differ from the Chinese concept copy.
 
 ## Findings
 
-- No P0, P1, or P2 visual defects found at the tested viewport.
-- All content fits without clipping; the fourth package, CTA, and trust copy remain visible.
-- Typography, icons, and card heights are materially smaller than the previous implementation and preserve readable touch targets.
+- No P0, P1, or P2 visual defects were found at the tested viewport.
+- All language options fit without clipping; Arabic remains visible and uses its native label.
+- Help center hierarchy, card borders, icon scale, CTA, and safe-area spacing match the selected design direction.
+- The local backend was not running during visual QA, so the ticket list correctly rendered its retry state. Ticket conversation rendering was verified from the compiled view implementation rather than a live backend response.
 
 ## Interaction checks
 
-- Wallet → Top Up navigation: passed.
-- Default first-purchase package and CTA summary: passed.
-- Package selection from first to third tier: passed; selection ring and CTA changed to 1,200 coins · $9.99.
-- Real purchase execution: intentionally not tested.
+- Profile → Language navigation: passed.
+- Language follow-device selected state: passed.
+- Profile → Help & Feedback navigation: passed.
+- Help center → Create Ticket: passed.
+- Disabled submit state before valid input: passed.
+- Live ticket creation, reply delivery, and resolution: not run because the backend was intentionally not started.
 
 ## Verification
 
-- `xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort -destination 'platform=iOS Simulator,name=iPhone 17' build`
+- `xcodebuild -quiet -project RelaxShort.xcodeproj -scheme RelaxShort -configuration Debug -destination 'platform=iOS Simulator,id=99782FD0-C497-439F-B95E-949E6AB85F1C' build`
 - Result: `BUILD SUCCEEDED`
 
 final result: passed

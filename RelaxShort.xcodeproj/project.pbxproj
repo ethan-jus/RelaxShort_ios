@@ -163,6 +163,10 @@
 		WLTB00000000000000000006 /* WalletTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = WLTF00000000000000000006 /* WalletTransactionsView.swift */; };
 		TUPB00000000000000000001 /* TopUpViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = TUPF00000000000000000001 /* TopUpViewModel.swift */; };
 		TUPB00000000000000000002 /* TopUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = TUPF00000000000000000002 /* TopUpView.swift */; };
+		SUPB00000000000000000001 /* SupportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = SUPF00000000000000000001 /* SupportModels.swift */; };
+		SUPB00000000000000000002 /* SupportResponseDTO.swift in Sources */ = {isa = PBXBuildFile; fileRef = SUPF00000000000000000002 /* SupportResponseDTO.swift */; };
+		SUPB00000000000000000003 /* RealSupportRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = SUPF00000000000000000003 /* RealSupportRepository.swift */; };
+		SUPB00000000000000000004 /* SupportCenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SUPF00000000000000000004 /* SupportCenterView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -182,6 +186,10 @@
 		0797BAFECB9547DD90CE90AE /* MemberModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MemberModels.swift; path = RelaxShort/Models/MemberModels.swift; sourceTree = SOURCE_ROOT; };
 		0F907B906FB605748F73151A /* TopToolbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopToolbarView.swift; sourceTree = "<group>"; };
 		0F9EDAF9DACFC07CD81B6706 /* AppStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStore.swift; sourceTree = "<group>"; };
+		SUPF00000000000000000001 /* SupportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SupportModels.swift; path = RelaxShort/Models/SupportModels.swift; sourceTree = SOURCE_ROOT; };
+		SUPF00000000000000000002 /* SupportResponseDTO.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SupportResponseDTO.swift; path = RelaxShort/Models/API/SupportResponseDTO.swift; sourceTree = SOURCE_ROOT; };
+		SUPF00000000000000000003 /* RealSupportRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RealSupportRepository.swift; path = RelaxShort/Core/Services/RealSupportRepository.swift; sourceTree = SOURCE_ROOT; };
+		SUPF00000000000000000004 /* SupportCenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SupportCenterView.swift; path = RelaxShort/Views/Profile/SupportCenterView.swift; sourceTree = SOURCE_ROOT; };
 		142D16FA5DD46D6AC295A967 /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageService.swift; sourceTree = "<group>"; };
 		158EE04959229D92A979E900 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
 		162A3AA839324704A0A1F73C /* ShortVideoPlayerEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortVideoPlayerEngine.swift; sourceTree = "<group>"; };
@@ -631,6 +639,10 @@
 				6F5610E5C2524D8EA347BB28 /* FacebookAppDelegate.swift */,
 				4A05F8B8DE224FD2BB703A9E /* FacebookOAuthClient.swift */,
 				A417F5D242674800BFF73810 /* AppleOAuthClient.swift */,
+				SUPF00000000000000000001 /* SupportModels.swift */,
+				SUPF00000000000000000002 /* SupportResponseDTO.swift */,
+				SUPF00000000000000000003 /* RealSupportRepository.swift */,
+				SUPF00000000000000000004 /* SupportCenterView.swift */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -1081,6 +1093,10 @@
 				WLTB00000000000000000006 /* WalletTransactionsView.swift in Sources */,
 				TUPB00000000000000000001 /* TopUpViewModel.swift in Sources */,
 				TUPB00000000000000000002 /* TopUpView.swift in Sources */,
+				SUPB00000000000000000001 /* SupportModels.swift in Sources */,
+				SUPB00000000000000000002 /* SupportResponseDTO.swift in Sources */,
+				SUPB00000000000000000003 /* RealSupportRepository.swift in Sources */,
+				SUPB00000000000000000004 /* SupportCenterView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

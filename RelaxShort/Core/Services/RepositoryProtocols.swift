@@ -124,6 +124,16 @@ protocol WalletRepositoryProtocol {
     ) async throws -> WalletTransactionPage
 }
 
+// MARK: - Support
+
+protocol SupportRepositoryProtocol {
+    func fetchTickets() async throws -> [SupportTicket]
+    func fetchTicket(number: String) async throws -> SupportTicket
+    func createTicket(_ ticket: CreateSupportTicket) async throws -> SupportTicket
+    func sendMessage(ticketNumber: String, message: String) async throws -> SupportTicket
+    func resolveTicket(number: String) async throws -> SupportTicket
+}
+
 // MARK: - VIP
 
 /// VIP 会员数据仓库协议

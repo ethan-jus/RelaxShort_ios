@@ -52,6 +52,7 @@ struct ProfileView: View {
     @StateObject private var viewModel: ProfileViewModel
     @EnvironmentObject var authStore: AuthStore
     @EnvironmentObject var appStore: AppStore
+    @EnvironmentObject private var dependencies: DependencyContainer
     @EnvironmentObject private var rewardSummaryStore: RewardSummaryStore
 
     @State private var selectedDestination: ProfileSheet?
@@ -223,7 +224,7 @@ struct ProfileView: View {
         case .theme:
             ThemePickerView()
         case .customerService:
-            PlaceholderView(title: sheet.title)
+            SupportCenterView(repository: dependencies.supportRepository)
         case .settings:
             SettingsView()
         case .topUp:
@@ -240,33 +241,105 @@ struct ProfileView: View {
 // MARK: - Language Picker
 
 private struct LanguagePickerView: View {
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var appStore: AppStore
 
     var body: some View {
-        List {
-            ForEach(AppLanguage.allCases, id: \.self) { lang in
-                Button(action: {
-                    appStore.language = lang
-                    dismiss()
-                }) {
-                    HStack {
-                        Text(lang.displayName)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                Button {
+                    appStore.followDeviceLanguage()
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "iphone")
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white)
+                            .frame(width: 24)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("language.follow_device".localized)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.white)
+                            Text(AppLanguage.preferred().nativeDisplayName)
+                                .font(.system(size: 12))
+                                .foregroundColor(DB.mutedText)
+                        }
+
                         Spacer()
-                        if appStore.language == lang {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(DT.logoRed)
+                        selectionMark(appStore.followsDeviceLanguage)
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(height: 62)
+                    .background(DB.panel.opacity(0.72))
+                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 9)
+                            .stroke(DB.divider, lineWidth: 0.8)
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+
+                Text("language.choose".localized)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(DB.mutedText)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 24)
+                    .padding(.bottom, 8)
+
+                VStack(spacing: 0) {
+                    ForEach(AppLanguage.allCases, id: \.self) { language in
+                        Button {
+                            appStore.selectLanguage(language)
+                        } label: {
+                            HStack {
+                                Text(language.nativeDisplayName)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white)
+                                Spacer()
+                                selectionMark(
+                                    !appStore.followsDeviceLanguage
+                                        && appStore.language == language
+                                )
+                            }
+                            .padding(.horizontal, 14)
+                            .frame(height: 54)
+                        }
+                        .buttonStyle(.plain)
+
+                        if language != AppLanguage.allCases.last {
+                            Divider()
+                                .overlay(DB.divider)
+                                .padding(.leading, 14)
                         }
                     }
                 }
-                .listRowBackground(DB.panel)
+                .background(DB.panel.opacity(0.45))
+                .clipShape(RoundedRectangle(cornerRadius: 9))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9)
+                        .stroke(DB.divider, lineWidth: 0.8)
+                }
+                .padding(.horizontal, 20)
+
+                Label(
+                    "language.saved_note".localized,
+                    systemImage: "lock"
+                )
+                .font(.system(size: 12))
+                .foregroundColor(DT.brandGold)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 24)
             }
         }
-        .listStyle(.insetGrouped)
-        .scrollContentBackground(.hidden)
-        .background(DB.black)
+        .background(DB.black.ignoresSafeArea())
         .compactSecondaryNavigation(title: L10n.language)
+    }
+
+    private func selectionMark(_ selected: Bool) -> some View {
+        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 20, weight: .medium))
+            .foregroundColor(selected ? DT.logoRed : DB.mutedText)
     }
 }
 

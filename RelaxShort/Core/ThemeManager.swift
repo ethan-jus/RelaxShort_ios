@@ -1,5 +1,10 @@
 import SwiftUI
 
+private enum AppPreferenceKey {
+    static let language = "app.language"
+    static let followsDeviceLanguage = "app.language.followsDevice"
+}
+
 // MARK: - Theme Mode
 
 /// 应用主题模式
@@ -52,6 +57,19 @@ enum AppLanguage: String, CaseIterable {
         }
     }
 
+    var nativeDisplayName: String {
+        switch self {
+        case .zhHans: return "简体中文"
+        case .zhHant: return "繁體中文"
+        case .en: return "English"
+        case .ko: return "한국어"
+        case .ja: return "日本語"
+        case .pt: return "Português"
+        case .es: return "Español"
+        case .ar: return "العربية"
+        }
+    }
+
     /// 是否 RTL 语言
     var isRTL: Bool {
         self == .ar
@@ -88,7 +106,10 @@ enum AppLocalization {
     private static let fallbackMarker = "\u{0010}RELAXSHORT_MISSING\u{0010}"
 
     static var currentLanguage: AppLanguage {
-        if let saved = UserDefaults.standard.string(forKey: ThemeManager.languageDefaultsKey),
+        if UserDefaults.standard.bool(forKey: AppPreferenceKey.followsDeviceLanguage) {
+            return AppLanguage.preferred()
+        }
+        if let saved = UserDefaults.standard.string(forKey: AppPreferenceKey.language),
            let language = AppLanguage(rawValue: saved) {
             return language
         }
@@ -134,7 +155,6 @@ enum AppLocalization {
 @MainActor
 final class ThemeManager: ObservableObject {
     static let shared = ThemeManager()
-    static let languageDefaultsKey = "app.language"
 
     @Published var themeMode: ThemeMode {
         didSet { save() }
@@ -142,11 +162,13 @@ final class ThemeManager: ObservableObject {
     @Published var language: AppLanguage {
         didSet { save() }
     }
+    @Published private(set) var followsDeviceLanguage: Bool
 
     private let defaults = UserDefaults.standard
     private enum Keys {
         static let themeMode = "app.themeMode"
-        static let language = ThemeManager.languageDefaultsKey
+        static let language = AppPreferenceKey.language
+        static let followsDeviceLanguage = AppPreferenceKey.followsDeviceLanguage
     }
 
     private init() {
@@ -154,13 +176,42 @@ final class ThemeManager: ObservableObject {
         self.themeMode = savedTheme.flatMap(ThemeMode.init(rawValue:)) ?? .dark
 
         let savedLang = defaults.string(forKey: Keys.language)
-        self.language = savedLang.flatMap(AppLanguage.init(rawValue:)) ?? AppLanguage.preferred()
+        let hasFollowDevicePreference =
+            defaults.object(forKey: Keys.followsDeviceLanguage) != nil
+        let followsDeviceLanguage = hasFollowDevicePreference
+            ? defaults.bool(forKey: Keys.followsDeviceLanguage)
+            : savedLang == nil
+        self.followsDeviceLanguage = followsDeviceLanguage
+        self.language = followsDeviceLanguage
+            ? AppLanguage.preferred()
+            : savedLang.flatMap(AppLanguage.init(rawValue:))
+                ?? AppLanguage.preferred()
         applyRTLLayout()
     }
 
     private func save() {
         defaults.set(themeMode.rawValue, forKey: Keys.themeMode)
         defaults.set(language.rawValue, forKey: Keys.language)
+        defaults.set(
+            followsDeviceLanguage,
+            forKey: Keys.followsDeviceLanguage
+        )
+    }
+
+    func selectLanguage(_ language: AppLanguage) {
+        followsDeviceLanguage = false
+        self.language = language
+        applyRTLLayout()
+        save()
+    }
+
+    @discardableResult
+    func followDeviceLanguage() -> AppLanguage {
+        followsDeviceLanguage = true
+        language = AppLanguage.preferred()
+        applyRTLLayout()
+        save()
+        return language
     }
 
     /// 获取当前 ColorScheme

@@ -20,9 +20,23 @@ final class AppStore: ObservableObject {
     }
     @Published var language: AppLanguage = ThemeManager.shared.language {
         didSet {
-            ThemeManager.shared.language = language
-            ThemeManager.shared.applyRTLLayout()
+            if ThemeManager.shared.language != language {
+                ThemeManager.shared.selectLanguage(language)
+            }
         }
+    }
+
+    var followsDeviceLanguage: Bool {
+        ThemeManager.shared.followsDeviceLanguage
+    }
+
+    func selectLanguage(_ language: AppLanguage) {
+        ThemeManager.shared.selectLanguage(language)
+        self.language = language
+    }
+
+    func followDeviceLanguage() {
+        language = ThemeManager.shared.followDeviceLanguage()
     }
 
     enum Tab: Int, CaseIterable {

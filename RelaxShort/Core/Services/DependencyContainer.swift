@@ -21,6 +21,7 @@ final class DependencyContainer: ObservableObject {
     let coinRewardRepository: CoinRewardRepositoryProtocol
     let adConfigRepository: AdConfigRepositoryProtocol
     let adRewardRepository: AdRewardRepositoryProtocol
+    let supportRepository: SupportRepositoryProtocol
     let adService: any AdServiceProtocol
     let discoveryAnalytics: any DiscoveryAnalyticsTracking
 
@@ -42,6 +43,7 @@ final class DependencyContainer: ObservableObject {
         coinRewardRepository: CoinRewardRepositoryProtocol = RealCoinRewardRepository(),
         adConfigRepository: AdConfigRepositoryProtocol = RealAdConfigRepository(),
         adRewardRepository: AdRewardRepositoryProtocol = RealAdRewardRepository(),
+        supportRepository: SupportRepositoryProtocol = RealSupportRepository(),
         adService: (any AdServiceProtocol)? = nil,
         discoveryAnalytics: (any DiscoveryAnalyticsTracking)? = nil
     ) {
@@ -58,6 +60,7 @@ final class DependencyContainer: ObservableObject {
         self.coinRewardRepository = coinRewardRepository
         self.adConfigRepository = adConfigRepository
         self.adRewardRepository = adRewardRepository
+        self.supportRepository = supportRepository
         self.adService = adService ?? RealAdService.shared
 
         // Analytics：使用真实 Client

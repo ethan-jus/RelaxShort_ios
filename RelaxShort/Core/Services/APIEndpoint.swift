@@ -97,6 +97,14 @@ enum APIEndpoint {
     )
     case rewardApplyInviteCode(code: String)
 
+    // MARK: - 客服工单
+
+    case supportTickets
+    case createSupportTicket(CreateSupportTicketRequestDTO)
+    case supportTicket(number: String)
+    case sendSupportMessage(ticketNumber: String, request: SendSupportMessageRequestDTO)
+    case resolveSupportTicket(number: String)
+
     // MARK: - 旧 mock 端点（保留兼容）
 
     case homeFeed(category: DramaCategory)
@@ -132,7 +140,9 @@ extension APIEndpoint {
              .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
              .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode:
+             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .supportTickets, .createSupportTicket, .supportTicket,
+             .sendSupportMessage, .resolveSupportTicket:
             return APIConfig.baseURL
         default:
             return "https://mock.relaxshort.local/v1"
@@ -180,6 +190,13 @@ extension APIEndpoint {
         case .rewardCheckIn:                 return "/api/v2/rewards/check-in"
         case .rewardShareComplete:           return "/api/v2/rewards/share-complete"
         case .rewardApplyInviteCode:         return "/api/v2/rewards/referral/apply"
+        case .supportTickets,
+             .createSupportTicket:           return "/api/v2/support/tickets"
+        case .supportTicket(let number):     return "/api/v2/support/tickets/\(number)"
+        case .sendSupportMessage(let number, _):
+            return "/api/v2/support/tickets/\(number)/messages"
+        case .resolveSupportTicket(let number):
+            return "/api/v2/support/tickets/\(number)/resolve"
         // ── 旧 mock ──
         case .homeFeed:                     return "/home/feed"
         case .banners:                      return "/home/banners"
@@ -208,13 +225,16 @@ extension APIEndpoint {
         case .appInit:              return .post
         case .forYou, .seriesEpisodes, .episodePlay, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
-             .userMe, .userWallet, .walletTransactions: return .get
+             .userMe, .userWallet, .walletTransactions,
+             .supportTickets, .supportTicket: return .get
         case .updateUserPreferences: return .patch
         case .episodeUnlock, .applePaymentVerify: return .post
         case .discoveryEvents:     return .post
         case .member, .adsConfig:  return .get
         case .adsRewardStart, .adsRewardComplete, .adsRewardCancel, .rewardCheckIn,
              .rewardShareComplete, .rewardApplyInviteCode: return .post
+        case .createSupportTicket, .sendSupportMessage,
+             .resolveSupportTicket: return .post
         case .rewardCenter: return .get
         case .watchHistoryV2, .bookmarksV2, .bookmarkStatus: return .get
         case .deleteWatchHistory: return .delete
@@ -238,7 +258,9 @@ extension APIEndpoint {
              .userMe, .userWallet, .walletTransactions, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
              .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode:
+             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .supportTickets, .createSupportTicket, .supportTicket,
+             .sendSupportMessage, .resolveSupportTicket:
             return true
         default: return false
         }
@@ -251,7 +273,9 @@ extension APIEndpoint {
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark,
              .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode:
+             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .supportTickets, .createSupportTicket, .supportTicket,
+             .sendSupportMessage, .resolveSupportTicket:
             return true
         default:
             return false
@@ -385,6 +409,14 @@ extension APIEndpoint {
             params = dict
         case .rewardApplyInviteCode(let code):
             params = ["invite_code": code]
+        case .createSupportTicket(let request):
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            return try? encoder.encode(request)
+        case .sendSupportMessage(_, let request):
+            let encoder = JSONEncoder()
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            return try? encoder.encode(request)
         default:
             params = [:]
         }
@@ -415,7 +447,9 @@ extension APIEndpoint {
             break
         case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
              .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode:
+             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .supportTickets, .createSupportTicket, .supportTicket,
+             .sendSupportMessage, .resolveSupportTicket:
             break
         // ── Task15 v2 query params ──
         case .home(let cl, let cc):
