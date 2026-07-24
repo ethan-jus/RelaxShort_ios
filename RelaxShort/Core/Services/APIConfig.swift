@@ -3,7 +3,7 @@ import Foundation
 // MARK: - APIConfig
 
 /// 后端 baseURL 配置。
-/// Debug 构建会由 Xcode 脚本把 Mac 当前局域网地址写入构建产物；手动地址只有显式开启后才生效。
+/// Debug 构建通过 Xcode build setting 注入 Mac 的本地网络地址；手动地址只有显式开启后才生效。
 /// 生产环境通过环境变量或 Info.plist 注入，不硬编码 IP。
 enum APIConfig {
 
@@ -12,7 +12,7 @@ enum APIConfig {
     /// UserDefaults 键，用于区分自动地址与手动覆盖地址。
     static let manualOverrideEnabledKey = "api_base_url_manual_override_enabled"
 
-    /// 构建时注入的地址；Debug 没有局域网地址时回退到本机地址。
+    /// 构建时注入的地址；仅为旧构建保留 loopback 回退。
     static var automaticBaseURL: String {
         if let injected = Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String,
            !injected.isEmpty {
@@ -28,6 +28,12 @@ enum APIConfig {
         if UserDefaults.standard.bool(forKey: manualOverrideEnabledKey),
            let override = UserDefaults.standard.string(forKey: overrideKey),
            !override.isEmpty {
+            #if !targetEnvironment(simulator)
+            // 真机的 loopback 指向 iPhone 自身，忽略历史调试值并使用构建注入的 Mac 地址。
+            if isLoopback(override) {
+                return automaticBaseURL
+            }
+            #endif
             return normalized(override)
         }
         return automaticBaseURL
@@ -48,5 +54,12 @@ enum APIConfig {
 
     private static func normalized(_ value: String) -> String {
         value.hasSuffix("/") ? String(value.dropLast()) : value
+    }
+
+    private static func isLoopback(_ value: String) -> Bool {
+        guard let host = URLComponents(string: value)?.host?.lowercased() else {
+            return false
+        }
+        return host == "127.0.0.1" || host == "localhost" || host == "::1"
     }
 }

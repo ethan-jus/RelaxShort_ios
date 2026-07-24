@@ -776,7 +776,7 @@
 			buildPhases = (
 				C7F899F8CC33C6965A7525A2 /* Sources */,
 				6A0AB54A86AB8C6D645148FD /* Resources */,
-				AAPI00000000000000000001 /* Inject Debug API Host */,
+				AAPI00000000000000000001 /* Validate API Base URL */,
 				AAPI00000000000000000002 /* Inject Build Commit */,
 				614BFD0D6EE453BA328CC9B1 /* Frameworks */,
 			);
@@ -825,7 +825,7 @@
 /* End PBXNativeTarget section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		AAPI00000000000000000001 /* Inject Debug API Host */ = {
+		AAPI00000000000000000001 /* Validate API Base URL */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -833,10 +833,10 @@
 			);
 			inputPaths = (
 			);
-			name = "Inject Debug API Host";
+			name = "Validate API Base URL";
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${SRCROOT}/scripts/inject-debug-api-host.sh\"\n";
+			shellScript = "\"${SRCROOT}/scripts/validate-api-base-url.sh\"\n";
 		};
 		AAPI00000000000000000002 /* Inject Build Commit */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1252,6 +1252,7 @@
 		906D424289A84C0DE9B44533 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				API_BASE_URL = "http://EthandeMacBook-Pro.local:8080";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = RelaxShort/RelaxShort.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -1327,6 +1328,7 @@
 		EBE50F153B74515DCCA57B0A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				API_BASE_URL = "$(RELAXSHORT_API_BASE_URL)";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = RelaxShort/RelaxShort.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
