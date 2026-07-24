@@ -199,14 +199,9 @@ private extension CoinRewardView {
 
             HStack {
                 if mode == .pushed {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .contentShape(Rectangle())
+                    CompactSecondaryBackButton {
+                        dismiss()
                     }
-                    .accessibilityLabel("common.back".localized)
                 } else {
                     Color.clear.frame(width: 40, height: 40)
                 }

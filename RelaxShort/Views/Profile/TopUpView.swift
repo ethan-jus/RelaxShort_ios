@@ -52,6 +52,7 @@ struct TopUpView: View {
         }
         .background(DB.black.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .interactivePopGestureEnabled()
         .preferredColorScheme(.dark)
         .task {
             await viewModel.load(
@@ -188,7 +189,7 @@ struct TopUpView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(package.amount.formatted(.number.grouping(.automatic)))
-                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .font(.system(size: 23, weight: .bold, design: .rounded))
                             .minimumScaleFactor(0.75)
                         Text("topup.coins".localized)
                             .font(.system(size: 11))

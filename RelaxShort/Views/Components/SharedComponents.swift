@@ -135,6 +135,68 @@ extension View {
     }
 }
 
+// MARK: - Secondary Navigation
+
+/// 二级页面统一返回按钮：保持钱包与充值页的圆形弱底样式。
+struct CompactSecondaryBackButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 38, height: 38)
+                .background(DB.panel.opacity(0.78))
+                .clipShape(Circle())
+                .overlay {
+                    Circle()
+                        .stroke(DB.divider, lineWidth: 0.8)
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("common.back".localized)
+    }
+}
+
+/// 二级页面统一紧凑导航栏。
+struct CompactProfileNavigationHeader: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let title: String
+
+    var body: some View {
+        ZStack {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
+
+            HStack {
+                CompactSecondaryBackButton {
+                    dismiss()
+                }
+
+                Spacer()
+            }
+        }
+        .frame(height: 46)
+    }
+}
+
+extension View {
+    /// 为使用系统导航栏的二级页替换统一导航栏，并保留原生侧滑返回。
+    func compactSecondaryNavigation(title: String) -> some View {
+        toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                CompactProfileNavigationHeader(title: title)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 4)
+                    .background(DB.black)
+            }
+            .interactivePopGestureEnabled()
+    }
+}
+
 // MARK: - Rewards Visuals
 
 enum RewardCoinMotion: Equatable {

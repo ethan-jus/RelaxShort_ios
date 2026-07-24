@@ -32,6 +32,7 @@ struct WalletView: View {
         }
         .background(DB.black.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .interactivePopGestureEnabled()
         .onAppear {
             Task { await viewModel.load(limit: 4) }
         }
@@ -310,41 +311,5 @@ private struct WalletTransactionRow: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
-    }
-}
-
-struct CompactProfileNavigationHeader: View {
-    @Environment(\.dismiss) private var dismiss
-
-    let title: String
-
-    var body: some View {
-        ZStack {
-            Text(title)
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(.white)
-
-            HStack {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 38, height: 38)
-                        .background(DB.panel.opacity(0.78))
-                        .clipShape(Circle())
-                        .overlay {
-                            Circle()
-                                .stroke(DB.divider, lineWidth: 0.8)
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("common.back".localized)
-
-                Spacer()
-            }
-        }
-        .frame(height: 46)
     }
 }

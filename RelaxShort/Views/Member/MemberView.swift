@@ -407,13 +407,9 @@ extension MemberView {
     private var memberHeader: some View {
         HStack(spacing: 4) {
             if mode == .push {
-                Button(action: { dismiss() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.headline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 44)
+                CompactSecondaryBackButton {
+                    dismiss()
                 }
-                .accessibilityLabel("common.back".localized)
             }
 
             Text("member.title".localized)

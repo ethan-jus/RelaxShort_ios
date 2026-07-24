@@ -266,8 +266,7 @@ private struct LanguagePickerView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(DB.black)
-        .navigationTitle(L10n.language)
-        .navigationBarTitleDisplayMode(.inline)
+        .compactSecondaryNavigation(title: L10n.language)
     }
 }
 
@@ -300,8 +299,7 @@ private struct ThemePickerView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(DB.black)
-        .navigationTitle(L10n.themeMenuTitle)
-        .navigationBarTitleDisplayMode(.inline)
+        .compactSecondaryNavigation(title: L10n.themeMenuTitle)
     }
 }
 

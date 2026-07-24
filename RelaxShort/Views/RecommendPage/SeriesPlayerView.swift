@@ -1986,17 +1986,9 @@ struct SeriesPlayerView: View {
 
     private func topControlBar(episodeNumber: Int) -> some View {
         HStack(spacing: 10) {
-            Button {
+            CompactSecondaryBackButton {
                 dismissSeries()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 34, height: 36)
-                    .contentShape(Rectangle())
-                    .shadow(color: .black.opacity(0.45), radius: 2, x: 0, y: 1)
             }
-            .buttonStyle(.plain)
 
             Text("EP.\(episodeNumber)")
                 .font(.system(size: 18, weight: .semibold))

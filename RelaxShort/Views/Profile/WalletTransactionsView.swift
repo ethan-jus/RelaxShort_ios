@@ -22,10 +22,9 @@ struct WalletTransactionsView: View {
             .padding(.bottom, 32)
         }
         .background(DB.black.ignoresSafeArea())
-        .navigationTitle("wallet.transaction_history".localized)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(DB.black, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .compactSecondaryNavigation(
+            title: "wallet.transaction_history".localized
+        )
         .task { await viewModel.load() }
         .refreshable { await viewModel.load() }
     }

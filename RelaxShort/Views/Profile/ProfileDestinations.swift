@@ -139,8 +139,7 @@ struct SettingsView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(DB.black)
-        .navigationTitle("profile.settings".localized)
-        .navigationBarTitleDisplayMode(.inline)
+        .compactSecondaryNavigation(title: "profile.settings".localized)
         .onAppear { refreshCachedVideoBytes() }
         .onChange(of: videoCacheMaximumBytes) { _, _ in
             HTTPRangeMediaCache.shared.pruneIfNeeded()
@@ -304,7 +303,6 @@ struct PlaceholderView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DB.black)
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
+        .compactSecondaryNavigation(title: title)
     }
 }

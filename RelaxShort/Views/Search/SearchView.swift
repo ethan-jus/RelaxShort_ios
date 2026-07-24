@@ -50,15 +50,9 @@ struct SearchView: View {
 
     private var searchHeader: some View {
         HStack(spacing: 12) {
-            Button {
+            CompactSecondaryBackButton {
                 dismiss()
-            } label: {
-                Image(systemName: "chevron.backward")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(width: 32, height: 36)
             }
-            .buttonStyle(.plain)
 
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
