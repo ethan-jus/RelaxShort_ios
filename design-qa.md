@@ -52,3 +52,35 @@
 - Result: `BUILD SUCCEEDED`
 
 final result: passed
+
+---
+
+# Offline Downloads Product Design QA
+
+## Evidence
+
+- Selected visual truth: `/Users/ethan/.codex/generated_images/019f79a3-b347-7671-ab45-21c816edd61d/call_YeRTh1YZyKMj6hbx0a3URufb.png`
+- Final download page: `/tmp/relaxshort-downloads-qa/downloads-final.png`
+- Combined comparison: `/tmp/relaxshort-downloads-qa/downloads-comparison.png`
+- Offline playback proof: `/tmp/relaxshort-downloads-qa/offline-playback.png`
+- Viewport: iPhone 17 Simulator, 402 × 874 pt, dark mode, Simplified Chinese.
+
+## Comparison scope
+
+- Compared navigation, storage hierarchy, progress treatment, section titles, row density, typography, dark palette, and red/gold accents against the selected option.
+- The selected visual contains three seeded dramas and an active queue item. The functional QA state contains one completed local video, so data quantity was not treated as a layout defect.
+- No P0 or P1 visual defects were found. The empty cover in QA is expected because the local fixture intentionally has no remote artwork.
+
+## Interaction checks
+
+- Profile → Offline Downloads: passed.
+- Completed download → offline player: passed.
+- Local MP4 was opened by the shared `PlayerCoordinator` without the former missing-environment crash: passed.
+- Edge-back from offline player: passed.
+
+## Verification
+
+- `xcodebuild -project RelaxShort.xcodeproj -scheme RelaxShort -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath /tmp/relaxshort-downloads-derived CODE_SIGNING_ALLOWED=NO build`
+- Result: `BUILD SUCCEEDED`
+
+final result: passed

@@ -5,7 +5,8 @@ import StoreKit
 
 /// DramaBox 风格设置页。Task33 保持原有实现不变。
 struct SettingsView: View {
-    @State private var downloadWithMobileData = false
+    @AppStorage("offlineDownloadsCellularEnabled")
+    private var downloadWithMobileData = false
     @State private var personalizedRecs = true
     @State private var marketingComms = false
     @ObservedObject private var privacyConsent = PrivacyConsentManager.shared

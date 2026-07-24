@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0FF1D0010000000000000001 /* OfflineDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF1F0010000000000000001 /* OfflineDownloadManager.swift */; };
+		0FF1D0020000000000000002 /* OfflineDownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF1F0020000000000000002 /* OfflineDownloadsView.swift */; };
 		018255F83848D18F615B66FC /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E421576C8190BCF4CC8EFABD /* HomeView.swift */; };
 		02917329D9801E38C7141950 /* CoinStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2917162BA77C9AFCC147AD4 /* CoinStore.swift */; };
 		043B74A00414531A76FD3490 /* CoinRewardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796597558E1D7B3BE7678413 /* CoinRewardViewModel.swift */; };
@@ -180,6 +182,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0FF1F0010000000000000001 /* OfflineDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OfflineDownloadManager.swift; path = RelaxShort/Core/Services/OfflineDownloadManager.swift; sourceTree = SOURCE_ROOT; };
+		0FF1F0020000000000000002 /* OfflineDownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OfflineDownloadsView.swift; path = RelaxShort/Views/Profile/OfflineDownloadsView.swift; sourceTree = SOURCE_ROOT; };
 		033FA10CEF10A18521342010 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 		04B19A3AE124A47F723E734F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		065FBCC273B75CBF80F7AD47 /* RealDetailRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealDetailRepository.swift; sourceTree = "<group>"; };
@@ -524,6 +528,7 @@
 		5C29374A6E7484A2706B1824 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				0FF1F0010000000000000001 /* OfflineDownloadManager.swift */,
 				B283C7770DFE5035A2A801EA /* AdConfig.swift */,
 				FF389AD770099338D3F8AAF2 /* AdService.swift */,
 				C0FBCC165022E5CCB45EA6E8 /* APIClient.swift */,
@@ -673,6 +678,7 @@
 		D6EF317C960C645129BCFAFF /* Profile */ = {
 			isa = PBXGroup;
 			children = (
+				0FF1F0020000000000000002 /* OfflineDownloadsView.swift */,
 				BFF861F910EFAE987BF1A60D /* ProfileView.swift */,
 				WLTF00000000000000000004 /* WalletView.swift */,
 				WLTF00000000000000000006 /* WalletTransactionsView.swift */,
@@ -948,6 +954,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0FF1D0010000000000000001 /* OfflineDownloadManager.swift in Sources */,
+				0FF1D0020000000000000002 /* OfflineDownloadsView.swift in Sources */,
 				479CE0557FE0EB68C8164DA2 /* APIClient.swift in Sources */,
 				BD62F14F9F5854A4669A9515 /* APIEndpoint.swift in Sources */,
 				AF577A0A561BC8893C579778 /* AdCardView.swift in Sources */,

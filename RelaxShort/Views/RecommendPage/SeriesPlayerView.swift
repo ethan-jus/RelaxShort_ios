@@ -83,6 +83,7 @@ struct SeriesPlayerView: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var coinStore: CoinStore
     @EnvironmentObject var storeKitManager: StoreKitManager
+    @StateObject private var offlineDownloads = OfflineDownloadManager.shared
     let handoff: PlayerHandoffContext?
     let sourceScene: String
     /// 标记 My List 初始 resume 是否已被消费
@@ -135,6 +136,8 @@ struct SeriesPlayerView: View {
     @State private var hasPreparedReturn = false
     /// 首次 AVPlayer/AVPlayerLayer 创建不得与 NavigationStack 的横向转场竞争主线程。
     @State private var hasCompletedNavigationTransition = false
+    @State private var isPreparingDownload = false
+    @State private var downloadNotice: String?
 
     private enum ChromeMetrics {
         static let horizontalPadding: CGFloat = 16
@@ -199,6 +202,27 @@ struct SeriesPlayerView: View {
 
                 // 视频和常规播放 UI 必须位于同一个分页页面内，拖动时整体同步移动。
                 episodePager(in: geo)
+
+                if let downloadNotice {
+                    VStack {
+                        Spacer()
+                        Text(downloadNotice)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 18)
+                            .frame(minHeight: 44)
+                            .background(.black.opacity(0.82))
+                            .clipShape(Capsule())
+                            .overlay {
+                                Capsule().stroke(.white.opacity(0.12), lineWidth: 0.8)
+                            }
+                            .padding(.horizontal, 28)
+                            .padding(.bottom, geo.safeAreaInsets.bottom + 96)
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(300)
+                }
 
                 if showSpeedHUD {
                     speedProgressOverlay(in: geo)
@@ -1427,17 +1451,136 @@ struct SeriesPlayerView: View {
 
             Spacer()
 
-            Button {} label: {
+            Button {
+                Task { await downloadCurrentEpisode() }
+            } label: {
                 HStack(spacing: 5) {
-                    Image(systemName: "arrow.down.circle")
-                        .font(.system(size: 14, weight: .medium))
-                    Text(L10n.download)
+                    if isPreparingDownload {
+                        ProgressView()
+                            .tint(.white.opacity(0.72))
+                            .scaleEffect(0.75)
+                    } else {
+                        Image(systemName: currentDownloadIcon)
+                    }
+                    Text(currentDownloadTitle)
                         .font(.system(size: 13, weight: .medium))
                 }
                 .foregroundColor(.white.opacity(0.72))
                 .frame(height: ChromeMetrics.membershipRowHeight)
             }
             .buttonStyle(.plain)
+            .disabled(isPreparingDownload)
+        }
+    }
+
+    private var currentDownloadItem: OfflineDownloadItem? {
+        guard let episodeID = episodes.first(
+            where: { $0.episodeNumber == currentEpisode }
+        )?.id else { return nil }
+        return offlineDownloads.item(episodeID: episodeID)
+    }
+
+    private var currentDownloadIcon: String {
+        switch currentDownloadItem?.status {
+        case .completed:
+            return "checkmark.circle.fill"
+        case .queued, .downloading, .paused:
+            return "arrow.down.circle.fill"
+        case .failed, .none:
+            return "arrow.down.circle"
+        }
+    }
+
+    private var currentDownloadTitle: String {
+        switch currentDownloadItem?.status {
+        case .completed:
+            return "downloads.completed".localized
+        case .queued, .downloading:
+            return "downloads.downloading_short".localized
+        case .paused:
+            return "downloads.paused".localized
+        case .failed, .none:
+            return L10n.download
+        }
+    }
+
+    @MainActor
+    private func downloadCurrentEpisode() async {
+        guard !isPreparingDownload else { return }
+        guard let episode = episodes.first(
+            where: { $0.episodeNumber == currentEpisode }
+        ) else {
+            showDownloadNotice("downloads.error.episode_unavailable".localized)
+            return
+        }
+
+        if let existing = offlineDownloads.item(episodeID: episode.id) {
+            switch existing.status {
+            case .paused, .failed:
+                offlineDownloads.resume(existing.id)
+                showDownloadNotice("downloads.resumed".localized)
+            case .queued, .downloading:
+                showDownloadNotice("downloads.already_downloading".localized)
+            case .completed:
+                showDownloadNotice("downloads.already_downloaded".localized)
+            }
+            return
+        }
+
+        // 付费/VIP 集必须使用 FairPlay 离线合同；当前播放接口仅返回在线 URL，
+        // 不能把受保护 MP4 直接落到普通文件目录。
+        guard !episode.isLocked, !episode.requiresVIP else {
+            showDownloadNotice("downloads.error.protected_unavailable".localized)
+            return
+        }
+
+        isPreparingDownload = true
+        defer { isPreparingDownload = false }
+        do {
+            let contract: PlaybackMediaSourceDTO
+            if let cached = episodePlayContracts[episode.id] {
+                contract = cached
+            } else {
+                contract = try await dependencies.detailRepository.fetchPlayAsset(
+                    episodeId: episode.id
+                )
+                episodePlayContracts[episode.id] = contract
+            }
+            guard let rawURL = contract.fallbackMp4Url
+                    ?? (contract.sourceType == "mp4" ? contract.preferredPlaybackURL : nil),
+                  let remoteURL = URL(string: rawURL) else {
+                showDownloadNotice("downloads.error.mp4_required".localized)
+                return
+            }
+
+            try offlineDownloads.enqueue(
+                OfflineDownloadRequest(
+                    dramaID: drama.id,
+                    episodeID: episode.id,
+                    dramaTitle: drama.title,
+                    coverURL: drama.coverURL,
+                    episodeNumber: episode.episodeNumber,
+                    totalEpisodes: totalEpisodes,
+                    remoteURL: remoteURL,
+                    isProtected: false
+                )
+            )
+            showDownloadNotice("downloads.started".localized)
+        } catch {
+            showDownloadNotice(error.localizedDescription)
+        }
+    }
+
+    private func showDownloadNotice(_ message: String) {
+        withAnimation(.easeOut(duration: 0.2)) {
+            downloadNotice = message
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.2))
+            guard downloadNotice == message else { return }
+            withAnimation(.easeIn(duration: 0.18)) {
+                downloadNotice = nil
+            }
         }
     }
 

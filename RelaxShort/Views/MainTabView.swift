@@ -79,6 +79,9 @@ struct MainTabView: View {
                 CoinRewardView(mode: .pushed)
             }
         }
+        // NavigationStack 创建的二级页面不继承仅注入到 TabContentHost 的环境。
+        // 在栈根注入同一个协调器，保证下载页等导航目标继续复用唯一播放器。
+        .environmentObject(playerCoordinator)
         .persistentSystemOverlays(appStore.selectedTab == .forYou ? .hidden : .visible)
         .onReceive(NotificationCenter.default.publisher(for: .showSearch)) { _ in
             appStore.isShowingSearch = true

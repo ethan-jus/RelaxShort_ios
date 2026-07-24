@@ -4,6 +4,19 @@ import UIKit
 final class FacebookAppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
+        handleEventsForBackgroundURLSession identifier: String,
+        completionHandler: @escaping () -> Void
+    ) {
+        guard identifier == OfflineDownloadManager.sessionIdentifier else {
+            completionHandler()
+            return
+        }
+        OfflineDownloadManager.shared.backgroundSessionCompletionHandler =
+            completionHandler
+    }
+
+    func application(
+        _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions:
             [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {

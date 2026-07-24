@@ -218,7 +218,7 @@ struct ProfileView: View {
         case .welfare:
             CoinRewardView(mode: .pushed)
         case .downloads:
-            PlaceholderView(title: sheet.title)
+            OfflineDownloadsView()
         case .language:
             LanguagePickerView()
         case .theme:
