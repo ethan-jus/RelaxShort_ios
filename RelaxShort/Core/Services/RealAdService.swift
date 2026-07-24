@@ -53,7 +53,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     }
 
     func prepareAds() async {
-        guard isSDKReady else { return }
+        guard isSDKReady, PrivacyConsentManager.shared.isAdRequestAllowed else { return }
         do {
             let config = try await adConfigRepository.fetchAdsConfig()
             cachedConfig = config
@@ -82,6 +82,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     }
 
     func loadAppOpenAd() async -> Bool {
+        guard isSDKReady, PrivacyConsentManager.shared.isAdRequestAllowed else { return false }
         do {
             let config = try await resolvedConfig()
             let placement = config.appOpen
@@ -94,7 +95,8 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     }
 
     func showAppOpenAd(onDismiss: @escaping () -> Void) {
-        guard rewardedPresentation == nil,
+        guard PrivacyConsentManager.shared.isAdRequestAllowed,
+              rewardedPresentation == nil,
               !isShowingAppOpenAd,
               let ad = validAppOpenAd else {
             print("🦐 [AdService] 广告未就绪")
@@ -128,6 +130,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
 
     func preloadRewardedAd(placement: AdPlacementConfig) async {
         guard isSDKReady,
+              PrivacyConsentManager.shared.isAdRequestAllowed,
               placement.enabled,
               !placement.adUnitID.isEmpty else { return }
         switch placement.format {
@@ -144,7 +147,9 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         placement: AdPlacementConfig,
         ssvCustomData: String
     ) async -> AdRewardResult {
-        guard placement.enabled,
+        guard isSDKReady,
+              PrivacyConsentManager.shared.isAdRequestAllowed,
+              placement.enabled,
               !placement.adUnitID.isEmpty,
               [.rewarded, .rewardedInterstitial].contains(placement.format),
               !isShowingAppOpenAd,
@@ -277,7 +282,9 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     }
 
     private func loadAppOpenAd(using placement: AdPlacementConfig) async -> Bool {
-        guard placement.enabled,
+        guard isSDKReady,
+              PrivacyConsentManager.shared.isAdRequestAllowed,
+              placement.enabled,
               placement.format == .appOpen,
               !placement.adUnitID.isEmpty else {
             print("🦐 [AdService] 开屏广告位已关闭或配置无效")

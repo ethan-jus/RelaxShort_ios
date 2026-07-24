@@ -15,6 +15,9 @@ final class PrivacyConsentManager: ObservableObject {
     @Published private(set) var isPrivacyOptionsRequired = false
     @Published private(set) var lastErrorMessage: String?
 
+    /// 只有本次启动的 UMP 流程完成且明确允许时，广告请求才可继续。
+    private(set) var isAdRequestAllowed = false
+    private(set) var isConsentFlowComplete = false
     private var didStartMobileAds = false
     private var isGatheringConsent = false
 
@@ -25,28 +28,26 @@ final class PrivacyConsentManager: ObservableObject {
         isGatheringConsent = true
         defer { isGatheringConsent = false }
 
+        isConsentFlowComplete = false
+        isAdRequestAllowed = false
         let parameters = UMPRequestParameters()
         let updateError = await requestConsentInfoUpdate(with: parameters)
         refreshPrivacyOptionsRequirement()
 
-        // UMP 可能已持有上一次会话的有效同意。官方建议在 consent info 更新完成后
-        // 立即检查一次，避免每次冷启动都等到表单流程结束才开始加载广告。
-        startMobileAdsIfAllowed()
-
         if let updateError {
             Logger.store.warning("UMP consent update failed: \(updateError.localizedDescription)")
+            isConsentFlowComplete = true
             return
         }
 
-        do {
-            if let formError = await loadAndPresentConsentFormIfRequired() {
-                throw formError
-            }
-        } catch {
-            Logger.store.warning("UMP consent form failed: \(error.localizedDescription)")
-        }
+        let formError = await loadAndPresentConsentFormIfRequired()
 
+        if let formError {
+            Logger.store.warning("UMP consent form failed: \(formError.localizedDescription)")
+        }
         refreshPrivacyOptionsRequirement()
+        isAdRequestAllowed = formError == nil && UMPConsentInformation.sharedInstance.canRequestAds
+        isConsentFlowComplete = true
         startMobileAdsIfAllowed()
     }
 
@@ -57,6 +58,8 @@ final class PrivacyConsentManager: ObservableObject {
             }
             lastErrorMessage = nil
             refreshPrivacyOptionsRequirement()
+            isAdRequestAllowed = UMPConsentInformation.sharedInstance.canRequestAds
+            startMobileAdsIfAllowed()
         } catch {
             lastErrorMessage = error.localizedDescription
             Logger.store.warning("UMP privacy options failed: \(error.localizedDescription)")
@@ -101,7 +104,7 @@ final class PrivacyConsentManager: ObservableObject {
     }
 
     private func startMobileAdsIfAllowed() {
-        guard UMPConsentInformation.sharedInstance.canRequestAds else {
+        guard isConsentFlowComplete, isAdRequestAllowed else {
             Logger.store.info("UMP has not allowed ad requests")
             return
         }
