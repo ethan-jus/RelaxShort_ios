@@ -709,6 +709,7 @@
 "support.message_placeholder" = "Escribe un mensaje";
 "support.me" = "Yo";
 "support.agent" = "Soporte de RelaxShort";
+"support.common_questions" = "Preguntas frecuentes";
 "support.faq.playback.q" = "¿Por qué no se reproduce el video?";
 "support.faq.playback.a" = "Comprueba la conexión, vuelve a abrir el episodio y prueba una calidad menor. Si continúa, crea una solicitud con la serie y el episodio.";
 "support.faq.coins.q" = "No recibí las monedas compradas";

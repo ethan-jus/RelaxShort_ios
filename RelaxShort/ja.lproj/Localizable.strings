@@ -709,6 +709,7 @@
 "support.message_placeholder" = "メッセージを入力";
 "support.me" = "自分";
 "support.agent" = "RelaxShort サポート";
+"support.common_questions" = "よくある質問";
 "support.faq.playback.q" = "動画を再生できない場合";
 "support.faq.playback.a" = "通信環境を確認し、エピソードを開き直して低画質をお試しください。改善しない場合は作品名と話数を添えてお問い合わせください。";
 "support.faq.coins.q" = "購入したコインが反映されない";

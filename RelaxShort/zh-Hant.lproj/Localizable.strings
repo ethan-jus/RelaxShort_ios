@@ -709,6 +709,7 @@
 "support.message_placeholder" = "輸入訊息";
 "support.me" = "我";
 "support.agent" = "RelaxShort 客服";
+"support.common_questions" = "常用問題";
 "support.faq.playback.q" = "影片無法播放怎麼辦？";
 "support.faq.playback.a" = "請檢查網路、重新開啟劇集並嘗試較低畫質。若仍無法播放，請提交工單並註明短劇與集數。";
 "support.faq.coins.q" = "儲值金幣沒有到帳";

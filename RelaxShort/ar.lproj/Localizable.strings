@@ -709,6 +709,7 @@
 "support.message_placeholder" = "اكتب رسالة";
 "support.me" = "أنا";
 "support.agent" = "دعم RelaxShort";
+"support.common_questions" = "الأسئلة الشائعة";
 "support.faq.playback.q" = "لماذا لا يعمل الفيديو؟";
 "support.faq.playback.a" = "تحقق من الاتصال وأعد فتح الحلقة وجرّب جودة أقل. إذا استمرت المشكلة، أنشئ تذكرة مع اسم المسلسل والحلقة.";
 "support.faq.coins.q" = "لم تصل العملات التي اشتريتها";

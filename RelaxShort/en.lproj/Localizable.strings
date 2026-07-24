@@ -726,6 +726,7 @@
 "support.message_placeholder" = "Type a message";
 "support.me" = "Me";
 "support.agent" = "RelaxShort Support";
+"support.common_questions" = "Common questions";
 "support.faq.playback.q" = "Why won’t a video play?";
 "support.faq.playback.a" = "Check your connection, reopen the episode, and try a lower quality. If it continues, create a ticket with the drama and episode.";
 "support.faq.coins.q" = "My purchased coins haven’t arrived";

@@ -713,6 +713,7 @@
 "support.message_placeholder" = "输入消息";
 "support.me" = "我";
 "support.agent" = "RelaxShort 客服";
+"support.common_questions" = "常用问题";
 "support.faq.playback.q" = "视频无法播放怎么办？";
 "support.faq.playback.a" = "请检查网络、重新打开剧集并尝试较低画质。若仍无法播放，请提交工单并注明短剧和集数。";
 "support.faq.coins.q" = "充值金币没有到账";

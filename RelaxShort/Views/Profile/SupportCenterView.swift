@@ -1,6 +1,10 @@
 import SwiftUI
 import UIKit
 
+private enum SupportDesign {
+    static let red = Color(hex: "#DA1D20")
+}
+
 struct SupportCenterView: View {
     @StateObject private var viewModel: SupportCenterViewModel
     @State private var searchText = ""
@@ -18,7 +22,7 @@ struct SupportCenterView: View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
                 searchBar
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 16)
                     .padding(.top, 12)
 
                 if !searchText.isEmpty {
@@ -27,8 +31,8 @@ struct SupportCenterView: View {
                         .padding(.top, 14)
                 } else {
                     categoryGrid
-                        .padding(.horizontal, 20)
-                        .padding(.top, 14)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
 
                     Button {
                         newTicketCategory = nil
@@ -42,12 +46,12 @@ struct SupportCenterView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(DT.logoRed)
+                        .background(SupportDesign.red)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 18)
 
                     ticketSection
                         .padding(.top, 24)
@@ -84,7 +88,22 @@ struct SupportCenterView: View {
             TextField("support.search_placeholder".localized, text: $searchText)
                 .font(.system(size: 15))
                 .foregroundColor(.white)
-                .tint(DT.logoRed)
+                .tint(SupportDesign.red)
+            if searchText.isEmpty {
+                Menu {
+                    ForEach(SupportFAQ.all) { faq in
+                        Button(faq.question) {
+                            searchText = faq.question
+                        }
+                    }
+                } label: {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(DB.mutedText)
+                        .frame(width: 28, height: 28)
+                }
+                .accessibilityLabel("support.common_questions".localized)
+            }
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
@@ -114,16 +133,16 @@ struct SupportCenterView: View {
                     newTicketCategory = category
                     showNewTicket = true
                 } label: {
-                    VStack(spacing: 9) {
+                    VStack(spacing: 8) {
                         SupportCategoryIcon(category: category)
                         Text(category.title)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: 98)
+                    .frame(height: 112)
                 }
                 .buttonStyle(.plain)
 
@@ -168,7 +187,7 @@ struct SupportCenterView: View {
                 Button("wallet.retry".localized) {
                     Task { await viewModel.load() }
                 }
-                .foregroundColor(DT.logoRed)
+                .foregroundColor(SupportDesign.red)
                 .accessibilityHint(error)
             }
             .frame(maxWidth: .infinity)
@@ -235,7 +254,7 @@ struct SupportCenterView: View {
                 } label: {
                     Text("support.no_faq_create_ticket".localized)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(DT.logoRed)
+                        .foregroundColor(SupportDesign.red)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
                 }
@@ -256,26 +275,34 @@ struct SupportCenterView: View {
 private struct SupportCategoryIcon: View {
     let category: SupportCategory
 
-    private let designGold = Color(hex: "#E6B84E")
-
+    @ViewBuilder
     var body: some View {
-        Group {
-            if category == .playbackDownload {
-                ZStack {
-                    Image(systemName: "play.rectangle")
-                        .font(.system(size: 27, weight: .regular))
-                        .offset(x: -3, y: -2)
-                    Image(systemName: "arrow.down")
-                        .font(.system(size: 15, weight: .medium))
-                        .offset(x: 12, y: 6)
-                }
-            } else {
-                Image(systemName: category.icon)
-                    .font(.system(size: 27, weight: .regular))
-            }
+        if let assetName {
+            Image(assetName)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 60, height: 60)
+                .accessibilityHidden(true)
+        } else {
+            Image(systemName: category.icon)
+                .font(.system(size: 27, weight: .regular))
+                .foregroundColor(Color(hex: "#E6B84E"))
+                .frame(width: 44, height: 44)
         }
-        .foregroundColor(designGold)
-        .frame(width: 36, height: 34)
+    }
+
+    private var assetName: String? {
+        switch category {
+        case .playbackDownload:
+            "SupportPlaybackIcon"
+        case .paymentCoins:
+            "SupportCoinsIcon"
+        case .accountLogin:
+            "SupportAccountIcon"
+        default:
+            nil
+        }
     }
 }
 
@@ -328,7 +355,7 @@ private struct SupportTicketRow: View {
 
     private var statusColor: Color {
         switch ticket.status {
-        case .waitingSupport: return DT.logoRed
+        case .waitingSupport: return SupportDesign.red
         case .replied, .waitingUser: return DT.brandGold
         case .resolved: return DT.success
         }
@@ -397,7 +424,7 @@ private struct NewSupportTicketView: View {
                     )
                     .font(.system(size: 13))
                     .foregroundColor(.white)
-                    .tint(DT.logoRed)
+                    .tint(SupportDesign.red)
 
                     Text("support.form.diagnostics_note".localized)
                         .font(.system(size: 11))
@@ -406,7 +433,7 @@ private struct NewSupportTicketView: View {
                     if let errorMessage {
                         Text(errorMessage)
                             .font(.system(size: 12))
-                            .foregroundColor(DT.logoRed)
+                            .foregroundColor(SupportDesign.red)
                     }
 
                     Button {
@@ -423,7 +450,7 @@ private struct NewSupportTicketView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(canSubmit ? DT.logoRed : DB.panel)
+                        .background(canSubmit ? SupportDesign.red : DB.panel)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                     .buttonStyle(.plain)
@@ -637,7 +664,7 @@ private struct SupportTicketConversationView: View {
             TextField("support.message_placeholder".localized, text: $draft, axis: .vertical)
                 .font(.system(size: 14))
                 .foregroundColor(.white)
-                .tint(DT.logoRed)
+                .tint(SupportDesign.red)
                 .lineLimit(1...4)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 44)
@@ -653,7 +680,7 @@ private struct SupportTicketConversationView: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.white)
                     .frame(width: 44, height: 44)
-                    .background(DT.logoRed)
+                    .background(SupportDesign.red)
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
@@ -674,7 +701,7 @@ private struct SupportTicketConversationView: View {
 
     private var statusColor: Color {
         switch viewModel.ticket.status {
-        case .waitingSupport: return DT.logoRed
+        case .waitingSupport: return SupportDesign.red
         case .replied, .waitingUser: return DT.brandGold
         case .resolved: return DT.success
         }
@@ -710,7 +737,7 @@ private struct SupportMessageBubble: View {
                         : message.senderName ?? "support.agent".localized
                 )
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(message.isCurrentUser ? .white : DT.logoRed)
+                .foregroundColor(message.isCurrentUser ? .white : SupportDesign.red)
 
                 Text(timeText)
                     .font(.system(size: 10))
@@ -733,7 +760,7 @@ private struct SupportMessageBubble: View {
                     RoundedRectangle(cornerRadius: 9)
                         .stroke(
                             message.isCurrentUser
-                                ? DT.logoRed.opacity(0.76)
+                                ? SupportDesign.red.opacity(0.76)
                                 : DB.divider,
                             lineWidth: 0.8
                         )
@@ -745,12 +772,12 @@ private struct SupportMessageBubble: View {
     private func avatar(title: String, isUser: Bool) -> some View {
         Text(title)
             .font(.system(size: 11, weight: .bold))
-            .foregroundColor(isUser ? .white : DT.logoRed)
+            .foregroundColor(isUser ? .white : SupportDesign.red)
             .frame(width: 32, height: 32)
-            .background(isUser ? DT.logoRed : DB.panel)
+            .background(isUser ? SupportDesign.red : DB.panel)
             .clipShape(Circle())
             .overlay {
-                Circle().stroke(isUser ? DT.logoRed : DB.divider, lineWidth: 0.8)
+                Circle().stroke(isUser ? SupportDesign.red : DB.divider, lineWidth: 0.8)
             }
     }
 
@@ -876,7 +903,7 @@ private extension View {
         self
             .font(.system(size: 15))
             .foregroundColor(.white)
-            .tint(DT.logoRed)
+            .tint(SupportDesign.red)
             .padding(.horizontal, 14)
             .frame(height: 50)
             .background(DB.panel.opacity(0.62))
