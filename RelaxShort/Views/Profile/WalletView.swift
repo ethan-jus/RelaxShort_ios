@@ -11,68 +11,80 @@ struct WalletView: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    balanceHero
-                    actionButtons
-                        .padding(.horizontal, 20)
-                        .padding(.top, 18)
-                    recentActivity
-                        .padding(.top, 28)
-                }
-                .frame(width: proxy.size.width)
-                .padding(.bottom, 32)
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 0) {
+                CompactProfileNavigationHeader(title: "wallet.title".localized)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+
+                balanceHero
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+
+                actionButtons
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+
+                recentActivity
+                    .padding(.top, 26)
             }
-            .background(DB.black)
+            .padding(.bottom, 28)
         }
         .background(DB.black.ignoresSafeArea())
-        .navigationTitle("wallet.title".localized)
-        .navigationBarTitleDisplayMode(.inline)
-        .navigationBarHidden(false)
-        .toolbarBackground(DB.black, for: .navigationBar)
-        .toolbarBackground(.visible, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             Task { await viewModel.load(limit: 4) }
         }
     }
 
     private var balanceHero: some View {
-        ZStack {
+        ZStack(alignment: .trailing) {
             Image("ProfileRedLight")
                 .resizable()
                 .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 262)
-                .offset(y: -2)
-                .opacity(0.96)
+                .frame(height: 156)
+                .opacity(0.78)
                 .blendMode(.screen)
                 .clipped()
 
-            VStack(spacing: 16) {
-                Text("wallet.coin_balance".localized)
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(DT.coinGold)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("wallet.coin_balance".localized)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(DB.mutedText)
 
-                HStack(spacing: 18) {
-                    Image("RewardCoinIcon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 104, height: 104)
-                        .shadow(color: DT.coinGold.opacity(0.3), radius: 14)
+                    HStack(spacing: 12) {
+                        Image("RewardCoinIcon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 52, height: 52)
 
-                    Text(balanceText)
-                        .font(.system(size: 72, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(.white)
-                        .minimumScaleFactor(0.55)
-                        .lineLimit(1)
+                        Text(balanceText)
+                            .font(.system(size: 48, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundColor(.white)
+                            .minimumScaleFactor(0.65)
+                            .lineLimit(1)
+                    }
                 }
-                .padding(.horizontal, 24)
+
+                Spacer(minLength: 8)
+
+                Image("TopUpCoinStackLarge")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 118, height: 88)
+                    .offset(x: 4)
             }
-            .padding(.top, 8)
+            .padding(.horizontal, 18)
         }
-        .frame(height: 262)
+        .frame(height: 156)
+        .background(Color(hex: "#080605"))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(DT.brandGold.opacity(0.48), lineWidth: 0.8)
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("wallet.balance_accessibility".localizedFormat(viewModel.overview?.balance ?? 0))
     }
@@ -83,7 +95,7 @@ struct WalletView: View {
     }
 
     private var actionButtons: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             NavigationLink {
                 TopUpView()
             } label: {
@@ -103,8 +115,8 @@ struct WalletView: View {
                     title: "wallet.earn_coins".localized,
                     systemImage: "gift",
                     foreground: DT.coinGold,
-                    background: DB.panel.opacity(0.72),
-                    border: DT.brandGold.opacity(0.75)
+                    background: DB.panel.opacity(0.58),
+                    border: DT.brandGold.opacity(0.52)
                 )
             }
         }
@@ -117,22 +129,22 @@ struct WalletView: View {
         background: Color,
         border: Color
     ) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: systemImage)
-                .font(.system(size: 25, weight: .medium))
+                .font(.system(size: 19, weight: .medium))
             Text(title)
-                .font(.system(size: 17, weight: .bold))
+                .font(.system(size: 15, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
         }
         .foregroundColor(foreground)
         .frame(maxWidth: .infinity)
-        .frame(height: 66)
+        .frame(height: 50)
         .background(background)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 9))
         .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(border, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 9)
+                .stroke(border, lineWidth: 0.8)
         }
     }
 
@@ -140,25 +152,25 @@ struct WalletView: View {
         VStack(spacing: 0) {
             HStack {
                 Text("wallet.recent_activity".localized)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
                 if !(viewModel.overview?.transactions.isEmpty ?? true) {
                     NavigationLink {
                         WalletTransactionsView(repository: repository)
                     } label: {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 4) {
                             Text("wallet.view_all".localized)
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 10, weight: .semibold))
                         }
-                        .font(.system(size: 15, weight: .medium))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(DT.logoRed)
                     }
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 10)
+            .padding(.bottom, 8)
 
             if let transactions = viewModel.overview?.transactions, !transactions.isEmpty {
                 LazyVStack(spacing: 0) {
@@ -167,7 +179,7 @@ struct WalletView: View {
                         if index < transactions.count - 1 {
                             Divider()
                                 .overlay(DB.divider)
-                                .padding(.leading, 88)
+                                .padding(.leading, 70)
                                 .padding(.trailing, 20)
                         }
                     }
@@ -204,17 +216,17 @@ private struct WalletTransactionRow: View {
     let transaction: WalletTransaction
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 12) {
             transactionIcon
-                .frame(width: 54, height: 54)
+                .frame(width: 38, height: 38)
 
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                 Text(dateText)
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     .foregroundColor(DB.mutedText)
                     .lineLimit(1)
             }
@@ -222,12 +234,12 @@ private struct WalletTransactionRow: View {
             Spacer(minLength: 10)
 
             Text(amountText)
-                .font(.system(size: 21, weight: .bold, design: .rounded))
+                .font(.system(size: 18, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .foregroundColor(transaction.amount >= 0 ? DT.coinGold : .white)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.vertical, 10)
         .accessibilityElement(children: .combine)
     }
 
@@ -235,17 +247,17 @@ private struct WalletTransactionRow: View {
     private var transactionIcon: some View {
         ZStack {
             Circle()
-                .fill(DB.panel)
-                .overlay(Circle().stroke(DB.divider, lineWidth: 1))
+                .fill(DB.panel.opacity(0.7))
+                .overlay(Circle().stroke(DB.divider, lineWidth: 0.8))
 
             if transaction.source == "purchase" {
                 Image("RewardCoinIcon")
                     .resizable()
                     .scaledToFit()
-                    .padding(10)
+                    .padding(7)
             } else {
                 Image(systemName: iconName)
-                    .font(.system(size: 23, weight: .medium))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(iconColor)
             }
         }
@@ -298,5 +310,41 @@ private struct WalletTransactionRow: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+}
+
+struct CompactProfileNavigationHeader: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let title: String
+
+    var body: some View {
+        ZStack {
+            Text(title)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(.white)
+
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 38, height: 38)
+                        .background(DB.panel.opacity(0.78))
+                        .clipShape(Circle())
+                        .overlay {
+                            Circle()
+                                .stroke(DB.divider, lineWidth: 0.8)
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("common.back".localized)
+
+                Spacer()
+            }
+        }
+        .frame(height: 46)
     }
 }

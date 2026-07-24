@@ -675,10 +675,10 @@ final class StoreKitManager: ObservableObject {
     /// 本地回退价格映射
     private func fallbackPrice(for productID: ProductID) -> String {
         switch productID {
-        case .coinsSmall:    return "$4.99"
-        case .coinsMedium:   return "$9.99"
-        case .coinsLarge:    return "$19.99"
-        case .coinsXLarge:   return "$49.99"
+        case .coinsSmall:    return "$3.99"
+        case .coinsMedium:   return "$4.99"
+        case .coinsLarge:    return "$9.99"
+        case .coinsXLarge:   return "$19.99"
         case .vipWeekly:     return "$12.99"
         case .vipMonthly:    return "$29.99"
         case .vipYearly:     return "$149.99"
