@@ -27,8 +27,8 @@ enum APIEndpoint {
     case seriesEpisodes(seriesId: String)
     /// 剧集播放地址
     case episodePlay(episodeId: String)
-    /// 金币或广告解锁剧集
-    case episodeUnlock(episodeId: String, method: EpisodeUnlockMethod, idempotencyKey: String)
+    /// 金币解锁剧集
+    case episodeCoinUnlock(episodeId: String, idempotencyKey: String)
     /// Apple StoreKit 验单并由服务端发放权益
     case applePaymentVerify(receipt: ApplePurchaseReceipt, idempotencyKey: String)
     /// 获取当前登录用户绑定 StoreKit 交易的稳定 appAccountToken
@@ -134,7 +134,7 @@ extension APIEndpoint {
     /// 真实后端 baseURL
     var baseURL: String {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
              .discoveryEvents,
@@ -157,7 +157,7 @@ extension APIEndpoint {
         case .forYou:                       return "/api/v2/feed/for-you"
         case .seriesEpisodes(let id):       return "/api/v2/series/\(id)/episodes"
         case .episodePlay(let id):          return "/api/v2/episodes/\(id)/play"
-        case .episodeUnlock(let id, let method, _): return "/api/v2/episodes/\(id)/unlock/\(method.rawValue)"
+        case .episodeCoinUnlock(let id, _):    return "/api/v2/episodes/\(id)/unlock/coins"
         case .applePaymentVerify:           return "/api/v2/payments/apple/verify"
         case .appleAccountToken:            return "/api/v2/payments/apple/account-token"
         // ── Task15 v2 ──
@@ -228,7 +228,7 @@ extension APIEndpoint {
              .userMe, .userWallet, .walletTransactions,
              .supportTickets, .supportTicket: return .get
         case .updateUserPreferences: return .patch
-        case .episodeUnlock, .applePaymentVerify: return .post
+        case .episodeCoinUnlock, .applePaymentVerify: return .post
         case .discoveryEvents:     return .post
         case .member, .adsConfig:  return .get
         case .adsRewardStart, .adsRewardComplete, .adsRewardCancel, .rewardCheckIn,
@@ -253,7 +253,7 @@ extension APIEndpoint {
     /// 真实 v2 端点标记（用于 X-Device-Id）
     private var requiresRealV2Header: Bool {
         switch self {
-        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
+        case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
              .userMe, .userWallet, .walletTransactions, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
@@ -269,7 +269,7 @@ extension APIEndpoint {
     /// 后端必须从 Bearer 会话解析用户的端点；匿名账户也属于有效会话。
     var requiresAuthenticatedSession: Bool {
         switch self {
-        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
+        case .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark,
              .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
@@ -310,7 +310,7 @@ extension APIEndpoint {
         }
 
         switch self {
-        case .episodeUnlock(_, _, let key), .applePaymentVerify(_, let key),
+        case .episodeCoinUnlock(_, let key), .applePaymentVerify(_, let key),
              .adsRewardStart(_, _, _, let key), .adsRewardComplete(_, _, let key),
              .adsRewardCancel(_, _, let key), .rewardCheckIn(let key):
             base["X-Idempotency-Key"] = key
@@ -445,7 +445,7 @@ extension APIEndpoint {
             ]
         case .seriesEpisodes:
             break
-        case .episodePlay, .episodeUnlock, .applePaymentVerify, .appleAccountToken,
+        case .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
              .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
              .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
              .supportTickets, .createSupportTicket, .supportTicket,

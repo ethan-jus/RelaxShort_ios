@@ -39,11 +39,6 @@ struct Episode: Codable, Identifiable {
     }
 }
 
-enum EpisodeUnlockMethod: String, Codable {
-    case coins
-    case ads
-}
-
 struct EpisodeUnlockAccount: Equatable {
     let balance: Int
     let isVIP: Bool

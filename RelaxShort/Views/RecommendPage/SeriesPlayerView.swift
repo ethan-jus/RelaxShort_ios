@@ -165,6 +165,11 @@ struct SeriesPlayerView: View {
         }
     }
 
+    private enum UnlockAction {
+        case coins
+        case rewardedAd
+    }
+
     @EnvironmentObject var playerCoordinator: PlayerCoordinator
     @Environment(\.dismiss) private var dismiss
 
@@ -487,7 +492,7 @@ struct SeriesPlayerView: View {
                             unlockState = latest
                         }
                         unlockPurchaseTab = nil
-                        Task { await performUnlock(method: .coins) }
+                        Task { await performUnlock(action: .coins) }
                     },
                     onVIPPurchaseCompleted: { account in
                         coinStore.synchronize(balance: account.balance)
@@ -601,7 +606,7 @@ struct SeriesPlayerView: View {
 
             Group {
                 if state.canUnlockWithAd {
-                    Button { Task { await performUnlock(method: .ads) } } label: {
+                    Button { Task { await performUnlock(action: .rewardedAd) } } label: {
                         Text("player.ad_unlock".localized)
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(.white.opacity(0.62))
@@ -717,7 +722,7 @@ struct SeriesPlayerView: View {
                     icon: "play.rectangle.fill",
                     selected: false,
                     disabled: state.isProcessing
-                ) { Task { await performUnlock(method: .ads) } }
+                ) { Task { await performUnlock(action: .rewardedAd) } }
             }
 
             if state.isProcessing {
@@ -816,7 +821,7 @@ struct SeriesPlayerView: View {
         if state.selection == .vip {
             unlockPurchaseTab = .vip
         } else if state.hasEnoughCoins {
-            Task { await performUnlock(method: .coins) }
+            Task { await performUnlock(action: .coins) }
         } else {
             unlockPurchaseTab = .coins
         }
@@ -866,22 +871,22 @@ struct SeriesPlayerView: View {
     }
 
     @MainActor
-    private func performUnlock(method: EpisodeUnlockMethod) async {
+    private func performUnlock(action: UnlockAction) async {
         guard var state = unlockState,
               !state.isProcessing,
               let episodeID = episodeID(for: state.episodeNumber),
-              method != .ads || state.canUnlockWithAd else { return }
+              action != .rewardedAd || state.canUnlockWithAd else { return }
         let targetEpisode = state.playbackTargetEpisode
         state.isProcessing = true
         state.errorMessage = nil
         unlockState = state
         do {
-            if method == .ads {
+            if action == .rewardedAd {
                 try await unlockEpisodeWithRewardedInterstitial(episodeID: episodeID)
                 await resumeEpisodeAfterUnlock(targetEpisode)
                 return
             }
-            let result = try await dependencies.detailRepository.unlockEpisode(episodeId: episodeID, method: method)
+            let result = try await dependencies.detailRepository.unlockEpisodeWithCoins(episodeId: episodeID)
             guard result.unlocked else {
                 throw APIError(code: "UNLOCK_FAILED", message: "player.unlock_failed".localized)
             }

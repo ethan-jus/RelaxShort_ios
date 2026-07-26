@@ -71,8 +71,8 @@ protocol DetailRepositoryProtocol {
     func fetchPlayAsset(episodeId: String) async throws -> PlaybackMediaSourceDTO
     /// 获取服务端钱包与 VIP 权益，作为解锁 UI 的唯一余额来源。
     func fetchUnlockAccount() async throws -> EpisodeUnlockAccount
-    /// 金币/广告解锁；只有服务端返回成功后才允许恢复播放。
-    func unlockEpisode(episodeId: String, method: EpisodeUnlockMethod) async throws -> EpisodeUnlockResult
+    /// 金币解锁；只有服务端返回成功后才允许恢复播放。
+    func unlockEpisodeWithCoins(episodeId: String) async throws -> EpisodeUnlockResult
     /// Apple 验单发币，返回服务端最终钱包余额。
     func verifyCoinPurchase(_ receipt: ApplePurchaseReceipt) async throws -> Int
     /// Apple 验单开通 VIP，只有服务端权益已生效才返回账户状态。

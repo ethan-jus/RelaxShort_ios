@@ -79,12 +79,11 @@ final class RealDetailRepository: DetailRepositoryProtocol {
         )
     }
 
-    func unlockEpisode(episodeId: String, method: EpisodeUnlockMethod) async throws -> EpisodeUnlockResult {
+    func unlockEpisodeWithCoins(episodeId: String) async throws -> EpisodeUnlockResult {
         let response: EpisodeUnlockResponseDTO = try await client.requestData(
-            .episodeUnlock(
+            .episodeCoinUnlock(
                 episodeId: episodeId,
-                method: method,
-                idempotencyKey: "ios-unlock-\(episodeId)-\(method.rawValue)-\(UUID().uuidString)"
+                idempotencyKey: "ios-unlock-\(episodeId)-coins-\(UUID().uuidString)"
             )
         )
         return EpisodeUnlockResult(

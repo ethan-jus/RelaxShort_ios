@@ -313,8 +313,8 @@ struct MockDetailRepository: DetailRepositoryProtocol {
     func fetchUnlockAccount() async throws -> EpisodeUnlockAccount {
         EpisodeUnlockAccount(balance: 100, isVIP: false)
     }
-    func unlockEpisode(episodeId: String, method: EpisodeUnlockMethod) async throws -> EpisodeUnlockResult {
-        EpisodeUnlockResult(unlocked: true, balanceAfter: method == .coins ? 70 : nil)
+    func unlockEpisodeWithCoins(episodeId: String) async throws -> EpisodeUnlockResult {
+        EpisodeUnlockResult(unlocked: true, balanceAfter: 70)
     }
     func verifyCoinPurchase(_ receipt: ApplePurchaseReceipt) async throws -> Int {
         100 + receipt.coins

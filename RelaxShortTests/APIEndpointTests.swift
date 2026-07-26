@@ -69,10 +69,9 @@ struct APIEndpointTests {
     }
 
     @Test
-    func episodeUnlockEndpointUsesMethodAndIdempotencyHeader() {
-        let endpoint = APIEndpoint.episodeUnlock(
+    func episodeCoinUnlockEndpointUsesFixedPathAndIdempotencyHeader() {
+        let endpoint = APIEndpoint.episodeCoinUnlock(
             episodeId: "2025031200000904",
-            method: .coins,
             idempotencyKey: "unlock-key"
         )
         #expect(endpoint.path == "/api/v2/episodes/2025031200000904/unlock/coins")
