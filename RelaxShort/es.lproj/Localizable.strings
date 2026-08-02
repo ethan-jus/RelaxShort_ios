@@ -607,7 +607,6 @@
 "rank.category.top_searched" = "Más buscados";
 "rank.category.new_releases" = "Nuevos lanzamientos";
 "filter.all" = "Todo";
-"filter.local" = "Local";
 "network.load_failed_retry" = "No se pudo cargar. Comprueba tu conexión.";
 "player.load_failed_retry" = "No se pudieron cargar los episodios. Inténtalo de nuevo.";
 "player.episode_load_failed_retry" = "No se pudo cargar este episodio. Inténtalo de nuevo.";

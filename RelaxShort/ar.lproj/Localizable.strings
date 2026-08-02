@@ -607,7 +607,6 @@
 "rank.category.top_searched" = "الأكثر بحثًا";
 "rank.category.new_releases" = "الإصدارات الجديدة";
 "filter.all" = "الكل";
-"filter.local" = "محلي";
 "network.load_failed_retry" = "تعذر التحميل. تحقق من اتصالك.";
 "player.load_failed_retry" = "تعذر تحميل الحلقات. حاول مرة أخرى.";
 "player.episode_load_failed_retry" = "تعذر تحميل هذه الحلقة. حاول مرة أخرى.";

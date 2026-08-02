@@ -31,6 +31,10 @@ final class HomeViewModel: ObservableObject {
     @Published var categoryErrorMessage: String?
     /// 数据库启用且当前 App 已提供本地化资源的语言编码。
     @Published var supportedLanguageCodes: [String] = AppLanguage.allCases.map(\.rawValue)
+    /// 当前分类筛选请求的后端分类 code；为空表示全部分类。
+    private var selectedCategoryCode: String?
+    /// 当前分类筛选请求的内容语言；为空表示使用默认内容语言。
+    private var selectedContentLanguage: String?
 
     var tabs: [String] {
         [
@@ -121,6 +125,10 @@ final class HomeViewModel: ObservableObject {
             }
         }
 
+        if repository.usesRemoteContentCatalog {
+            // 真实目录请求失败时不保留本地语言枚举，避免把静态数据冒充服务端目录。
+            supportedLanguageCodes = []
+        }
         do {
             let languages = try await repository.fetchSupportedLanguages()
             if !languages.isEmpty {
@@ -129,10 +137,14 @@ final class HomeViewModel: ObservableObject {
         } catch {
             logError("HomeViewModel.loadSupportedLanguages failed: \(error)")
         }
-        if !categories.isEmpty {
-            selectedCategoryIndex = 0
-            await loadCategoryDramas(for: categories[0])
+        let selectedCategory = selectedCategoryCode.flatMap { code in
+            categories.first(where: { $0.code == code })
         }
+        if let selectedCategory,
+           let index = categories.firstIndex(where: { $0.code == selectedCategory.code }) {
+            selectedCategoryIndex = index
+        }
+        await loadCategoryDramas(for: selectedCategory, contentLanguage: selectedContentLanguage)
     }
 
     private static func userFacingLoadError(_ error: Error) -> String {
@@ -146,29 +158,56 @@ final class HomeViewModel: ObservableObject {
     // MARK: - Category Drama Loading
 
     /// 切换分类并加载对应剧集
-    func selectCategory(at index: Int) async {
+    func selectCategory(at index: Int, contentLanguage: String? = nil) async {
         guard index >= 0, index < categories.count else { return }
         selectedCategoryIndex = index
         let cat = categories[index]
-        await loadCategoryDramas(for: cat)
+        selectedCategoryCode = cat.code
+        selectedContentLanguage = contentLanguage
+        await loadCategoryDramas(for: cat, contentLanguage: contentLanguage)
     }
 
-    private func loadCategoryDramas(for category: HomeCategory) async {
+    /// 选择全部分类，并按当前语言重新请求真实内容。
+    func selectAllCategories(contentLanguage: String?) async {
+        selectedCategoryCode = nil
+        selectedContentLanguage = contentLanguage
+        await loadCategoryDramas(for: nil, contentLanguage: contentLanguage)
+    }
+
+    /// 选择内容语言，并保留当前分类条件重新请求真实内容。
+    func selectLanguage(_ contentLanguage: String?) async {
+        selectedContentLanguage = contentLanguage
+        let category = selectedCategoryCode.flatMap { code in
+            categories.first(where: { $0.code == code })
+        }
+        await loadCategoryDramas(for: category, contentLanguage: contentLanguage)
+    }
+
+    /// 重试当前分类/语言筛选请求。
+    func reloadCategoryContent() async {
+        let category = selectedCategoryCode.flatMap { code in
+            categories.first(where: { $0.code == code })
+        }
+        await loadCategoryDramas(for: category, contentLanguage: selectedContentLanguage)
+    }
+
+    private func loadCategoryDramas(for category: HomeCategory?, contentLanguage: String?) async {
         isCategoryLoading = true
         categoryErrorMessage = nil
         defer { isCategoryLoading = false }
 
         do {
             // Mock 或接口降级得到本地分类时，使用本地过滤。
-            if let localCat = category.localCategory {
+            if let localCat = category?.localCategory {
                 let matches = filterFeatured(by: localCat)
                 categoryDramas = matches.isEmpty ? featuredDramas : matches
             } else {
-                // 真实后端分类（localCategory == nil）：通过协议方法调 categorySeries（Task17 收口）
-                let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
+                // 真实后端按分类和内容语言查询；category 为空时请求全部分类内容。
                 let country = UserDefaults.standard.string(forKey: "app_country_code")
-                categoryDramas = try await repository.fetchCategorySeries(
-                    code: category.code, contentLang: contentLang, country: country
+                categoryDramas = try await repository.fetchCategoryContent(
+                    categoryCode: category?.code,
+                    contentLang: contentLanguage,
+                    country: country
                 )
             }
         } catch {

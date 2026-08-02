@@ -607,7 +607,6 @@
 "rank.category.top_searched" = "検索ランキング";
 "rank.category.new_releases" = "新着作品";
 "filter.all" = "すべて";
-"filter.local" = "ローカル";
 "network.load_failed_retry" = "読み込めませんでした。通信環境を確認してください。";
 "player.load_failed_retry" = "エピソードを読み込めませんでした。もう一度お試しください。";
 "player.episode_load_failed_retry" = "この話を読み込めませんでした。もう一度お試しください。";

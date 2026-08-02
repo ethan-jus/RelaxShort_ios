@@ -611,7 +611,6 @@
 "rank.category.top_searched" = "热搜榜";
 "rank.category.new_releases" = "最新上线";
 "filter.all" = "全部";
-"filter.local" = "本地";
 "network.load_failed_retry" = "加载失败，请检查网络后重试。";
 "player.load_failed_retry" = "剧集加载失败，请重试。";
 "player.episode_load_failed_retry" = "本集加载失败，请重试。";

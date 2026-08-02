@@ -70,6 +70,15 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
     }
 
+    func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem] {
+        if let categoryCode, !categoryCode.isEmpty {
+            return try await fetchCategorySeries(code: categoryCode, contentLang: contentLang, country: country)
+        }
+
+        // “全部分类”仍走真实内容接口，不能直接复用首页已经加载的推荐快照。
+        return try await fetchForYou(contentLang: contentLang, country: country, limit: 20)
+    }
+
     // MARK: - For You
 
     /// Task36A: 支持 feedSeed 和游标分页的 For You 请求。

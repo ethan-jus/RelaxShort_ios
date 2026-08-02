@@ -607,7 +607,6 @@
 "rank.category.top_searched" = "熱搜榜";
 "rank.category.new_releases" = "最新上線";
 "filter.all" = "全部";
-"filter.local" = "本地";
 "network.load_failed_retry" = "載入失敗，請檢查網路後再試。";
 "player.load_failed_retry" = "劇集載入失敗，請再試一次。";
 "player.episode_load_failed_retry" = "本集載入失敗，請再試一次。";

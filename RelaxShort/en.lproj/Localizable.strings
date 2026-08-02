@@ -624,7 +624,6 @@
 "rank.category.top_searched" = "Top Searched";
 "rank.category.new_releases" = "New Releases";
 "filter.all" = "All";
-"filter.local" = "Local";
 "network.load_failed_retry" = "Failed to load. Check your connection and try again.";
 "player.load_failed_retry" = "Unable to load episodes. Please try again.";
 "player.episode_load_failed_retry" = "Unable to load this episode. Please try again.";

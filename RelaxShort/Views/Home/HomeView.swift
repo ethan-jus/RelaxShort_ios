@@ -304,14 +304,10 @@ struct HomeView: View {
 
     // MARK: - Tab 3: Categories
 
-    /// 语言行：All、本地内容和数据库启用的语言；不再显示无法解释的 Others。
+    /// 语言行：All 和数据库启用、且当前 App 已内置本地化资源的语言。
     private var languageOptions: [CategoryFilterOption] {
-        var options = [
-            CategoryFilterOption(id: "All", title: "filter.all".localized),
-            CategoryFilterOption(id: "local", title: "filter.local".localized)
-        ]
+        var options = [CategoryFilterOption(id: "All", title: "filter.all".localized)]
         options.append(contentsOf: viewModel.supportedLanguageCodes
-            .filter { $0 != "local" }
             .map { code in
                 CategoryFilterOption(
                     id: code,
@@ -335,7 +331,15 @@ struct HomeView: View {
     }
 
     private var languageRow: some View {
-        catFilterRow(options: languageOptions, selected: $selectedLanguage)
+        catFilterRow(options: languageOptions, selected: .init(
+            get: { selectedLanguage },
+            set: { newValue in
+                selectedLanguage = newValue
+                Task {
+                    await viewModel.selectLanguage(newValue == "All" ? nil : newValue)
+                }
+            }
+        ))
     }
 
     private var genreRow: some View {
@@ -344,12 +348,20 @@ struct HomeView: View {
             set: { newVal in
                 selectedGenre = newVal
                 if newVal == "All" {
-                    viewModel.categoryDramas = []
+                    Task {
+                        await viewModel.selectAllCategories(contentLanguage: selectedContentLanguage)
+                    }
                 } else if let idx = viewModel.categories.firstIndex(where: { $0.code == newVal }) {
-                    Task { await viewModel.selectCategory(at: idx) }
+                    Task {
+                        await viewModel.selectCategory(at: idx, contentLanguage: selectedContentLanguage)
+                    }
                 }
             }
         ))
+    }
+
+    private var selectedContentLanguage: String? {
+        selectedLanguage == "All" ? nil : selectedLanguage
     }
 
     private var categorySelectedSummary: String {
@@ -473,13 +485,13 @@ struct HomeView: View {
             VStack(spacing: DT.Space.md) {
                 Spacer(minLength: 120)
                 Text(err).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
-                Button(L10n.retry) { Task { await viewModel.selectCategory(at: viewModel.selectedCategoryIndex) } }
+                Button(L10n.retry) { Task { await viewModel.reloadCategoryContent() } }
                     .font(DT.Font.button).foregroundColor(DT.brandPink)
                 Spacer(minLength: 120)
             }
             .frame(maxWidth: .infinity)
         } else {
-            let dramas = selectedGenre == "All" ? viewModel.featuredDramas : viewModel.categoryDramas
+            let dramas = viewModel.categoryDramas
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3), spacing: DT.Space.md) {
                 ForEach(dramas) { drama in
                     Button { openSeries(drama) } label: {

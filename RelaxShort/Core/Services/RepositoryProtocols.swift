@@ -22,6 +22,8 @@ protocol HomeRepositoryProtocol {
     func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent]
     /// 按后端分类 code 获取剧集列表。
     func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]
+    /// 按分类和内容语言获取首页分类内容；categoryCode 为空时获取全部分类内容。
+    func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem]
     /// 获取数据库启用且当前 App 可展示的语言目录。
     func fetchSupportedLanguages() async throws -> [String]
 }
@@ -35,6 +37,13 @@ extension HomeRepositoryProtocol {
     }
     /// 默认实现：Mock 模式返回空或全量本地过滤
     func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
+        return try await fetchDramas(category: .all)
+    }
+    /// 默认实现：Mock 模式使用本地数据；真实分类查询由 RealHomeRepository 覆盖。
+    func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem] {
+        if let categoryCode, !categoryCode.isEmpty {
+            return try await fetchCategorySeries(code: categoryCode, contentLang: contentLang, country: country)
+        }
         return try await fetchDramas(category: .all)
     }
     /// 默认实现：Mock 模式暂不提供运营 section 数据
