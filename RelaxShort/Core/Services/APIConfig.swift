@@ -18,7 +18,7 @@ enum APIConfig {
            !injected.isEmpty {
             return normalized(injected)
         }
-        return "http://127.0.0.1:8080"
+        return "http://127.0.0.1:8880"
     }
 
     /// 当前有效 baseURL

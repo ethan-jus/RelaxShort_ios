@@ -601,12 +601,13 @@
 "home.tab.rankings" = "ランキング";
 "home.tab.categories" = "カテゴリー";
 "home.tab.anime" = "アニメ";
+"home.tab.vip" = "VIP";
+"home.tab.original_plus" = "オリジナル+";
+"rank.category.trending" = "急上昇";
+"rank.category.top_searched" = "検索ランキング";
+"rank.category.new_releases" = "新着作品";
 "filter.all" = "すべて";
 "filter.local" = "ローカル";
-"filter.others" = "その他";
-"filter.paid" = "有料";
-"filter.members_only" = "メンバー限定";
-"filter.free" = "無料";
 "network.load_failed_retry" = "読み込めませんでした。通信環境を確認してください。";
 "player.load_failed_retry" = "エピソードを読み込めませんでした。もう一度お試しください。";
 "player.episode_load_failed_retry" = "この話を読み込めませんでした。もう一度お試しください。";

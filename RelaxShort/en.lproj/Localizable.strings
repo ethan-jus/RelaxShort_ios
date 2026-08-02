@@ -618,12 +618,13 @@
 "home.tab.rankings" = "Rankings";
 "home.tab.categories" = "Categories";
 "home.tab.anime" = "Anime";
+"home.tab.vip" = "VIP";
+"home.tab.original_plus" = "Original+";
+"rank.category.trending" = "Most Trending";
+"rank.category.top_searched" = "Top Searched";
+"rank.category.new_releases" = "New Releases";
 "filter.all" = "All";
 "filter.local" = "Local";
-"filter.others" = "Others";
-"filter.paid" = "Paid";
-"filter.members_only" = "Members Only";
-"filter.free" = "Free";
 "network.load_failed_retry" = "Failed to load. Check your connection and try again.";
 "player.load_failed_retry" = "Unable to load episodes. Please try again.";
 "player.episode_load_failed_retry" = "Unable to load this episode. Please try again.";

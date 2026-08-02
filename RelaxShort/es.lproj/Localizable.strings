@@ -601,12 +601,13 @@
 "home.tab.rankings" = "Clasificación";
 "home.tab.categories" = "Categorías";
 "home.tab.anime" = "Anime";
+"home.tab.vip" = "VIP";
+"home.tab.original_plus" = "Original+";
+"rank.category.trending" = "Tendencias";
+"rank.category.top_searched" = "Más buscados";
+"rank.category.new_releases" = "Nuevos lanzamientos";
 "filter.all" = "Todo";
 "filter.local" = "Local";
-"filter.others" = "Otros";
-"filter.paid" = "De pago";
-"filter.members_only" = "Solo miembros";
-"filter.free" = "Gratis";
 "network.load_failed_retry" = "No se pudo cargar. Comprueba tu conexión.";
 "player.load_failed_retry" = "No se pudieron cargar los episodios. Inténtalo de nuevo.";
 "player.episode_load_failed_retry" = "No se pudo cargar este episodio. Inténtalo de nuevo.";

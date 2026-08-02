@@ -8,6 +8,8 @@ import Foundation
 
 /// 首页数据仓库协议
 protocol HomeRepositoryProtocol {
+    /// 真实后端仓库不允许用本地枚举伪造分类；Mock 仓库保留本地默认实现供预览和单元测试使用。
+    var usesRemoteContentCatalog: Bool { get }
     /// 按分类获取短剧列表
     func fetchDramas(category: DramaCategory) async throws -> [DramaItem]
     /// 获取 Banner 轮播数据
@@ -20,9 +22,13 @@ protocol HomeRepositoryProtocol {
     func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent]
     /// 按后端分类 code 获取剧集列表。
     func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]
+    /// 获取数据库启用且当前 App 可展示的语言目录。
+    func fetchSupportedLanguages() async throws -> [String]
 }
 
 extension HomeRepositoryProtocol {
+    var usesRemoteContentCatalog: Bool { false }
+
     /// 默认实现：Mock 模式用本地 DramaCategory 列表
     func fetchHomeCategories() async throws -> [HomeCategory] {
         return DramaCategory.allCases.map { HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0) }
@@ -34,6 +40,10 @@ extension HomeRepositoryProtocol {
     /// 默认实现：Mock 模式暂不提供运营 section 数据
     func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent] {
         return []
+    }
+    /// 默认实现：Mock 使用当前 App 已内置的语言资源。
+    func fetchSupportedLanguages() async throws -> [String] {
+        AppLanguage.allCases.map(\.rawValue)
     }
     /// 默认实现：Mock 模式用 viewCount 生成测试指标
     func fetchRankingEntries(type: String) async throws -> [RankingEntry] {

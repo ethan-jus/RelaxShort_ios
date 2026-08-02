@@ -11,8 +11,16 @@ struct AppInitResponseDTO: Decodable {
     let mixRatio: MixRatioDTO?
     let matchedLanguage: String?
     let fallbackReason: String?
+    let supportedLanguages: [SupportedLanguageDTO]?
     let update: UpdateInfoDTO?
     let ads: AdsConfigDTO?
+}
+
+struct SupportedLanguageDTO: Decodable {
+    let code: String
+    let nameEn: String?
+    let nameNative: String?
+    let sortOrder: Int?
 }
 
 struct MixRatioDTO: Decodable {

@@ -601,12 +601,13 @@
 "home.tab.rankings" = "순위";
 "home.tab.categories" = "카테고리";
 "home.tab.anime" = "애니";
+"home.tab.vip" = "VIP";
+"home.tab.original_plus" = "오리지널+";
+"rank.category.trending" = "인기 급상승";
+"rank.category.top_searched" = "인기 검색";
+"rank.category.new_releases" = "신규 공개";
 "filter.all" = "전체";
 "filter.local" = "로컬";
-"filter.others" = "기타";
-"filter.paid" = "유료";
-"filter.members_only" = "멤버 전용";
-"filter.free" = "무료";
 "network.load_failed_retry" = "불러오지 못했습니다. 네트워크를 확인하세요.";
 "player.load_failed_retry" = "에피소드를 불러오지 못했습니다. 다시 시도하세요.";
 "player.episode_load_failed_retry" = "이 에피소드를 불러오지 못했습니다. 다시 시도하세요.";

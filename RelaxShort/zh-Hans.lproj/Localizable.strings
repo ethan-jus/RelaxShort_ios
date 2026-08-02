@@ -605,12 +605,13 @@
 "home.tab.rankings" = "榜单";
 "home.tab.categories" = "分类";
 "home.tab.anime" = "动漫";
+"home.tab.vip" = "会员";
+"home.tab.original_plus" = "原创+";
+"rank.category.trending" = "热门趋势";
+"rank.category.top_searched" = "热搜榜";
+"rank.category.new_releases" = "最新上线";
 "filter.all" = "全部";
 "filter.local" = "本地";
-"filter.others" = "其他";
-"filter.paid" = "付费";
-"filter.members_only" = "会员专享";
-"filter.free" = "免费";
 "network.load_failed_retry" = "加载失败，请检查网络后重试。";
 "player.load_failed_retry" = "剧集加载失败，请重试。";
 "player.episode_load_failed_retry" = "本集加载失败，请重试。";

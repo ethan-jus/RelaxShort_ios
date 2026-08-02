@@ -41,6 +41,8 @@ enum APIEndpoint {
     case searchV2(query: String, cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?)
     case rankings(type: String, contentLanguage: String?, countryCode: String?)
     case categories(contentLanguage: String?, countryCode: String?)
+    /// 数据库启用的语言目录（用于 App 筛选和语言选择）
+    case languages
     case categorySeries(categoryCode: String, cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?)
 
     // MARK: - Task23 用户/钱包/偏好端点
@@ -135,7 +137,7 @@ extension APIEndpoint {
     var baseURL: String {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
              .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
              .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
@@ -166,6 +168,7 @@ extension APIEndpoint {
         case .searchV2:                     return "/api/v2/search"
         case .rankings:                     return "/api/v2/rankings"
         case .categories:                   return "/api/v2/categories"
+        case .languages:                    return "/api/v2/languages"
         case .categorySeries(let code, _, _, _, _): return "/api/v2/categories/\(code)/series"
         // ── Task23 v2 ──
         case .userMe:                           return "/api/v2/users/me"
@@ -224,7 +227,7 @@ extension APIEndpoint {
         switch self {
         case .appInit:              return .post
         case .forYou, .seriesEpisodes, .episodePlay, .appleAccountToken,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
              .userMe, .userWallet, .walletTransactions,
              .supportTickets, .supportTicket: return .get
         case .updateUserPreferences: return .patch
@@ -254,7 +257,7 @@ extension APIEndpoint {
     private var requiresRealV2Header: Bool {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .categorySeries,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
              .userMe, .userWallet, .walletTransactions, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
              .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
@@ -478,6 +481,8 @@ extension APIEndpoint {
             if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
             if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
             if !items.isEmpty { components?.queryItems = items }
+        case .languages:
+            break
         case .categorySeries(_, let cursor, let limit, let cl, let cc):
             var items = [URLQueryItem(name: "limit", value: "\(limit)")]
             if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }

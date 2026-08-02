@@ -288,12 +288,12 @@ private struct LanguagePickerView: View {
                     .padding(.bottom, 8)
 
                 VStack(spacing: 0) {
-                    ForEach(AppLanguage.allCases, id: \.self) { language in
+                    ForEach(AppLanguage.enabledForCurrentCatalog, id: \.self) { language in
                         Button {
                             appStore.selectLanguage(language)
                         } label: {
                             HStack {
-                                Text(language.nativeDisplayName)
+                            Text(language.catalogNativeDisplayName)
                                     .font(.system(size: 15, weight: .medium))
                                     .foregroundColor(.white)
                                 Spacer()
@@ -307,7 +307,7 @@ private struct LanguagePickerView: View {
                         }
                         .buttonStyle(.plain)
 
-                        if language != AppLanguage.allCases.last {
+                        if language != AppLanguage.enabledForCurrentCatalog.last {
                             Divider()
                                 .overlay(DB.divider)
                                 .padding(.leading, 14)

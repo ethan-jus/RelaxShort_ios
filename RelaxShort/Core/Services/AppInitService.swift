@@ -45,6 +45,17 @@ final class AppInitService {
         UserDefaults.standard.set(dto.uiLanguage, forKey: "app_ui_language")
         UserDefaults.standard.set(dto.contentLanguage, forKey: "app_content_language")
         UserDefaults.standard.set(dto.countryCode, forKey: "app_country_code")
+        if let supportedLanguages = dto.supportedLanguages, !supportedLanguages.isEmpty {
+            UserDefaults.standard.set(
+                supportedLanguages.map(\.code),
+                forKey: "app_supported_ui_languages"
+            )
+            let nativeNames: [String: String] = Dictionary(uniqueKeysWithValues: supportedLanguages.compactMap { item in
+                guard let name = item.nameNative, !name.isEmpty else { return nil }
+                return (item.code, name)
+            })
+            UserDefaults.standard.set(nativeNames, forKey: "app_supported_language_native_names")
+        }
         if let matched = dto.matchedLanguage {
             UserDefaults.standard.set(matched, forKey: "app_matched_language")
         }

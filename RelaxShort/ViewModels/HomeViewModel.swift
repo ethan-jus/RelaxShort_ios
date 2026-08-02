@@ -29,6 +29,8 @@ final class HomeViewModel: ObservableObject {
     @Published var isCategoryLoading: Bool = false
     /// 分类错误信息
     @Published var categoryErrorMessage: String?
+    /// 数据库启用且当前 App 已提供本地化资源的语言编码。
+    @Published var supportedLanguageCodes: [String] = AppLanguage.allCases.map(\.rawValue)
 
     var tabs: [String] {
         [
@@ -37,8 +39,8 @@ final class HomeViewModel: ObservableObject {
             "home.tab.rankings".localized,
             "home.tab.categories".localized,
             "home.tab.anime".localized,
-            "VIP",
-            "Original+"
+            "home.tab.vip".localized,
+            "home.tab.original_plus".localized
         ]
     }
 
@@ -55,6 +57,11 @@ final class HomeViewModel: ObservableObject {
     }
 
     var dramasForAnimeTab: [DramaItem] {
+        if repository.usesRemoteContentCatalog {
+            return homeTabsByCode["anime"]?.sections.flatMap(\.items) ?? []
+        }
+
+        // 仅供 Mock/预览使用：真实 App 不再根据静态标签或分类名猜测动漫内容。
         let anime = featuredDramas.filter { drama in
             drama.tags.contains { tag in
                 let lower = tag.lowercased()
@@ -103,15 +110,24 @@ final class HomeViewModel: ObservableObject {
             return
         }
 
-        // 分类独立加载；失败时回退本地枚举，再加载默认分类内容。
+        // 分类是后端运营字典的唯一来源；真实仓库失败时不能展示另一套本地分类。
         do {
             let cats = try await repository.fetchHomeCategories()
             self.categories = cats
         } catch {
             logError("HomeViewModel.loadCategories failed: \(error)")
-            self.categories = DramaCategory.allCases.map {
+            self.categories = repository.usesRemoteContentCatalog ? [] : DramaCategory.allCases.map {
                 HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0)
             }
+        }
+
+        do {
+            let languages = try await repository.fetchSupportedLanguages()
+            if !languages.isEmpty {
+                supportedLanguageCodes = languages
+            }
+        } catch {
+            logError("HomeViewModel.loadSupportedLanguages failed: \(error)")
         }
         if !categories.isEmpty {
             selectedCategoryIndex = 0

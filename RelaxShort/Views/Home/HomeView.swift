@@ -102,7 +102,6 @@ struct HomeView: View {
     /// Categories 三行筛选状态。
     @State private var selectedLanguage: String = "All"
     @State private var selectedGenre: String = "All"
-    @State private var selectedPayment: String = "All"
     @State private var categoryScrollOffsetY: CGFloat = 0
     @State private var isCategoryFilterOverlayPresented = false
     @State private var selectedRankCategory: RankCategory = .hot
@@ -305,18 +304,21 @@ struct HomeView: View {
 
     // MARK: - Tab 3: Categories
 
-    /// 语言行：All + 常用语言码映射
+    /// 语言行：All、本地内容和数据库启用的语言；不再显示无法解释的 Others。
     private var languageOptions: [CategoryFilterOption] {
-        [
+        var options = [
             CategoryFilterOption(id: "All", title: "filter.all".localized),
-            CategoryFilterOption(id: "local", title: "filter.local".localized),
-            CategoryFilterOption(id: "zh-Hans", title: "lang.zh_hans".localized),
-            CategoryFilterOption(id: "ko", title: "lang.ko".localized),
-            CategoryFilterOption(id: "ja", title: "lang.ja".localized),
-            CategoryFilterOption(id: "es", title: "lang.es".localized),
-            CategoryFilterOption(id: "others", title: "filter.others".localized),
-            CategoryFilterOption(id: "en", title: "lang.en".localized)
+            CategoryFilterOption(id: "local", title: "filter.local".localized)
         ]
+        options.append(contentsOf: viewModel.supportedLanguageCodes
+            .filter { $0 != "local" }
+            .map { code in
+                CategoryFilterOption(
+                    id: code,
+                    title: AppLanguage(rawValue: code)?.displayName ?? code
+                )
+            })
+        return options
     }
 
     private var genreOptions: [CategoryFilterOption] {
@@ -325,21 +327,11 @@ struct HomeView: View {
             opts.append(
                 CategoryFilterOption(
                     id: cat.code,
-                    title: L10n.categoryDisplayName(cat.title)
+                    title: cat.title
                 )
             )
         }
         return opts
-    }
-
-    /// 付费行：All / Paid / Members Only / Free（前端过滤）
-    private var paymentOptions: [CategoryFilterOption] {
-        [
-            CategoryFilterOption(id: "All", title: "filter.all".localized),
-            CategoryFilterOption(id: "paid", title: "filter.paid".localized),
-            CategoryFilterOption(id: "member", title: "filter.members_only".localized),
-            CategoryFilterOption(id: "free", title: "filter.free".localized)
-        ]
     }
 
     private var languageRow: some View {
@@ -360,15 +352,10 @@ struct HomeView: View {
         ))
     }
 
-    private var paymentRow: some View {
-        catFilterRow(options: paymentOptions, selected: $selectedPayment)
-    }
-
     private var categorySelectedSummary: String {
         let selectedTitles = [
             selectedLanguage == "All" ? nil : title(for: selectedLanguage, in: languageOptions),
-            selectedGenre == "All" ? nil : title(for: selectedGenre, in: genreOptions),
-            selectedPayment == "All" ? nil : title(for: selectedPayment, in: paymentOptions)
+            selectedGenre == "All" ? nil : title(for: selectedGenre, in: genreOptions)
         ].compactMap { $0 }
 
         return selectedTitles.isEmpty
@@ -416,7 +403,6 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 10) {
             languageRow
             genreRow
-            paymentRow
         }
         .padding(.horizontal, DT.Space.pageH)
         .padding(.top, DT.Space.sm)

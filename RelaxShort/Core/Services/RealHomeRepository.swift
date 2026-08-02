@@ -8,6 +8,8 @@ import Foundation
 @MainActor
 final class RealHomeRepository: HomeRepositoryProtocol {
 
+    let usesRemoteContentCatalog = true
+
     private let client = APIClient.shared
 
     func fetchDramas(category: DramaCategory) async throws -> [DramaItem] {
@@ -118,8 +120,8 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     // MARK: - Categories
 
     func fetchHomeCategories() async throws -> [HomeCategory] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let contentLang = UserDefaults.standard.string(forKey: "app_ui_language")
+            let country = UserDefaults.standard.string(forKey: "app_country_code")
         let dto: CategoriesResponseDTO = try await client.requestData(
             .categories(contentLanguage: contentLang, countryCode: country)
         )
@@ -154,12 +156,17 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     // MARK: - Categories
 
     func fetchCategories() async throws -> [CategoryItemDTO] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
+        let contentLang = UserDefaults.standard.string(forKey: "app_ui_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
         let dto: CategoriesResponseDTO = try await client.requestData(
             .categories(contentLanguage: contentLang, countryCode: country)
         )
         return dto.items ?? []
+    }
+
+    func fetchSupportedLanguages() async throws -> [String] {
+        let items: [SupportedLanguageDTO] = try await client.requestData(.languages)
+        return items.map(\.code).filter { AppLanguage(rawValue: $0) != nil }
     }
 }
 

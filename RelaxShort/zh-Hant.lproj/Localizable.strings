@@ -601,12 +601,13 @@
 "home.tab.rankings" = "榜單";
 "home.tab.categories" = "分類";
 "home.tab.anime" = "動漫";
+"home.tab.vip" = "會員";
+"home.tab.original_plus" = "原創+";
+"rank.category.trending" = "熱門趨勢";
+"rank.category.top_searched" = "熱搜榜";
+"rank.category.new_releases" = "最新上線";
 "filter.all" = "全部";
 "filter.local" = "本地";
-"filter.others" = "其他";
-"filter.paid" = "付費";
-"filter.members_only" = "會員專享";
-"filter.free" = "免費";
 "network.load_failed_retry" = "載入失敗，請檢查網路後再試。";
 "player.load_failed_retry" = "劇集載入失敗，請再試一次。";
 "player.episode_load_failed_retry" = "本集載入失敗，請再試一次。";

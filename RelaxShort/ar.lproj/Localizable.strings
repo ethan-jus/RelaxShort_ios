@@ -601,12 +601,13 @@
 "home.tab.rankings" = "التصنيفات";
 "home.tab.categories" = "الفئات";
 "home.tab.anime" = "أنمي";
+"home.tab.vip" = "VIP";
+"home.tab.original_plus" = "أصلي+";
+"rank.category.trending" = "الأكثر رواجًا";
+"rank.category.top_searched" = "الأكثر بحثًا";
+"rank.category.new_releases" = "الإصدارات الجديدة";
 "filter.all" = "الكل";
 "filter.local" = "محلي";
-"filter.others" = "أخرى";
-"filter.paid" = "مدفوع";
-"filter.members_only" = "للأعضاء فقط";
-"filter.free" = "مجاني";
 "network.load_failed_retry" = "تعذر التحميل. تحقق من اتصالك.";
 "player.load_failed_retry" = "تعذر تحميل الحلقات. حاول مرة أخرى.";
 "player.episode_load_failed_retry" = "تعذر تحميل هذه الحلقة. حاول مرة أخرى.";

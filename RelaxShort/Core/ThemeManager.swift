@@ -70,6 +70,23 @@ enum AppLanguage: String, CaseIterable {
         }
     }
 
+    /// 语言目录可覆盖的本地名称；没有服务端名称时回退到 App 内置名称。
+    var catalogNativeDisplayName: String {
+        let names = UserDefaults.standard.dictionary(forKey: "app_supported_language_native_names") as? [String: String]
+        return names?[rawValue] ?? nativeDisplayName
+    }
+
+    /// 后端语言目录启用且当前 App 已随包提供资源的语言。
+    /// 未完成 app/init 时保留本地完整列表，避免冷启动期间语言设置页为空。
+    static var enabledForCurrentCatalog: [AppLanguage] {
+        guard let codes = UserDefaults.standard.array(forKey: "app_supported_ui_languages") as? [String],
+              !codes.isEmpty else {
+            return allCases
+        }
+        let enabled = allCases.filter { codes.contains($0.rawValue) }
+        return enabled.isEmpty ? allCases : enabled
+    }
+
     /// 是否 RTL 语言
     var isRTL: Bool {
         self == .ar

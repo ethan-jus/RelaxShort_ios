@@ -54,7 +54,9 @@ enum RankCategory: CaseIterable, Identifiable {
     }
     var title: String {
         switch self {
-        case .hot: "Most Trending"; case .trending: "Top Searched"; case .new: "New Releases"
+        case .hot: "rank.category.trending".localized
+        case .trending: "rank.category.top_searched".localized
+        case .new: "rank.category.new_releases".localized
         }
     }
 }
