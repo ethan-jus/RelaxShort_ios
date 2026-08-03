@@ -277,7 +277,7 @@ struct SettingsView: View {
         HStack {
             Text(title).font(.system(size: 15)).foregroundColor(.white)
             Spacer()
-            Toggle("", isOn: isOn).tint(DB.pink)
+            Toggle("", isOn: isOn).tint(DB.logoRed)
         }
         .listRowBackground(DB.panel)
     }

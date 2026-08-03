@@ -12,7 +12,7 @@ struct DramaBoxSectionHeader: View {
         HStack(spacing: 8) {
             // Left accent bar
             RoundedRectangle(cornerRadius: 1.5)
-                .fill(DB.pink)
+                .fill(DB.logoRed)
                 .frame(width: 3, height: 18)
 
             // Title

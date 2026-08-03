@@ -515,6 +515,7 @@
 "reward.task.watch_30_minutes.description" = "شاهد المسلسلات لمدة 30 دقيقة إجمالًا";
 "episode.locked_watch" = "افتح للمشاهدة";
 "episode.free_watch" = "مشاهدة مجانية";
+"episode.paid" = "مدفوع";
 "network.invalid_url" = "عنوان الطلب غير صالح.";
 "network.invalid_response" = "أعاد الخادم استجابة غير صالحة.";
 "network.bad_status" = "فشل الطلب (الحالة %d).";

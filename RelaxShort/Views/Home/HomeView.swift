@@ -486,7 +486,7 @@ struct HomeView: View {
                 Spacer(minLength: 120)
                 Text(err).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
                 Button(L10n.retry) { Task { await viewModel.reloadCategoryContent() } }
-                    .font(DT.Font.button).foregroundColor(DT.brandPink)
+                    .font(DT.Font.button).foregroundColor(DT.logoRed)
                 Spacer(minLength: 120)
             }
             .frame(maxWidth: .infinity)
@@ -721,7 +721,7 @@ struct HomeView: View {
     // MARK: - States
 
     private var loadingView: some View {
-        VStack(spacing: DT.Space.lg) { ProgressView().tint(DT.brandPink).scaleEffect(1.2); Text(L10n.loading).font(DT.Font.caption).foregroundColor(DT.Color.textSecondary) }
+        VStack(spacing: DT.Space.lg) { ProgressView().tint(DT.logoRed).scaleEffect(1.2); Text(L10n.loading).font(DT.Font.caption).foregroundColor(DT.Color.textSecondary) }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(false)
     }
@@ -733,8 +733,8 @@ struct HomeView: View {
             Button { Task { await viewModel.loadData() } } label: {
                 HStack(spacing: DT.Space.sm) {
                     Image(systemName: "arrow.clockwise").font(DT.Font.body(14)); Text(L10n.retry).font(DT.Font.button)
-                }.foregroundColor(DT.brandPink).padding(.horizontal, DT.Space.xl).padding(.vertical, DT.Space.sm)
-                    .overlay(RoundedRectangle(cornerRadius: DT.Radius.md).stroke(DT.brandPink, lineWidth: 1))
+                }.foregroundColor(DT.logoRed).padding(.horizontal, DT.Space.xl).padding(.vertical, DT.Space.sm)
+                    .overlay(RoundedRectangle(cornerRadius: DT.Radius.md).stroke(DT.logoRed, lineWidth: 1))
             }
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }

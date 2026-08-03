@@ -75,7 +75,7 @@ struct DramaBoxPosterCard: View {
                 .foregroundColor(.white)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(DB.pink)
+                .background(DB.logoRed)
                 .cornerRadius(DB.ctaRadius)
         case .new:
             Text("badge.new".localized)
@@ -107,7 +107,7 @@ struct DramaBoxPosterCard: View {
                     .fill(DB.divider)
                     .frame(height: 2)
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(DB.pink)
+                .fill(DB.logoRed)
                     .frame(width: geo.size.width * CGFloat(progress), height: 2)
             }
         }

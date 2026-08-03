@@ -156,13 +156,14 @@ struct RecommendView: View {
                 }
 
                 if showAbout, let drama = currentDrama {
-                    DramaAboutSheet(
+                    EpisodePickerSheet(
                         drama: drama,
-                        relatedDramas: relatedDramas(for: drama),
+                        episodes: [],
+                        currentEpisode: drama.currentEpisode,
+                        unlockedEpisodes: [],
                         isPresented: $showAbout,
-                        onWatchFullSeries: {
-                            showAbout = false
-                            navigateToSeries(drama)
+                        onSelectEpisode: { episode in
+                            navigateToSeries(drama, startEpisode: episode)
                         }
                     )
                     .zIndex(200)
@@ -490,18 +491,15 @@ struct RecommendView: View {
         return viewModel.dramas[session.currentIndex]
     }
 
-    private func relatedDramas(for drama: DramaItem) -> [DramaItem] {
-        viewModel.dramas
-            .filter { $0.id != drama.id }
-            .prefix(12)
-            .map { $0 }
-    }
-
     /// 点击全剧入口时先把同一个 AVPlayer 的所有权交给 Series，再触发导航。
     /// For You 因路由遮挡而执行生命周期暂停时，已不再持有播放权，因此不会打断画面。
-    private func navigateToSeries(_ drama: DramaItem, preservesPlayback: Bool = true) {
+    private func navigateToSeries(
+        _ drama: DramaItem,
+        startEpisode: Int? = nil,
+        preservesPlayback: Bool = true
+    ) {
         guard !pagerState.isDragging else { return }
-        let episodeNumber = max(1, drama.currentEpisode)
+        let episodeNumber = max(1, startEpisode ?? drama.currentEpisode)
         let handoff = preservesPlayback
             ? playerCoordinator.handoffForYouToSeries(
                 dramaID: drama.id,
@@ -769,320 +767,6 @@ private struct CollectToastView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
         .background(Capsule().fill(Color.black.opacity(0.8)))
-    }
-}
-
-// MARK: - 剧集详情弹层
-
-/// 短剧应用风格剧集详情弹层
-private struct DramaAboutSheet: View {
-    private enum Tab {
-        case synopsis
-        case episodes
-    }
-
-    let drama: DramaItem
-    let relatedDramas: [DramaItem]
-    @Binding var isPresented: Bool
-    var onWatchFullSeries: () -> Void
-
-    @State private var selectedTab: Tab = .synopsis
-
-    var body: some View {
-        GeometryReader { geo in
-            let sheetHeight = min(geo.size.height * 0.78, max(geo.size.height * 0.6, geo.size.height - geo.safeAreaInsets.top - 24))
-
-            ZStack(alignment: .bottom) {
-                Color.black.opacity(0.5)
-                    .ignoresSafeArea()
-                    .onTapGesture { dismiss() }
-
-                VStack(spacing: 0) {
-                    sheetChrome
-                    header
-                    tabBar
-
-                    ScrollView(showsIndicators: false) {
-                        Group {
-                            if selectedTab == .synopsis {
-                                synopsisContent
-                            } else {
-                                episodesContent
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 22)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: sheetHeight, alignment: .top)
-                .background(
-                    LinearGradient(
-                        colors: [Color(hex: "#232323"), Color(hex: "#111111")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .clipShape(UnevenRoundedRectangle(topLeadingRadius: 22, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 22, style: .continuous))
-                .ignoresSafeArea(edges: .bottom)
-            }
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .transition(.move(edge: .bottom).combined(with: .opacity))
-    }
-
-    private var sheetChrome: some View {
-        ZStack {
-            Capsule()
-                .fill(Color.white.opacity(0.14))
-                .frame(width: 40, height: 5)
-
-            Button { dismiss() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 21, weight: .light))
-                    .foregroundColor(.white.opacity(0.62))
-                    .frame(width: 40, height: 40)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .padding(.top, 7)
-        .padding(.horizontal, 18)
-        .padding(.bottom, 12)
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
-            CoverImageView(
-                url: drama.coverURL,
-                aspectRatio: 2.0 / 3.0,
-                cornerRadius: DB.posterRadius,
-                width: 92,
-                height: 124
-            )
-
-            VStack(alignment: .leading, spacing: 9) {
-                Text(drama.title)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-
-                Text("player.views_count".localizedFormat(drama.formattedViewCount))
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.white.opacity(0.42))
-
-                HStack(spacing: 5) {
-                    Image(systemName: "star")
-                        .font(.system(size: 14, weight: .regular))
-                    Text(String(format: "%.1f(5.5K)", drama.rating))
-                    Text("player.rate".localized)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .bold))
-                }
-                .font(.system(size: 16, weight: .regular))
-                .foregroundColor(.white.opacity(0.52))
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 20)
-    }
-
-    private var tabBar: some View {
-        HStack(alignment: .bottom, spacing: 32) {
-            tabButton(L10n.synopsis, tab: .synopsis)
-            tabButton(L10n.tabEpisodes, tab: .episodes)
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 20)
-    }
-
-    private func tabButton(_ title: String, tab: Tab) -> some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.18)) { selectedTab = tab }
-        } label: {
-            VStack(spacing: 7) {
-                Text(title)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.45))
-                Capsule()
-                    .fill(selectedTab == tab ? Color.white : Color.clear)
-                    .frame(width: 34, height: 3)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var synopsisContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(drama.synopsis)
-                .font(.system(size: 15, weight: .regular))
-                .foregroundColor(.white.opacity(0.78))
-                .lineSpacing(4)
-                .fixedSize(horizontal: false, vertical: true)
-
-            tagCloud
-
-            VStack(alignment: .leading, spacing: 16) {
-                Text("player.cast".localized)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-
-                castRow(name: "Xinhui Zhu", color: DB.gold.opacity(0.8))
-                castRow(name: "Yadi Zhang", color: DB.pink.opacity(0.75))
-            }
-
-            if !relatedDramas.isEmpty {
-                VStack(spacing: 16) {
-                    HStack {
-                        Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-                        Text("player.more_similar".localized)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white.opacity(0.42))
-                            .fixedSize()
-                        Rectangle().fill(Color.white.opacity(0.12)).frame(height: 1)
-                    }
-
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 16) {
-                        ForEach(relatedDramas, id: \.id) { item in
-                            relatedDramaCard(item)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var tagCloud: some View {
-        HStack(spacing: 8) {
-            aboutTag("tag.revenge".localized)
-            aboutTag("home.theme_counterattack".localized)
-            aboutTag("home.hidden_identity".localized)
-            aboutTag(L10n.categoryDisplayName(drama.category))
-        }
-    }
-
-    private func aboutTag(_ text: String) -> some View {
-        HStack(spacing: 3) {
-            Text(text)
-            Image(systemName: "chevron.right")
-                .font(.system(size: 8, weight: .bold))
-        }
-        .font(.system(size: 12, weight: .medium))
-        .foregroundColor(.white.opacity(0.56))
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.08)))
-    }
-
-    private func castRow(name: String, color: Color) -> some View {
-        HStack(spacing: 14) {
-            Circle()
-                .fill(color)
-                .frame(width: 54, height: 54)
-                .overlay(
-                    Text(String(name.prefix(1)))
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.white)
-                )
-
-            Text(name)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white.opacity(0.9))
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white.opacity(0.36))
-        }
-    }
-
-    private var episodesContent: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 34) {
-                Text("1-30")
-                    .foregroundColor(.white)
-                Text("31-60")
-                    .foregroundColor(.white.opacity(0.38))
-            }
-            .font(.system(size: 18, weight: .medium))
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 6), spacing: 10) {
-                ForEach(1...max(60, drama.episodeCount), id: \.self) { episode in
-                    episodeButton(episode)
-                }
-            }
-        }
-    }
-
-    private func episodeButton(_ episode: Int) -> some View {
-        Button {
-            if episode <= 3 {
-                onWatchFullSeries()
-            }
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(Color.white.opacity(0.075))
-                    .frame(height: 54)
-
-                Text("\(episode)")
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                if episode > 11 {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white.opacity(0.82))
-                        .padding(5)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func relatedDramaCard(_ item: DramaItem) -> some View {
-        Button {
-            dismiss()
-        } label: {
-            VStack(alignment: .leading, spacing: 6) {
-                ZStack(alignment: .bottomTrailing) {
-                    CoverImageView(
-                        url: item.coverURL,
-                        aspectRatio: 2.0 / 3.0,
-                        cornerRadius: DB.posterRadius
-                    )
-                    .frame(height: 150)
-                    .clipped()
-
-                    Label(item.formattedViewCount, systemImage: "play.fill")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(5)
-                        .shadow(color: .black.opacity(0.7), radius: 2)
-                }
-
-                Text(item.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .lineLimit(2)
-
-                Text(L10n.categoryDisplayName(item.category))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(.white.opacity(0.42))
-                    .lineLimit(1)
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func dismiss() {
-        withAnimation(.easeOut(duration: 0.25)) { isPresented = false }
     }
 }
 

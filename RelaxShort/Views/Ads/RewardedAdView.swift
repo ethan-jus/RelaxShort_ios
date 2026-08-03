@@ -208,7 +208,7 @@ struct RewardedAdView: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [DT.brandPink, DT.brandPinkDark],
+                                colors: [DT.logoRed, DT.logoRed],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -247,7 +247,7 @@ struct RewardedAdView: View {
                     .foregroundColor(DT.Color.textPrimary)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(DT.brandPink)
+                    .background(DT.logoRed)
                     .cornerRadius(DT.Radius.md)
             }
         }

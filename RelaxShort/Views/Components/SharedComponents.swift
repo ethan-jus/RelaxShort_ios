@@ -516,7 +516,7 @@ struct ContinueWatchingSection: View {
                                 if let progress = drama.progressPercentage {
                                     GeometryReader { geo in
                                         Rectangle()
-                                            .fill(DT.brandPink)
+                                            .fill(DT.logoRed)
                                             .frame(width: geo.size.width * CGFloat(progress), height: 3)
                                     }
                                     .frame(height: 3)
@@ -551,7 +551,7 @@ struct SectionHeaderView: View {
         HStack(spacing: DT.Space.sm) {
             // Decorative left bar
             Rectangle()
-                .fill(DT.brandPink)
+                .fill(DT.logoRed)
                 .frame(width: 3, height: 16)
                 .cornerRadius(1.5)
 
@@ -723,6 +723,428 @@ struct HDBadgeIconView: View {
                 .foregroundColor(color)
         }
         .frame(width: width, height: height)
+    }
+}
+
+// MARK: - Shared Episode Picker Sheet
+
+/// 推荐页、Series 播放页和全屏播放器共用的选集弹层。
+///
+/// 这里只维护一套视觉和交互实现；各入口只负责提供剧集数据、当前集和选集后的业务回调。
+struct EpisodePickerSheet: View {
+    let drama: DramaItem
+    let episodes: [Episode]
+    let currentEpisode: Int
+    let unlockedEpisodes: Set<Int>
+    @Binding var isPresented: Bool
+    var onSelectEpisode: (Int) -> Void
+
+    private enum Detent {
+        case compact
+        case expanded
+    }
+
+    private struct EpisodeVisualState {
+        let wasLocked: Bool
+        let isUnlocked: Bool
+        let isPaid: Bool
+
+        var isLockedForDisplay: Bool { wasLocked && !isUnlocked }
+    }
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+    private let rangeSize = 30
+    @State private var selectedRange = 0
+    @State private var detent: Detent = .compact
+    @State private var isSynopsisExpanded = false
+    @GestureState private var dragTranslation: CGFloat = 0
+
+    private var totalEpisodes: Int {
+        max(1, episodes.map(\.episodeNumber).max() ?? drama.episodeCount)
+    }
+
+    private var ranges: [ClosedRange<Int>] {
+        var result: [ClosedRange<Int>] = []
+        var start = 1
+        while start <= totalEpisodes {
+            let end = min(start + rangeSize - 1, totalEpisodes)
+            result.append(start...end)
+            start += rangeSize
+        }
+        return result
+    }
+
+    private var selectedEpisodeRange: ClosedRange<Int> {
+        guard ranges.indices.contains(selectedRange) else { return ranges[0] }
+        return ranges[selectedRange]
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let compactHeight = min(geo.size.height - 24, max(420, geo.size.height * 0.60))
+            let expandedHeight = min(
+                geo.size.height - geo.safeAreaInsets.top - 12,
+                max(compactHeight, geo.size.height * 0.80)
+            )
+            let baseHeight = detent == .compact ? compactHeight : expandedHeight
+            let visibleHeight = min(
+                expandedHeight,
+                max(compactHeight, baseHeight - dragTranslation)
+            )
+
+            ZStack(alignment: .bottom) {
+                Color.black.opacity(0.52)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismiss() }
+
+                VStack(spacing: 0) {
+                    sheetChrome
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 0) {
+                            header
+                            synopsisBlock
+
+                            Rectangle()
+                                .fill(Color.white.opacity(0.10))
+                                .frame(height: 1)
+                                .padding(.horizontal, 20)
+
+                            episodeSection
+                        }
+                        .padding(.bottom, max(20, geo.safeAreaInsets.bottom + 12))
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: visibleHeight, alignment: .top)
+                .background(DB.panelElevated)
+                .clipShape(
+                    UnevenRoundedRectangle(
+                        topLeadingRadius: 22,
+                        bottomLeadingRadius: 0,
+                        bottomTrailingRadius: 0,
+                        topTrailingRadius: 22,
+                        style: .continuous
+                    )
+                )
+                .ignoresSafeArea(edges: .bottom)
+                .animation(.interactiveSpring(response: 0.34, dampingFraction: 0.86), value: detent)
+            }
+            .ignoresSafeArea(edges: .bottom)
+            .onAppear(perform: alignSelectedRange)
+            .onChange(of: drama.id) { _, _ in alignSelectedRange() }
+        }
+        .transition(.move(edge: .bottom).combined(with: .opacity))
+    }
+
+    private var sheetChrome: some View {
+        ZStack {
+            Capsule()
+                .fill(Color.white.opacity(0.22))
+                .frame(width: 40, height: 5)
+
+            Button { dismiss() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.72))
+                    .frame(width: 38, height: 38)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .frame(height: 54)
+        .padding(.horizontal, 18)
+        .contentShape(Rectangle())
+        .gesture(sheetDragGesture)
+    }
+
+    private var header: some View {
+        HStack(alignment: .top, spacing: 14) {
+            CoverImageView(
+                url: drama.coverURL,
+                aspectRatio: 2.0 / 3.0,
+                cornerRadius: DB.posterRadius,
+                width: 88,
+                height: 118
+            )
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(drama.title)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+                    .lineLimit(2)
+
+                Text(metadataText)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.52))
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    if drama.rating > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(DB.logoRed)
+                            Text(String(format: "%.1f", drama.rating))
+                        }
+                    }
+
+                    if drama.rating > 0 {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: 1, height: 14)
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "play")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(L10n.viewsCount(drama.formattedViewCount))
+                    }
+                }
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.58))
+
+                HStack(spacing: 6) {
+                    Text("\(L10n.playerNowPlaying) \(L10n.playerEpisodeNumber(max(1, currentEpisode)))")
+                        .font(.system(size: 14, weight: .semibold))
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 10, weight: .bold))
+                }
+                .foregroundColor(DB.logoRed)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(DB.logoRed.opacity(0.16), in: Capsule())
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 18)
+    }
+
+    private var synopsisBlock: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L10n.synopsis)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                if !drama.synopsis.isEmpty {
+                    Button {
+                        withAnimation(.easeOut(duration: 0.18)) {
+                            isSynopsisExpanded.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(isSynopsisExpanded ? L10n.collapse : L10n.expand)
+                            Image(systemName: isSynopsisExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.55))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Text(drama.synopsis.isEmpty ? "home.synopsis_unavailable".localized : drama.synopsis)
+                .font(.system(size: 14, weight: .regular))
+                .foregroundColor(.white.opacity(0.78))
+                .lineSpacing(4)
+                .lineLimit(isSynopsisExpanded ? nil : 3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 18)
+    }
+
+    private var episodeSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L10n.tabEpisodes)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Text(L10n.totalEpisodeCount(totalEpisodes))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.48))
+            }
+
+            if ranges.count > 1 {
+                rangeTabs
+            }
+
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(Array(selectedEpisodeRange), id: \.self) { episode in
+                    episodeCell(episode)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+    }
+
+    private var rangeTabs: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(ranges.enumerated()), id: \.offset) { index, range in
+                Button {
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        selectedRange = index
+                    }
+                } label: {
+                    VStack(spacing: 6) {
+                        Text("\(range.lowerBound)–\(range.upperBound)")
+                            .font(.system(size: 15, weight: selectedRange == index ? .bold : .medium))
+                            .foregroundColor(selectedRange == index ? DB.logoRed : .white.opacity(0.55))
+
+                        Capsule()
+                            .fill(selectedRange == index ? DB.logoRed : Color.clear)
+                            .frame(width: 38, height: 3)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 4)
+        .background(Color.white.opacity(0.06), in: Capsule())
+    }
+
+    private func episodeCell(_ episodeNumber: Int) -> some View {
+        let state = visualState(for: episodeNumber)
+        let isCurrent = episodeNumber == currentEpisode
+        let isLocked = state.isLockedForDisplay
+
+        return Button {
+            // 锁图标只是状态预览；真正的播放/权益判断仍由调用方负责。
+            onSelectEpisode(episodeNumber)
+            dismiss()
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(
+                        isCurrent
+                            ? DB.logoRed
+                            : (isLocked ? Color.white.opacity(0.055) : Color.white.opacity(0.10))
+                    )
+                    .overlay {
+                        if state.isPaid && !isCurrent {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .stroke(DB.gold.opacity(0.36), lineWidth: 1)
+                        }
+                    }
+                    .frame(height: 52)
+
+                Text("\(episodeNumber)")
+                    .font(.system(size: 19, weight: isCurrent ? .bold : .medium))
+                    .foregroundColor(
+                        isCurrent
+                            ? .white
+                            : (state.isPaid ? DB.gold : (isLocked ? DB.mutedText : .white.opacity(0.88)))
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if state.isPaid && !isCurrent {
+                    Text(L10n.paidEpisode)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.black.opacity(0.82))
+                        .padding(.horizontal, 5)
+                        .frame(height: 18)
+                        .background(DB.gold, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+                        .padding(4)
+                } else if state.wasLocked && state.isUnlocked {
+                    Image(systemName: "lock.open.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(DB.gold.opacity(0.82))
+                        .padding(5)
+                } else if isLocked {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(DB.mutedText)
+                        .padding(5)
+                }
+
+                if isCurrent {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                        .padding(7)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func visualState(for episodeNumber: Int) -> EpisodeVisualState {
+        let episode = episodes.first(where: { $0.episodeNumber == episodeNumber })
+        let wasLocked = episode?.isLocked
+            ?? !(drama.freeEpisodeRange ?? 1...3).contains(episodeNumber)
+        let isUnlocked = !wasLocked
+            || episode?.isUnlocked == true
+            || unlockedEpisodes.contains(episodeNumber)
+        let requiresVIP = episode?.requiresVIP ?? (drama.isVIPOnly || drama.isMemberOnly)
+        let canUnlockWithCoins = episode?.unlockCoinPrice != nil || drama.coinPrice != nil
+
+        return EpisodeVisualState(
+            wasLocked: wasLocked,
+            isUnlocked: isUnlocked,
+            isPaid: wasLocked && !isUnlocked && canUnlockWithCoins && !requiresVIP
+        )
+    }
+
+    private var metadataText: String {
+        var parts: [String] = []
+        let category = L10n.categoryDisplayName(drama.category)
+        if !category.isEmpty { parts.append(category) }
+        if let tag = drama.tags.first, !tag.isEmpty { parts.append(tag) }
+        parts.append("\(totalEpisodes)\(L10n.shortEpisodeCount)")
+        return parts.joined(separator: " · ")
+    }
+
+    private var sheetDragGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .updating($dragTranslation) { value, state, _ in
+                state = value.translation.height
+            }
+            .onEnded { value in
+                let translation = value.translation.height
+                let projected = value.predictedEndTranslation.height
+
+                if translation < -56 || projected < -96 {
+                    withAnimation(.interactiveSpring(response: 0.34, dampingFraction: 0.86)) {
+                        detent = .expanded
+                    }
+                } else if translation > 56 || projected > 96 {
+                    if detent == .expanded {
+                        withAnimation(.interactiveSpring(response: 0.34, dampingFraction: 0.86)) {
+                            detent = .compact
+                        }
+                    } else {
+                        dismiss()
+                    }
+                }
+            }
+    }
+
+    private func alignSelectedRange() {
+        guard let index = ranges.firstIndex(where: { $0.contains(currentEpisode) }) else { return }
+        selectedRange = index
+    }
+
+    private func dismiss() {
+        withAnimation(.easeOut(duration: 0.25)) {
+            isPresented = false
+        }
     }
 }
 

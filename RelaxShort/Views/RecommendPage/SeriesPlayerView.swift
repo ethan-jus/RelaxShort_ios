@@ -244,11 +244,10 @@ struct SeriesPlayerView: View {
                     EpisodePickerSheet(
                         drama: drama,
                         episodes: episodes,
-                        currentEpisode: $currentEpisode,
+                        currentEpisode: currentEpisode,
                         unlockedEpisodes: unlockedEpisodes,
                         isPresented: $showEpisodeList,
                         onSelectEpisode: { ep in
-                            showEpisodeList = false
                             requestEpisodeSwitch(ep)
                         }
                     )
@@ -2407,153 +2406,6 @@ struct SeriesPlayerView: View {
         return !(drama.freeEpisodeRange ?? 1...3).contains(ep)
     }
 
-}
-
-// MARK: - Episode Picker Sheet
-
-private struct EpisodePickerSheet: View {
-    let drama: DramaItem
-    let episodes: [Episode]
-    @Binding var currentEpisode: Int
-    let unlockedEpisodes: Set<Int>
-    @Binding var isPresented: Bool
-    var onSelectEpisode: (Int) -> Void
-
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 6)
-    private let rangeSize = 30
-    @State private var selectedRange = 0
-
-    private var ranges: [ClosedRange<Int>] {
-        let total = episodes.isEmpty ? max(1, drama.episodeCount) : episodes.count
-        guard total > 0 else { return [1...1] }
-        var result: [ClosedRange<Int>] = []
-        var start = 1
-        while start <= total {
-            let end = min(start + rangeSize - 1, total)
-            result.append(start...end)
-            start += rangeSize
-        }
-        return result
-    }
-
-    var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.black.opacity(0.5).ignoresSafeArea().onTapGesture { dismiss() }
-            VStack(spacing: 0) {
-                // Drag handle + close X
-                ZStack {
-                    Capsule().fill(Color.white.opacity(0.14)).frame(width: 40, height: 5)
-                    HStack {
-                        Spacer()
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.7))
-                                .frame(width: 36, height: 36)
-                        }
-                    }
-                }
-                .padding(.top, 10).padding(.bottom, 8)
-
-                // Header: poster + title
-                HStack(alignment: .top, spacing: 14) {
-                    CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: 72, height: 96)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(drama.title).font(.system(size: 20, weight: .bold)).foregroundColor(.white).lineLimit(1)
-                        Text("player.views_count".localizedFormat(drama.formattedViewCount)).font(.system(size: 16)).foregroundColor(.white.opacity(0.5))
-                        HStack(spacing: 4) {
-                            Image(systemName: "star").font(.system(size: 12))
-                            Text(String(format: "%.1f(5.5K)", drama.rating))
-                            Text("player.rate".localized).font(.system(size: 12))
-                        }.foregroundColor(.white.opacity(0.5))
-                    }
-                    Spacer()
-                }
-                .padding(.horizontal, 20).padding(.bottom, 16)
-
-                // Range tabs
-                if ranges.count > 1 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 20) {
-                            ForEach(Array(ranges.enumerated()), id: \.offset) { idx, range in
-                                Button {
-                                    withAnimation(.easeOut(duration: 0.18)) { selectedRange = idx }
-                                } label: {
-                                    Text("\(range.lowerBound)-\(range.upperBound)")
-                                        .font(.system(size: 16, weight: selectedRange == idx ? .bold : .regular))
-                                        .foregroundColor(selectedRange == idx ? .white : .white.opacity(0.45))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    }
-                    .padding(.bottom, 14)
-                }
-
-                // 6-column grid
-                ScrollView {
-                    let range = ranges.indices.contains(selectedRange) ? ranges[selectedRange] : (1...1)
-                    LazyVGrid(columns: columns, spacing: 10) {
-                        ForEach(Array(range), id: \.self) { ep in
-                            episodeCell(ep)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                }
-                .frame(maxHeight: 300)
-            }
-            .padding(.bottom, 20)
-            .background(DB.panelElevated)
-            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 22, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 22, style: .continuous))
-        }
-    }
-
-    @ViewBuilder
-    private func episodeCell(_ ep: Int) -> some View {
-        let isCurrent = ep == currentEpisode
-        let episodeIsLocked = episodes.first(where: { $0.episodeNumber == ep })?.isLocked
-            ?? !(drama.freeEpisodeRange ?? 1...3).contains(ep)
-        let isUnlocked = episodeIsLocked && unlockedEpisodes.contains(ep)
-        let isLocked = episodeIsLocked && !isUnlocked
-        Button {
-            // 锁图标仅作预提示；最终权限以播放接口为准，支持已登录 VIP 直接播放。
-            onSelectEpisode(ep)
-            dismiss()
-        } label: {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(isCurrent ? DB.pink.opacity(0.5) : (isLocked ? Color.white.opacity(0.05) : Color.white.opacity(0.12)))
-                    .frame(height: 48)
-
-                Text("\(ep)")
-                    .font(.system(size: 20, weight: isCurrent ? .bold : .medium))
-                    .foregroundColor(isCurrent ? .white : (isLocked ? DB.mutedText : .white.opacity(0.85)))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                // Lock badge
-                if episodeIsLocked {
-                    Image(systemName: isUnlocked ? "lock.open.fill" : "lock.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(isUnlocked ? DB.gold.opacity(0.75) : .white)
-                        .padding(3)
-                }
-
-                // Playing indicator
-                if isCurrent {
-                    HStack(spacing: 2) {
-                        RoundedRectangle(cornerRadius: 1).fill(.white).frame(width: 2, height: 6)
-                        RoundedRectangle(cornerRadius: 1).fill(.white).frame(width: 2, height: 10)
-                        RoundedRectangle(cornerRadius: 1).fill(.white).frame(width: 2, height: 4)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                    .padding(4)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func dismiss() { withAnimation(.easeOut(duration: 0.25)) { isPresented = false } }
 }
 
 #if DEBUG

@@ -515,6 +515,7 @@
 "reward.task.watch_30_minutes.description" = "드라마를 총 30분 시청하세요";
 "episode.locked_watch" = "잠금 해제 후 시청";
 "episode.free_watch" = "무료 시청";
+"episode.paid" = "유료";
 "network.invalid_url" = "요청 주소가 유효하지 않습니다.";
 "network.invalid_response" = "서버가 잘못된 응답을 반환했습니다.";
 "network.bad_status" = "요청 실패(상태 %d).";

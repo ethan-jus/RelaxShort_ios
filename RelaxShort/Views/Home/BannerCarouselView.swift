@@ -59,7 +59,7 @@ struct BannerCardView: View {
                     .foregroundColor(DT.Color.textPrimary)
                     .padding(.horizontal, DT.Space.sm)
                     .padding(.vertical, DT.Space.xs)
-                    .background(DT.brandPink)
+                    .background(DT.logoRed)
                     .cornerRadius(DT.Radius.sm)
 
                 // Title

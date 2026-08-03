@@ -47,7 +47,7 @@ struct PlayerSpeedSheet: View {
                             .frame(height: 46)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(isSelected ? DB.pink.opacity(0.95) : Color.white.opacity(0.08))
+                                .fill(isSelected ? DB.logoRed.opacity(0.95) : Color.white.opacity(0.08))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -123,7 +123,7 @@ struct PlayerQualitySheet: View {
                             Spacer()
                             if option.isSelected {
                                 Circle()
-                                    .fill(option.isVIP ? DB.gold : DB.pink)
+                                    .fill(option.isVIP ? DB.gold : DB.logoRed)
                                     .frame(width: 20, height: 20)
                                     .overlay(
                                         Image(systemName: "checkmark")
@@ -197,7 +197,7 @@ struct PlayerSubtitleSheet: View {
                 Spacer()
                 if selectedSubtitleID == id {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(DB.pink)
+                        .foregroundColor(DB.logoRed)
                 }
             }
             .padding(.horizontal, 20)

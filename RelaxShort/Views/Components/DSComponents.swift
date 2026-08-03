@@ -13,7 +13,7 @@ import SwiftUI
 /// ```
 struct DSLoadingView: View {
     var message: String? = nil
-    var tint: SwiftUI.Color = DT.brandPink
+    var tint: SwiftUI.Color = DT.logoRed
     var scale: CGFloat = 1.2
 
     var body: some View {
@@ -46,7 +46,7 @@ struct DSLoadingView: View {
 struct DSTagView: View {
     enum TagStyle {
         case hot       // 红色标签
-        case vip        // 品牌粉色标签
+        case vip        // 品牌红色标签
         case recommend  // 品牌金色标签
         case `default`  // 默认灰色标签
         case custom(bg: SwiftUI.Color, textColor: SwiftUI.Color)
@@ -54,7 +54,7 @@ struct DSTagView: View {
         var bgColor: SwiftUI.Color {
             switch self {
             case .hot:       return DT.hotTag.opacity(0.15)
-            case .vip:        return DT.brandPink
+            case .vip:        return DT.logoRed
             case .recommend:  return DT.brandGold.opacity(0.2)
             case .default:    return DT.Color.textSecondary.opacity(0.15)
             case .custom(let bg, _): return bg
@@ -136,7 +136,7 @@ struct DSSearchBar: View {
                     .font(DT.Font.bodyDefault)
                     .foregroundColor(DT.Color.textPrimary)
                     .focused($isFocused)
-                    .tint(DT.brandPink)
+                    .tint(DT.logoRed)
                     .overlay(alignment: .leading) {
                         if text.isEmpty {
                             Text(placeholder)
@@ -199,7 +199,7 @@ struct DSSearchBar: View {
 struct DSTabBar: View {
     let tabs: [String]
     @Binding var selectedIndex: Int
-    var underlineColor: SwiftUI.Color = DT.brandPink
+    var underlineColor: SwiftUI.Color = DT.logoRed
     var selectedColor: SwiftUI.Color = DT.Color.textPrimary
     var unselectedColor: SwiftUI.Color = DT.Color.textSecondary
     var font: SwiftUI.Font = DT.Font.largeTitle(24)

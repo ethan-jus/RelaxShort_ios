@@ -73,7 +73,7 @@ struct ExitGuidePopupView: View {
                         .foregroundColor(DT.Color.textPrimary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
-                        .background(DT.brandPink)
+                        .background(DT.logoRed)
                         .clipShape(Capsule())
                 }
 

@@ -10,10 +10,6 @@ enum DT {
     
     /// App 唯一品牌强调色：Logo 红。
     static let logoRed        = SwiftUI.Color(hex: "#E85048")
-    /// 历史命名兼容。所有旧 pink 调用统一落到 Logo 红，禁止继续产生粉色分支。
-    static let brandPink      = logoRed
-    /// 历史深色命名兼容；当前设计系统不再使用另一套粉色。
-    static let brandPinkDark  = logoRed
     /// 硬币/金币 #C29852
     static let brandGold      = SwiftUI.Color(hex: "#C29852")
     /// 会员卡金色 #D6B46A
@@ -230,8 +226,6 @@ enum DT {
 /// DramaBox 第一版复刻令牌 — 不替换 DT，只在复刻页面使用
 enum DB {
     // MARK: 品牌色
-    /// DramaBox 风格强调色统一使用 App Logo 红，避免界面混入额外高饱和粉色
-    static let pink: SwiftUI.Color = DT.logoRed
     /// App Logo 主红色，用于选中态品牌色
     static let logoRed: SwiftUI.Color = DT.logoRed
     /// 金色/会员色 #C29852

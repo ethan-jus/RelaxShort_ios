@@ -519,6 +519,7 @@
 "reward.task.watch_30_minutes.description" = "累计观看短剧 30 分钟";
 "episode.locked_watch" = "解锁后观看";
 "episode.free_watch" = "免费观看";
+"episode.paid" = "付费";
 "network.invalid_url" = "无效的请求地址。";
 "network.invalid_response" = "服务器响应异常。";
 "network.bad_status" = "请求失败（状态码：%d）。";

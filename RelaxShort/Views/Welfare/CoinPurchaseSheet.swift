@@ -157,7 +157,7 @@ struct CoinPurchaseSheet: View {
                     Text(displayPrice)
                         .font(DT.Font.body(18, weight: .bold))
                         .foregroundColor(
-                            isSelected ? DT.brandPink : DT.Color.textPrimary
+                            isSelected ? DT.logoRed : DT.Color.textPrimary
                         )
                 }
 
@@ -165,7 +165,7 @@ struct CoinPurchaseSheet: View {
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill")
                         .font(DT.Font.body(20))
-                        .foregroundColor(DT.brandPink)
+                        .foregroundColor(DT.logoRed)
                 }
             }
             .padding(DT.Space.lg)
@@ -179,7 +179,7 @@ struct CoinPurchaseSheet: View {
             .overlay(
                 RoundedRectangle(cornerRadius: DT.Radius.lg)
                     .stroke(
-                        isSelected ? DT.brandPink : DT.Color.textPrimary.opacity(0.06),
+                        isSelected ? DT.logoRed : DT.Color.textPrimary.opacity(0.06),
                         lineWidth: isSelected ? 1.5 : 1
                     )
             )
@@ -245,8 +245,8 @@ struct CoinPurchaseSheet: View {
                 .frame(height: DT.Layout.ctaButtonHeight)
                 .background(
                     (isPurchasing || selectedPackage == nil)
-                        ? DT.brandPink.opacity(0.5)
-                        : DT.brandPink
+                        ? DT.logoRed.opacity(0.5)
+                        : DT.logoRed
                 )
                 .cornerRadius(DT.Radius.md)
             }

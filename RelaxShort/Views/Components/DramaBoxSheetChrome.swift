@@ -92,7 +92,7 @@ struct DramaBoxSheetChrome_Previews: PreviewProvider {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
-                            .background(DB.pink)
+                            .background(DB.logoRed)
                             .cornerRadius(DB.ctaRadius)
                     }
                     .padding(.horizontal, 24)

@@ -10,7 +10,7 @@ extension View {
 
     func dramaButtonStyle() -> some View {
         self
-            .background(DT.brandPink)
+            .background(DT.logoRed)
             .cornerRadius(24)
             .foregroundColor(DT.Color.textPrimary)
     }

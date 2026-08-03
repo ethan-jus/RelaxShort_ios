@@ -80,10 +80,10 @@ struct AdCardView: View {
                     HStack(spacing: DT.Space.xs) {
                         Text(L10n.adSponsoredLabel)
                             .font(DT.Font.small)
-                            .foregroundColor(DT.brandPink)
+                            .foregroundColor(DT.logoRed)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(DT.brandPink.opacity(0.1))
+                            .background(DT.logoRed.opacity(0.1))
                             .cornerRadius(DT.Radius.sm)
 
                         Spacer()
@@ -161,10 +161,10 @@ struct NativeAdDetailView: View {
                     HStack {
                         Text(L10n.adSponsoredLabel)
                             .font(DT.Font.small)
-                            .foregroundColor(DT.brandPink)
+                            .foregroundColor(DT.logoRed)
                             .padding(.horizontal, DT.Space.sm)
                             .padding(.vertical, DT.Space.xs)
-                            .background(DT.brandPink.opacity(0.1))
+                            .background(DT.logoRed.opacity(0.1))
                             .cornerRadius(DT.Radius.sm)
 
                         Spacer()
@@ -191,7 +191,7 @@ struct NativeAdDetailView: View {
                         }
                         .foregroundColor(DT.Color.textPrimary)
                         .frame(height: 48)
-                        .background(DT.brandPink)
+                        .background(DT.logoRed)
                         .cornerRadius(DT.Radius.md)
                     }
                     .padding(.top, DT.Space.md)
