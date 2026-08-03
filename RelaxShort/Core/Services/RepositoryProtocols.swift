@@ -98,8 +98,6 @@ protocol DetailRepositoryProtocol {
     func verifyVIPPurchase(_ receipt: ApplePurchaseReceipt) async throws -> EpisodeUnlockAccount
     /// 获取后端为当前登录用户分配的 StoreKit appAccountToken。
     func fetchAppleAccountToken() async throws -> UUID
-    /// 获取相关推荐短剧
-    func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem]
 }
 
 // MARK: - Favorites

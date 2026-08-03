@@ -325,9 +325,6 @@ struct MockDetailRepository: DetailRepositoryProtocol {
     func fetchAppleAccountToken() async throws -> UUID {
         UUID(uuidString: "3DF2AF28-C7BD-34BC-B307-01DC6FF85CB5")!
     }
-    func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem] {
-        try await Task.sleep(nanoseconds: MC.delay); return Array(MockData.dramas.shuffled().prefix(6))
-    }
 }
 
 struct MockFavoritesRepository: FavoritesRepositoryProtocol {

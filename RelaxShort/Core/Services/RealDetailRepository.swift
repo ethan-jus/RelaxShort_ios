@@ -56,11 +56,6 @@ final class RealDetailRepository: DetailRepositoryProtocol {
         }
     }
 
-    func fetchRelatedDramas(dramaId: String) async throws -> [DramaItem] {
-        // Gap: 后端暂缺 related dramas 接口，返回空
-        return []
-    }
-
     // MARK: - Play Asset
 
     /// 获取播放地址并映射到播放接口 DTO，同时更新 Episode.videoURL 为兼容 URL。

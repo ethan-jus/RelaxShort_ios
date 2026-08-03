@@ -94,6 +94,8 @@ struct SeriesPlayerView: View {
     @State private var showSpeedHUD = false
     @State private var showEpisodeList = false
     @State private var episodes: [Episode] = []
+    @State private var episodesLoaded = false
+    @State private var episodesLoadError: String?
     /// 缓存每集的后端 resumeTime，切集时使用当前 episode 的值
     @State private var episodeResumeTimes: [String: TimeInterval] = [:]
     @State private var unlockedEpisodes: Set<Int> = []
@@ -246,9 +248,16 @@ struct SeriesPlayerView: View {
                         episodes: episodes,
                         currentEpisode: currentEpisode,
                         unlockedEpisodes: unlockedEpisodes,
+                        episodesLoaded: episodesLoaded,
+                        episodesLoadError: episodesLoadError,
                         isPresented: $showEpisodeList,
                         onSelectEpisode: { ep in
                             requestEpisodeSwitch(ep)
+                        },
+                        onRetryEpisodes: {
+                            Task { @MainActor in
+                                await loadEpisodes()
+                            }
                         }
                     )
                     .zIndex(200)
@@ -1181,6 +1190,8 @@ struct SeriesPlayerView: View {
     private func loadEpisodes() async {
         let repo = dependencies.detailRepository
         let startedAt = CACurrentMediaTime()
+        episodesLoaded = false
+        episodesLoadError = nil
         do {
             episodes = try await repo.fetchEpisodes(dramaId: drama.id)
             unlockedEpisodes = Set(
@@ -1188,6 +1199,7 @@ struct SeriesPlayerView: View {
                     .filter { $0.isLocked && $0.isUnlocked }
                     .map(\.episodeNumber)
             )
+            episodesLoaded = true
             Task { @MainActor in
                 await preloadEpisodeUnlockAd()
             }
@@ -1199,6 +1211,8 @@ struct SeriesPlayerView: View {
         } catch {
             guard !Task.isCancelled else { return }
             Logger.viewModel.error("SeriesPlayerView: fetchEpisodes failed: \(error)")
+            episodesLoaded = false
+            episodesLoadError = "player.load_failed_retry".localized
             if playerCoordinator.engine.currentItem?.id != PlayerMediaItem.stableID(
                 dramaID: drama.id,
                 episodeNumber: currentEpisode
@@ -2394,16 +2408,6 @@ struct SeriesPlayerView: View {
             + ChromeMetrics.progressScrubbingHeight
             + 180
         return location.y >= geo.size.height - bottomChromeHeight
-    }
-
-    // MARK: - Episode Lock Check
-
-    private func isEpisodeLocked(_ ep: Int) -> Bool {
-        if unlockedEpisodes.contains(ep) { return false }
-        if let episode = episodes.first(where: { $0.episodeNumber == ep }) {
-            return episode.isLocked
-        }
-        return !(drama.freeEpisodeRange ?? 1...3).contains(ep)
     }
 
 }

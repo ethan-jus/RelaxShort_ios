@@ -31,6 +31,10 @@ struct RecommendView: View {
     @State private var isScrubbing = false
     @State private var scrubFraction: CGFloat = 0
     @State private var showAbout = false
+    @State private var aboutEpisodes: [Episode] = []
+    @State private var aboutUnlockedEpisodes: Set<Int> = []
+    @State private var aboutEpisodesLoaded = false
+    @State private var aboutEpisodesLoadError: String?
     @State private var wasPlayingBeforeScrub = false
     @State private var scrubThumbnail: UIImage?
 
@@ -103,6 +107,15 @@ struct RecommendView: View {
                 withAnimation(.easeOut(duration: 0.18)) {
                     appStore.isBottomTabBarHidden = isShowing
                 }
+
+                if isShowing, let drama = currentDrama {
+                    startAboutEpisodesLoad(for: drama.id)
+                } else if !isShowing {
+                    aboutEpisodes = []
+                    aboutUnlockedEpisodes = []
+                    aboutEpisodesLoaded = false
+                    aboutEpisodesLoadError = nil
+                }
             }
             .onDisappear {
                 appStore.isBottomTabBarHidden = false
@@ -158,12 +171,17 @@ struct RecommendView: View {
                 if showAbout, let drama = currentDrama {
                     EpisodePickerSheet(
                         drama: drama,
-                        episodes: [],
+                        episodes: aboutEpisodes,
                         currentEpisode: drama.currentEpisode,
-                        unlockedEpisodes: [],
+                        unlockedEpisodes: aboutUnlockedEpisodes,
+                        episodesLoaded: aboutEpisodesLoaded,
+                        episodesLoadError: aboutEpisodesLoadError,
                         isPresented: $showAbout,
                         onSelectEpisode: { episode in
                             navigateToSeries(drama, startEpisode: episode)
+                        },
+                        onRetryEpisodes: {
+                            startAboutEpisodesLoad(for: drama.id)
                         }
                     )
                     .zIndex(200)
@@ -476,6 +494,39 @@ struct RecommendView: View {
         }
         await viewModel.loadData()
         // replacePlaylist 已在 viewModel.onReplaceCompleted 回调中调用
+    }
+
+    private func startAboutEpisodesLoad(for dramaID: String) {
+        aboutEpisodes = []
+        aboutUnlockedEpisodes = []
+        aboutEpisodesLoaded = false
+        aboutEpisodesLoadError = nil
+
+        Task { @MainActor in
+            await loadAboutEpisodes(dramaID: dramaID)
+        }
+    }
+
+    @MainActor
+    private func loadAboutEpisodes(dramaID: String) async {
+        do {
+            let loadedEpisodes = try await dependencies.detailRepository.fetchEpisodes(dramaId: dramaID)
+            guard showAbout, currentDrama?.id == dramaID else { return }
+
+            aboutEpisodes = loadedEpisodes
+            aboutUnlockedEpisodes = Set(
+                loadedEpisodes.lazy
+                    .filter { $0.isLocked && $0.isUnlocked }
+                    .map(\.episodeNumber)
+            )
+            aboutEpisodesLoaded = true
+        } catch is CancellationError {
+            return
+        } catch {
+            guard showAbout, currentDrama?.id == dramaID else { return }
+            Logger.viewModel.error("RecommendView: fetchEpisodes failed: \(error)")
+            aboutEpisodesLoadError = "player.load_failed_retry".localized
+        }
     }
 
     private func initializePlaybackIfNeeded() {

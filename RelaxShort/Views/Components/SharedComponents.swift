@@ -736,8 +736,11 @@ struct EpisodePickerSheet: View {
     let episodes: [Episode]
     let currentEpisode: Int
     let unlockedEpisodes: Set<Int>
+    let episodesLoaded: Bool
+    let episodesLoadError: String?
     @Binding var isPresented: Bool
     var onSelectEpisode: (Int) -> Void
+    var onRetryEpisodes: (() -> Void)?
 
     private enum Detent {
         case compact
@@ -760,7 +763,11 @@ struct EpisodePickerSheet: View {
     @GestureState private var dragTranslation: CGFloat = 0
 
     private var totalEpisodes: Int {
-        max(1, episodes.map(\.episodeNumber).max() ?? drama.episodeCount)
+        episodes.map(\.episodeNumber).max() ?? 0
+    }
+
+    private var metadataEpisodeCount: Int {
+        episodesLoaded ? totalEpisodes : drama.episodeCount
     }
 
     private var ranges: [ClosedRange<Int>] {
@@ -775,8 +782,17 @@ struct EpisodePickerSheet: View {
     }
 
     private var selectedEpisodeRange: ClosedRange<Int> {
-        guard ranges.indices.contains(selectedRange) else { return ranges[0] }
+        guard let first = ranges.first else { return 1...1 }
+        guard ranges.indices.contains(selectedRange) else { return first }
         return ranges[selectedRange]
+    }
+
+    private var selectedEpisodeNumbers: [Int] {
+        guard !episodes.isEmpty else { return [] }
+        return episodes
+            .filter { selectedEpisodeRange.contains($0.episodeNumber) }
+            .map(\.episodeNumber)
+            .sorted()
     }
 
     var body: some View {
@@ -835,6 +851,8 @@ struct EpisodePickerSheet: View {
             .ignoresSafeArea(edges: .bottom)
             .onAppear(perform: alignSelectedRange)
             .onChange(of: drama.id) { _, _ in alignSelectedRange() }
+            .onChange(of: episodes.count) { _, _ in alignSelectedRange() }
+            .onChange(of: episodesLoaded) { _, _ in alignSelectedRange() }
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
@@ -972,18 +990,48 @@ struct EpisodePickerSheet: View {
 
                 Spacer()
 
-                Text(L10n.totalEpisodeCount(totalEpisodes))
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.48))
+                if episodesLoaded {
+                    Text(L10n.totalEpisodeCount(totalEpisodes))
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.48))
+                }
             }
 
-            if ranges.count > 1 {
+            if episodesLoaded, !episodes.isEmpty, ranges.count > 1 {
                 rangeTabs
             }
 
-            LazyVGrid(columns: columns, spacing: 10) {
-                ForEach(Array(selectedEpisodeRange), id: \.self) { episode in
-                    episodeCell(episode)
+            if !episodesLoaded {
+                ProgressView()
+                    .tint(.white.opacity(0.78))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+            } else if let episodesLoadError {
+                VStack(spacing: 10) {
+                    Text(episodesLoadError)
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundColor(.white.opacity(0.62))
+                        .multilineTextAlignment(.center)
+
+                    if let onRetryEpisodes {
+                        Button(L10n.retry, action: onRetryEpisodes)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(DB.logoRed)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+            } else if episodes.isEmpty {
+                Text(L10n.noContent)
+                    .font(.system(size: 14, weight: .regular))
+                    .foregroundColor(.white.opacity(0.55))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+            } else {
+                LazyVGrid(columns: columns, spacing: 10) {
+                    ForEach(selectedEpisodeNumbers, id: \.self) { episode in
+                        episodeCell(episode)
+                    }
                 }
             }
         }
@@ -1087,13 +1135,12 @@ struct EpisodePickerSheet: View {
 
     private func visualState(for episodeNumber: Int) -> EpisodeVisualState {
         let episode = episodes.first(where: { $0.episodeNumber == episodeNumber })
-        let wasLocked = episode?.isLocked
-            ?? !(drama.freeEpisodeRange ?? 1...3).contains(episodeNumber)
+        let wasLocked = episode?.isLocked ?? true
         let isUnlocked = !wasLocked
             || episode?.isUnlocked == true
             || unlockedEpisodes.contains(episodeNumber)
-        let requiresVIP = episode?.requiresVIP ?? (drama.isVIPOnly || drama.isMemberOnly)
-        let canUnlockWithCoins = episode?.unlockCoinPrice != nil || drama.coinPrice != nil
+        let requiresVIP = episode?.requiresVIP ?? false
+        let canUnlockWithCoins = episode?.unlockCoinPrice != nil
 
         return EpisodeVisualState(
             wasLocked: wasLocked,
@@ -1107,7 +1154,7 @@ struct EpisodePickerSheet: View {
         let category = L10n.categoryDisplayName(drama.category)
         if !category.isEmpty { parts.append(category) }
         if let tag = drama.tags.first, !tag.isEmpty { parts.append(tag) }
-        parts.append("\(totalEpisodes)\(L10n.shortEpisodeCount)")
+        parts.append("\(metadataEpisodeCount)\(L10n.shortEpisodeCount)")
         return parts.joined(separator: " · ")
     }
 
