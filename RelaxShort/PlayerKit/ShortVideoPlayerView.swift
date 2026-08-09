@@ -122,7 +122,7 @@ struct ShortVideoPlayerView: View {
 
     @ViewBuilder
     private var coverView: some View {
-        if imageLoader.imageKey == coverURL, let image = imageLoader.image {
+        if imageLoader.imageKey == ImageLoader.canonicalURLString(coverURL), let image = imageLoader.image {
             Image(uiImage: image)
                 .resizable()
                 .scaledToFill()

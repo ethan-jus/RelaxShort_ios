@@ -33,11 +33,16 @@ final class ImageLoader: ObservableObject, @unchecked Sendable {
 
     func load(_ url: URL) async { await loadImage(from: url) }
     func load(_ urlString: String) async {
-        guard let url = URL(string: urlString), !urlString.isEmpty else {
-            await setImage(nil, key: urlString)
+        guard let url = Self.canonicalURL(from: urlString) else {
+            await setImage(nil, key: nil)
             return
         }
         await loadImage(from: url)
+    }
+
+    /// URL(string:) 会把封面路径中的空格规范化为 %20；UI 必须使用同一个规范化 key 判断图片是否已加载。
+    static func canonicalURLString(_ value: String) -> String? {
+        canonicalURL(from: value)?.absoluteString
     }
 
     func cancel() {
@@ -50,6 +55,17 @@ final class ImageLoader: ObservableObject, @unchecked Sendable {
     }
 
     // MARK: - Private
+
+    private static func canonicalURL(from value: String) -> URL? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let url = URL(string: trimmed),
+              let scheme = url.scheme,
+              !scheme.isEmpty else {
+            return nil
+        }
+        return url
+    }
 
     private func loadImage(from url: URL) async {
         let key = url.absoluteString

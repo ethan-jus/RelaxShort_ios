@@ -423,7 +423,7 @@ struct CoverImageView: View {
         ZStack {
             placeholderGradient
 
-            if imageLoader.imageKey == url, let image = imageLoader.image {
+            if imageLoader.imageKey == ImageLoader.canonicalURLString(url), let image = imageLoader.image {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -835,6 +835,7 @@ struct EpisodePickerSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: visibleHeight, alignment: .top)
+                .frame(width: geo.size.width)
                 .background(DB.panelElevated)
                 .clipShape(
                     UnevenRoundedRectangle(

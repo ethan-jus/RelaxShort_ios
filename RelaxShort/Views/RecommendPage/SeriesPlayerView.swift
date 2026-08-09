@@ -276,7 +276,7 @@ struct SeriesPlayerView: View {
                         episodeUnlockOverlay(unlockState, in: geo)
                             .zIndex(250)
                     }
-                } else if let episodeLoadError {
+                } else if let episodeLoadError, !showEpisodeList {
                     episodeLoadFailureOverlay(episodeLoadError)
                         .zIndex(240)
                 }
@@ -350,11 +350,19 @@ struct SeriesPlayerView: View {
         }
         .onReceive(playerCoordinator.engine.$state) { state in
             playbackState = state
-            if state == .playing { resetAutoHide() }
+            if state == .playing {
+                if isCurrentEpisodePlaying {
+                    episodeLoadError = nil
+                }
+                resetAutoHide()
+            }
             else if state == .pausedByUser { autoHideTask?.cancel() }
         }
         .onReceive(playerCoordinator.engine.$hasVisiblePlaybackStarted) { started in
             guard started else { return }
+            if isCurrentEpisodePlaying {
+                episodeLoadError = nil
+            }
             let elapsed = (CACurrentMediaTime() - playbackTraceStartedAt) * 1000
             Logger.player.info("SeriesTrace 首帧可见 原因=\(playbackTraceReason) 当前集=\(currentEpisode) 总耗时=\(Int(elapsed))ms")
         }
@@ -391,6 +399,13 @@ struct SeriesPlayerView: View {
     }
 
     /// 网络或媒体失败不阻断上下滑动；用户可以重试当前集，也可以继续浏览其他集。
+    private var isCurrentEpisodePlaying: Bool {
+        playerCoordinator.owner == .series(dramaID: drama.id)
+            && playerCoordinator.engine.currentItem?.episodeNumber == currentEpisode
+            && playerCoordinator.engine.hasVisiblePlaybackStarted
+            && playerCoordinator.engine.state == .playing
+    }
+
     private func episodeLoadFailureOverlay(_ message: String) -> some View {
         VStack(spacing: 12) {
             Text(message)
@@ -1216,7 +1231,7 @@ struct SeriesPlayerView: View {
             if playerCoordinator.engine.currentItem?.id != PlayerMediaItem.stableID(
                 dramaID: drama.id,
                 episodeNumber: currentEpisode
-            ) {
+            ), !isCurrentEpisodePlaying {
                 episodeLoadError = "player.load_failed_retry".localized
                 playerCoordinator.engine.deactivate()
             }
@@ -1253,7 +1268,9 @@ struct SeriesPlayerView: View {
                   let source = dto.toPlayerMediaSource() else { return false }
             episodeMediaSources[episodeID] = source
             episodePlayContracts[episodeID] = dto
-            episodeLoadError = nil
+            if episodeNumber == currentEpisode {
+                episodeLoadError = nil
+            }
             if let resume = dto.resumeTime, resume > 0 {
                 episodeResumeTimes[episodeID] = TimeInterval(resume)
             }
@@ -1910,7 +1927,7 @@ struct SeriesPlayerView: View {
             guard await ensurePlayAsset(for: currentEpisode) else {
                 guard unlockState == nil else { return }
                 playerCoordinator.engine.endContentTransitionWithoutMedia()
-                if episodeLoadError == nil {
+                if episodeLoadError == nil, !isCurrentEpisodePlaying {
                     episodeLoadError = "player.episode_load_failed_retry".localized
                 }
                 return
@@ -1988,7 +2005,7 @@ struct SeriesPlayerView: View {
 
         // 内存缓存命中
         if episodeMediaSources[episodeId] != nil {
-            if recordTrace { episodeLoadError = nil }
+            if recordTrace, episodeNumber == currentEpisode { episodeLoadError = nil }
             Logger.player.info("SeriesTrace 播放源命中内存缓存 集数=\(episodeNumber)")
             if recordTrace { playerCoordinator.engine.markTrace("缓存命中") }
             return true
@@ -1998,7 +2015,7 @@ struct SeriesPlayerView: View {
         if let url = URL(string: ep.videoURL),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             episodeMediaSources[episodeId] = .mp4(url)
-            if recordTrace { episodeLoadError = nil }
+            if recordTrace, episodeNumber == currentEpisode { episodeLoadError = nil }
             Logger.player.info("SeriesTrace 播放源使用剧集URL 集数=\(episodeNumber)")
             if recordTrace { playerCoordinator.engine.markTrace("剧集URL") }
             return true
@@ -2008,12 +2025,14 @@ struct SeriesPlayerView: View {
         if episodeId == (initialEpisodeID ?? drama.previewEpisodeID),
            let initialPlayAssetTask {
             let success = await initialPlayAssetTask.value
+            guard !Task.isCancelled else { return false }
             if success, episodeMediaSources[episodeId] != nil {
                 if recordTrace { playerCoordinator.engine.markTrace("首屏播放源复用") }
                 return true
             }
             // 同一次请求已经明确失败或被权益拦截，本轮不再立即重试相同接口。
-            if recordTrace, unlockState == nil {
+            if recordTrace, unlockState == nil,
+               episodeNumber == currentEpisode, !isCurrentEpisodePlaying {
                 episodeLoadError = "player.episode_load_failed_retry".localized
             }
             return false
@@ -2024,6 +2043,7 @@ struct SeriesPlayerView: View {
         Logger.player.info("SeriesTrace 请求播放源 集数=\(episodeNumber) 剧集ID=\(episodeId)")
         do {
             let dto = try await dependencies.detailRepository.fetchPlayAsset(episodeId: episodeId)
+            guard !Task.isCancelled else { return false }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             if let url = dto.preferredPlaybackURL {
                 episodes[epIndex].videoURL = url
@@ -2035,13 +2055,13 @@ struct SeriesPlayerView: View {
                     episodeResumeTimes[episodeId] = TimeInterval(resume)
                 }
                 unlockedEpisodes.insert(episodeNumber)
-                if recordTrace { episodeLoadError = nil }
+                if recordTrace, episodeNumber == currentEpisode { episodeLoadError = nil }
                 Logger.player.info("SeriesTrace 播放源请求成功 集数=\(episodeNumber) 类型=\(dto.sourceType) 耗时=\(Int(elapsed))ms")
                 if recordTrace { playerCoordinator.engine.markTrace("播放源") }
                 return true
             }
             Logger.player.warning("SeriesTrace 播放源为空 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms")
-            if recordTrace {
+            if recordTrace, episodeNumber == currentEpisode {
                 episodeLoadError = "player.episode_unavailable".localized
                 playerCoordinator.engine.markTrace("播放源失败-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "播放源失败")
@@ -2050,19 +2070,20 @@ struct SeriesPlayerView: View {
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 已进入解锁流程")
-            if recordTrace {
+            if recordTrace, episodeNumber == currentEpisode {
                 episodeLoadError = nil
                 playerCoordinator.engine.markTrace("锁集阻断-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "锁集阻断")
             }
-            if recordTrace {
+            if recordTrace, episodeNumber == currentEpisode {
                 presentEpisodeUnlock(episodeNumber)
             }
             return false
         } catch {
+            guard !Task.isCancelled else { return false }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
-            if recordTrace {
+            if recordTrace, episodeNumber == currentEpisode, !isCurrentEpisodePlaying {
                 episodeLoadError = "player.episode_load_failed_retry".localized
                 playerCoordinator.engine.markTrace("网络失败-EP\(episodeNumber)")
                 playerCoordinator.engine.finishTrace(termination: "网络失败")
