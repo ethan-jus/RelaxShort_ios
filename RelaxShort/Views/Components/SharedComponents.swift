@@ -755,7 +755,7 @@ struct EpisodePickerSheet: View {
         var isLockedForDisplay: Bool { wasLocked && !isUnlocked }
     }
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 5)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
     private let rangeSize = 30
     @State private var selectedRange = 0
     @State private var detent: Detent = .compact
@@ -861,43 +861,44 @@ struct EpisodePickerSheet: View {
     private var sheetChrome: some View {
         ZStack {
             Capsule()
-                .fill(Color.white.opacity(0.22))
-                .frame(width: 40, height: 5)
+                .fill(Color.white.opacity(0.28))
+                .frame(width: 48, height: 5)
 
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.72))
-                    .frame(width: 38, height: 38)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.82))
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.08), in: Circle())
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .frame(height: 54)
-        .padding(.horizontal, 18)
+        .frame(height: 50)
+        .padding(.horizontal, 20)
         .contentShape(Rectangle())
         .gesture(sheetDragGesture)
     }
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 16) {
             CoverImageView(
                 url: drama.coverURL,
                 aspectRatio: 2.0 / 3.0,
                 cornerRadius: DB.posterRadius,
-                width: 88,
-                height: 118
+                width: 106,
+                height: 144
             )
 
             VStack(alignment: .leading, spacing: 8) {
                 Text(drama.title)
-                    .font(.system(size: 20, weight: .bold))
+                    .font(.system(size: 21, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(2)
 
                 Text(metadataText)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white.opacity(0.52))
                     .lineLimit(1)
 
@@ -935,13 +936,17 @@ struct EpisodePickerSheet: View {
                 .foregroundColor(DB.logoRed)
                 .padding(.horizontal, 12)
                 .frame(height: 32)
-                .background(DB.logoRed.opacity(0.16), in: Capsule())
+                .background(DB.logoRed.opacity(0.14), in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(DB.logoRed.opacity(0.24), lineWidth: 1)
+                }
             }
 
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 18)
+        .padding(.bottom, 22)
     }
 
     private var synopsisBlock: some View {
@@ -984,22 +989,16 @@ struct EpisodePickerSheet: View {
 
     private var episodeSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .center, spacing: 12) {
                 Text(L10n.tabEpisodes)
-                    .font(.system(size: 18, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
 
                 Spacer()
 
-                if episodesLoaded {
-                    Text(L10n.totalEpisodeCount(totalEpisodes))
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.white.opacity(0.48))
+                if episodesLoaded, !episodes.isEmpty, ranges.count > 1 {
+                    rangeTabs
                 }
-            }
-
-            if episodesLoaded, !episodes.isEmpty, ranges.count > 1 {
-                rangeTabs
             }
 
             if !episodesLoaded {
@@ -1041,7 +1040,7 @@ struct EpisodePickerSheet: View {
     }
 
     private var rangeTabs: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 16) {
             ForEach(Array(ranges.enumerated()), id: \.offset) { index, range in
                 Button {
                     withAnimation(.easeOut(duration: 0.18)) {
@@ -1050,22 +1049,21 @@ struct EpisodePickerSheet: View {
                 } label: {
                     VStack(spacing: 6) {
                         Text("\(range.lowerBound)–\(range.upperBound)")
-                            .font(.system(size: 15, weight: selectedRange == index ? .bold : .medium))
+                            .font(.system(size: 14, weight: selectedRange == index ? .bold : .medium))
                             .foregroundColor(selectedRange == index ? DB.logoRed : .white.opacity(0.55))
 
                         Capsule()
                             .fill(selectedRange == index ? DB.logoRed : Color.clear)
-                            .frame(width: 38, height: 3)
+                            .frame(width: 32, height: 3)
                     }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
+                    .frame(minWidth: 58)
+                    .frame(height: 38)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 4)
-        .background(Color.white.opacity(0.06), in: Capsule())
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     private func episodeCell(_ episodeNumber: Int) -> some View {
@@ -1078,21 +1076,7 @@ struct EpisodePickerSheet: View {
             onSelectEpisode(episodeNumber)
             dismiss()
         } label: {
-            ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(
-                        isCurrent
-                            ? DB.logoRed
-                            : (isLocked ? Color.white.opacity(0.055) : Color.white.opacity(0.10))
-                    )
-                    .overlay {
-                        if state.isPaid && !isCurrent {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(DB.gold.opacity(0.36), lineWidth: 1)
-                        }
-                    }
-                    .frame(height: 52)
-
+            VStack(spacing: 5) {
                 Text("\(episodeNumber)")
                     .font(.system(size: 19, weight: isCurrent ? .bold : .medium))
                     .foregroundColor(
@@ -1100,35 +1084,51 @@ struct EpisodePickerSheet: View {
                             ? .white
                             : (state.isPaid ? DB.gold : (isLocked ? DB.mutedText : .white.opacity(0.88)))
                     )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                if state.isPaid && !isCurrent {
+                if isCurrent {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(height: 12)
+                } else if state.isPaid {
                     Text(L10n.paidEpisode)
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.black.opacity(0.82))
-                        .padding(.horizontal, 5)
-                        .frame(height: 18)
-                        .background(DB.gold, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
-                        .padding(4)
+                        .foregroundColor(DB.gold)
+                        .padding(.horizontal, 6)
+                        .frame(height: 16)
+                        .background(DB.gold.opacity(0.14), in: Capsule())
                 } else if state.wasLocked && state.isUnlocked {
                     Image(systemName: "lock.open.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(DB.gold.opacity(0.82))
-                        .padding(5)
+                        .frame(height: 14)
                 } else if isLocked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(DB.mutedText)
-                        .padding(5)
+                        .frame(height: 14)
+                } else {
+                    Color.clear.frame(height: 14)
                 }
-
-                if isCurrent {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                        .padding(7)
-                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 66)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        isCurrent
+                            ? DB.logoRed
+                            : (isLocked ? Color.white.opacity(0.055) : Color.white.opacity(0.085))
+                    )
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        state.isPaid && !isCurrent
+                            ? DB.gold.opacity(0.30)
+                            : Color.white.opacity(isCurrent ? 0 : 0.07),
+                        lineWidth: 1
+                    )
             }
         }
         .buttonStyle(.plain)
