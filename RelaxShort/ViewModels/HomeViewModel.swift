@@ -10,7 +10,9 @@ final class HomeViewModel: ObservableObject {
     /// Home API section data keyed by tab code.
     @Published var homeTabsByCode: [String: HomeTabContent] = [:]
     @Published var fixedDramas: [DramaItem] = []
-    @Published var masonryDramas: [DramaItem] = []
+    @Published var forYouDramas: [DramaItem] = []
+    @Published var homeCategoryCollections: [HomeCategoryCollection] = []
+    @Published private(set) var isLoadingMoreForYou = false
     @Published var rankingDramas: [DramaItem] = []
     @Published var banners: [BannerItem] = []
     @Published var isLoading: Bool = false
@@ -35,6 +37,10 @@ final class HomeViewModel: ObservableObject {
     private var selectedCategoryCode: String?
     /// 当前分类筛选请求的内容语言；为空表示使用默认内容语言。
     private var selectedContentLanguage: String?
+    private var forYouCursor: String?
+    private var forYouHasMore = true
+    private var forYouSessionID: String?
+    private let forYouPageSize = 20
 
     var tabs: [String] {
         [
@@ -90,6 +96,11 @@ final class HomeViewModel: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
+        forYouDramas = []
+        homeCategoryCollections = []
+        forYouCursor = nil
+        forYouHasMore = true
+        forYouSessionID = UUID().uuidString
         defer { isLoading = false }
 
         do {
@@ -105,10 +116,8 @@ final class HomeViewModel: ObservableObject {
             homeTabsByCode = loadedTabs
             self.featuredDramas = dramas
             self.fixedDramas = Array(dramas.prefix(9))
-            self.masonryDramas = Array(dramas.dropFirst(9))
             self.rankingDramas = dramas.sorted { $0.viewCount > $1.viewCount }
             self.banners = banners
-            prefetchFirstScreenMedia(dramas: dramas, banners: banners)
         } catch {
             errorMessage = Self.userFacingLoadError(error)
             logError("HomeViewModel.loadData failed: \(error)")
@@ -125,6 +134,13 @@ final class HomeViewModel: ObservableObject {
                 HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0)
             }
         }
+
+        await loadHomeCategoryCollections()
+        await loadForYouPage(reset: true)
+        prefetchFirstScreenMedia(
+            dramas: fixedDramas + Array(forYouDramas.prefix(9)),
+            banners: banners
+        )
 
         if repository.usesRemoteContentCatalog {
             // 真实目录请求失败时不保留本地语言枚举，避免把静态数据冒充服务端目录。
@@ -146,6 +162,77 @@ final class HomeViewModel: ObservableObject {
             selectedCategoryIndex = index
         }
         await loadCategoryDramas(for: selectedCategory, contentLanguage: selectedContentLanguage)
+    }
+
+    /// “猜你喜欢”的分类合集来自真实分类字典与分类内容接口。
+    /// 分类标题跟随 App UI 语言，短剧内容仍按内容语言和国家筛选。
+    private func loadHomeCategoryCollections() async {
+        guard !categories.isEmpty else {
+            homeCategoryCollections = []
+            return
+        }
+
+        let contentLanguage = UserDefaults.standard.string(forKey: "app_content_language")
+        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        var collections: [HomeCategoryCollection] = []
+
+        for category in categories {
+            guard collections.count < 5 else { break }
+            do {
+                let items = try await repository.fetchCategorySeries(
+                    code: category.code,
+                    contentLang: contentLanguage,
+                    country: country
+                )
+                let unique = Array(items.uniquedByID().prefix(4))
+                guard unique.count == 4 else { continue }
+                collections.append(HomeCategoryCollection(category: category, dramas: unique))
+            } catch {
+                logError("HomeViewModel.loadHomeCategoryCollection failed code=\(category.code): \(error)")
+            }
+        }
+        homeCategoryCollections = collections
+    }
+
+    func loadMoreForYouIfNeeded(currentDramaID: String) async {
+        guard currentDramaID == forYouDramas.last?.id,
+              forYouHasMore,
+              !isLoadingMoreForYou else { return }
+        await loadForYouPage(reset: false)
+    }
+
+    private func loadForYouPage(reset: Bool) async {
+        if !reset {
+            guard forYouHasMore, !isLoadingMoreForYou else { return }
+            isLoadingMoreForYou = true
+        }
+        defer { isLoadingMoreForYou = false }
+
+        let contentLanguage = UserDefaults.standard.string(forKey: "app_content_language")
+        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        do {
+            let result = try await repository.fetchForYouPaginated(
+                contentLang: contentLanguage,
+                country: country,
+                cursor: reset ? nil : forYouCursor,
+                limit: forYouPageSize,
+                feedSeed: forYouSessionID
+            )
+            forYouCursor = result.nextCursor
+            forYouHasMore = result.hasMore
+
+            var blockedIDs = Set(fixedDramas.map(\.id))
+            blockedIDs.formUnion(homeCategoryCollections.flatMap { $0.dramas.map(\.id) })
+            if !reset { blockedIDs.formUnion(forYouDramas.map(\.id)) }
+            let unique = result.items.filter { !blockedIDs.contains($0.id) }.uniquedByID()
+            if reset {
+                forYouDramas = unique
+            } else {
+                forYouDramas.append(contentsOf: unique)
+            }
+        } catch {
+            logError("HomeViewModel.loadForYou failed: \(error)")
+        }
     }
 
     private static func userFacingLoadError(_ error: Error) -> String {
@@ -254,5 +341,12 @@ final class HomeViewModel: ObservableObject {
         #if DEBUG
         Logger.viewModel.error("\(message)")
         #endif
+    }
+}
+
+private extension Array where Element == DramaItem {
+    func uniquedByID() -> [DramaItem] {
+        var seen = Set<String>()
+        return filter { seen.insert($0.id).inserted }
     }
 }

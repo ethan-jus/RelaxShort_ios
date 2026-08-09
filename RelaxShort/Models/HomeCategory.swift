@@ -11,3 +11,12 @@ struct HomeCategory: Identifiable {
     let title: String       // 展示文案
     let localCategory: DramaCategory?   // Mock 模式时关联的本地枚举，真实模式为 nil
 }
+
+/// 首页“猜你喜欢”中的真实分类合集。标题来自后端分类本地化，内容来自该分类的真实短剧接口。
+struct HomeCategoryCollection: Identifiable {
+    let category: HomeCategory
+    let dramas: [DramaItem]
+
+    var id: String { category.id }
+    var title: String { category.title }
+}

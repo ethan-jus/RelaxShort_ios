@@ -249,7 +249,18 @@ struct HomeView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
                 if !viewModel.fixedDramas.isEmpty { MarketingGrid(dramas: viewModel.fixedDramas, playerDrama: seriesNavigationBinding, containerW: containerW) }
-                if !viewModel.featuredDramas.isEmpty { YouMightLikeSection(dramas: viewModel.featuredDramas, playerDrama: seriesNavigationBinding, containerW: containerW).padding(.top, 28) }
+                if !viewModel.forYouDramas.isEmpty || !viewModel.homeCategoryCollections.isEmpty {
+                    YouMightLikeSection(
+                        dramas: viewModel.forYouDramas,
+                        collections: viewModel.homeCategoryCollections,
+                        playerDrama: seriesNavigationBinding,
+                        containerW: containerW,
+                        onDramaAppear: { dramaID in
+                            Task { await viewModel.loadMoreForYouIfNeeded(currentDramaID: dramaID) }
+                        }
+                    )
+                    .padding(.top, 28)
+                }
             }
             .padding(.bottom, 64)
         }

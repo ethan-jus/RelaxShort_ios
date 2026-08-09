@@ -26,6 +26,11 @@ protocol HomeRepositoryProtocol {
     func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem]
     /// 获取数据库启用且当前 App 可展示的语言目录。
     func fetchSupportedLanguages() async throws -> [String]
+    /// 获取真实 For You 推荐流；登录用户由后端基于行为偏好重排，匿名用户使用全局推荐。
+    func fetchForYouPaginated(contentLang: String?, country: String?, cursor: String?, limit: Int,
+                              feedSeed: String?) async throws -> (
+        items: [DramaItem], nextCursor: String?, hasMore: Bool
+    )
 }
 
 extension HomeRepositoryProtocol {
@@ -53,6 +58,16 @@ extension HomeRepositoryProtocol {
     /// 默认实现：Mock 使用当前 App 已内置的语言资源。
     func fetchSupportedLanguages() async throws -> [String] {
         AppLanguage.allCases.map(\.rawValue)
+    }
+    func fetchForYouPaginated(contentLang: String?, country: String?, cursor: String?, limit: Int,
+                              feedSeed: String?) async throws -> (
+        items: [DramaItem], nextCursor: String?, hasMore: Bool
+    ) {
+        let all = try await fetchDramas(category: .all)
+        let start = cursor.flatMap(Int.init) ?? 0
+        let end = min(start + max(limit, 1), all.count)
+        let items = start < end ? Array(all[start..<end]) : []
+        return (items, end < all.count ? String(end) : nil, end < all.count)
     }
     /// 默认实现：Mock 模式用 viewCount 生成测试指标
     func fetchRankingEntries(type: String) async throws -> [RankingEntry] {

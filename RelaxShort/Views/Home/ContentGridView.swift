@@ -14,20 +14,20 @@ struct RoundedCorner: Shape {
 
 // MARK: - Helpers
 private func rankText(rank: Int) -> String? {
-    guard rank <= 10 else { return nil }
+    guard rank > 0, rank <= 10 else { return nil }
     return rank % 2 == 1
         ? "home.rank_most_popular".localizedFormat(rank)
         : "home.rank_top_searched".localizedFormat(rank)
 }
 
 // MARK: - Category Themes
-struct CategoryTheme { let name: String; let bg: Color; let subBg: Color }
+struct CategoryTheme { let bg: Color; let subBg: Color }
 let categoryThemes: [CategoryTheme] = [
-    CategoryTheme(name:"home.theme_counterattack", bg:Color(red:0.35,green:0.15,blue:0.55),subBg:Color(red:0.45,green:0.25,blue:0.65)),
-    CategoryTheme(name:"home.theme_forbidden_love", bg:Color(red:0.55,green:0.10,blue:0.20),subBg:Color(red:0.65,green:0.20,blue:0.30)),
-    CategoryTheme(name:"home.theme_young_adult", bg:Color(red:0.08,green:0.35,blue:0.38),subBg:Color(red:0.12,green:0.45,blue:0.48)),
-    CategoryTheme(name:"home.theme_billionaire_game",bg:Color(red:0.45,green:0.30,blue:0.08),subBg:Color(red:0.55,green:0.40,blue:0.14)),
-    CategoryTheme(name:"home.theme_fantasy_realm", bg:Color(red:0.18,green:0.15,blue:0.45),subBg:Color(red:0.25,green:0.22,blue:0.55)),
+    CategoryTheme(bg:Color(red:0.35,green:0.15,blue:0.55),subBg:Color(red:0.45,green:0.25,blue:0.65)),
+    CategoryTheme(bg:Color(red:0.55,green:0.10,blue:0.20),subBg:Color(red:0.65,green:0.20,blue:0.30)),
+    CategoryTheme(bg:Color(red:0.08,green:0.35,blue:0.38),subBg:Color(red:0.12,green:0.45,blue:0.48)),
+    CategoryTheme(bg:Color(red:0.45,green:0.30,blue:0.08),subBg:Color(red:0.55,green:0.40,blue:0.14)),
+    CategoryTheme(bg:Color(red:0.18,green:0.15,blue:0.45),subBg:Color(red:0.25,green:0.22,blue:0.55)),
 ]
 
 // MARK: - Marketing Grid (3×3)
@@ -61,7 +61,11 @@ struct MarketingCard: View {
 
 // MARK: - You Might Like Section (行式错位: 左Cat行 1,4,19,25… 右Cat行 11,16,22,28…)
 struct YouMightLikeSection: View {
-    let dramas: [DramaItem]; @Binding var playerDrama: DramaItem?; let containerW: CGFloat
+    let dramas: [DramaItem]
+    let collections: [HomeCategoryCollection]
+    @Binding var playerDrama: DramaItem?
+    let containerW: CGFloat
+    let onDramaAppear: (String) -> Void
     private var colW:CGFloat{(containerW-margin*2-hGap)/2}; private var coverH:CGFloat{colW*4/3}
 
     var body: some View {
@@ -71,30 +75,40 @@ struct YouMightLikeSection: View {
         }
     }
 
-    private enum Slot{case cat(Int,[DramaItem]);case drama(DramaItem,Int)}
+    private enum Slot { case category(HomeCategoryCollection, Int); case drama(DramaItem) }
     private func isLCat(_ r: Int) -> Bool { if r == 1 || r == 4 || r == 19 { return true }; if r < 26 { return false }; return (r - 26) % 7 == 0 }
     private func isRCat(_ r: Int) -> Bool { if r == 11 || r == 16 { return true }; if r < 23 { return false }; return (r - 23) % 7 == 0 }
 
     private var twoColumnLayout: some View {
-        var li:[Slot]=[]; var ri:[Slot]=[]; var ti=0; let pool=Array(dramas); var po=0
-        let sorted=dramas.sorted{$0.viewCount>$1.viewCount}
-        var di=0; var row=1
-        while di<dramas.count {
-            if isLCat(row){let s=po%pool.count;li.append(.cat(ti,(0..<4).compactMap{pool[(s+$0)%pool.count]}));ti+=1;po+=4}
-            else{let d=dramas[di];di+=1;let rk=(sorted.firstIndex{$0.id==d.id} ?? -1)+1;li.append(.drama(d,rk))}
-            _ = di<dramas.count || isRCat(row)
-            if isRCat(row){let s=po%pool.count;ri.append(.cat(ti,(0..<4).compactMap{pool[(s+$0)%pool.count]}));ti+=1;po+=4}
-            else if di<dramas.count{let d=dramas[di];di+=1;let rk=(sorted.firstIndex{$0.id==d.id} ?? -1)+1;ri.append(.drama(d,rk))}
-            row+=1
+        var li: [Slot] = []; var ri: [Slot] = []
+        var collectionIndex = 0; var dramaIndex = 0; var row = 1
+        while dramaIndex < dramas.count || collectionIndex < collections.count {
+            var consumed = false
+            if collectionIndex < collections.count, isLCat(row) {
+                li.append(.category(collections[collectionIndex], collectionIndex)); collectionIndex += 1; consumed = true
+            } else if dramaIndex < dramas.count {
+                li.append(.drama(dramas[dramaIndex])); dramaIndex += 1; consumed = true
+            }
+            if collectionIndex < collections.count, isRCat(row) {
+                ri.append(.category(collections[collectionIndex], collectionIndex)); collectionIndex += 1; consumed = true
+            } else if dramaIndex < dramas.count {
+                ri.append(.drama(dramas[dramaIndex])); dramaIndex += 1; consumed = true
+            }
+            if !consumed, collectionIndex < collections.count {
+                let slot = Slot.category(collections[collectionIndex], collectionIndex)
+                if li.count <= ri.count { li.append(slot) } else { ri.append(slot) }
+                collectionIndex += 1
+            }
+            row += 1
         }
         return HStack(alignment:.top,spacing:hGap){
             VStack(spacing:vGap){ForEach(Array(li.enumerated()),id:\.offset){s in
-                if case .cat(let ti,let sd)=s.element{CategoryCard(theme:categoryThemes[ti%categoryThemes.count],dramas:sd,colW:colW,playerDrama:$playerDrama)}
-                else if case .drama(let d,let rk)=s.element{WaterfallCard(drama:d,rank:rk,colW:colW,coverH:coverH,playerDrama:$playerDrama)}
+                if case .category(let collection, let themeIndex)=s.element{CategoryCard(title:collection.title,theme:categoryThemes[themeIndex%categoryThemes.count],dramas:collection.dramas,colW:colW,playerDrama:$playerDrama)}
+                else if case .drama(let d)=s.element{WaterfallCard(drama:d,colW:colW,coverH:coverH,playerDrama:$playerDrama).onAppear{onDramaAppear(d.id)}}
             }}
             VStack(spacing:vGap){ForEach(Array(ri.enumerated()),id:\.offset){s in
-                if case .cat(let ti,let sd)=s.element{CategoryCard(theme:categoryThemes[ti%categoryThemes.count],dramas:sd,colW:colW,playerDrama:$playerDrama)}
-                else if case .drama(let d,let rk)=s.element{WaterfallCard(drama:d,rank:rk,colW:colW,coverH:coverH,playerDrama:$playerDrama)}
+                if case .category(let collection, let themeIndex)=s.element{CategoryCard(title:collection.title,theme:categoryThemes[themeIndex%categoryThemes.count],dramas:collection.dramas,colW:colW,playerDrama:$playerDrama)}
+                else if case .drama(let d)=s.element{WaterfallCard(drama:d,colW:colW,coverH:coverH,playerDrama:$playerDrama).onAppear{onDramaAppear(d.id)}}
             }}
         }.padding(.horizontal,margin)
     }
@@ -102,10 +116,10 @@ struct YouMightLikeSection: View {
 
 // MARK: - Category Card
 struct CategoryCard: View {
-    let theme:CategoryTheme;let dramas:[DramaItem];let colW:CGFloat;@Binding var playerDrama:DramaItem?
+    let title:String;let theme:CategoryTheme;let dramas:[DramaItem];let colW:CGFloat;@Binding var playerDrama:DramaItem?
     var body: some View {
         VStack(alignment:.leading,spacing:0){
-            HStack(spacing:0){Text(theme.name.localized).font(.system(size:16,weight:.bold)).foregroundColor(.white);Spacer();Image(systemName:"chevron.right").font(.system(size:14,weight:.bold)).foregroundColor(.white).padding(.trailing,8)}
+            HStack(spacing:0){Text(title).font(.system(size:16,weight:.bold)).foregroundColor(.white);Spacer();Image(systemName:"chevron.right").font(.system(size:14,weight:.bold)).foregroundColor(.white).padding(.trailing,8)}
                 .padding(.bottom,10).padding(.top,2)
             ForEach(Array(dramas.prefix(4).enumerated()),id:\.element.id){idx,drama in
                 Button{playerDrama=drama}label:{

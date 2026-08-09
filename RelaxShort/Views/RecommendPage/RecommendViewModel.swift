@@ -117,11 +117,7 @@ final class RecommendViewModel: ObservableObject {
 
     /// 请求 For You 首页（带 seed）
     private func fetchForYouFirstPage(contentLang: String?, country: String?, seed: String) async throws -> [DramaItem] {
-        // 需要访问 RealHomeRepository 的 paginated 方法
-        guard let realRepo = repository as? RealHomeRepository else {
-            return try await repository.fetchDramas(category: .all)
-        }
-        let result = try await realRepo.fetchForYouPaginated(
+        let result = try await repository.fetchForYouPaginated(
             contentLang: contentLang, country: country,
             cursor: nil, limit: pageSize, feedSeed: seed
         )
@@ -132,9 +128,6 @@ final class RecommendViewModel: ObservableObject {
 
     /// 加载下一页；当前 seed 耗尽后自动开启新 seed。
     private func loadNextPage() async throws -> [DramaItem] {
-        guard let realRepo = repository as? RealHomeRepository else {
-            return []
-        }
         let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
 
@@ -146,7 +139,7 @@ final class RecommendViewModel: ObservableObject {
                 hasMore = true
             }
 
-            let result = try await realRepo.fetchForYouPaginated(
+            let result = try await repository.fetchForYouPaginated(
                 contentLang: contentLang, country: country,
                 cursor: nextCursor, limit: pageSize,
                 feedSeed: feedSessionId
