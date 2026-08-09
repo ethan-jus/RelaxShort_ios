@@ -823,6 +823,7 @@ struct EpisodeUnlockOverlay: View {
                         .frame(width: 34, height: 34)
                         .background(.white.opacity(0.09), in: Circle())
                 }
+                .disabled(state.isProcessing)
                 .accessibilityLabel("general.close".localized)
             }
 
@@ -967,6 +968,7 @@ struct EpisodeUnlockOverlay: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 15))
         }
+        .disabled(state.isProcessing)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -984,6 +986,7 @@ struct EpisodeUnlockOverlay: View {
                         .frame(width: 34, height: 34)
                         .background(.white.opacity(0.09), in: Circle())
                 }
+                .disabled(state.isProcessing)
                 .accessibilityLabel("general.close".localized)
             }
 
@@ -1073,6 +1076,49 @@ struct EpisodeUnlockOverlay: View {
                     .overlay(Capsule().stroke(unlockGold.opacity(0.62), lineWidth: 1))
             }
         }
+    }
+}
+
+private struct EpisodePlayingWaveform: View {
+    @State private var isAnimating = false
+
+    private let activeScales: [CGFloat] = [0.55, 0.82, 1.0, 0.68, 0.9]
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 2) {
+            ForEach(activeScales.indices, id: \.self) { index in
+                Capsule()
+                    .fill(.white)
+                    .frame(width: 2, height: 12)
+                    .scaleEffect(y: isAnimating ? activeScales[index] : 0.38, anchor: .center)
+                    .animation(
+                        .easeInOut(duration: 0.42)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.06),
+                        value: isAnimating
+                    )
+            }
+        }
+        .frame(width: 18, height: 12)
+        .onAppear { isAnimating = true }
+        .onDisappear { isAnimating = false }
+        .accessibilityHidden(true)
+    }
+}
+
+struct EpisodeUnlockVerificationOverlay: View {
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.16)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+
+            ProgressView()
+                .tint(.white)
+                .scaleEffect(1.05)
+        }
+        .allowsHitTesting(true)
+        .accessibilityLabel("player.unlock_pending".localized)
     }
 }
 
@@ -1344,17 +1390,17 @@ struct EpisodePickerSheet: View {
 
     private var episodeSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
+            ZStack(alignment: .leading) {
                 Text(L10n.tabEpisodes)
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(.white)
 
-                Spacer()
-
                 if episodesLoaded, !episodes.isEmpty, ranges.count > 1 {
                     rangeTabs
+                        .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
+            .frame(maxWidth: .infinity)
 
             if !episodesLoaded {
                 ProgressView()
@@ -1432,42 +1478,31 @@ struct EpisodePickerSheet: View {
             dismiss()
         } label: {
             ZStack(alignment: .topTrailing) {
-                VStack(spacing: 5) {
-                    Spacer(minLength: 0)
-
-                    Text("\(episodeNumber)")
-                        .font(.system(size: 19, weight: isCurrent ? .bold : .medium))
-                        .foregroundColor(.white)
-
-                    if isCurrent {
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.white)
-                            .frame(height: 12)
-                    } else {
-                        Color.clear.frame(height: 12)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(
+                        isCurrent
+                            ? DB.logoRed
+                            : (isLocked ? Color.white.opacity(0.055) : Color.white.opacity(0.085))
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(
+                                state.requiresVIP && !isCurrent
+                                    ? DB.gold.opacity(0.30)
+                                    : Color.white.opacity(isCurrent ? 0 : 0.07),
+                                lineWidth: 1
+                            )
                     }
 
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 66)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(
-                            isCurrent
-                                ? DB.logoRed
-                                : (isLocked ? Color.white.opacity(0.055) : Color.white.opacity(0.085))
-                        )
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(
-                            state.requiresVIP && !isCurrent
-                                ? DB.gold.opacity(0.30)
-                                : Color.white.opacity(isCurrent ? 0 : 0.07),
-                            lineWidth: 1
-                        )
+                Text("\(episodeNumber)")
+                    .font(.system(size: 18, weight: isCurrent ? .bold : .medium))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+
+                if isCurrent {
+                    EpisodePlayingWaveform()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .padding(.bottom, 6)
                 }
 
                 if state.requiresVIP {
@@ -1499,6 +1534,9 @@ struct EpisodePickerSheet: View {
                         .padding(.trailing, 4)
                 }
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(.plain)
     }

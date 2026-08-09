@@ -120,6 +120,9 @@ struct SeriesPlayerView: View {
     @State private var playbackTraceReason = "open"
     /// 锁集状态独占 Series 页面交互；出现后不得继续切集或触发播放器手势。
     @State private var unlockState: EpisodeUnlockFlowState?
+    /// 广告结束后的奖励确认在后台完成；确认期间隐藏完整解锁弹窗，只保留轻量加载态。
+    @State private var isRewardedUnlockVerifying = false
+    @State private var rewardedUnlockConfirmationTask: Task<Void, Never>?
     /// 同一解锁结果只允许恢复一次播放器，防止购买、账户刷新等回调并发重复提交。
     @State private var activeUnlockResumeEpisode: Int?
     /// 顶部返回动作已提前完成 Series → For You 所有权交接，onDisappear 不再重复释放。
@@ -253,7 +256,10 @@ struct SeriesPlayerView: View {
                 }
 
                 if let unlockState {
-                    if let unlockPurchaseTab {
+                    if isRewardedUnlockVerifying {
+                        EpisodeUnlockVerificationOverlay()
+                            .zIndex(250)
+                    } else if let unlockPurchaseTab {
                         unlockPurchaseOverlay(
                             unlockState,
                             initialTab: unlockPurchaseTab,
@@ -391,6 +397,7 @@ struct SeriesPlayerView: View {
             episodeSwitchTask?.cancel()
             episodePrefetchTask?.cancel()
             initialPlayAssetTask?.cancel()
+            rewardedUnlockConfirmationTask?.cancel()
             Task { await dependencies.watchProgressReporter.finalize(completed: false) }
             if !hasPreparedReturn {
                 playerCoordinator.release(.series(dramaID: drama.id))
@@ -530,6 +537,9 @@ struct SeriesPlayerView: View {
     @MainActor
     private func presentEpisodeUnlock(_ episodeNumber: Int) {
         guard unlockState?.episodeNumber != episodeNumber else { return }
+        isRewardedUnlockVerifying = false
+        rewardedUnlockConfirmationTask?.cancel()
+        rewardedUnlockConfirmationTask = nil
         let episode = episodes.first(where: { $0.episodeNumber == episodeNumber })
         unlockState = EpisodeUnlockFlowState(
             episodeNumber: episodeNumber,
@@ -574,8 +584,13 @@ struct SeriesPlayerView: View {
         unlockState = state
         do {
             if action == .rewardedAd {
-                try await unlockEpisodeWithRewardedInterstitial(episodeID: episodeID)
-                await resumeEpisodeAfterUnlock(targetEpisode)
+                let session = try await unlockEpisodeWithRewardedInterstitial(episodeID: episodeID)
+                // 广告已经看完，立即收起完整解锁弹窗；奖励确认和播放恢复在后台继续。
+                isRewardedUnlockVerifying = true
+                rewardedUnlockConfirmationTask?.cancel()
+                rewardedUnlockConfirmationTask = Task { @MainActor in
+                    await completeRewardedUnlock(session, targetEpisode: targetEpisode)
+                }
                 return
             }
             let result = try await dependencies.detailRepository.unlockEpisodeWithCoins(episodeId: episodeID)
@@ -602,7 +617,7 @@ struct SeriesPlayerView: View {
     }
 
     @MainActor
-    private func unlockEpisodeWithRewardedInterstitial(episodeID: String) async throws {
+    private func unlockEpisodeWithRewardedInterstitial(episodeID: String) async throws -> AdRewardSession {
         let placement = try await resolvedEpisodeUnlockAdPlacement()
 
         let session = try await dependencies.adRewardRepository.startSession(
@@ -620,13 +635,53 @@ struct SeriesPlayerView: View {
         )
         switch result {
         case .rewarded:
-            break
+            return session
         case .cancelled:
             throw APIError(code: "AD_NOT_COMPLETED", message: "player.ad_not_completed".localized)
         case .failed:
             throw APIError(code: "AD_LOAD_FAILED", message: "reward.ad_load_failed".localized)
         }
+    }
 
+    @MainActor
+    private func completeRewardedUnlock(
+        _ session: AdRewardSession,
+        targetEpisode: Int
+    ) async {
+        defer { rewardedUnlockConfirmationTask = nil }
+
+        do {
+            try await confirmRewardedUnlock(session)
+            guard unlockState?.playbackTargetEpisode == targetEpisode else {
+                unlockState = nil
+                unlockPurchaseTab = nil
+                isRewardedUnlockVerifying = false
+                return
+            }
+
+            await resumeEpisodeAfterUnlock(targetEpisode)
+
+            // 播放源或播放器恢复失败时，不重新打开完整解锁弹窗，改成普通可重试提示。
+            if let state = unlockState {
+                let message = state.errorMessage ?? "player.entitlement_source_failed".localized
+                unlockState = nil
+                unlockPurchaseTab = nil
+                isRewardedUnlockVerifying = false
+                episodeLoadError = message
+                playerCoordinator.engine.endContentTransitionWithoutMedia()
+            }
+        } catch {
+            unlockState = nil
+            unlockPurchaseTab = nil
+            isRewardedUnlockVerifying = false
+            episodeLoadError = (error as? APIError)?.code == "AD_REWARD_PENDING"
+                ? "player.unlock_pending".localized
+                : "player.entitlement_source_failed".localized
+            playerCoordinator.engine.endContentTransitionWithoutMedia()
+        }
+    }
+
+    private func confirmRewardedUnlock(_ session: AdRewardSession) async throws {
         for attempt in 0..<12 {
             let completion = try await dependencies.adRewardRepository.completeSession(session)
             if completion.isDelivered {
@@ -746,6 +801,7 @@ struct SeriesPlayerView: View {
             "SeriesTrace 解锁后恢复完成 集数=\(episodeNumber) 首帧=\(firstFrameVisible) 总耗时=\(Int(totalResumeMs))ms"
         )
 
+        isRewardedUnlockVerifying = false
         unlockState = nil
         unlockPurchaseTab = nil
         resetAutoHide()
