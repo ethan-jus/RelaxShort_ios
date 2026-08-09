@@ -418,6 +418,7 @@
 "player.continue_unlock" = "解放を続ける";
 "player.episode_not_unlocked" = "この話は解放されていません";
 "player.exit_playback" = "再生を終了";
+"player.unlock_now" = "今すぐロック解除";
 "player.join_vip_unlock" = "VIPに登録して解放";
 "player.top_up_unlock" = "チャージして解放";
 "player.playback_failed" = "再生に失敗しました";

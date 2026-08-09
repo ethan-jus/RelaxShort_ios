@@ -418,6 +418,7 @@
 "player.continue_unlock" = "繼續解鎖";
 "player.episode_not_unlocked" = "本集未解鎖";
 "player.exit_playback" = "退出播放";
+"player.unlock_now" = "立即解鎖";
 "player.join_vip_unlock" = "開通 VIP 並解鎖";
 "player.top_up_unlock" = "儲值並解鎖";
 "player.playback_failed" = "播放失敗";

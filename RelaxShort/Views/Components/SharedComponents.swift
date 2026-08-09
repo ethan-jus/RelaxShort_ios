@@ -1067,6 +1067,14 @@ struct EpisodeUnlockOverlay: View {
             Text("player.episode_not_unlocked".localized)
                 .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.82))
+            Button(action: onOpenPrimary) {
+                Text("player.unlock_now".localized)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(.black)
+                    .padding(.horizontal, 32)
+                    .frame(height: 44)
+                    .background(unlockPaleGold, in: Capsule())
+            }
             Button(action: onExitPlayback) {
                 Text("player.exit_playback".localized)
                     .font(.system(size: 15, weight: .semibold))

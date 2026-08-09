@@ -111,7 +111,7 @@ struct EpisodeUnlockFlowState: Equatable {
     }
 
     mutating func reopenFromRetention() {
-        guard presentation == .retention else { return }
+        guard presentation == .retention || presentation == .lockedFrame else { return }
         presentation = .primary
     }
 }

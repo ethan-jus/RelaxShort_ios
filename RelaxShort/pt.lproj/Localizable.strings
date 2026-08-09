@@ -418,6 +418,7 @@
 "player.continue_unlock" = "Continuar desbloqueio";
 "player.episode_not_unlocked" = "Este episódio não está desbloqueado";
 "player.exit_playback" = "Sair da reprodução";
+"player.unlock_now" = "Desbloquear agora";
 "player.join_vip_unlock" = "Assinar VIP e desbloquear";
 "player.top_up_unlock" = "Recarregar e desbloquear";
 "player.playback_failed" = "Falha na reprodução";

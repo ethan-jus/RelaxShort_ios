@@ -108,6 +108,7 @@ final class HomeViewModel: ObservableObject {
             self.masonryDramas = Array(dramas.dropFirst(9))
             self.rankingDramas = dramas.sorted { $0.viewCount > $1.viewCount }
             self.banners = banners
+            prefetchFirstScreenMedia(dramas: dramas, banners: banners)
         } catch {
             errorMessage = Self.userFacingLoadError(error)
             logError("HomeViewModel.loadData failed: \(error)")
@@ -153,6 +154,21 @@ final class HomeViewModel: ObservableObject {
             return description
         }
         return "network.load_failed_retry".localized
+    }
+
+    /// 首屏媒体预热：封面降采样缓存 + 头部卡片预览视频的起始字节。
+    /// 后台低优先级执行；点进播放页时封面与 MP4 头部直接命中缓存。
+    private func prefetchFirstScreenMedia(dramas: [DramaItem], banners: [BannerItem]) {
+        let coverURLs = banners.map(\.imageName) + dramas.prefix(18).map(\.coverURL)
+        ImageLoader.prefetch(coverURLs)
+
+        let previewURLs = dramas.prefix(6).compactMap { item -> URL? in
+            guard let raw = item.videoURL,
+                  let url = URL(string: raw),
+                  ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+            return url
+        }
+        MediaPreviewPrefetcher.prefetch(urls: previewURLs)
     }
 
     // MARK: - Category Drama Loading

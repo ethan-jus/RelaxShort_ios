@@ -418,6 +418,7 @@
 "player.continue_unlock" = "잠금 해제 계속";
 "player.episode_not_unlocked" = "이 에피소드는 잠겨 있습니다";
 "player.exit_playback" = "재생 종료";
+"player.unlock_now" = "지금 잠금 해제";
 "player.join_vip_unlock" = "VIP 가입 및 잠금 해제";
 "player.top_up_unlock" = "충전 및 잠금 해제";
 "player.playback_failed" = "재생에 실패했습니다";

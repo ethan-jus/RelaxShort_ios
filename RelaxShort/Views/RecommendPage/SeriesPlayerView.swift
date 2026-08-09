@@ -689,28 +689,41 @@ struct SeriesPlayerView: View {
                 }
             }
         } catch {
-            let playbackVisible = isCurrentEpisodeVisible
-            unlockState = nil
             unlockPurchaseTab = nil
             isRewardedUnlockVerifying = false
-            episodeLoadError = playbackVisible
-                ? nil
-                : ((error as? APIError)?.code == "AD_REWARD_PENDING"
+            // 确认失败时不留下死胡同重试层：重新打开解锁面板并给出错误，
+            // 用户可以立即重试广告、金币或 VIP，播放页状态保持不动。
+            if var state = unlockState {
+                state.isProcessing = false
+                state.presentation = .primary
+                state.errorMessage = (error as? APIError)?.code == "AD_REWARD_PENDING"
                     ? "player.unlock_pending".localized
-                    : "player.entitlement_source_failed".localized)
-            if !playbackVisible {
+                    : "player.unlock_network_failed".localized
+                unlockState = state
+            } else if !isCurrentEpisodeVisible {
+                episodeLoadError = "player.entitlement_source_failed".localized
                 playerCoordinator.engine.endContentTransitionWithoutMedia()
             }
         }
     }
 
     private func confirmRewardedUnlock(_ session: AdRewardSession) async throws {
-        for attempt in 0..<12 {
-            let completion = try await dependencies.adRewardRepository.completeSession(session)
+        // 服务端客户端确认即发货；仅在网络异常时重试，不再长时间轮询等待 SSV。
+        for attempt in 0..<3 {
+            let completion: AdRewardCompletion
+            do {
+                completion = try await dependencies.adRewardRepository.completeSession(session)
+            } catch {
+                if attempt < 2 {
+                    try await Task.sleep(for: .milliseconds(500))
+                    continue
+                }
+                throw error
+            }
             if completion.isDelivered {
                 return
             }
-            if attempt < 11 {
+            if attempt < 2 {
                 try await Task.sleep(for: .milliseconds(500))
             }
         }

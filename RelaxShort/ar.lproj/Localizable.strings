@@ -418,6 +418,7 @@
 "player.continue_unlock" = "متابعة الفتح";
 "player.episode_not_unlocked" = "هذه الحلقة غير مفتوحة";
 "player.exit_playback" = "إنهاء التشغيل";
+"player.unlock_now" = "فتح الآن";
 "player.join_vip_unlock" = "الاشتراك في VIP والفتح";
 "player.top_up_unlock" = "الشحن والفتح";
 "player.playback_failed" = "فشل التشغيل";

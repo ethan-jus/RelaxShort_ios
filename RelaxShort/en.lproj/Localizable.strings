@@ -427,6 +427,7 @@
 "player.continue_unlock" = "Continue Unlocking";
 "player.episode_not_unlocked" = "This episode is not unlocked";
 "player.exit_playback" = "Exit Playback";
+"player.unlock_now" = "Unlock Now";
 "player.join_vip_unlock" = "Join VIP and Unlock";
 "player.top_up_unlock" = "Top Up and Unlock";
 "player.playback_failed" = "Playback failed";
