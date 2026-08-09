@@ -277,12 +277,16 @@ struct SeriesPlayerView: View {
                             onOpenPrimary: openPrimaryUnlockPanel,
                             onSelectMethod: selectUnlockMethod,
                             onPrimaryAction: handlePrimaryUnlockAction,
-                            onRewardedAd: { Task { await performUnlock(action: .rewardedAd) } },
+                            onRewardedAd: {
+                                // 进入广告前立即退出主解锁弹窗，广告与后台确认期间由状态层拦截重复操作。
+                                isRewardedUnlockVerifying = true
+                                Task { await performUnlock(action: .rewardedAd) }
+                            },
                             onExitPlayback: { dismiss() }
                         )
                             .zIndex(250)
                     }
-                } else if let episodeLoadError, !showEpisodeList {
+                } else if let episodeLoadError, !showEpisodeList, !isCurrentEpisodeVisible {
                     episodeLoadFailureOverlay(episodeLoadError)
                         .zIndex(240)
                 }
@@ -357,7 +361,7 @@ struct SeriesPlayerView: View {
         .onReceive(playerCoordinator.engine.$state) { state in
             playbackState = state
             if state == .playing {
-                if isCurrentEpisodePlaying {
+                if isCurrentEpisodeVisible {
                     episodeLoadError = nil
                 }
                 resetAutoHide()
@@ -366,7 +370,7 @@ struct SeriesPlayerView: View {
         }
         .onReceive(playerCoordinator.engine.$hasVisiblePlaybackStarted) { started in
             guard started else { return }
-            if isCurrentEpisodePlaying {
+            if isCurrentEpisodeVisible {
                 episodeLoadError = nil
             }
             let elapsed = (CACurrentMediaTime() - playbackTraceStartedAt) * 1000
@@ -405,11 +409,16 @@ struct SeriesPlayerView: View {
         }
     }
 
-    /// 网络或媒体失败不阻断上下滑动；用户可以重试当前集，也可以继续浏览其他集。
-    private var isCurrentEpisodePlaying: Bool {
+    /// 当前集已经有可见首帧时，任何旧的加载/失败提示都不能盖住视频。
+    private var isCurrentEpisodeVisible: Bool {
         playerCoordinator.owner == .series(dramaID: drama.id)
             && playerCoordinator.engine.currentItem?.episodeNumber == currentEpisode
             && playerCoordinator.engine.hasVisiblePlaybackStarted
+    }
+
+    /// 网络或媒体失败不阻断上下滑动；用户可以重试当前集，也可以继续浏览其他集。
+    private var isCurrentEpisodePlaying: Bool {
+        isCurrentEpisodeVisible
             && playerCoordinator.engine.state == .playing
     }
 
@@ -602,6 +611,9 @@ struct SeriesPlayerView: View {
             }
             await resumeEpisodeAfterUnlock(targetEpisode)
         } catch let error as APIError {
+            if action == .rewardedAd {
+                isRewardedUnlockVerifying = false
+            }
             guard var latest = unlockState else { return }
             latest.isProcessing = false
             latest.errorMessage = error.code == "INSUFFICIENT_COINS"
@@ -609,6 +621,9 @@ struct SeriesPlayerView: View {
                 : error.localizedDescription
             unlockState = latest
         } catch {
+            if action == .rewardedAd {
+                isRewardedUnlockVerifying = false
+            }
             guard var latest = unlockState else { return }
             latest.isProcessing = false
             latest.errorMessage = "player.unlock_network_failed".localized
@@ -664,20 +679,28 @@ struct SeriesPlayerView: View {
             // 播放源或播放器恢复失败时，不重新打开完整解锁弹窗，改成普通可重试提示。
             if let state = unlockState {
                 let message = state.errorMessage ?? "player.entitlement_source_failed".localized
+                let playbackVisible = isCurrentEpisodeVisible
                 unlockState = nil
                 unlockPurchaseTab = nil
                 isRewardedUnlockVerifying = false
-                episodeLoadError = message
-                playerCoordinator.engine.endContentTransitionWithoutMedia()
+                episodeLoadError = playbackVisible ? nil : message
+                if !playbackVisible {
+                    playerCoordinator.engine.endContentTransitionWithoutMedia()
+                }
             }
         } catch {
+            let playbackVisible = isCurrentEpisodeVisible
             unlockState = nil
             unlockPurchaseTab = nil
             isRewardedUnlockVerifying = false
-            episodeLoadError = (error as? APIError)?.code == "AD_REWARD_PENDING"
-                ? "player.unlock_pending".localized
-                : "player.entitlement_source_failed".localized
-            playerCoordinator.engine.endContentTransitionWithoutMedia()
+            episodeLoadError = playbackVisible
+                ? nil
+                : ((error as? APIError)?.code == "AD_REWARD_PENDING"
+                    ? "player.unlock_pending".localized
+                    : "player.entitlement_source_failed".localized)
+            if !playbackVisible {
+                playerCoordinator.engine.endContentTransitionWithoutMedia()
+            }
         }
     }
 
@@ -802,6 +825,7 @@ struct SeriesPlayerView: View {
         )
 
         isRewardedUnlockVerifying = false
+        episodeLoadError = nil
         unlockState = nil
         unlockPurchaseTab = nil
         resetAutoHide()

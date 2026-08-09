@@ -1108,15 +1108,10 @@ private struct EpisodePlayingWaveform: View {
 
 struct EpisodeUnlockVerificationOverlay: View {
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.16)
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-
-            ProgressView()
-                .tint(.white)
-                .scaleEffect(1.05)
-        }
+        // 只负责拦截重复操作，不再额外绘制 spinner；播放器自己的首帧 loading 是唯一反馈。
+        Color.clear
+            .ignoresSafeArea()
+            .contentShape(Rectangle())
         .allowsHitTesting(true)
         .accessibilityLabel("player.unlock_pending".localized)
     }
