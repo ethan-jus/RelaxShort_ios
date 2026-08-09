@@ -17,6 +17,6 @@ struct HomeCategoryCollection: Identifiable {
     let category: HomeCategory
     let dramas: [DramaItem]
 
-    var id: String { category.id }
+    var id: String { category.id + ":" + dramas.map(\.id).joined(separator: ",") }
     var title: String { category.title }
 }

@@ -82,22 +82,17 @@ struct YouMightLikeSection: View {
     private var twoColumnLayout: some View {
         var li: [Slot] = []; var ri: [Slot] = []
         var collectionIndex = 0; var dramaIndex = 0; var row = 1
-        while dramaIndex < dramas.count || collectionIndex < collections.count {
-            var consumed = false
+        // 与旧版一致：聚集卡只在短剧流达到对应行时插入，不在流末尾连续堆叠。
+        while dramaIndex < dramas.count {
             if collectionIndex < collections.count, isLCat(row) {
-                li.append(.category(collections[collectionIndex], collectionIndex)); collectionIndex += 1; consumed = true
+                li.append(.category(collections[collectionIndex], collectionIndex)); collectionIndex += 1
             } else if dramaIndex < dramas.count {
-                li.append(.drama(dramas[dramaIndex])); dramaIndex += 1; consumed = true
+                li.append(.drama(dramas[dramaIndex])); dramaIndex += 1
             }
             if collectionIndex < collections.count, isRCat(row) {
-                ri.append(.category(collections[collectionIndex], collectionIndex)); collectionIndex += 1; consumed = true
+                ri.append(.category(collections[collectionIndex], collectionIndex)); collectionIndex += 1
             } else if dramaIndex < dramas.count {
-                ri.append(.drama(dramas[dramaIndex])); dramaIndex += 1; consumed = true
-            }
-            if !consumed, collectionIndex < collections.count {
-                let slot = Slot.category(collections[collectionIndex], collectionIndex)
-                if li.count <= ri.count { li.append(slot) } else { ri.append(slot) }
-                collectionIndex += 1
+                ri.append(.drama(dramas[dramaIndex])); dramaIndex += 1
             }
             row += 1
         }
@@ -153,7 +148,12 @@ struct WaterfallCard: View {
     }
     @ViewBuilder private var footerRow: some View {
         if let r=rankText(rank:rank){HStack(spacing:4){Text(r).font(.system(size:11)).foregroundColor(DT.brandGold);Image(systemName:"chevron.right").font(.system(size:9,weight:.bold)).foregroundColor(DT.brandGold)}}
-        else{HStack(spacing:6){ForEach(drama.tags.prefix(2),id:\.self){tag in HStack(spacing:3){Text(tag.capitalized).font(.system(size:11));Image(systemName:"chevron.right").font(.system(size:8,weight:.bold))}.foregroundColor(DT.Color.textSecondary).padding(.horizontal,6).padding(.vertical,3).background(DT.Color.textPrimary.opacity(0.06)).cornerRadius(2)}}}
+        else {
+            let labels = drama.tags.isEmpty
+                ? (drama.category.isEmpty ? [] : [drama.category])
+                : Array(drama.tags.prefix(2))
+            HStack(spacing:6){ForEach(labels,id:\.self){tag in HStack(spacing:3){Text(tag).font(.system(size:11));Image(systemName:"chevron.right").font(.system(size:8,weight:.bold))}.foregroundColor(DT.Color.textSecondary).padding(.horizontal,6).padding(.vertical,3).background(DT.Color.textPrimary.opacity(0.06)).cornerRadius(2)}}
+        }
     }
 }
 

@@ -174,22 +174,36 @@ final class HomeViewModel: ObservableObject {
 
         let contentLanguage = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
-        var collections: [HomeCategoryCollection] = []
+        var chunksByCategory: [(HomeCategory, [[DramaItem]])] = []
 
         for category in categories {
-            guard collections.count < 5 else { break }
             do {
                 let items = try await repository.fetchCategorySeries(
                     code: category.code,
                     contentLang: contentLanguage,
                     country: country
                 )
-                let unique = Array(items.uniquedByID().prefix(4))
-                guard unique.count == 4 else { continue }
-                collections.append(HomeCategoryCollection(category: category, dramas: unique))
+                let unique = items.uniquedByID()
+                let chunks = stride(from: 0, to: unique.count, by: 4).compactMap { start -> [DramaItem]? in
+                    let end = min(start + 4, unique.count)
+                    guard end - start == 4 else { return nil }
+                    return Array(unique[start..<end])
+                }
+                if !chunks.isEmpty { chunksByCategory.append((category, chunks)) }
             } catch {
                 logError("HomeViewModel.loadHomeCategoryCollection failed code=\(category.code): \(error)")
             }
+        }
+
+        // 先覆盖不同分类，再使用同一分类的后续 4 部剧，保证真实数据不足时仍能维持原布局节奏。
+        var collections: [HomeCategoryCollection] = []
+        let maxChunkCount = chunksByCategory.map { $0.1.count }.max() ?? 0
+        for chunkIndex in 0..<maxChunkCount {
+            for (category, chunks) in chunksByCategory where chunkIndex < chunks.count {
+                collections.append(HomeCategoryCollection(category: category, dramas: chunks[chunkIndex]))
+                if collections.count == 5 { break }
+            }
+            if collections.count == 5 { break }
         }
         homeCategoryCollections = collections
     }
@@ -221,9 +235,8 @@ final class HomeViewModel: ObservableObject {
             forYouCursor = result.nextCursor
             forYouHasMore = result.hasMore
 
-            var blockedIDs = Set(fixedDramas.map(\.id))
-            blockedIDs.formUnion(homeCategoryCollections.flatMap { $0.dramas.map(\.id) })
-            if !reset { blockedIDs.formUnion(forYouDramas.map(\.id)) }
+            // 聚集卡是内容导航模块，允许与热门/推荐流交叉；只防止 For You 自身分页重复。
+            let blockedIDs: Set<String> = reset ? [] : Set(forYouDramas.map(\.id))
             let unique = result.items.filter { !blockedIDs.contains($0.id) }.uniquedByID()
             if reset {
                 forYouDramas = unique
