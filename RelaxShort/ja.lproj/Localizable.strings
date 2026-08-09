@@ -515,7 +515,6 @@
 "reward.task.watch_30_minutes.description" = "合計30分ドラマを視聴";
 "episode.locked_watch" = "解放して視聴";
 "episode.free_watch" = "無料視聴";
-"episode.paid" = "有料";
 "network.invalid_url" = "リクエスト先が無効です。";
 "network.invalid_response" = "サーバーから無効な応答が返されました。";
 "network.bad_status" = "リクエストに失敗しました（ステータス%d）。";

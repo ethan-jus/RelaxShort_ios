@@ -515,7 +515,6 @@
 "reward.task.watch_30_minutes.description" = "累計觀看短劇 30 分鐘";
 "episode.locked_watch" = "解鎖後觀看";
 "episode.free_watch" = "免費觀看";
-"episode.paid" = "付費";
 "network.invalid_url" = "無效的請求位址。";
 "network.invalid_response" = "伺服器回應異常。";
 "network.bad_status" = "請求失敗（狀態碼：%d）。";

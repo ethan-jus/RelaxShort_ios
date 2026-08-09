@@ -726,6 +726,356 @@ struct HDBadgeIconView: View {
     }
 }
 
+// MARK: - Shared Episode Unlock Overlay
+
+/// 全 App 共用的剧集解锁弹窗。
+///
+/// 播放器只负责权益状态、购买和解锁回调；VIP/金币选择、挽留层和锁定态的视觉实现全部在这里维护。
+struct EpisodeUnlockOverlay: View {
+    let state: EpisodeUnlockFlowState
+    let containerWidth: CGFloat
+    let containerHeight: CGFloat
+    let safeAreaTop: CGFloat
+    let safeAreaBottom: CGFloat
+    let onClose: () -> Void
+    let onOpenPrimary: () -> Void
+    let onSelectMethod: (EpisodeUnlockFlowState.Selection) -> Void
+    let onPrimaryAction: () -> Void
+    let onRewardedAd: () -> Void
+    let onExitPlayback: () -> Void
+
+    private enum PanelLayout {
+        static func primaryHeight(containerHeight: CGFloat) -> CGFloat {
+            min(430, max(320, containerHeight * 0.46))
+        }
+
+        static func bottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
+            max(34, safeAreaBottom + 18)
+        }
+    }
+
+    private var unlockGold: Color { Color(red: 1.0, green: 0.76, blue: 0.20) }
+    private var unlockPaleGold: Color { Color(red: 1.0, green: 0.90, blue: 0.62) }
+
+    private var unlockSheetGradient: LinearGradient {
+        LinearGradient(
+            colors: [Color(red: 0.13, green: 0.11, blue: 0.08), Color(red: 0.055, green: 0.05, blue: 0.044), .black],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    var body: some View {
+        let standardRetentionHeight: CGFloat = 206
+        let upwardAdjustment: CGFloat = 32
+        let retentionBottomInset = max(safeAreaBottom + 44, containerHeight * 0.1)
+        let retentionTopInset = max(
+            safeAreaTop + 24,
+            containerHeight - retentionBottomInset - standardRetentionHeight - upwardAdjustment
+        )
+
+        ZStack {
+            Color.black.opacity(0.76)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+
+            switch state.presentation {
+            case .primary:
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    primaryPanel
+                        .frame(width: containerWidth)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            case .retention:
+                retentionDialog
+                    .frame(width: min(containerWidth - 40, 420))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, retentionTopInset)
+                    .transition(.scale(scale: 0.94).combined(with: .opacity))
+            case .lockedFrame:
+                finalLockedFrame
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .allowsHitTesting(true)
+    }
+
+    private var primaryPanel: some View {
+        let panelHeight = PanelLayout.primaryHeight(containerHeight: containerHeight)
+        let isCompact = panelHeight < 370
+        let choiceHeight: CGFloat = isCompact ? 62 : 76
+
+        return VStack(spacing: 0) {
+            HStack {
+                if !state.vipOnly {
+                    unlockMetadata
+                } else {
+                    Label("player.vip_exclusive".localized, systemImage: "crown.fill")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(unlockPaleGold)
+                }
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .frame(width: 34, height: 34)
+                        .background(.white.opacity(0.09), in: Circle())
+                }
+                .accessibilityLabel("general.close".localized)
+            }
+
+            VStack(spacing: isCompact ? 8 : 10) {
+                unlockChoice(
+                    title: "player.vip_all_access".localized,
+                    subtitle: "player.vip_all_access_detail".localized,
+                    icon: "crown.fill",
+                    selected: state.selection == .vip,
+                    height: choiceHeight
+                ) { onSelectMethod(.vip) }
+
+                if state.canUnlockWithCoins {
+                    unlockChoice(
+                        title: "player.coin_unlock".localized,
+                        subtitle: "player.coin_unlock_detail".localized,
+                        icon: "bitcoinsign.circle.fill",
+                        selected: state.selection == .coins,
+                        height: choiceHeight
+                    ) { onSelectMethod(.coins) }
+                }
+            }
+            .padding(.top, isCompact ? 10 : 18)
+
+            Spacer(minLength: isCompact ? 8 : 14)
+
+            if let message = state.errorMessage {
+                Text(message)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color(red: 1, green: 0.43, blue: 0.38))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 10)
+            }
+
+            Button(action: onPrimaryAction) {
+                HStack(spacing: 8) {
+                    if state.isProcessing {
+                        ProgressView().tint(.black)
+                    }
+                    Text(state.primaryButtonTitle)
+                        .font(.system(size: 17, weight: .bold))
+                }
+                .foregroundStyle(.black)
+                .frame(maxWidth: .infinity)
+                .frame(height: isCompact ? 52 : 58)
+                .background(
+                    LinearGradient(
+                        colors: [.white, unlockPaleGold, unlockGold],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 15)
+                )
+                .shadow(color: unlockGold.opacity(0.25), radius: 18, y: 8)
+            }
+            .disabled(state.isProcessing)
+
+            Group {
+                if state.canUnlockWithAd {
+                    Button(action: onRewardedAd) {
+                        Text("player.ad_unlock".localized)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .underline(color: .white.opacity(0.28))
+                    }
+                    .disabled(state.isProcessing)
+                } else {
+                    Color.clear.accessibilityHidden(true)
+                }
+            }
+            .frame(height: 18)
+            .padding(.top, isCompact ? 8 : 12)
+        }
+        .padding(.horizontal, 22)
+        .padding(.top, isCompact ? 14 : 22)
+        .padding(.bottom, PanelLayout.bottomPadding(safeAreaBottom: safeAreaBottom))
+        .frame(height: panelHeight, alignment: .top)
+        .background(
+            unlockSheetGradient,
+            in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+        )
+        .overlay(
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                .stroke(
+                    LinearGradient(colors: [unlockGold.opacity(0.5), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 1
+                )
+        )
+        .environment(\.colorScheme, .dark)
+    }
+
+    private var unlockMetadata: some View {
+        HStack(spacing: 13) {
+            unlockMetadataItem(label: "player.this_episode".localized, value: state.coinCost)
+            Rectangle().fill(.white.opacity(0.14)).frame(width: 1, height: 18)
+            unlockMetadataItem(label: "player.balance".localized, value: state.balance)
+        }
+    }
+
+    private func unlockMetadataItem(label: String, value: Int) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+            Image(systemName: "bitcoinsign.circle.fill")
+                .foregroundStyle(unlockGold)
+            Text("\(value)")
+        }
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(.white.opacity(0.86))
+    }
+
+    private func unlockChoice(
+        title: String,
+        subtitle: String,
+        icon: String,
+        selected: Bool,
+        height: CGFloat,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(selected ? unlockGold : .white.opacity(0.55))
+                    .frame(width: 36, height: 36)
+                    .background(selected ? unlockGold.opacity(0.12) : .white.opacity(0.06), in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.5))
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .frame(height: height)
+            .background(selected ? unlockGold.opacity(0.12) : .white.opacity(0.035))
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(selected ? unlockGold : .white.opacity(0.08), lineWidth: selected ? 1.6 : 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+        }
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var retentionDialog: some View {
+        VStack(spacing: 12) {
+            HStack {
+                Text(state.vipOnly ? "player.continue_watching".localized : "player.choose_unlock_method".localized)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(unlockPaleGold)
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .frame(width: 34, height: 34)
+                        .background(.white.opacity(0.09), in: Circle())
+                }
+                .accessibilityLabel("general.close".localized)
+            }
+
+            retentionActionButton(
+                title: state.vipOnly ? "player.join_vip_continue".localized : "player.continue_unlock".localized,
+                icon: state.vipOnly ? "crown.fill" : "lock.fill",
+                selected: true,
+                disabled: state.isProcessing,
+                action: onOpenPrimary
+            )
+
+            if state.canUnlockWithAd {
+                retentionActionButton(
+                    title: "player.ad_unlock".localized,
+                    icon: "play.rectangle.fill",
+                    selected: false,
+                    disabled: state.isProcessing,
+                    action: onRewardedAd
+                )
+            }
+
+            if state.isProcessing {
+                ProgressView().tint(unlockGold)
+            } else if let errorMessage = state.errorMessage {
+                Text(errorMessage)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color(red: 1, green: 0.43, blue: 0.38))
+            }
+        }
+        .padding(18)
+        .background(
+            unlockSheetGradient,
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .stroke(
+                    LinearGradient(colors: [unlockGold.opacity(0.5), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: 1
+                )
+        )
+    }
+
+    private func retentionActionButton(
+        title: String,
+        icon: String,
+        selected: Bool,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(selected ? .black : unlockPaleGold)
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(
+                    selected
+                        ? AnyShapeStyle(LinearGradient(colors: [.white, unlockPaleGold, unlockGold], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        : AnyShapeStyle(unlockGold.opacity(0.08)),
+                    in: RoundedRectangle(cornerRadius: 15)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(unlockGold.opacity(selected ? 0 : 0.72), lineWidth: selected ? 0 : 1.4)
+                )
+        }
+        .disabled(disabled)
+        .opacity(disabled ? 0.58 : 1)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var finalLockedFrame: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(unlockGold)
+            Text("player.episode_not_unlocked".localized)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.82))
+            Button(action: onExitPlayback) {
+                Text("player.exit_playback".localized)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(unlockPaleGold)
+                    .padding(.horizontal, 28)
+                    .frame(height: 44)
+                    .overlay(Capsule().stroke(unlockGold.opacity(0.62), lineWidth: 1))
+            }
+        }
+    }
+}
+
 // MARK: - Shared Episode Picker Sheet
 
 /// 推荐页、Series 播放页和全屏播放器共用的选集弹层。
@@ -750,9 +1100,11 @@ struct EpisodePickerSheet: View {
     private struct EpisodeVisualState {
         let wasLocked: Bool
         let isUnlocked: Bool
-        let isPaid: Bool
+        let requiresVIP: Bool
 
         var isLockedForDisplay: Bool { wasLocked && !isUnlocked }
+        var showsLockBadge: Bool { !requiresVIP && isLockedForDisplay }
+        var showsUnlockedBadge: Bool { !requiresVIP && wasLocked && isUnlocked }
     }
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
@@ -819,7 +1171,7 @@ struct EpisodePickerSheet: View {
 
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 0) {
-                            header
+                            header(containerWidth: geo.size.width)
                             synopsisBlock
 
                             Rectangle()
@@ -881,14 +1233,17 @@ struct EpisodePickerSheet: View {
         .gesture(sheetDragGesture)
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 16) {
+    private func header(containerWidth: CGFloat) -> some View {
+        let posterWidth = min(150, max(106, containerWidth * 0.385))
+        let posterHeight = posterWidth * 1.53
+
+        return HStack(alignment: .top, spacing: 16) {
             CoverImageView(
                 url: drama.coverURL,
                 aspectRatio: 2.0 / 3.0,
                 cornerRadius: DB.posterRadius,
-                width: 106,
-                height: 144
+                width: posterWidth,
+                height: posterHeight
             )
 
             VStack(alignment: .leading, spacing: 8) {
@@ -1076,59 +1431,73 @@ struct EpisodePickerSheet: View {
             onSelectEpisode(episodeNumber)
             dismiss()
         } label: {
-            VStack(spacing: 5) {
-                Text("\(episodeNumber)")
-                    .font(.system(size: 19, weight: isCurrent ? .bold : .medium))
-                    .foregroundColor(
-                        isCurrent
-                            ? .white
-                            : (state.isPaid ? DB.gold : (isLocked ? DB.mutedText : .white.opacity(0.88)))
-                    )
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 5) {
+                    Spacer(minLength: 0)
 
-                if isCurrent {
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 10, weight: .bold))
+                    Text("\(episodeNumber)")
+                        .font(.system(size: 19, weight: isCurrent ? .bold : .medium))
                         .foregroundColor(.white)
-                        .frame(height: 12)
-                } else if state.isPaid {
-                    Text(L10n.paidEpisode)
-                        .font(.system(size: 10, weight: .bold))
+
+                    if isCurrent {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(height: 12)
+                    } else {
+                        Color.clear.frame(height: 12)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 66)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
+                            isCurrent
+                                ? DB.logoRed
+                                : (isLocked ? Color.white.opacity(0.055) : Color.white.opacity(0.085))
+                        )
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(
+                            state.requiresVIP && !isCurrent
+                                ? DB.gold.opacity(0.30)
+                                : Color.white.opacity(isCurrent ? 0 : 0.07),
+                            lineWidth: 1
+                        )
+                }
+
+                if state.requiresVIP {
+                    Text("VIP")
+                        .font(.system(size: 9, weight: .bold))
                         .foregroundColor(DB.gold)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 5)
                         .frame(height: 16)
-                        .background(DB.gold.opacity(0.14), in: Capsule())
-                } else if state.wasLocked && state.isUnlocked {
-                    Image(systemName: "lock.open.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DB.gold.opacity(0.82))
-                        .frame(height: 14)
-                } else if isLocked {
+                        .background(DB.gold.opacity(0.14), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .stroke(DB.gold.opacity(0.35), lineWidth: 1)
+                        }
+                        .padding(.top, 7)
+                        .padding(.trailing, 7)
+                } else if state.showsLockBadge {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(DB.mutedText)
-                        .frame(height: 14)
-                } else {
-                    Color.clear.frame(height: 14)
+                        .foregroundColor(.white)
+                        .frame(width: 22, height: 22)
+                        .padding(.top, 4)
+                        .padding(.trailing, 4)
+                } else if state.showsUnlockedBadge {
+                    Image(systemName: "lock.open.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 22, height: 22)
+                        .padding(.top, 4)
+                        .padding(.trailing, 4)
                 }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 66)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        isCurrent
-                            ? DB.logoRed
-                            : (isLocked ? Color.white.opacity(0.055) : Color.white.opacity(0.085))
-                    )
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(
-                        state.isPaid && !isCurrent
-                            ? DB.gold.opacity(0.30)
-                            : Color.white.opacity(isCurrent ? 0 : 0.07),
-                        lineWidth: 1
-                    )
             }
         }
         .buttonStyle(.plain)
@@ -1141,12 +1510,11 @@ struct EpisodePickerSheet: View {
             || episode?.isUnlocked == true
             || unlockedEpisodes.contains(episodeNumber)
         let requiresVIP = episode?.requiresVIP ?? false
-        let canUnlockWithCoins = episode?.unlockCoinPrice != nil
 
         return EpisodeVisualState(
             wasLocked: wasLocked,
             isUnlocked: isUnlocked,
-            isPaid: wasLocked && !isUnlocked && canUnlockWithCoins && !requiresVIP
+            requiresVIP: requiresVIP
         )
     }
 

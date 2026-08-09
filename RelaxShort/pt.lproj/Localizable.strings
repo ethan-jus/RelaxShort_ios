@@ -515,7 +515,6 @@
 "reward.task.watch_30_minutes.description" = "Assista a dramas por 30 minutos no total";
 "episode.locked_watch" = "Desbloqueie para assistir";
 "episode.free_watch" = "Grátis";
-"episode.paid" = "Pago";
 "network.invalid_url" = "O endereço da solicitação é inválido.";
 "network.invalid_response" = "O servidor retornou uma resposta inválida.";
 "network.bad_status" = "A solicitação falhou (status %d).";

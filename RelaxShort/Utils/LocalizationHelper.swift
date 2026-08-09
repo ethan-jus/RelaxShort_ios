@@ -371,8 +371,6 @@ enum L10n {
         loc("episode.total_count", formatArgs: [count])
     }
 
-    static var paidEpisode: String { loc("episode.paid") }
-
     // MARK: - Splash
 
     static var splashTagline: String { loc("splash.tagline") }

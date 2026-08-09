@@ -14,7 +14,7 @@ struct Episode: Codable, Identifiable {
     var videoURL: String
     /// 视频时长（秒）
     let duration: TimeInterval
-    /// 是否锁定（需付费/VIP 解锁）
+    /// 是否锁定（需要 VIP 或其他解锁权益）
     let isLocked: Bool
     /// 当前用户是否通过金币或广告获得了永久解锁权益。
     var isUnlocked: Bool = false

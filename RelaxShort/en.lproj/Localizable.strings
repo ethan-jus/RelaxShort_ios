@@ -528,7 +528,6 @@
 
 "episode.locked_watch" = "Unlock to Watch";
 "episode.free_watch" = "Free to Watch";
-"episode.paid" = "Paid";
 
 "network.invalid_url" = "The request address is invalid.";
 "network.invalid_response" = "The server returned an invalid response.";

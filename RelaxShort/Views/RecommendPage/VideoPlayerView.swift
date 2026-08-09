@@ -205,7 +205,7 @@ import Combine
 
         guard let pIdx = playableIndex(for: new) else {
             // 极端情况下仍允许进入封面占位页并暂停旧音频，用户可以继续滑动；
-            // For You 不展示付费解锁，也不能被一条坏数据困住。
+            // For You 不展示解锁流程，也不能被一条坏数据困住。
             coordinator.pauseForYou()
             currentIndex = new
             poolVersion &+= 1
