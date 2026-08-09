@@ -68,10 +68,10 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             print("🦐 [AdService] 冷启动开屏广告准备结果: \(appOpenLoaded)")
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                async let rewarded: Void = self.preloadRewardedAd(
+                async let rewarded: Bool = self.preloadRewardedAd(
                     placement: config.rewardedEarnCoins
                 )
-                async let rewardedInterstitial: Void = self.preloadRewardedAd(
+                async let rewardedInterstitial: Bool = self.preloadRewardedAd(
                     placement: config.interstitialUnlockEpisode
                 )
                 _ = await (rewarded, rewardedInterstitial)
@@ -128,26 +128,27 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         ad.present(from: topVC)
     }
 
-    func preloadRewardedAd(placement: AdPlacementConfig) async {
+    @discardableResult
+    func preloadRewardedAd(placement: AdPlacementConfig) async -> Bool {
         guard PrivacyConsentManager.shared.isAdRequestAllowed else {
             print("🦐 [AdService] 跳过激励广告预加载：UMP 未允许广告请求")
-            return
+            return false
         }
         guard await waitForSDKReady() else {
             print("🦐 [AdService] 跳过激励广告预加载：SDK 初始化超时")
-            return
+            return false
         }
         guard placement.enabled, !placement.adUnitID.isEmpty else {
             print("🦐 [AdService] 跳过激励广告预加载：广告位关闭或 unitID 为空")
-            return
+            return false
         }
         switch placement.format {
         case .rewarded:
-            _ = await ensureRewardedAd(for: placement.adUnitID)
+            return await ensureRewardedAd(for: placement.adUnitID) != nil
         case .rewardedInterstitial:
-            _ = await ensureRewardedInterstitialAd(for: placement.adUnitID)
+            return await ensureRewardedInterstitialAd(for: placement.adUnitID) != nil
         default:
-            return
+            return false
         }
     }
 
@@ -191,7 +192,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
                     from: viewController,
                     rewardCoins: placement.rewardCoins
                 )
-                Task { await preloadRewardedAd(placement: placement) }
+                Task { _ = await preloadRewardedAd(placement: placement) }
                 return result
             case .rewardedInterstitial:
                 guard let ad = await takeRewardedInterstitialAd(for: placement.adUnitID) else {
@@ -204,7 +205,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
                     from: viewController,
                     rewardCoins: placement.rewardCoins
                 )
-                Task { await preloadRewardedAd(placement: placement) }
+                Task { _ = await preloadRewardedAd(placement: placement) }
                 return result
             default:
                 return .failed

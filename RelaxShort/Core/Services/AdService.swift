@@ -19,8 +19,9 @@ enum AdRewardResult {
 protocol AdServiceProtocol {
     /// 启动后预加载各广告位，降低用户点击后的等待时间。
     func prepareAds() async
-    /// 按广告位预加载一条激励广告；不同格式分别缓存。
-    func preloadRewardedAd(placement: AdPlacementConfig) async
+    /// 按广告位预加载一条激励广告；返回广告是否已经可以立即展示。
+    @discardableResult
+    func preloadRewardedAd(placement: AdPlacementConfig) async -> Bool
     /// 根据服务端广告位格式展示激励视频或激励插屏。
     func showRewardedAd(
         placement: AdPlacementConfig,
@@ -55,7 +56,8 @@ final class MockAdService: ObservableObject, AdServiceProtocol {
 
     func prepareAds() async {}
 
-    func preloadRewardedAd(placement: AdPlacementConfig) async {}
+    @discardableResult
+    func preloadRewardedAd(placement: AdPlacementConfig) async -> Bool { true }
 
     func showRewardedAd(
         placement: AdPlacementConfig,

@@ -278,8 +278,7 @@ struct SeriesPlayerView: View {
                             onSelectMethod: selectUnlockMethod,
                             onPrimaryAction: handlePrimaryUnlockAction,
                             onRewardedAd: {
-                                // 进入广告前立即退出主解锁弹窗，广告与后台确认期间由状态层拦截重复操作。
-                                isRewardedUnlockVerifying = true
+                                // 未命中预加载时保留弹窗并显示按钮 loading；广告就绪后再关闭。
                                 Task { await performUnlock(action: .rewardedAd) }
                             },
                             onExitPlayback: { dismiss() }
@@ -589,6 +588,7 @@ struct SeriesPlayerView: View {
               action != .rewardedAd || state.canUnlockWithAd else { return }
         let targetEpisode = state.playbackTargetEpisode
         state.isProcessing = true
+        state.isPreparingRewardedAd = action == .rewardedAd
         state.errorMessage = nil
         unlockState = state
         do {
@@ -616,6 +616,7 @@ struct SeriesPlayerView: View {
             }
             guard var latest = unlockState else { return }
             latest.isProcessing = false
+            latest.isPreparingRewardedAd = false
             latest.errorMessage = error.code == "INSUFFICIENT_COINS"
                 ? "player.insufficient_balance".localized
                 : error.localizedDescription
@@ -626,6 +627,7 @@ struct SeriesPlayerView: View {
             }
             guard var latest = unlockState else { return }
             latest.isProcessing = false
+            latest.isPreparingRewardedAd = false
             latest.errorMessage = "player.unlock_network_failed".localized
             unlockState = latest
         }
@@ -635,14 +637,23 @@ struct SeriesPlayerView: View {
     private func unlockEpisodeWithRewardedInterstitial(episodeID: String) async throws -> AdRewardSession {
         let placement = try await resolvedEpisodeUnlockAdPlacement()
 
+        // 点击时先确认缓存广告确实就绪；未命中时弹窗继续显示按钮 loading。
+        guard await dependencies.adService.preloadRewardedAd(placement: placement) else {
+            throw APIError(code: "AD_LOAD_FAILED", message: "reward.ad_load_failed".localized)
+        }
+
         let session = try await dependencies.adRewardRepository.startSession(
             placementCode: placement.placementCode,
             rewardType: "unlock_episode",
             targetEpisodeID: episodeID
         )
         guard session.placement.format == .rewardedInterstitial else {
+            await dependencies.adRewardRepository.cancelSession(session)
             throw APIError(code: "AD_FORMAT_MISMATCH", message: "reward.ad_config_mismatch".localized)
         }
+
+        // 广告与后端会话均准备完成，下一步会立即 present；此时才关闭完整解锁弹窗。
+        isRewardedUnlockVerifying = true
 
         let result = await dependencies.adService.showRewardedAd(
             placement: session.placement,
@@ -697,6 +708,7 @@ struct SeriesPlayerView: View {
             // 用户可以立即重试广告、金币或 VIP，播放页状态保持不动。
             if var state = unlockState {
                 state.isProcessing = false
+                state.isPreparingRewardedAd = false
                 state.presentation = .primary
                 state.errorMessage = (error as? APIError)?.code == "AD_REWARD_PENDING"
                     ? "player.unlock_pending".localized

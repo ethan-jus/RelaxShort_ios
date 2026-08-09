@@ -76,6 +76,8 @@ struct EpisodeUnlockFlowState: Equatable {
     var selection: Selection
     var presentation: Presentation = .primary
     var isProcessing = false
+    /// 广告未命中预加载时，解锁弹窗保持展示并在广告按钮上显示准备状态。
+    var isPreparingRewardedAd = false
     var errorMessage: String?
     private(set) var hasShownRetention = false
 

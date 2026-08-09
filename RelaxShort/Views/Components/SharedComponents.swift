@@ -860,7 +860,7 @@ struct EpisodeUnlockOverlay: View {
 
             Button(action: onPrimaryAction) {
                 HStack(spacing: 8) {
-                    if state.isProcessing {
+                    if state.isProcessing && !state.isPreparingRewardedAd {
                         ProgressView().tint(.black)
                     }
                     Text(state.primaryButtonTitle)
@@ -884,10 +884,17 @@ struct EpisodeUnlockOverlay: View {
             Group {
                 if state.canUnlockWithAd {
                     Button(action: onRewardedAd) {
-                        Text("player.ad_unlock".localized)
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.62))
-                            .underline(color: .white.opacity(0.28))
+                        HStack(spacing: 7) {
+                            if state.isPreparingRewardedAd {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.white.opacity(0.72))
+                            }
+                            Text("player.ad_unlock".localized)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.62))
+                                .underline(color: .white.opacity(0.28))
+                        }
                     }
                     .disabled(state.isProcessing)
                 } else {
