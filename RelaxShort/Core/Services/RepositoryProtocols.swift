@@ -24,8 +24,8 @@ protocol HomeRepositoryProtocol {
     func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]
     /// 按分类和内容语言获取首页分类内容；categoryCode 为空时获取全部分类内容。
     func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem]
-    /// 获取数据库启用且当前 App 可展示的语言目录。
-    func fetchSupportedLanguages() async throws -> [String]
+    /// 获取数据库启用的内容语言目录；不受 App 界面语言资源范围限制。
+    func fetchSupportedLanguages() async throws -> [HomeContentLanguage]
     /// 获取真实 For You 推荐流；登录用户由后端基于行为偏好重排，匿名用户使用全局推荐。
     func fetchForYouPaginated(contentLang: String?, country: String?, cursor: String?, limit: Int,
                               feedSeed: String?) async throws -> (
@@ -56,8 +56,14 @@ extension HomeRepositoryProtocol {
         return []
     }
     /// 默认实现：Mock 使用当前 App 已内置的语言资源。
-    func fetchSupportedLanguages() async throws -> [String] {
-        AppLanguage.allCases.map(\.rawValue)
+    func fetchSupportedLanguages() async throws -> [HomeContentLanguage] {
+        AppLanguage.allCases.map {
+            HomeContentLanguage(
+                code: $0.rawValue,
+                nameEn: $0.nativeDisplayName,
+                nameNative: $0.nativeDisplayName
+            )
+        }
     }
     func fetchForYouPaginated(contentLang: String?, country: String?, cursor: String?, limit: Int,
                               feedSeed: String?) async throws -> (

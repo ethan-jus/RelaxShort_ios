@@ -31,8 +31,10 @@ final class HomeViewModel: ObservableObject {
     @Published var isCategoryLoading: Bool = false
     /// 分类错误信息
     @Published var categoryErrorMessage: String?
-    /// 数据库启用且当前 App 已提供本地化资源的语言编码。
-    @Published var supportedLanguageCodes: [String] = AppLanguage.allCases.map(\.rawValue)
+    /// 数据库启用的内容语言；与 App 界面语言资源范围相互独立。
+    @Published var supportedLanguages: [HomeContentLanguage] = AppLanguage.allCases.map {
+        HomeContentLanguage(code: $0.rawValue, nameEn: $0.nativeDisplayName, nameNative: $0.nativeDisplayName)
+    }
     /// 当前分类筛选请求的后端分类 code；为空表示全部分类。
     private var selectedCategoryCode: String?
     /// 当前分类筛选请求的内容语言；为空表示使用默认内容语言。
@@ -144,12 +146,12 @@ final class HomeViewModel: ObservableObject {
 
         if repository.usesRemoteContentCatalog {
             // 真实目录请求失败时不保留本地语言枚举，避免把静态数据冒充服务端目录。
-            supportedLanguageCodes = []
+            supportedLanguages = []
         }
         do {
             let languages = try await repository.fetchSupportedLanguages()
             if !languages.isEmpty {
-                supportedLanguageCodes = languages
+                supportedLanguages = languages
             }
         } catch {
             logError("HomeViewModel.loadSupportedLanguages failed: \(error)")
@@ -305,6 +307,20 @@ final class HomeViewModel: ObservableObject {
             categories.first(where: { $0.code == code })
         }
         await loadCategoryDramas(for: category, contentLanguage: selectedContentLanguage)
+    }
+
+    /// App 界面语言切换后重新请求分类字典；分类 code 和内容语言筛选保持不变。
+    func reloadCategoryLocalizations() async {
+        do {
+            categories = try await repository.fetchHomeCategories()
+            if let selectedCategoryCode,
+               let index = categories.firstIndex(where: { $0.code == selectedCategoryCode }) {
+                selectedCategoryIndex = index
+            }
+            await loadHomeCategoryCollections()
+        } catch {
+            logError("HomeViewModel.reloadCategoryLocalizations failed: \(error)")
+        }
     }
 
     private func loadCategoryDramas(for category: HomeCategory?, contentLanguage: String?) async {

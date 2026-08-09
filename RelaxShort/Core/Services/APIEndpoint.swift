@@ -295,10 +295,8 @@ extension APIEndpoint {
             "Accept-Language": AppLocalization.currentLanguage.rawValue
         ]
 
-        // App 启动后保存的语言上下文
-        if let uiLang = UserDefaults.standard.string(forKey: "app_ui_language"), !uiLang.isEmpty {
-            base["X-App-Language"] = uiLang
-        }
+        // 界面语言以用户当前选择为准，避免 app/init 的旧结果覆盖实时语言设置。
+        base["X-App-Language"] = AppLocalization.currentLanguage.rawValue
         if let contentLang = UserDefaults.standard.string(forKey: "app_content_language"), !contentLang.isEmpty {
             // 在需要时作为 query 参数使用，不单独做 header
             _ = contentLang

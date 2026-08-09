@@ -129,8 +129,10 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     // MARK: - Categories
 
     func fetchHomeCategories() async throws -> [HomeCategory] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_ui_language")
-            let country = UserDefaults.standard.string(forKey: "app_country_code")
+        // 分类名称属于界面文案，必须跟随用户当前选择的 App 语言，
+        // 不能使用 app/init 早先写入、可能已经过期的语言结果。
+        let contentLang = AppLocalization.currentLanguage.rawValue
+        let country = UserDefaults.standard.string(forKey: "app_country_code")
         let dto: CategoriesResponseDTO = try await client.requestData(
             .categories(contentLanguage: contentLang, countryCode: country)
         )
@@ -165,7 +167,7 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     // MARK: - Categories
 
     func fetchCategories() async throws -> [CategoryItemDTO] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_ui_language")
+        let contentLang = AppLocalization.currentLanguage.rawValue
         let country = UserDefaults.standard.string(forKey: "app_country_code")
         let dto: CategoriesResponseDTO = try await client.requestData(
             .categories(contentLanguage: contentLang, countryCode: country)
@@ -173,9 +175,15 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         return dto.items ?? []
     }
 
-    func fetchSupportedLanguages() async throws -> [String] {
+    func fetchSupportedLanguages() async throws -> [HomeContentLanguage] {
         let items: [SupportedLanguageDTO] = try await client.requestData(.languages)
-        return items.map(\.code).filter { AppLanguage(rawValue: $0) != nil }
+        return items.map {
+            HomeContentLanguage(
+                code: $0.code,
+                nameEn: $0.nameEn ?? "",
+                nameNative: $0.nameNative ?? ""
+            )
+        }
     }
 }
 

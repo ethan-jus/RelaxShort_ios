@@ -165,6 +165,9 @@ struct HomeView: View {
             guard tab == .home else { return }
             Task { await rewardSummaryStore.refresh() }
         }
+        .onChange(of: appStore.language) { _, _ in
+            Task { await viewModel.reloadCategoryLocalizations() }
+        }
     }
 
     /// Home 卡片直接发起全局播放页路由，避免中转 State 的写入和清空在 push 动画期间重复重建首页。
@@ -315,14 +318,14 @@ struct HomeView: View {
 
     // MARK: - Tab 3: Categories
 
-    /// 语言行：All 和数据库启用、且当前 App 已内置本地化资源的语言。
+    /// 语言行：All 和数据库启用的全部内容语言。
     private var languageOptions: [CategoryFilterOption] {
         var options = [CategoryFilterOption(id: "All", title: "filter.all".localized)]
-        options.append(contentsOf: viewModel.supportedLanguageCodes
-            .map { code in
+        options.append(contentsOf: viewModel.supportedLanguages
+            .map { language in
                 CategoryFilterOption(
-                    id: code,
-                    title: AppLanguage(rawValue: code)?.displayName ?? code
+                    id: language.code,
+                    title: language.displayName
                 )
             })
         return options
@@ -391,7 +394,7 @@ struct HomeView: View {
     }
 
     private var categoriesTabContent: some View {
-        GeometryReader { _ in
+        GeometryReader { geo in
             let filterHideThreshold = HomeMetrics.categoryFilterHideThreshold
             let filterIsFullyHidden = categoryScrollOffsetY >= filterHideThreshold
 
@@ -402,7 +405,7 @@ struct HomeView: View {
 
                     categoryFilterContent
 
-                    categoryGridStateContent
+                    categoryGridStateContent(containerW: geo.size.width)
                 }
                 .onChange(of: categoryScrollOffsetY) { _, offset in
                     if offset < filterHideThreshold {
@@ -484,7 +487,7 @@ struct HomeView: View {
     }
 
     @ViewBuilder
-    private var categoryGridStateContent: some View {
+    private func categoryGridStateContent(containerW: CGFloat) -> some View {
         if viewModel.isCategoryLoading {
             VStack {
                 Spacer(minLength: 120)
@@ -502,19 +505,11 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity)
         } else {
-            let dramas = viewModel.categoryDramas
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: DT.Space.sm), count: 3), spacing: DT.Space.md) {
-                ForEach(dramas) { drama in
-                    Button { openSeries(drama) } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: DB.posterWidth, height: DB.posterHeight)
-                            Text(drama.title).font(.system(size: 12, weight: .medium)).foregroundColor(.white).lineLimit(1)
-                            Text("home.episode_short".localizedFormat(drama.episodeCount)).font(.system(size: 10)).foregroundColor(DB.mutedText)
-                        }
-                    }.buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, DT.Space.pageH)
+            MarketingGrid(
+                dramas: viewModel.categoryDramas,
+                playerDrama: seriesNavigationBinding,
+                containerW: containerW
+            )
             Color.clear.frame(height: 72)
         }
     }
