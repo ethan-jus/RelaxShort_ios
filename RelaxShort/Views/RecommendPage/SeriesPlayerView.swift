@@ -552,7 +552,7 @@ struct SeriesPlayerView: View {
         let episode = episodes.first(where: { $0.episodeNumber == episodeNumber })
         unlockState = EpisodeUnlockFlowState(
             episodeNumber: episodeNumber,
-            coinCost: max(0, episode?.unlockCoinPrice ?? 30),
+            coinCost: max(0, episode?.unlockCoinPrice ?? Episode.defaultUnlockCoinCost),
             balance: coinStore.coinBalance,
             vipOnly: episode?.requiresVIP ?? false
         )
@@ -652,8 +652,10 @@ struct SeriesPlayerView: View {
         case .rewarded:
             return session
         case .cancelled:
+            await dependencies.adRewardRepository.cancelSession(session)
             throw APIError(code: "AD_NOT_COMPLETED", message: "player.ad_not_completed".localized)
         case .failed:
+            await dependencies.adRewardRepository.cancelSession(session)
             throw APIError(code: "AD_LOAD_FAILED", message: "reward.ad_load_failed".localized)
         }
     }

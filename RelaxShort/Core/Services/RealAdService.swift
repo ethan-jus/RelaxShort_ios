@@ -129,10 +129,18 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     }
 
     func preloadRewardedAd(placement: AdPlacementConfig) async {
-        guard isSDKReady,
-              PrivacyConsentManager.shared.isAdRequestAllowed,
-              placement.enabled,
-              !placement.adUnitID.isEmpty else { return }
+        guard PrivacyConsentManager.shared.isAdRequestAllowed else {
+            print("🦐 [AdService] 跳过激励广告预加载：UMP 未允许广告请求")
+            return
+        }
+        guard await waitForSDKReady() else {
+            print("🦐 [AdService] 跳过激励广告预加载：SDK 初始化超时")
+            return
+        }
+        guard placement.enabled, !placement.adUnitID.isEmpty else {
+            print("🦐 [AdService] 跳过激励广告预加载：广告位关闭或 unitID 为空")
+            return
+        }
         switch placement.format {
         case .rewarded:
             _ = await ensureRewardedAd(for: placement.adUnitID)
@@ -147,14 +155,26 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         placement: AdPlacementConfig,
         ssvCustomData: String
     ) async -> AdRewardResult {
-        guard isSDKReady,
-              PrivacyConsentManager.shared.isAdRequestAllowed,
-              placement.enabled,
+        guard PrivacyConsentManager.shared.isAdRequestAllowed else {
+            print("🦐 [AdService] 激励广告不可用：UMP 未允许广告请求")
+            return .failed
+        }
+        guard await waitForSDKReady() else {
+            print("🦐 [AdService] 激励广告不可用：SDK 初始化超时")
+            return .failed
+        }
+        guard placement.enabled,
               !placement.adUnitID.isEmpty,
-              [.rewarded, .rewardedInterstitial].contains(placement.format),
-              !isShowingAppOpenAd,
-              rewardedPresentation == nil,
-              let viewController = topViewController() else {
+              [.rewarded, .rewardedInterstitial].contains(placement.format) else {
+            print("🦐 [AdService] 激励广告不可用：广告位配置无效 format=\(placement.format.rawValue) unitIDEmpty=\(placement.adUnitID.isEmpty)")
+            return .failed
+        }
+        guard !isShowingAppOpenAd, rewardedPresentation == nil else {
+            print("🦐 [AdService] 激励广告不可用：已有全屏广告正在展示")
+            return .failed
+        }
+        guard let viewController = topViewController() else {
+            print("🦐 [AdService] 激励广告不可用：找不到展示页面")
             return .failed
         }
 
@@ -162,6 +182,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             switch placement.format {
             case .rewarded:
                 guard let ad = await takeRewardedAd(for: placement.adUnitID) else {
+                    print("🦐 [AdService] 激励广告展示中止：两次加载均失败")
                     return .failed
                 }
                 configureSSV(on: ad, customData: ssvCustomData)
@@ -174,6 +195,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
                 return result
             case .rewardedInterstitial:
                 guard let ad = await takeRewardedInterstitialAd(for: placement.adUnitID) else {
+                    print("🦐 [AdService] 解锁激励插屏展示中止：两次加载均失败")
                     return .failed
                 }
                 configureSSV(on: ad, customData: ssvCustomData)
@@ -263,6 +285,17 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         return top
     }
 
+    /// UMP 允许后 Mobile Ads 初始化通常很快；点击时最多等待 2 秒，
+    /// 避免启动竞态被立即误报成“广告加载失败”。
+    private func waitForSDKReady() async -> Bool {
+        if isSDKReady { return true }
+        for _ in 0..<20 {
+            try? await Task.sleep(for: .milliseconds(100))
+            if isSDKReady { return true }
+        }
+        return false
+    }
+
     private var validAppOpenAd: AppOpenAd? {
         guard let appOpenAd,
               let appOpenLoadTime,
@@ -332,22 +365,27 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             return await rewardedAdLoadTask.value
         }
         let task = Task { @MainActor [weak self] () -> RewardedAd? in
-            do {
-                let ad = try await RewardedAd.load(
-                    with: unitID,
-                    request: Request()
-                )
-                self?.rewardedAd = ad
-                self?.rewardedAdUnitID = unitID
-                self?.rewardedAdLoadTime = Date()
-                self?.rewardedAdLoadTask = nil
-                print("🦐 [AdService] ✅ 奖励页激励视频预加载成功")
-                return ad
-            } catch {
-                self?.rewardedAdLoadTask = nil
-                print("🦐 [AdService] ❌ 激励视频预加载失败: \(error.localizedDescription)")
-                return nil
+            defer { self?.rewardedAdLoadTask = nil }
+            for attempt in 1...2 {
+                do {
+                    let ad = try await RewardedAd.load(
+                        with: unitID,
+                        request: Request()
+                    )
+                    self?.rewardedAd = ad
+                    self?.rewardedAdUnitID = unitID
+                    self?.rewardedAdLoadTime = Date()
+                    print("🦐 [AdService] ✅ 奖励页激励视频预加载成功 attempt=\(attempt)")
+                    return ad
+                } catch {
+                    let nsError = error as NSError
+                    print("🦐 [AdService] ❌ 激励视频加载失败 attempt=\(attempt) domain=\(nsError.domain) code=\(nsError.code) message=\(error.localizedDescription)")
+                    if attempt == 1 {
+                        try? await Task.sleep(for: .milliseconds(400))
+                    }
+                }
             }
+            return nil
         }
         rewardedAdLoadTask = task
         return await task.value
@@ -367,22 +405,27 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             return await rewardedInterstitialLoadTask.value
         }
         let task = Task { @MainActor [weak self] () -> RewardedInterstitialAd? in
-            do {
-                let ad = try await RewardedInterstitialAd.load(
-                    with: unitID,
-                    request: Request()
-                )
-                self?.rewardedInterstitialAd = ad
-                self?.rewardedInterstitialAdUnitID = unitID
-                self?.rewardedInterstitialAdLoadTime = Date()
-                self?.rewardedInterstitialLoadTask = nil
-                print("🦐 [AdService] ✅ 解锁激励插屏预加载成功")
-                return ad
-            } catch {
-                self?.rewardedInterstitialLoadTask = nil
-                print("🦐 [AdService] ❌ 激励插屏预加载失败: \(error.localizedDescription)")
-                return nil
+            defer { self?.rewardedInterstitialLoadTask = nil }
+            for attempt in 1...2 {
+                do {
+                    let ad = try await RewardedInterstitialAd.load(
+                        with: unitID,
+                        request: Request()
+                    )
+                    self?.rewardedInterstitialAd = ad
+                    self?.rewardedInterstitialAdUnitID = unitID
+                    self?.rewardedInterstitialAdLoadTime = Date()
+                    print("🦐 [AdService] ✅ 解锁激励插屏预加载成功 attempt=\(attempt)")
+                    return ad
+                } catch {
+                    let nsError = error as NSError
+                    print("🦐 [AdService] ❌ 激励插屏加载失败 attempt=\(attempt) domain=\(nsError.domain) code=\(nsError.code) message=\(error.localizedDescription)")
+                    if attempt == 1 {
+                        try? await Task.sleep(for: .milliseconds(400))
+                    }
+                }
             }
+            return nil
         }
         rewardedInterstitialLoadTask = task
         return await task.value
@@ -451,6 +494,8 @@ private final class RewardedPresentationDelegate: NSObject, FullScreenContentDel
         _ ad: FullScreenPresentingAd,
         didFailToPresentFullScreenContentWithError error: Error
     ) {
+        let nsError = error as NSError
+        print("🦐 [AdService] 激励广告展示失败 domain=\(nsError.domain) code=\(nsError.code) message=\(error.localizedDescription)")
         finish(.failed)
     }
 

@@ -36,7 +36,11 @@ final class PrivacyConsentManager: ObservableObject {
 
         if let updateError {
             Logger.store.warning("UMP consent update failed: \(updateError.localizedDescription)")
+            // UMP 会保留上一会话的 canRequestAds；网络更新失败时仍以 SDK 的缓存状态为准，
+            // 避免一次短暂网络错误让整次启动的所有广告永久不可用。
+            isAdRequestAllowed = UMPConsentInformation.sharedInstance.canRequestAds
             isConsentFlowComplete = true
+            startMobileAdsIfAllowed()
             return
         }
 
@@ -46,7 +50,8 @@ final class PrivacyConsentManager: ObservableObject {
             Logger.store.warning("UMP consent form failed: \(formError.localizedDescription)")
         }
         refreshPrivacyOptionsRequirement()
-        isAdRequestAllowed = formError == nil && UMPConsentInformation.sharedInstance.canRequestAds
+        // canRequestAds 是 UMP 对当前同意状态的最终判断；表单展示错误不应覆盖仍有效的历史同意。
+        isAdRequestAllowed = UMPConsentInformation.sharedInstance.canRequestAds
         isConsentFlowComplete = true
         startMobileAdsIfAllowed()
     }
