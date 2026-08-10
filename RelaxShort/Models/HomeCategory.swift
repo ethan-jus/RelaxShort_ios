@@ -18,9 +18,11 @@ struct HomeContentLanguage: Identifiable, Equatable {
     let code: String
     let nameEn: String
     let nameNative: String
+    let localizedName: String
 
     var id: String { code }
     var displayName: String {
+        if !localizedName.isEmpty { return localizedName }
         if !nameNative.isEmpty { return nameNative }
         if !nameEn.isEmpty { return nameEn }
         return code

@@ -181,7 +181,8 @@ final class RealHomeRepository: HomeRepositoryProtocol {
             HomeContentLanguage(
                 code: $0.code,
                 nameEn: $0.nameEn ?? "",
-                nameNative: $0.nameNative ?? ""
+                nameNative: $0.nameNative ?? "",
+                localizedName: $0.localizedName ?? ""
             )
         }
     }

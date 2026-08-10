@@ -61,7 +61,8 @@ extension HomeRepositoryProtocol {
             HomeContentLanguage(
                 code: $0.rawValue,
                 nameEn: $0.nativeDisplayName,
-                nameNative: $0.nativeDisplayName
+                nameNative: $0.nativeDisplayName,
+                localizedName: $0.displayName
             )
         }
     }

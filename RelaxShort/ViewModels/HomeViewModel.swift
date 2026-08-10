@@ -33,7 +33,12 @@ final class HomeViewModel: ObservableObject {
     @Published var categoryErrorMessage: String?
     /// 数据库启用的内容语言；与 App 界面语言资源范围相互独立。
     @Published var supportedLanguages: [HomeContentLanguage] = AppLanguage.allCases.map {
-        HomeContentLanguage(code: $0.rawValue, nameEn: $0.nativeDisplayName, nameNative: $0.nativeDisplayName)
+        HomeContentLanguage(
+            code: $0.rawValue,
+            nameEn: $0.nativeDisplayName,
+            nameNative: $0.nativeDisplayName,
+            localizedName: $0.displayName
+        )
     }
     /// 当前分类筛选请求的后端分类 code；为空表示全部分类。
     private var selectedCategoryCode: String?
@@ -320,6 +325,12 @@ final class HomeViewModel: ObservableObject {
             await loadHomeCategoryCollections()
         } catch {
             logError("HomeViewModel.reloadCategoryLocalizations failed: \(error)")
+        }
+        do {
+            let languages = try await repository.fetchSupportedLanguages()
+            if !languages.isEmpty { supportedLanguages = languages }
+        } catch {
+            logError("HomeViewModel.reloadLanguageLocalizations failed: \(error)")
         }
     }
 

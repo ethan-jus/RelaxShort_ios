@@ -20,6 +20,7 @@ struct SupportedLanguageDTO: Decodable {
     let code: String
     let nameEn: String?
     let nameNative: String?
+    let localizedName: String?
     let sortOrder: Int?
 }
 
