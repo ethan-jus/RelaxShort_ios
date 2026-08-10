@@ -75,8 +75,9 @@ final class RealHomeRepository: HomeRepositoryProtocol {
             return try await fetchCategorySeries(code: categoryCode, contentLang: contentLang, country: country)
         }
 
-        // “全部分类”仍走真实内容接口，不能直接复用首页已经加载的推荐快照。
-        return try await fetchForYou(contentLang: contentLang, country: country, limit: 20)
+        // 分类页明确选择语言时必须严格匹配，不能沿用推荐流的英语兜底。
+        return try await fetchForYou(contentLang: contentLang, country: country, limit: 20,
+                                     strictContentLanguage: contentLang?.isEmpty == false)
     }
 
     // MARK: - For You
@@ -92,7 +93,7 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         let cty = country ?? UserDefaults.standard.string(forKey: "app_country_code")
         let dto: ForYouFeedResponseDTO = try await client.requestData(
             .forYou(cursor: cursor, limit: limit, contentLanguage: lang, countryCode: cty,
-                    feedSeed: feedSeed)
+                    feedSeed: feedSeed, strictContentLanguage: false)
         )
         return (
             items: (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem),
@@ -102,9 +103,21 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     }
 
     func fetchForYou(contentLang: String? = nil, country: String? = nil,
-                     cursor: String? = nil, limit: Int = 10) async throws -> [DramaItem] {
-        let result = try await fetchForYouPaginated(contentLang: contentLang, country: country,
-                                                     cursor: cursor, limit: limit, feedSeed: nil)
+                     cursor: String? = nil, limit: Int = 10,
+                     strictContentLanguage: Bool = false) async throws -> [DramaItem] {
+        if strictContentLanguage {
+            let lang = contentLang ?? UserDefaults.standard.string(forKey: "app_content_language")
+            let cty = country ?? UserDefaults.standard.string(forKey: "app_country_code")
+            let dto: ForYouFeedResponseDTO = try await client.requestData(
+                .forYou(cursor: cursor, limit: limit, contentLanguage: lang, countryCode: cty,
+                        feedSeed: nil, strictContentLanguage: true)
+            )
+            return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
+        }
+
+        let result = try await fetchForYouPaginated(
+            contentLang: contentLang, country: country, cursor: cursor, limit: limit, feedSeed: nil
+        )
         return result.items
     }
 

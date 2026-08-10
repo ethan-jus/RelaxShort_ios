@@ -48,7 +48,8 @@ final class RealAPISmokeRunner: ObservableObject {
         // 2. For You
         await step("For You", "GET /api/v2/feed/for-you") {
             let dto: ForYouFeedResponseDTO = try await self.client.requestData(
-                .forYou(cursor: nil, limit: 5, contentLanguage: lang, countryCode: country, feedSeed: nil)
+                .forYou(cursor: nil, limit: 5, contentLanguage: lang, countryCode: country,
+                        feedSeed: nil, strictContentLanguage: false)
             )
             if let first = dto.items?.first { lastSeriesId = first.seriesId }
             return "items=\(dto.items?.count ?? 0) hasMore=\(dto.hasMore ?? false)"
