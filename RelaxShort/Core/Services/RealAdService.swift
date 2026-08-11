@@ -10,6 +10,7 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     private var appOpenLoadTask: Task<AppOpenAd?, Never>?
     private var appOpenAdOnDismiss: (() -> Void)?
     private var lastBackgroundTime: Date?
+    private var lastAppOpenPresentationTime: Date?
     private var rewardedAd: RewardedAd?
     private var rewardedAdUnitID: String?
     private var rewardedAdLoadTime: Date?
@@ -46,10 +47,33 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     func consumeBackgroundAppOpenOpportunity() -> Bool {
         guard wasInBackground, let lastBg = lastBackgroundTime else { return false }
         wasInBackground = false
-        let bgDuration = Date().timeIntervalSince(lastBg)
+        let now = Date()
+        let bgDuration = now.timeIntervalSince(lastBg)
+        let presentationInterval = lastAppOpenPresentationTime.map {
+            now.timeIntervalSince($0)
+        } ?? .infinity
+        let presentationIntervalDescription = presentationInterval.isFinite
+            ? "\(Int(presentationInterval))s"
+            : "无"
         let should = bgDuration >= AdConfig.hotStartAdInterval
-        print("🦐 [AdService] 后台时长: \(Int(bgDuration))s, 阈值: \(Int(AdConfig.hotStartAdInterval))s, 展示: \(should)")
+            && presentationInterval >= AdConfig.minimumAppOpenPresentationInterval
+        print(
+            "🦐 [AdService] 后台时长: \(Int(bgDuration))s, "
+                + "距上次开屏: \(presentationIntervalDescription), "
+                + "展示: \(should)"
+        )
         return should
+    }
+
+    /// App Open 只应从应用根页面拉起；已有二级页、系统弹窗、登录、支付或其他全屏广告时跳过。
+    var canPresentAppOpenAdFromRoot: Bool {
+        guard rewardedPresentation == nil,
+              !isShowingAppOpenAd,
+              let rootViewController = appRootViewController() else {
+            return false
+        }
+        return rootViewController.presentedViewController == nil
+            && !hasPushedNavigation(in: rootViewController)
     }
 
     func prepareAds() async {
@@ -107,25 +131,18 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
 
         appOpenAdOnDismiss = onDismiss
 
-        guard let keyWindow = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .flatMap({ $0.windows })
-            .first(where: { $0.isKeyWindow }),
-              let rootVC = keyWindow.rootViewController else {
+        guard canPresentAppOpenAdFromRoot,
+              let rootVC = appRootViewController() else {
             onDismiss()
             appOpenAdOnDismiss = nil
             return
         }
 
-        var topVC = rootVC
-        while let presented = topVC.presentedViewController {
-            topVC = presented
-        }
-
         isShowingAppOpenAd = true
+        lastAppOpenPresentationTime = Date()
         appOpenAd = nil
         isAppOpenAdReady = false
-        ad.present(from: topVC)
+        ad.present(from: rootVC)
     }
 
     @discardableResult
@@ -306,6 +323,24 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
             return nil
         }
         return appOpenAd
+    }
+
+    private func appRootViewController() -> UIViewController? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController
+    }
+
+    private func hasPushedNavigation(in viewController: UIViewController) -> Bool {
+        if let navigationController = viewController as? UINavigationController,
+           navigationController.viewControllers.count > 1 {
+            return true
+        }
+        return viewController.children.contains {
+            hasPushedNavigation(in: $0)
+        }
     }
 
     private func resolvedConfig() async throws -> AdsConfig {

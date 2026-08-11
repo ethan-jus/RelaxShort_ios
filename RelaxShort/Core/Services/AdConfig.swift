@@ -5,6 +5,15 @@ enum AdConfig {
     /// 热启动展示间隔（秒），在后台超过此时间再次进入才展示开屏广告
     static let hotStartAdInterval: TimeInterval = 60.0
 
+    /// 两次开屏广告实际展示之间的最短间隔，避免用户频繁切换前后台时连续看到广告。
+    static let minimumAppOpenPresentationInterval: TimeInterval = 5 * 60
+
+    /// 收到登录或内容深链后的短暂保护期，避免广告抢在路由前出现。
+    static let foregroundAdDeepLinkSuppressionDuration: TimeInterval = 2
+
+    /// 品牌承接页的最短展示时长，同时给深链和页面恢复留出状态同步时间。
+    static let foregroundAdTransitionDuration: TimeInterval = 0.25
+
     /// 品牌页最短展示时长。
     static let brandingDuration: TimeInterval = 0.8
 

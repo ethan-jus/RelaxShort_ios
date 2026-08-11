@@ -27,6 +27,9 @@ struct RelaxShortApp: App {
 
     /// 控制启动页 → 主界面的过渡
     @State private var showSplash = true
+    @State private var showForegroundAdTransition = false
+    @State private var foregroundAdTask: Task<Void, Never>?
+    @State private var suppressForegroundAdUntil: Date?
     @State private var isSynchronizingPendingStoreKitTransactions = false
     @Environment(\.scenePhase) private var scenePhase
 
@@ -79,6 +82,12 @@ struct RelaxShortApp: App {
                         .transition(.opacity)
                 }
 
+                if showForegroundAdTransition {
+                    ForegroundAdTransitionView()
+                        .transition(.opacity)
+                        .zIndex(2)
+                }
+
             }
             .id(appStore.language)
             .environment(\.locale, Locale(identifier: appStore.language.rawValue))
@@ -112,6 +121,15 @@ struct RelaxShortApp: App {
                 await synchronizePendingStoreKitTransactions()
             }
             .onOpenURL { url in
+                // 热启动深链应直接进入目标内容，不在路由前插入广告。
+                if !showSplash {
+                    suppressForegroundAdUntil = Date().addingTimeInterval(
+                        AdConfig.foregroundAdDeepLinkSuppressionDuration
+                    )
+                    foregroundAdTask?.cancel()
+                    foregroundAdTask = nil
+                    hideForegroundAdTransition()
+                }
                 if !GIDSignIn.sharedInstance.handle(url) {
                     handleDeepLink(url)
                 }
@@ -123,6 +141,9 @@ struct RelaxShortApp: App {
                     Task { await synchronizePendingStoreKitTransactions() }
                 }
                 if newPhase == .background {
+                    foregroundAdTask?.cancel()
+                    foregroundAdTask = nil
+                    showForegroundAdTransition = false
                     dependencies.discoveryAnalytics.flushForBackground()
                     // 短任务上报观看进度
                     Task {
@@ -196,13 +217,70 @@ struct RelaxShortApp: App {
     }
 
     private func handleForegroundAd() {
-        guard PrivacyConsentManager.shared.isAdRequestAllowed else { return }
         guard adService.consumeBackgroundAppOpenOpportunity() else { return }
+        foregroundAdTask?.cancel()
+        guard !isForegroundAdSuppressed else {
+            suppressForegroundAdUntil = nil
+            Logger.store.info("热启动开屏已跳过：正在处理深链")
+            return
+        }
+        suppressForegroundAdUntil = nil
+        guard PrivacyConsentManager.shared.isAdRequestAllowed else { return }
+        guard isSafeForegroundAdSurface,
+              adService.canPresentAppOpenAdFromRoot else {
+            Logger.store.info("热启动开屏已跳过：当前不是安全根页面")
+            return
+        }
         guard adService.isAppOpenAdReady else {
+            // 未就绪时只预加载下一次，不在用户已经开始操作后补弹。
             Task { await adService.prepareAds() }
             return
         }
-        adService.showAppOpenAd(onDismiss: {})
+
+        // 广告已就绪才遮住当前页面，避免恢复后先暴露可交互内容再突然盖广告。
+        withAnimation(.easeOut(duration: 0.1)) {
+            showForegroundAdTransition = true
+        }
+        foregroundAdTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(AdConfig.foregroundAdTransitionDuration))
+            guard !Task.isCancelled,
+                  scenePhase == .active,
+                  !isForegroundAdSuppressed,
+                  isSafeForegroundAdSurface,
+                  adService.canPresentAppOpenAdFromRoot else {
+                hideForegroundAdTransition()
+                return
+            }
+            adService.showAppOpenAd(onDismiss: hideForegroundAdTransition)
+        }
+    }
+
+    private var isForegroundAdSuppressed: Bool {
+        guard let deadline = suppressForegroundAdUntil else { return false }
+        return deadline > Date()
+    }
+
+    private var isSafeForegroundAdSurface: Bool {
+        guard appStore.navigationTarget == nil,
+              !appStore.isShowingSearch,
+              !appStore.isShowingMembership,
+              !appStore.isShowingRewards,
+              !appStore.isBottomTabBarHidden else {
+            return false
+        }
+        switch appStore.selectedTab {
+        case .home, .myList, .profile:
+            return true
+        case .forYou, .member:
+            return false
+        }
+    }
+
+    private func hideForegroundAdTransition() {
+        foregroundAdTask = nil
+        withAnimation(.easeInOut(duration: 0.2)) {
+            showForegroundAdTransition = false
+        }
     }
 
     private func finishColdStart() {
@@ -242,5 +320,28 @@ struct RelaxShortApp: App {
         } catch {
             Logger.store.warning("StoreKit pending sync unavailable: \(error.localizedDescription)")
         }
+    }
+}
+
+/// 热启动广告的品牌承接页：只在广告已就绪时出现，不额外拉长等待。
+private struct ForegroundAdTransitionView: View {
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            VStack(spacing: 14) {
+                Image("AppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                Text("RelaxShort")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .allowsHitTesting(true)
+        .accessibilityHidden(true)
     }
 }
