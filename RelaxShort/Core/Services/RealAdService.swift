@@ -62,10 +62,10 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
                 return
             }
 
-            // 首页稳定后顺序预热开屏广告，再并行预热激励广告，
+            // 冷启动先争取开屏广告；激励广告随后并行预热，
             // 避免三个全屏广告请求同时竞争 SDK 首次网络。
             let appOpenLoaded = await loadAppOpenAd(using: config.appOpen)
-            print("🦐 [AdService] 后续开屏广告预加载结果: \(appOpenLoaded)")
+            print("🦐 [AdService] 开屏广告预加载结果: \(appOpenLoaded)")
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 async let rewarded: Bool = self.preloadRewardedAd(

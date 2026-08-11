@@ -97,16 +97,14 @@ struct RelaxShortApp: App {
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
-                // 先完成首页首帧和交互，再启动可能创建 WebContent/GPU 进程的 UMP 与广告 SDK。
-                try? await Task.sleep(for: .seconds(
-                    AdConfig.brandingDuration + AdConfig.postLaunchAdInitializationDelay
-                ))
+                // 先提交 SwiftUI 首帧，再并行争取有严格时间预算的冷启动开屏广告。
+                try? await Task.sleep(for: .seconds(AdConfig.coldStartConsentKickoffDelay))
                 guard !Task.isCancelled else { return }
                 await PrivacyConsentManager.shared.gatherConsentAndStartAds()
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
-                await finishBrandingFlow()
+                await runColdStartAdFlow()
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
@@ -158,13 +156,42 @@ struct RelaxShortApp: App {
         }
     }
 
-    /// 冷启动只承担品牌展示，不再让第三方广告网络决定首页出现时间。
-    private func finishBrandingFlow() async {
+    /// 冷启动保留一次开屏广告机会，但总等待时间有硬上限。
+    /// 超时后广告继续在后台预加载，只供后续热启动使用，绝不进入首页后补弹。
+    private func runColdStartAdFlow() async {
         let startedAt = CACurrentMediaTime()
         try? await Task.sleep(for: .seconds(AdConfig.brandingDuration))
         guard !Task.isCancelled else { return }
+
+        let deadline = Date().addingTimeInterval(AdConfig.coldStartAdLoadTimeout)
+        while Date() < deadline {
+            guard showSplash else { return }
+            guard scenePhase == .active else {
+                let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+                Logger.store.info("冷启动场景已变化，放弃开屏广告，耗时=\(Int(elapsed))ms")
+                finishColdStart()
+                return
+            }
+
+            if PrivacyConsentManager.shared.isConsentFlowComplete {
+                guard PrivacyConsentManager.shared.isAdRequestAllowed else {
+                    let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+                    Logger.store.info("冷启动未获广告请求许可，直接进入首页，耗时=\(Int(elapsed))ms")
+                    finishColdStart()
+                    return
+                }
+                if adService.isAppOpenAdReady {
+                    let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+                    Logger.store.info("冷启动开屏广告已就绪，准备耗时=\(Int(elapsed))ms")
+                    adService.showAppOpenAd(onDismiss: finishColdStart)
+                    return
+                }
+            }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+
         let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-        Logger.store.info("冷启动品牌页结束，耗时=\(Int(elapsed))ms")
+        Logger.store.info("冷启动开屏广告超时，直接进入首页，耗时=\(Int(elapsed))ms")
         finishColdStart()
     }
 

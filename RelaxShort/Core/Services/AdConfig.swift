@@ -5,11 +5,14 @@ enum AdConfig {
     /// 热启动展示间隔（秒），在后台超过此时间再次进入才展示开屏广告
     static let hotStartAdInterval: TimeInterval = 60.0
 
-    /// 品牌页最短展示时长；冷启动不再等待第三方广告 SDK。
+    /// 品牌页最短展示时长。
     static let brandingDuration: TimeInterval = 0.8
 
-    /// 首页可交互后再启动 UMP/广告 SDK，避免 WebContent 创建阻塞冷启动首帧。
-    static let postLaunchAdInitializationDelay: TimeInterval = 1.0
+    /// 首帧提交后启动 UMP，避免与最早的 SwiftUI 首帧完全重叠。
+    static let coldStartConsentKickoffDelay: TimeInterval = 0.25
+
+    /// 品牌展示结束后额外等待开屏广告的硬上限；总预算约 1.5 秒。
+    static let coldStartAdLoadTimeout: TimeInterval = 0.7
 
     /// 广告过期时间（秒），AdMob 官方是 4 小时
     static let adExpiryInterval: TimeInterval = 4 * 3600
