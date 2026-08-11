@@ -97,8 +97,8 @@ struct RelaxShortApp: App {
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
-                // 先提交 SwiftUI 首帧，再并行争取有严格时间预算的冷启动开屏广告。
-                try? await Task.sleep(for: .seconds(AdConfig.coldStartConsentKickoffDelay))
+                // 只让出一次首帧调度，随后立即启动 UMP；获准后优先加载开屏广告。
+                await Task.yield()
                 guard !Task.isCancelled else { return }
                 await PrivacyConsentManager.shared.gatherConsentAndStartAds()
             }

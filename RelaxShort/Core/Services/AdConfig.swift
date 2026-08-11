@@ -8,11 +8,8 @@ enum AdConfig {
     /// 品牌页最短展示时长。
     static let brandingDuration: TimeInterval = 0.8
 
-    /// 首帧提交后启动 UMP，避免与最早的 SwiftUI 首帧完全重叠。
-    static let coldStartConsentKickoffDelay: TimeInterval = 0.25
-
-    /// 品牌展示结束后额外等待开屏广告的硬上限；总预算约 1.5 秒。
-    static let coldStartAdLoadTimeout: TimeInterval = 0.7
+    /// 品牌展示结束后额外等待开屏广告的硬上限；总预算约 2 秒。
+    static let coldStartAdLoadTimeout: TimeInterval = 1.2
 
     /// 广告过期时间（秒），AdMob 官方是 4 小时
     static let adExpiryInterval: TimeInterval = 4 * 3600
