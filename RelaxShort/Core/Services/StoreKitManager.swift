@@ -534,6 +534,20 @@ final class StoreKitManager: ObservableObject {
         await finishTransaction(receipt)
     }
 
+    /// 本地预检是否存在需要后端补偿的未完成真实 Apple 交易；不访问业务后端。
+    func hasUnfinishedBackendTransactions() async -> Bool {
+        for await result in Transaction.unfinished {
+            guard case .verified(let transaction) = result,
+                  transaction.revocationDate == nil,
+                  let productID = ProductID(rawValue: transaction.productID),
+                  productID.isCoinPackage || productID.isVIPSubscription else { continue }
+            if purchaseReceipt(from: transaction, coins: 0).requiresBackendVerification {
+                return true
+            }
+        }
+        return false
+    }
+
     /// 返回尚未完成且属于当前 App 用户的真实 Apple 交易，供启动时补偿后端发货。
     func unfinishedPurchaseReceipts(appAccountToken: UUID) async -> [ApplePurchaseReceipt] {
         var receipts: [ApplePurchaseReceipt] = []

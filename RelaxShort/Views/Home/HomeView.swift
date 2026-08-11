@@ -161,6 +161,10 @@ struct HomeView: View {
         }
         .task { await viewModel.loadData() }
         .task { await rewardSummaryStore.refresh() }
+        .onChange(of: viewModel.selectedTab) { _, tab in
+            guard tab == 3 else { return }
+            Task { await viewModel.loadInitialCategoryContentIfNeeded() }
+        }
         .onChange(of: appStore.selectedTab) { _, tab in
             guard tab == .home else { return }
             Task { await rewardSummaryStore.refresh() }

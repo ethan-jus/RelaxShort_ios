@@ -123,6 +123,7 @@ struct CoinRewardView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .task { await viewModel.loadIfNeeded() }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .interactivePopGestureEnabled(mode == .pushed)

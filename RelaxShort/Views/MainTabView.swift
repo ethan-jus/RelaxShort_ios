@@ -102,6 +102,11 @@ struct MainTabView: View {
 private struct TabContentHost: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var dependencies: DependencyContainer
+    /// Home 和 For You 预挂载保证首屏与推荐切换速度；其余重页面首次进入后才常驻。
+    @State private var mountedTabValues: Set<Int> = [
+        AppStore.Tab.home.rawValue,
+        AppStore.Tab.forYou.rawValue
+    ]
     let homeVM: HomeViewModel
     let homeRepository: HomeRepositoryProtocol
     let recommendVM: RecommendViewModel
@@ -121,31 +126,45 @@ private struct TabContentHost: View {
                 .opacity(appStore.selectedTab == .forYou ? 1 : 0)
                 .disabled(appStore.selectedTab != .forYou)
 
-            /// Task32：底部 Member Tab 使用新的 MemberView（Real-only）
-            MemberView(
-                mode: .tab,
-                repository: dependencies.memberRepository
-            )
-                .id(AppStore.Tab.member.rawValue)
-                .zIndex(appStore.selectedTab == .member ? 1 : 0)
-                .opacity(appStore.selectedTab == .member ? 1 : 0)
-                .disabled(appStore.selectedTab != .member)
+            if shouldMount(.member) {
+                /// Task32：底部 Member Tab 使用新的 MemberView（Real-only）
+                MemberView(
+                    mode: .tab,
+                    repository: dependencies.memberRepository
+                )
+                    .id(AppStore.Tab.member.rawValue)
+                    .zIndex(appStore.selectedTab == .member ? 1 : 0)
+                    .opacity(appStore.selectedTab == .member ? 1 : 0)
+                    .disabled(appStore.selectedTab != .member)
+            }
 
-            FavoritesView(viewModel: FavoritesViewModel(
-                repository: dependencies.favoritesRepository,
-                bookmarkStore: dependencies.bookmarkStore,
-                homeRepository: dependencies.homeRepository
-            ))
-                .id(AppStore.Tab.myList.rawValue)
-                .zIndex(appStore.selectedTab == .myList ? 1 : 0)
-                .opacity(appStore.selectedTab == .myList ? 1 : 0)
-                .disabled(appStore.selectedTab != .myList)
+            if shouldMount(.myList) {
+                FavoritesView(viewModel: FavoritesViewModel(
+                    repository: dependencies.favoritesRepository,
+                    bookmarkStore: dependencies.bookmarkStore,
+                    homeRepository: dependencies.homeRepository
+                ))
+                    .id(AppStore.Tab.myList.rawValue)
+                    .zIndex(appStore.selectedTab == .myList ? 1 : 0)
+                    .opacity(appStore.selectedTab == .myList ? 1 : 0)
+                    .disabled(appStore.selectedTab != .myList)
+            }
 
-            ProfileView(viewModel: ProfileViewModel(repository: dependencies.profileRepository))
-                .id(AppStore.Tab.profile.rawValue)
-                .zIndex(appStore.selectedTab == .profile ? 1 : 0)
-                .opacity(appStore.selectedTab == .profile ? 1 : 0)
-                .disabled(appStore.selectedTab != .profile)
+            if shouldMount(.profile) {
+                ProfileView(viewModel: ProfileViewModel(repository: dependencies.profileRepository))
+                    .id(AppStore.Tab.profile.rawValue)
+                    .zIndex(appStore.selectedTab == .profile ? 1 : 0)
+                    .opacity(appStore.selectedTab == .profile ? 1 : 0)
+                    .disabled(appStore.selectedTab != .profile)
+            }
         }
+        .onAppear { mountedTabValues.insert(appStore.selectedTab.rawValue) }
+        .onChange(of: appStore.selectedTab) { _, tab in
+            mountedTabValues.insert(tab.rawValue)
+        }
+    }
+
+    private func shouldMount(_ tab: AppStore.Tab) -> Bool {
+        appStore.selectedTab == tab || mountedTabValues.contains(tab.rawValue)
     }
 }

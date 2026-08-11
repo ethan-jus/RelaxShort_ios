@@ -27,6 +27,7 @@ struct RelaxShortApp: App {
 
     /// 控制启动页 → 主界面的过渡
     @State private var showSplash = true
+    @State private var isSynchronizingPendingStoreKitTransactions = false
     @Environment(\.scenePhase) private var scenePhase
 
     // MARK: - Init
@@ -60,18 +61,21 @@ struct RelaxShortApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
+                // 主界面始终在品牌页下方预构建，让 Home 数据和首屏封面利用品牌展示时间加载。
+                MainTabView(playerCoordinator: playerCoordinator, dependencies: dependencies)
+                    .environmentObject(appStore)
+                    .environmentObject(authStore)
+                    .environmentObject(coinStore)
+                    .environmentObject(rewardSummaryStore)
+                    .environmentObject(storeKit)
+                    .environmentObject(dependencies)
+                    .environmentObject(themeManager)
+                    .opacity(showSplash ? 0 : 1)
+                    .disabled(showSplash)
+                    .accessibilityHidden(showSplash)
+
                 if showSplash {
                     SplashView(onFinish: finishColdStart, autoFinishAfter: nil)
-                    .transition(.opacity)
-                } else {
-                    MainTabView(playerCoordinator: playerCoordinator, dependencies: dependencies)
-                        .environmentObject(appStore)
-                        .environmentObject(authStore)
-                        .environmentObject(coinStore)
-                        .environmentObject(rewardSummaryStore)
-                        .environmentObject(storeKit)
-                        .environmentObject(dependencies)
-                        .environmentObject(themeManager)
                         .transition(.opacity)
                 }
 
@@ -91,6 +95,8 @@ struct RelaxShortApp: App {
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
+                // 先让品牌页和 Home 首帧提交，再启动可能创建 WebContent 进程的 UMP。
+                try? await Task.sleep(for: .milliseconds(250))
                 await PrivacyConsentManager.shared.gatherConsentAndStartAds()
             }
             .task {
@@ -210,6 +216,12 @@ struct RelaxShortApp: App {
 
     /// 补偿购买后崩溃、断网或后端暂时失败留下的未完成真实 Apple 交易。
     private func synchronizePendingStoreKitTransactions() async {
+        guard !isSynchronizingPendingStoreKitTransactions else { return }
+        isSynchronizingPendingStoreKitTransactions = true
+        defer { isSynchronizingPendingStoreKitTransactions = false }
+
+        // 绝大多数启动没有未完成交易；先查本地 StoreKit，避免每次冷/热启动都请求账户令牌。
+        guard await storeKit.hasUnfinishedBackendTransactions() else { return }
         do {
             let token = try await dependencies.detailRepository.fetchAppleAccountToken()
             let receipts = await storeKit.unfinishedPurchaseReceipts(appAccountToken: token)

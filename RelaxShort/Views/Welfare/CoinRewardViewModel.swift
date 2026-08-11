@@ -45,6 +45,7 @@ final class CoinRewardViewModel: ObservableObject {
     private let adConfigRepository: AdConfigRepositoryProtocol
     private let adRewardRepository: AdRewardRepositoryProtocol
     private var rewardedCoinPlacement: AdPlacementConfig?
+    private var hasLoaded = false
 
     // MARK: - Init
 
@@ -58,7 +59,6 @@ final class CoinRewardViewModel: ObservableObject {
         self.adService = adService ?? RealAdService.shared
         self.adConfigRepository = adConfigRepository
         self.adRewardRepository = adRewardRepository
-        Task { await loadData() }
     }
 
     // MARK: - Computed
@@ -69,13 +69,20 @@ final class CoinRewardViewModel: ObservableObject {
 
     // MARK: - Data Loading
 
+    func loadIfNeeded() async {
+        guard !hasLoaded else { return }
+        await loadData()
+    }
+
     func loadData() async {
+        guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
 
         do {
             apply(try await repository.fetchRewardCenter())
+            hasLoaded = true
         } catch {
             errorMessage = error.localizedDescription
             logError("CoinRewardViewModel.fetchRewardCenter failed: \(error)")

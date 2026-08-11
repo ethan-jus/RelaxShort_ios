@@ -65,25 +65,46 @@ struct RewardCenterState {
 
 @MainActor
 final class RewardSummaryStore: ObservableObject {
+    private static let freshnessInterval: TimeInterval = 30
+
     @Published private(set) var remainingEarnableCoins = 0
     @Published private(set) var coinBalance = 0
     private let repository: CoinRewardRepositoryProtocol
+    private var refreshTask: Task<RewardCenterState, Error>?
+    private var lastRefreshAt: Date?
 
     init(repository: CoinRewardRepositoryProtocol = RealCoinRewardRepository()) {
         self.repository = repository
     }
 
-    func refresh() async {
+    func refresh(force: Bool = false) async {
+        if !force,
+           let lastRefreshAt,
+           Date().timeIntervalSince(lastRefreshAt) < Self.freshnessInterval {
+            return
+        }
+
+        let task: Task<RewardCenterState, Error>
+        if let refreshTask {
+            task = refreshTask
+        } else {
+            let newTask = Task { try await repository.fetchRewardCenter() }
+            refreshTask = newTask
+            task = newTask
+        }
+
         do {
-            apply(try await repository.fetchRewardCenter())
+            apply(try await task.value)
         } catch {
             Logger.viewModel.warning("RewardSummaryStore refresh failed: \(error.localizedDescription)")
         }
+        refreshTask = nil
     }
 
     func apply(_ state: RewardCenterState) {
         remainingEarnableCoins = state.remainingEarnableCoins
         coinBalance = state.coinBalance
+        lastRefreshAt = Date()
     }
 
     func apply(balance: Int, remainingEarnableCoins: Int) {
