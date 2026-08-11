@@ -274,8 +274,8 @@ enum FeedCardDTOMapper {
             return nil
         }()
 
-        // 首页点击后的首播体验优先选择 MP4 fallback：省去 HLS master/segment 探测，首帧更快。
-        let resolvedVideoURL = card.playAsset?.mp4FallbackUrl ?? card.playAsset?.hlsMasterUrl
+        // HLS 分段更适合移动网络快速首播和自适应码率；旧内容缺 HLS 时才回退 MP4。
+        let resolvedVideoURL = card.playAsset?.hlsMasterUrl ?? card.playAsset?.mp4FallbackUrl
 
         var item = DramaItem(
             id: String(card.seriesId),
@@ -309,6 +309,7 @@ enum FeedCardDTOMapper {
             isMemberOnly: false
         )
         item.bannerCoverURL = card.horizontalCoverUrl
+        item.categoryCode = card.categoryCode
         item.displayFlags = card.displayFlags ?? []
         item.placementBadge = card.placementBadge.map {
             PlacementBadge(

@@ -47,6 +47,7 @@ struct FeedCardDTO: Decodable {
     let fallbackReason: String?
     /// Task14 后端已补齐的展示字段
     let viewCount: Int64?
+    let categoryCode: String?
     let category: String?
     let regionTag: String?
     let languageTag: String?

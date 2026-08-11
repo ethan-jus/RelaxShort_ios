@@ -29,6 +29,8 @@ final class HomeViewModel: ObservableObject {
     @Published var categoryDramas: [DramaItem] = []
     /// 分类加载状态
     @Published var isCategoryLoading: Bool = false
+    /// 切换筛选时保留旧网格，只显示轻量刷新提示，避免整页闪空。
+    @Published private(set) var isCategoryRefreshing: Bool = false
     /// 分类错误信息
     @Published var categoryErrorMessage: String?
     /// 数据库启用的内容语言；与 App 界面语言资源范围相互独立。
@@ -49,8 +51,10 @@ final class HomeViewModel: ObservableObject {
     private var forYouSessionID: String?
     private let forYouPageSize = 20
     private var enrichmentTask: Task<Void, Never>?
-    private var hasLoadedCategoryContent = false
+    private var playbackWarmupTask: Task<Void, Never>?
     private var categoryRequestGeneration = 0
+
+    var canLoadMoreForYou: Bool { forYouHasMore }
 
     var tabs: [String] {
         [
@@ -105,6 +109,7 @@ final class HomeViewModel: ObservableObject {
     func loadData() async {
         guard !isLoading else { return }
         enrichmentTask?.cancel()
+        playbackWarmupTask?.cancel()
         isLoading = true
         errorMessage = nil
         forYouDramas = []
@@ -112,7 +117,6 @@ final class HomeViewModel: ObservableObject {
         forYouCursor = nil
         forYouHasMore = true
         forYouSessionID = UUID().uuidString
-        hasLoadedCategoryContent = false
 
         do {
             // Home 是首页关键请求；明确失败后立即结束，不再自动请求其他 feed。
@@ -127,6 +131,9 @@ final class HomeViewModel: ObservableObject {
             homeTabsByCode = loadedTabs
             self.featuredDramas = dramas
             self.fixedDramas = Array(dramas.prefix(9))
+            // /home 已经返回热门前 20 条。先用第 10 条起即时填充“猜你喜欢”，
+            // 个性化 Feed 随后成功时再无缝替换，网络抖动也不会只剩 9 张卡片。
+            self.forYouDramas = Array(dramas.dropFirst(9)).uniquedByID()
             self.rankingDramas = dramas.sorted { $0.viewCount > $1.viewCount }
             self.banners = banners
         } catch {
@@ -138,7 +145,7 @@ final class HomeViewModel: ObservableObject {
 
         // 首屏 Home 数据一到立即结束骨架；分类字典、猜你喜欢和筛选数据转入非阻塞增强链路。
         isLoading = false
-        prefetchFirstScreenMedia(dramas: fixedDramas, banners: banners)
+        schedulePlaybackWarmup(dramas: fixedDramas)
         enrichmentTask = Task { [weak self] in
             await self?.loadSecondaryContent()
         }
@@ -148,10 +155,7 @@ final class HomeViewModel: ObservableObject {
         // 先补齐首屏下方的猜你喜欢，再加载筛选字典和更深层分类合集。
         await loadForYouPage(reset: true)
         guard !Task.isCancelled else { return }
-        prefetchFirstScreenMedia(
-            dramas: fixedDramas + Array(forYouDramas.prefix(9)),
-            banners: banners
-        )
+        schedulePlaybackWarmup(dramas: fixedDramas + Array(forYouDramas.prefix(3)))
 
         // 分类是后端运营字典的唯一来源；真实仓库失败时不能展示另一套本地分类。
         do {
@@ -184,43 +188,31 @@ final class HomeViewModel: ObservableObject {
            let index = categories.firstIndex(where: { $0.code == selectedCategory.code }) {
             selectedCategoryIndex = index
         }
-        if selectedTab == 3 {
-            await loadInitialCategoryContentIfNeeded()
-        }
-        guard !Task.isCancelled else { return }
-        await loadHomeCategoryCollections(categories: categories)
+        rebuildHomeCategoryCollections()
     }
 
-    /// “猜你喜欢”的分类合集来自真实分类字典与分类内容接口。
-    /// 分类标题跟随 App UI 语言，短剧内容仍按内容语言和国家筛选。
-    private func loadHomeCategoryCollections(categories: [HomeCategory]) async {
+    /// 使用已加载的真实推荐流在本地组装分类合集。
+    /// 后端同时返回稳定 categoryCode 和本地化 category 名称，因此无需为 12 个分类逐个发请求。
+    private func rebuildHomeCategoryCollections() {
         guard !categories.isEmpty else {
             homeCategoryCollections = []
             return
         }
 
-        let contentLanguage = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
         var chunksByCategory: [(HomeCategory, [[DramaItem]])] = []
 
         for category in categories {
-            guard !Task.isCancelled else { return }
-            do {
-                let items = try await repository.fetchCategorySeries(
-                    code: category.code,
-                    contentLang: contentLanguage,
-                    country: country
-                )
-                let unique = items.uniquedByID()
-                let chunks = stride(from: 0, to: unique.count, by: 4).compactMap { start -> [DramaItem]? in
-                    let end = min(start + 4, unique.count)
-                    guard end - start == 4 else { return nil }
-                    return Array(unique[start..<end])
-                }
-                if !chunks.isEmpty { chunksByCategory.append((category, chunks)) }
-            } catch {
-                logError("HomeViewModel.loadHomeCategoryCollection failed code=\(category.code): \(error)")
+            let unique = forYouDramas.filter { drama in
+                if drama.categoryCode == category.code { return true }
+                // 兼容后端升级前的短时缓存；只有展示名称确实相同时才采用。
+                return drama.category.localizedCaseInsensitiveCompare(category.title) == .orderedSame
+            }.uniquedByID()
+            let chunks = stride(from: 0, to: unique.count, by: 4).compactMap { start -> [DramaItem]? in
+                let end = min(start + 4, unique.count)
+                guard end - start == 4 else { return nil }
+                return Array(unique[start..<end])
             }
+            if !chunks.isEmpty { chunksByCategory.append((category, chunks)) }
         }
 
         // 先覆盖不同分类，再使用同一分类的后续 4 部剧，保证真实数据不足时仍能维持原布局节奏。
@@ -236,9 +228,8 @@ final class HomeViewModel: ObservableObject {
         homeCategoryCollections = collections
     }
 
-    func loadMoreForYouIfNeeded(currentDramaID: String) async {
-        guard currentDramaID == forYouDramas.last?.id,
-              forYouHasMore,
+    func loadMoreForYou() async {
+        guard forYouHasMore,
               !isLoadingMoreForYou else { return }
         await loadForYouPage(reset: false)
     }
@@ -253,6 +244,7 @@ final class HomeViewModel: ObservableObject {
         let contentLanguage = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
         do {
+            let homeFallback = reset ? forYouDramas : []
             let result = try await repository.fetchForYouPaginated(
                 contentLang: contentLanguage,
                 country: country,
@@ -267,11 +259,13 @@ final class HomeViewModel: ObservableObject {
             let blockedIDs: Set<String> = reset ? [] : Set(forYouDramas.map(\.id))
             let unique = result.items.filter { !blockedIDs.contains($0.id) }.uniquedByID()
             if reset {
-                forYouDramas = unique
+                forYouDramas = (unique + homeFallback).uniquedByID()
             } else {
                 forYouDramas.append(contentsOf: unique)
             }
+            rebuildHomeCategoryCollections()
         } catch {
+            guard !Task.isCancelled else { return }
             logError("HomeViewModel.loadForYou failed: \(error)")
         }
     }
@@ -284,47 +278,36 @@ final class HomeViewModel: ObservableObject {
         return "network.load_failed_retry".localized
     }
 
-    /// 首屏媒体预热：封面降采样缓存 + 头部卡片预览视频的起始字节。
-    /// 后台低优先级执行；点进播放页时封面与 MP4 头部直接命中缓存。
-    private func prefetchFirstScreenMedia(dramas: [DramaItem], banners: [BannerItem]) {
-        let coverURLs = banners.map(\.imageName) + dramas.prefix(18).map(\.coverURL)
-        ImageLoader.prefetch(coverURLs)
-
-        let previewURLs = dramas.prefix(6).compactMap { item -> URL? in
+    /// 首屏稳定后再低优先级预热少量旧 MP4；HLS 由播放器按分片加载。
+    /// 可见封面自身已经按需加载，这里不再重复下载和解码同一批图片。
+    private func schedulePlaybackWarmup(dramas: [DramaItem]) {
+        playbackWarmupTask?.cancel()
+        let previewURLs = dramas.compactMap { item -> URL? in
             guard let raw = item.videoURL,
                   let url = URL(string: raw),
-                  ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+                  ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+                  url.pathExtension.lowercased() == "mp4" else { return nil }
             return url
         }
-        MediaPreviewPrefetcher.prefetch(urls: previewURLs)
+        guard !previewURLs.isEmpty else { return }
+        playbackWarmupTask = Task {
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+            MediaPreviewPrefetcher.prefetch(urls: previewURLs, maxCount: 2)
+        }
     }
 
     // MARK: - Category Drama Loading
 
-    /// 切换分类并加载对应剧集
-    func selectCategory(at index: Int, contentLanguage: String? = nil) async {
-        guard index >= 0, index < categories.count else { return }
-        selectedCategoryIndex = index
-        let cat = categories[index]
-        selectedCategoryCode = cat.code
+    /// 分类与语言作为同一份筛选状态提交，避免两个按钮各自创建异步任务后互相覆盖。
+    func selectFilters(categoryCode: String?, contentLanguage: String?) async {
+        selectedCategoryCode = categoryCode
         selectedContentLanguage = contentLanguage
-        hasLoadedCategoryContent = false
-        await loadCategoryDramas(for: cat, contentLanguage: contentLanguage)
-    }
-
-    /// 选择全部分类，并按当前语言重新请求真实内容。
-    func selectAllCategories(contentLanguage: String?) async {
-        selectedCategoryCode = nil
-        selectedContentLanguage = contentLanguage
-        hasLoadedCategoryContent = false
-        await loadCategoryDramas(for: nil, contentLanguage: contentLanguage)
-    }
-
-    /// 选择内容语言，并保留当前分类条件重新请求真实内容。
-    func selectLanguage(_ contentLanguage: String?) async {
-        selectedContentLanguage = contentLanguage
-        hasLoadedCategoryContent = false
-        let category = selectedCategoryCode.flatMap { code in
+        if let categoryCode,
+           let index = categories.firstIndex(where: { $0.code == categoryCode }) {
+            selectedCategoryIndex = index
+        }
+        let category = categoryCode.flatMap { code in
             categories.first(where: { $0.code == code })
         }
         await loadCategoryDramas(for: category, contentLanguage: contentLanguage)
@@ -332,7 +315,6 @@ final class HomeViewModel: ObservableObject {
 
     /// 重试当前分类/语言筛选请求。
     func reloadCategoryContent() async {
-        hasLoadedCategoryContent = false
         let category = selectedCategoryCode.flatMap { code in
             categories.first(where: { $0.code == code })
         }
@@ -347,7 +329,7 @@ final class HomeViewModel: ObservableObject {
                let index = categories.firstIndex(where: { $0.code == selectedCategoryCode }) {
                 selectedCategoryIndex = index
             }
-            await loadHomeCategoryCollections(categories: categories)
+            rebuildHomeCategoryCollections()
         } catch {
             logError("HomeViewModel.reloadCategoryLocalizations failed: \(error)")
         }
@@ -359,18 +341,11 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    func loadInitialCategoryContentIfNeeded() async {
-        guard !hasLoadedCategoryContent else { return }
-        let category = selectedCategoryCode.flatMap { code in
-            categories.first(where: { $0.code == code })
-        }
-        await loadCategoryDramas(for: category, contentLanguage: selectedContentLanguage)
-    }
-
     private func loadCategoryDramas(for category: HomeCategory?, contentLanguage: String?) async {
         categoryRequestGeneration += 1
         let requestGeneration = categoryRequestGeneration
-        isCategoryLoading = true
+        isCategoryLoading = categoryDramas.isEmpty
+        isCategoryRefreshing = !categoryDramas.isEmpty
         categoryErrorMessage = nil
 
         do {
@@ -390,15 +365,20 @@ final class HomeViewModel: ObservableObject {
             }
             guard requestGeneration == categoryRequestGeneration else { return }
             categoryDramas = loadedDramas
-            hasLoadedCategoryContent = true
         } catch {
             guard requestGeneration == categoryRequestGeneration else { return }
+            guard !Task.isCancelled else {
+                isCategoryLoading = false
+                isCategoryRefreshing = false
+                return
+            }
             categoryErrorMessage = "分类数据加载失败"
             logError("HomeViewModel.loadCategoryDramas failed: \(error)")
             // 失败时不覆盖已有数据
         }
         if requestGeneration == categoryRequestGeneration {
             isCategoryLoading = false
+            isCategoryRefreshing = false
         }
     }
 

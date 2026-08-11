@@ -24,7 +24,7 @@ struct MainTabView: View {
         self.playerCoordinator = playerCoordinator
         _homeVM = StateObject(wrappedValue: HomeViewModel(repository: dependencies.homeRepository))
         _recommendVM = StateObject(wrappedValue: RecommendViewModel(repository: dependencies.homeRepository))
-        // For You 常驻预加载，但 App 默认进入 Home，必须等用户切入后才取得播放权。
+        // For You 首次进入时再加载；冷启动只把网络和渲染预算留给 Home。
         _recommendSession = StateObject(
             wrappedValue: RecommendSession(coordinator: playerCoordinator, playbackEnabled: false)
         )
@@ -102,11 +102,8 @@ struct MainTabView: View {
 private struct TabContentHost: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject var dependencies: DependencyContainer
-    /// Home 和 For You 预挂载保证首屏与推荐切换速度；其余重页面首次进入后才常驻。
-    @State private var mountedTabValues: Set<Int> = [
-        AppStore.Tab.home.rawValue,
-        AppStore.Tab.forYou.rawValue
-    ]
+    /// 冷启动只挂载 Home；其他重页面首次进入后常驻，保留切换后的状态。
+    @State private var mountedTabValues: Set<Int> = [AppStore.Tab.home.rawValue]
     let homeVM: HomeViewModel
     let homeRepository: HomeRepositoryProtocol
     let recommendVM: RecommendViewModel
@@ -120,11 +117,13 @@ private struct TabContentHost: View {
                 .opacity(appStore.selectedTab == .home ? 1 : 0)
                 .disabled(appStore.selectedTab != .home)
 
-            RecommendView(viewModel: recommendVM, session: recommendSession, isVisible: appStore.selectedTab == .forYou)
-                .id(AppStore.Tab.forYou.rawValue)
-                .zIndex(appStore.selectedTab == .forYou ? 1 : 0)
-                .opacity(appStore.selectedTab == .forYou ? 1 : 0)
-                .disabled(appStore.selectedTab != .forYou)
+            if shouldMount(.forYou) {
+                RecommendView(viewModel: recommendVM, session: recommendSession, isVisible: appStore.selectedTab == .forYou)
+                    .id(AppStore.Tab.forYou.rawValue)
+                    .zIndex(appStore.selectedTab == .forYou ? 1 : 0)
+                    .opacity(appStore.selectedTab == .forYou ? 1 : 0)
+                    .disabled(appStore.selectedTab != .forYou)
+            }
 
             if shouldMount(.member) {
                 /// Task32：底部 Member Tab 使用新的 MemberView（Real-only）

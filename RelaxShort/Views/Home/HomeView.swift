@@ -160,10 +160,21 @@ struct HomeView: View {
             CoinRewardView(mode: .pushed)
         }
         .task { await viewModel.loadData() }
-        .task { await rewardSummaryStore.refresh() }
-        .onChange(of: viewModel.selectedTab) { _, tab in
-            guard tab == 3 else { return }
-            Task { await viewModel.loadInitialCategoryContentIfNeeded() }
+        .task {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await rewardSummaryStore.refresh()
+        }
+        .task(id: CategoryFilterRequest(
+            isActive: viewModel.selectedTab == 3,
+            language: selectedLanguage,
+            genre: selectedGenre
+        )) {
+            guard viewModel.selectedTab == 3 else { return }
+            await viewModel.selectFilters(
+                categoryCode: selectedGenre == "All" ? nil : selectedGenre,
+                contentLanguage: selectedContentLanguage
+            )
         }
         .onChange(of: appStore.selectedTab) { _, tab in
             guard tab == .home else { return }
@@ -254,19 +265,27 @@ struct HomeView: View {
 
     private func popularContent(containerW: CGFloat) -> some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
+            LazyVStack(spacing: 0) {
                 if !viewModel.fixedDramas.isEmpty { MarketingGrid(dramas: viewModel.fixedDramas, playerDrama: seriesNavigationBinding, containerW: containerW) }
                 if !viewModel.forYouDramas.isEmpty || !viewModel.homeCategoryCollections.isEmpty {
                     YouMightLikeSection(
                         dramas: viewModel.forYouDramas,
                         collections: viewModel.homeCategoryCollections,
                         playerDrama: seriesNavigationBinding,
-                        containerW: containerW,
-                        onDramaAppear: { dramaID in
-                            Task { await viewModel.loadMoreForYouIfNeeded(currentDramaID: dramaID) }
-                        }
+                        containerW: containerW
                     )
                     .padding(.top, 28)
+                }
+                if viewModel.isLoadingMoreForYou {
+                    ProgressView()
+                        .tint(DT.Color.textSecondary)
+                        .frame(height: 52)
+                } else if viewModel.canLoadMoreForYou, !viewModel.forYouDramas.isEmpty {
+                    Color.clear
+                        .frame(height: 1)
+                        .onAppear {
+                            Task { await viewModel.loadMoreForYou() }
+                        }
                 }
             }
             .padding(.bottom, 64)
@@ -320,6 +339,12 @@ struct HomeView: View {
         let title: String
     }
 
+    private struct CategoryFilterRequest: Hashable {
+        let isActive: Bool
+        let language: String
+        let genre: String
+    }
+
     // MARK: - Tab 3: Categories
 
     /// 语言行：All 和数据库启用的全部内容语言。
@@ -353,9 +378,6 @@ struct HomeView: View {
             get: { selectedLanguage },
             set: { newValue in
                 selectedLanguage = newValue
-                Task {
-                    await viewModel.selectLanguage(newValue == "All" ? nil : newValue)
-                }
             }
         ))
     }
@@ -365,15 +387,6 @@ struct HomeView: View {
             get: { selectedGenre },
             set: { newVal in
                 selectedGenre = newVal
-                if newVal == "All" {
-                    Task {
-                        await viewModel.selectAllCategories(contentLanguage: selectedContentLanguage)
-                    }
-                } else if let idx = viewModel.categories.firstIndex(where: { $0.code == newVal }) {
-                    Task {
-                        await viewModel.selectCategory(at: idx, contentLanguage: selectedContentLanguage)
-                    }
-                }
             }
         ))
     }
@@ -492,29 +505,46 @@ struct HomeView: View {
 
     @ViewBuilder
     private func categoryGridStateContent(containerW: CGFloat) -> some View {
-        if viewModel.isCategoryLoading {
-            VStack {
-                Spacer(minLength: 120)
-                ProgressView().tint(DT.Color.textSecondary)
-                Spacer(minLength: 120)
+        ZStack(alignment: .top) {
+            if viewModel.isCategoryLoading {
+                VStack {
+                    Spacer(minLength: 120)
+                    ProgressView().tint(DT.Color.textSecondary)
+                    Spacer(minLength: 120)
+                }
+                .frame(maxWidth: .infinity)
+            } else if let err = viewModel.categoryErrorMessage, viewModel.categoryDramas.isEmpty {
+                VStack(spacing: DT.Space.md) {
+                    Spacer(minLength: 120)
+                    Text(err).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
+                    Button(L10n.retry) { Task { await viewModel.reloadCategoryContent() } }
+                        .font(DT.Font.button).foregroundColor(DT.logoRed)
+                    Spacer(minLength: 120)
+                }
+                .frame(maxWidth: .infinity)
+            } else if viewModel.categoryDramas.isEmpty {
+                Text(L10n.noContent)
+                    .font(DT.Font.bodyDefault)
+                    .foregroundColor(DT.Color.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 120)
+                    .padding(.bottom, 120)
+            } else {
+                VStack(spacing: 0) {
+                    MarketingGrid(
+                        dramas: viewModel.categoryDramas,
+                        playerDrama: seriesNavigationBinding,
+                        containerW: containerW
+                    )
+                    Color.clear.frame(height: 72)
+                }
             }
-            .frame(maxWidth: .infinity)
-        } else if let err = viewModel.categoryErrorMessage, viewModel.categoryDramas.isEmpty {
-            VStack(spacing: DT.Space.md) {
-                Spacer(minLength: 120)
-                Text(err).font(DT.Font.bodyDefault).foregroundColor(DT.Color.textSecondary)
-                Button(L10n.retry) { Task { await viewModel.reloadCategoryContent() } }
-                    .font(DT.Font.button).foregroundColor(DT.logoRed)
-                Spacer(minLength: 120)
+
+            if viewModel.isCategoryRefreshing {
+                ProgressView()
+                    .tint(DB.logoRed)
+                    .padding(.top, 8)
             }
-            .frame(maxWidth: .infinity)
-        } else {
-            MarketingGrid(
-                dramas: viewModel.categoryDramas,
-                playerDrama: seriesNavigationBinding,
-                containerW: containerW
-            )
-            Color.clear.frame(height: 72)
         }
     }
 

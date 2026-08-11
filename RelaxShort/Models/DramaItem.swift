@@ -26,6 +26,8 @@ struct DramaItem: Identifiable, Codable, Hashable {
     var displayFlags: [String] = []
     /// Home 栏目条目级角标，同一剧在不同栏目可不同。
     var placementBadge: PlacementBadge? = nil
+    /// 后端稳定主分类编码，用于客户端聚合展示；category 仅承担本地化名称展示。
+    var categoryCode: String? = nil
     let category: String
     let tags: [String]
     let viewCount: Int

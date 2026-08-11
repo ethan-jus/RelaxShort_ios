@@ -2,14 +2,14 @@ import Foundation
 
 /// 广告运行时配置（编译时配置，不用 UserDefaults）
 enum AdConfig {
-    /// 品牌展示后额外等待广告的最长时间（秒）。总最长等待 = brandingDuration + coldStartLoadTimeout
-    static let coldStartLoadTimeout: TimeInterval = 0.7
-
     /// 热启动展示间隔（秒），在后台超过此时间再次进入才展示开屏广告
     static let hotStartAdInterval: TimeInterval = 60.0
 
-    /// 品牌页展示时长（秒）。到期立即检查广告，就绪→展示，未就绪→再等 coldStartLoadTimeout
+    /// 品牌页最短展示时长；冷启动不再等待第三方广告 SDK。
     static let brandingDuration: TimeInterval = 0.8
+
+    /// 首页可交互后再启动 UMP/广告 SDK，避免 WebContent 创建阻塞冷启动首帧。
+    static let postLaunchAdInitializationDelay: TimeInterval = 1.0
 
     /// 广告过期时间（秒），AdMob 官方是 4 小时
     static let adExpiryInterval: TimeInterval = 4 * 3600

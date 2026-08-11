@@ -91,17 +91,22 @@ struct RelaxShortApp: App {
             // 挂在稳定根视图上，避免 Splash 退出时取消尚未完成的 app/init。
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
+                try? await Task.sleep(for: .seconds(AdConfig.brandingDuration))
+                guard !Task.isCancelled else { return }
                 await AppInitService.shared.initialize()
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
-                // 先让品牌页和 Home 首帧提交，再启动可能创建 WebContent 进程的 UMP。
-                try? await Task.sleep(for: .milliseconds(250))
+                // 先完成首页首帧和交互，再启动可能创建 WebContent/GPU 进程的 UMP 与广告 SDK。
+                try? await Task.sleep(for: .seconds(
+                    AdConfig.brandingDuration + AdConfig.postLaunchAdInitializationDelay
+                ))
+                guard !Task.isCancelled else { return }
                 await PrivacyConsentManager.shared.gatherConsentAndStartAds()
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
-                await runColdStartAdFlow()
+                await finishBrandingFlow()
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
@@ -153,48 +158,14 @@ struct RelaxShortApp: App {
         }
     }
 
-    private func runColdStartAdFlow() async {
+    /// 冷启动只承担品牌展示，不再让第三方广告网络决定首页出现时间。
+    private func finishBrandingFlow() async {
         let startedAt = CACurrentMediaTime()
         try? await Task.sleep(for: .seconds(AdConfig.brandingDuration))
-
-        let deadline = Date().addingTimeInterval(AdConfig.coldStartLoadTimeout)
-        while Date() < deadline {
-            guard showSplash, scenePhase == .active else {
-                let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-                Logger.store.info("冷启动结束：页面或场景已变化，耗时=\(Int(elapsed))ms")
-                finishColdStart()
-                return
-            }
-
-            if PrivacyConsentManager.shared.isConsentFlowComplete {
-                guard PrivacyConsentManager.shared.isAdRequestAllowed else {
-                    let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-                    Logger.store.info("冷启动未获广告同意，直接进入首页，耗时=\(Int(elapsed))ms")
-                    finishColdStart()
-                    return
-                }
-                if adService.isAppOpenAdReady { break }
-            }
-            try? await Task.sleep(for: .milliseconds(100))
-        }
-
-        guard showSplash, scenePhase == .active else {
-            let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            Logger.store.info("冷启动结束：页面或场景已变化，耗时=\(Int(elapsed))ms")
-            finishColdStart()
-            return
-        }
-        if PrivacyConsentManager.shared.isConsentFlowComplete,
-           PrivacyConsentManager.shared.isAdRequestAllowed,
-           adService.isAppOpenAdReady {
-            let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            Logger.store.info("冷启动展示开屏广告，准备耗时=\(Int(elapsed))ms")
-            adService.showAppOpenAd(onDismiss: finishColdStart)
-        } else {
-            let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-            Logger.store.info("冷启动广告未在预算内获准或就绪，直接进入首页，耗时=\(Int(elapsed))ms")
-            finishColdStart()
-        }
+        guard !Task.isCancelled else { return }
+        let elapsed = (CACurrentMediaTime() - startedAt) * 1000
+        Logger.store.info("冷启动品牌页结束，耗时=\(Int(elapsed))ms")
+        finishColdStart()
     }
 
     private func handleForegroundAd() {

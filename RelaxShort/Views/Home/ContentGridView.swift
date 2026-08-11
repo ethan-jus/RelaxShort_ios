@@ -65,7 +65,6 @@ struct YouMightLikeSection: View {
     let collections: [HomeCategoryCollection]
     @Binding var playerDrama: DramaItem?
     let containerW: CGFloat
-    let onDramaAppear: (String) -> Void
     private var colW:CGFloat{(containerW-margin*2-hGap)/2}; private var coverH:CGFloat{colW*4/3}
 
     var body: some View {
@@ -97,13 +96,13 @@ struct YouMightLikeSection: View {
             row += 1
         }
         return HStack(alignment:.top,spacing:hGap){
-            VStack(spacing:vGap){ForEach(Array(li.enumerated()),id:\.offset){s in
+            LazyVStack(spacing:vGap){ForEach(Array(li.enumerated()),id:\.offset){s in
                 if case .category(let collection, let themeIndex)=s.element{CategoryCard(title:collection.title,theme:categoryThemes[themeIndex%categoryThemes.count],dramas:collection.dramas,colW:colW,playerDrama:$playerDrama)}
-                else if case .drama(let d)=s.element{WaterfallCard(drama:d,colW:colW,coverH:coverH,playerDrama:$playerDrama).onAppear{onDramaAppear(d.id)}}
+                else if case .drama(let d)=s.element{WaterfallCard(drama:d,colW:colW,coverH:coverH,playerDrama:$playerDrama)}
             }}
-            VStack(spacing:vGap){ForEach(Array(ri.enumerated()),id:\.offset){s in
+            LazyVStack(spacing:vGap){ForEach(Array(ri.enumerated()),id:\.offset){s in
                 if case .category(let collection, let themeIndex)=s.element{CategoryCard(title:collection.title,theme:categoryThemes[themeIndex%categoryThemes.count],dramas:collection.dramas,colW:colW,playerDrama:$playerDrama)}
-                else if case .drama(let d)=s.element{WaterfallCard(drama:d,colW:colW,coverH:coverH,playerDrama:$playerDrama).onAppear{onDramaAppear(d.id)}}
+                else if case .drama(let d)=s.element{WaterfallCard(drama:d,colW:colW,coverH:coverH,playerDrama:$playerDrama)}
             }}
         }.padding(.horizontal,margin)
     }
