@@ -752,3 +752,10 @@
 "downloads.error.invalid_url" = "下載位址無效。";
 "downloads.error.episode_unavailable" = "劇集資訊仍在載入，請稍後再試。";
 "downloads.error.mp4_required" = "本集暫未提供可離線下載的檔案。";
+"app.update.force_title" = "需要更新";
+"app.update.optional_title" = "新版本已準備好";
+"app.update.force_message" = "請更新至 RelaxShort %@ 後繼續觀看。";
+"app.update.optional_message" = "RelaxShort %@ 帶來了最新改善。";
+"app.update.now" = "立即更新";
+"app.update.later" = "稍後再說";
+"app.update.store_unavailable" = "暫時無法開啟 App Store，請稍後再試。";

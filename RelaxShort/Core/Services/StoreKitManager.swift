@@ -40,16 +40,6 @@ enum ProductID: String, CaseIterable, Hashable {
         }
     }
 
-    /// 对应的金币数量（仅金币包有效）
-    var coinAmount: Int {
-        switch self {
-        case .coinsSmall:  return 800
-        case .coinsMedium: return 550
-        case .coinsLarge:  return 1200
-        case .coinsXLarge: return 2600
-        default: return 0
-        }
-    }
 }
 
 // MARK: - Coin Package
@@ -59,7 +49,6 @@ struct CoinPackage: Identifiable, Equatable {
     let id: String
     let productID: ProductID
     let amount: Int
-    let price: String
     let bonus: Int?
     let isPopular: Bool
 
@@ -71,8 +60,6 @@ struct CoinPackage: Identifiable, Equatable {
         return nil
     }
 
-    /// 当前显示价格：优先使用 StoreKit displayPrice，否则使用 fallback price
-    var displayPrice: String { price }
 }
 
 // MARK: - VIP Subscription
@@ -82,8 +69,7 @@ struct VIPSubscription: Identifiable, Equatable {
     let id: String
     let productID: ProductID
     let period: String          // "周" / "月" / "年"
-    let price: String
-    let dailyEquivalent: String // "¥1.86/天"
+    let dailyEquivalent: String
 }
 
 /// StoreKit 已确认用户有资格使用的 introductory offer 展示数据。
@@ -246,22 +232,22 @@ final class StoreKitManager: ObservableObject {
     /// Transaction 监听任务
     private var transactionListenerTask: Task<Void, Never>?
 
-    // MARK: - Fallback Product Data
+    // MARK: - Product Metadata
 
-    /// 金币包列表（本地回退数据）
+    /// 金币数量来自服务端商品目录的当前合同；价格只能来自 StoreKit。
     let coinPackages: [CoinPackage] = [
-        CoinPackage(id: "pack_400_first", productID: .coinsSmall, amount: 400, price: "$3.99", bonus: 400, isPopular: false),
-        CoinPackage(id: "pack_500", productID: .coinsMedium, amount: 500, price: "$4.99", bonus: 50, isPopular: false),
-        CoinPackage(id: "pack_1000", productID: .coinsLarge, amount: 1000, price: "$9.99", bonus: 200, isPopular: true),
-        CoinPackage(id: "pack_2000", productID: .coinsXLarge, amount: 2000, price: "$19.99", bonus: 600, isPopular: false),
+        CoinPackage(id: "pack_400_first", productID: .coinsSmall, amount: 400, bonus: 400, isPopular: false),
+        CoinPackage(id: "pack_500", productID: .coinsMedium, amount: 500, bonus: 50, isPopular: false),
+        CoinPackage(id: "pack_1000", productID: .coinsLarge, amount: 1000, bonus: 200, isPopular: true),
+        CoinPackage(id: "pack_2000", productID: .coinsXLarge, amount: 2000, bonus: 600, isPopular: false),
     ]
 
-    /// VIP 订阅列表。价格优先使用 StoreKit 本地化价格。
+    /// VIP 订阅列表。价格在展示处从 StoreKit Product 动态读取。
     var vipSubscriptions: [VIPSubscription] {
         [
-            VIPSubscription(id: "vip_weekly", productID: .vipWeekly, period: "member.period.week".localized, price: displayPrice(for: .vipWeekly), dailyEquivalent: "member.plan.weekly_detail".localized),
-            VIPSubscription(id: "vip_monthly", productID: .vipMonthly, period: "member.period.month".localized, price: displayPrice(for: .vipMonthly), dailyEquivalent: "membership.monthly_detail".localized),
-            VIPSubscription(id: "vip_yearly", productID: .vipYearly, period: "member.period.year".localized, price: displayPrice(for: .vipYearly), dailyEquivalent: "member.plan.yearly_detail".localized)
+            VIPSubscription(id: "vip_weekly", productID: .vipWeekly, period: "member.period.week".localized, dailyEquivalent: "member.plan.weekly_detail".localized),
+            VIPSubscription(id: "vip_monthly", productID: .vipMonthly, period: "member.period.month".localized, dailyEquivalent: "membership.monthly_detail".localized),
+            VIPSubscription(id: "vip_yearly", productID: .vipYearly, period: "member.period.year".localized, dailyEquivalent: "member.plan.yearly_detail".localized)
         ]
     }
 
@@ -294,17 +280,20 @@ final class StoreKitManager: ObservableObject {
         return try await fetchFromServer()
     }
 
-    /// 获取产品显示价格
-    /// - 优先返回 App Store 真实价格（含本地化货币符号）
-    /// - 回退到本地定义的 fallback 价格
+    /// 获取产品显示价格。真实金额和货币符号只能来自当前 storefront 的 StoreKit Product。
     func displayPrice(for productID: ProductID) -> String {
         storeKitProducts[productID.rawValue]?.displayPrice
-            ?? fallbackPrice(for: productID)
+            ?? "member.price_unavailable".localized
     }
 
     /// Member 订阅页只允许展示 StoreKit 返回的本地化价格，不使用硬编码币种回退。
     func storeDisplayPrice(for productID: ProductID) -> String? {
         storeKitProducts[productID.rawValue]?.displayPrice
+    }
+
+    /// 商品必须由当前 App Store storefront 返回后才允许进入购买流程。
+    func isProductAvailable(_ productID: ProductID) -> Bool {
+        storeKitProducts[productID.rawValue] != nil
     }
 
     func introductoryOffer(
@@ -318,7 +307,7 @@ final class StoreKitManager: ObservableObject {
     /// 从 App Store 获取产品信息
     ///
     /// 成功时将产品缓存到 `storeKitProducts`，
-    /// 失败时清空缓存、回退到 mock 模式。
+    /// 失败时清空商品缓存并保持购买不可用，避免展示或购买伪造价格。
     func requestProducts() async {
         guard !isLoadingProducts else { return }
         isLoadingProducts = true
@@ -352,7 +341,7 @@ final class StoreKitManager: ObservableObject {
                 )
             }
             vipIntroductoryOffers = eligibleOffers
-            isStoreKitReady = ProductID.supportedVIPSubscriptions.allSatisfy {
+            isStoreKitReady = ProductID.allCases.allSatisfy {
                 storeKitProducts[$0.rawValue] != nil
             }
             Logger.store.info("StoreKitManager: loaded \(self.storeKitProducts.count) products from App Store")
@@ -684,18 +673,4 @@ final class StoreKitManager: ObservableObject {
         }
     }
 
-    // MARK: - Private — Fallback Price
-
-    /// 本地回退价格映射
-    private func fallbackPrice(for productID: ProductID) -> String {
-        switch productID {
-        case .coinsSmall:    return "$3.99"
-        case .coinsMedium:   return "$4.99"
-        case .coinsLarge:    return "$9.99"
-        case .coinsXLarge:   return "$19.99"
-        case .vipWeekly:     return "$12.99"
-        case .vipMonthly:    return "$29.99"
-        case .vipYearly:     return "$149.99"
-        }
-    }
 }

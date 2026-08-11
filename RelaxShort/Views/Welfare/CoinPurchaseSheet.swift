@@ -94,6 +94,7 @@ struct CoinPurchaseSheet: View {
     @ViewBuilder
     private func coinPackageCard(_ package: CoinPackage) -> some View {
         let isSelected = selectedPackage?.id == package.id
+        let isAvailable = storeKit.isProductAvailable(package.productID)
         let displayPrice = storeKit.displayPrice(for: package.productID)
 
         Button {
@@ -184,6 +185,8 @@ struct CoinPurchaseSheet: View {
                     )
             )
         }
+        .disabled(!isAvailable)
+        .opacity(isAvailable || storeKit.isLoadingProducts ? 1 : 0.58)
     }
 
     private func displayedBonus(for package: CoinPackage) -> Int? {
@@ -250,7 +253,7 @@ struct CoinPurchaseSheet: View {
                 )
                 .cornerRadius(DT.Radius.md)
             }
-            .disabled(isPurchasing || selectedPackage == nil)
+            .disabled(isPurchasing || !canPurchaseSelectedPackage)
             .padding(.horizontal, DT.Space.lg)
 
             // 合规声明
@@ -265,8 +268,15 @@ struct CoinPurchaseSheet: View {
 
     // MARK: - Purchase Logic
 
+    private var canPurchaseSelectedPackage: Bool {
+        guard let selectedPackage else { return false }
+        return storeKit.isProductAvailable(selectedPackage.productID)
+    }
+
     private func performPurchase() {
-        guard let pkg = selectedPackage, !isPurchasing else { return }
+        guard let pkg = selectedPackage,
+              storeKit.isProductAvailable(pkg.productID),
+              !isPurchasing else { return }
         isPurchasing = true
         purchaseErrorMessage = nil
 
@@ -507,6 +517,7 @@ struct EpisodeUnlockPurchaseSheet: View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible())], spacing: 12) {
             ForEach(storeKit.coinPackages) { package in
                 let selected = selectedPackage?.id == package.id
+                let isAvailable = storeKit.isProductAvailable(package.productID)
                 Button {
                     selectedPackage = package
                     errorMessage = nil
@@ -538,6 +549,8 @@ struct EpisodeUnlockPurchaseSheet: View {
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
+                .disabled(!isAvailable)
+                .opacity(isAvailable || storeKit.isLoadingProducts ? 1 : 0.58)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
@@ -547,6 +560,7 @@ struct EpisodeUnlockPurchaseSheet: View {
         VStack(spacing: 12) {
             ForEach(vipPlans) { plan in
                 let selected = selectedSubscription?.id == plan.id
+                let isAvailable = storeKit.isProductAvailable(plan.productID)
                 Button {
                     selectedSubscription = plan
                     errorMessage = nil
@@ -584,6 +598,8 @@ struct EpisodeUnlockPurchaseSheet: View {
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
+                .disabled(!isAvailable)
+                .opacity(isAvailable || storeKit.isLoadingProducts ? 1 : 0.58)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
 
@@ -625,7 +641,7 @@ struct EpisodeUnlockPurchaseSheet: View {
                 )
                 .shadow(color: gold.opacity(0.22), radius: 18, y: 7)
             }
-            .disabled(isPurchasing || (selectedTab == .coins ? selectedPackage == nil : selectedSubscription == nil))
+            .disabled(isPurchasing || !selectedStoreProductIsAvailable)
 
             Text(selectedTab == .coins
                  ? "store.auto_unlock_notice".localizedFormat(coinCost)
@@ -662,8 +678,19 @@ struct EpisodeUnlockPurchaseSheet: View {
         return "general.continue".localized
     }
 
+    private var selectedStoreProductIsAvailable: Bool {
+        switch selectedTab {
+        case .coins:
+            guard let selectedPackage else { return false }
+            return storeKit.isProductAvailable(selectedPackage.productID)
+        case .vip:
+            guard let selectedSubscription else { return false }
+            return storeKit.isProductAvailable(selectedSubscription.productID)
+        }
+    }
+
     private func performPurchase() {
-        guard !isPurchasing else { return }
+        guard !isPurchasing, selectedStoreProductIsAvailable else { return }
         isPurchasing = true
         errorMessage = nil
         Task {

@@ -1090,7 +1090,9 @@ public enum StreamedRangeFetcher {
             }
             let loS = String(br[..<di]); let hiS = String(br[br.index(after: di)...])
             guard let lo = Int64(loS), let hi = Int64(hiS),
-                  lo == reqRange.lowerBound, hi - lo + 1 == Int64(data.count) else {
+                  lo == reqRange.lowerBound,
+                  hi <= reqRange.upperBound,
+                  hi - lo + 1 == Int64(data.count) else {
                 session.invalidateAndCancel(); cb(.failed(NSError(domain: "SRF", code: -2, userInfo: [NSLocalizedDescriptionKey: "Content-Range不匹配: \(br)"]))); return
             }
             let tl = cr.components(separatedBy: "/").last.flatMap { Int64($0) }

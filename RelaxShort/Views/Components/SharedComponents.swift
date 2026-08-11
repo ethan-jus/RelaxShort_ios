@@ -728,6 +728,17 @@ struct HDBadgeIconView: View {
 
 // MARK: - Shared Episode Unlock Overlay
 
+/// 解锁面板布局规则独立保留，避免不同播放器入口各自计算安全区间距。
+enum EpisodeUnlockPanelLayout {
+    static func primaryHeight(containerHeight: CGFloat) -> CGFloat {
+        min(430, max(320, containerHeight * 0.46))
+    }
+
+    static func bottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
+        max(34, safeAreaBottom + 18)
+    }
+}
+
 /// 全 App 共用的剧集解锁弹窗。
 ///
 /// 播放器只负责权益状态、购买和解锁回调；VIP/金币选择、挽留层和锁定态的视觉实现全部在这里维护。
@@ -743,16 +754,6 @@ struct EpisodeUnlockOverlay: View {
     let onPrimaryAction: () -> Void
     let onRewardedAd: () -> Void
     let onExitPlayback: () -> Void
-
-    private enum PanelLayout {
-        static func primaryHeight(containerHeight: CGFloat) -> CGFloat {
-            min(430, max(320, containerHeight * 0.46))
-        }
-
-        static func bottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
-            max(34, safeAreaBottom + 18)
-        }
-    }
 
     private var unlockGold: Color { Color(red: 1.0, green: 0.76, blue: 0.20) }
     private var unlockPaleGold: Color { Color(red: 1.0, green: 0.90, blue: 0.62) }
@@ -802,7 +803,7 @@ struct EpisodeUnlockOverlay: View {
     }
 
     private var primaryPanel: some View {
-        let panelHeight = PanelLayout.primaryHeight(containerHeight: containerHeight)
+        let panelHeight = EpisodeUnlockPanelLayout.primaryHeight(containerHeight: containerHeight)
         let isCompact = panelHeight < 370
         let choiceHeight: CGFloat = isCompact ? 62 : 76
 
@@ -906,7 +907,7 @@ struct EpisodeUnlockOverlay: View {
         }
         .padding(.horizontal, 22)
         .padding(.top, isCompact ? 14 : 22)
-        .padding(.bottom, PanelLayout.bottomPadding(safeAreaBottom: safeAreaBottom))
+        .padding(.bottom, EpisodeUnlockPanelLayout.bottomPadding(safeAreaBottom: safeAreaBottom))
         .frame(height: panelHeight, alignment: .top)
         .background(
             unlockSheetGradient,

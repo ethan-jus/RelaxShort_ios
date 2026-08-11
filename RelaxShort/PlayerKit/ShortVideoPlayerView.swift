@@ -72,16 +72,8 @@ struct ShortVideoPlayerView: View {
 
             // 字幕
             if let text = engine.subtitleText, !text.isEmpty {
-                VStack {
-                    Spacer()
-                    Text(text)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white)
-                        .shadow(color: .black.opacity(0.7), radius: 2)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 60)
-                }
+                PlayerSubtitleOverlay(text: text)
+                    .transition(.opacity)
             }
 
             #if DEBUG
@@ -136,6 +128,53 @@ struct ShortVideoPlayerView: View {
                     )
                 )
         }
+    }
+}
+
+/// 外挂字幕使用独立覆盖层，避开底部手势区、播放控件和剧集操作区。
+/// 字号随播放器宽度轻微缩放，但限制在移动端可读范围内，避免小屏过小或大屏过度抢画面。
+private struct PlayerSubtitleOverlay: View {
+    let text: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            VStack {
+                Spacer(minLength: 0)
+
+                Text(text)
+                    .font(
+                        .system(
+                            size: min(21, max(17, proxy.size.width * 0.046)),
+                            weight: .semibold,
+                            design: .rounded
+                        )
+                    )
+                    .foregroundStyle(.white)
+                    .lineSpacing(3)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.86)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.58), in: RoundedRectangle(cornerRadius: 7))
+                    .shadow(color: .black.opacity(0.9), radius: 2, y: 1)
+                    .frame(maxWidth: min(max(0, proxy.size.width - 32), 640))
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, bottomClearance(in: proxy))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+
+    private func bottomClearance(in proxy: GeometryProxy) -> CGFloat {
+        let adaptive = proxy.size.height >= 600
+            ? proxy.size.height * 0.17
+            : proxy.size.height * 0.20
+        return max(proxy.size.height >= 600 ? 122 : 62, adaptive)
+            + proxy.safeAreaInsets.bottom
     }
 }
 

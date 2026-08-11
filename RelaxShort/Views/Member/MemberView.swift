@@ -679,20 +679,11 @@ extension MemberView {
         return "\(plan.titleKey.localized), \(offerDisclosure), \("member.standard_price".localized) \(standardPrice)"
     }
 
-    /// Debug 环境在 StoreKit 尚未连通时保留套餐价格，便于先验收页面布局。
-    /// 购买入口仍只认真实 StoreKit 产品，不会把测试价格当成可购买状态。
+    /// 订阅金额和货币符号只显示当前 storefront 的 StoreKit 本地化结果。
     private func planDisplayPrice(
         for productID: ProductID
     ) -> String? {
-        if let storePrice = storeKit.storeDisplayPrice(for: productID) {
-            return storePrice
-        }
-
-        #if DEBUG
-        return storeKit.displayPrice(for: productID)
-        #else
-        return nil
-        #endif
+        storeKit.storeDisplayPrice(for: productID)
     }
 }
 

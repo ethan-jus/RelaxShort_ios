@@ -19,7 +19,8 @@ final class AppInitService {
     private(set) var didInitialize = false
 
     /// 调用 app/init，结果写入 UserDefaults。失败时记录日志，不抛异常。
-    func initialize() async {
+    @discardableResult
+    func initialize() async -> AppInitResponseDTO? {
         do {
             let dto: AppInitResponseDTO = try await withTimeout(seconds: timeoutSeconds) {
                 try await self.client.requestData(.appInit)
@@ -27,9 +28,11 @@ final class AppInitService {
             apply(dto)
             didInitialize = true
             Logger.general.info("AppInitService: initialized ui=\(dto.uiLanguage) content=\(dto.contentLanguage) country=\(dto.countryCode)")
+            return dto
         } catch {
-            guard Self.shouldReportFailure(error) else { return }
+            guard Self.shouldReportFailure(error) else { return nil }
             Logger.general.warning("AppInitService: init failed (will retry on next launch): \(error.localizedDescription)")
+            return nil
         }
     }
 

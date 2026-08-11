@@ -230,8 +230,8 @@ struct RecommendSessionIndexMappingTests {
         #expect(session.playableIndex(for: 99) == nil) // out of bounds
     }
 
-    @Test("attemptTransition 无映射时拒绝切换、不修改 currentIndex")
-    func attemptTransitionRejectsUnplayable() {
+    @Test("attemptTransition 无预览源时进入封面占位并暂停旧音频")
+    func attemptTransitionAllowsPlaceholderWithoutPlayingOldAudio() {
         let coordinator = PlayerCoordinator()
         let session = RecommendSession(coordinator: coordinator)
 
@@ -243,8 +243,9 @@ struct RecommendSessionIndexMappingTests {
         #expect(session.currentIndex == 0)
 
         let result = session.attemptTransition(from: 0, to: 1, autoplay: true)
-        #expect(result == false)
-        #expect(session.currentIndex == 0) // 未变
+        #expect(result == true)
+        #expect(session.currentIndex == 1)
+        #expect(coordinator.engine.wantsPlayback == false)
     }
 
     // MARK: - Series Ownership

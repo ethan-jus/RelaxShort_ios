@@ -752,3 +752,10 @@
 "downloads.error.invalid_url" = "다운로드 주소가 올바르지 않습니다.";
 "downloads.error.episode_unavailable" = "에피소드 정보를 불러오는 중입니다.";
 "downloads.error.mp4_required" = "오프라인 파일을 제공하지 않는 에피소드입니다.";
+"app.update.force_title" = "업데이트가 필요합니다";
+"app.update.optional_title" = "새 버전이 준비되었습니다";
+"app.update.force_message" = "계속 시청하려면 RelaxShort %@ 버전으로 업데이트하세요.";
+"app.update.optional_message" = "RelaxShort %@ 버전에 최신 개선 사항이 포함되어 있습니다.";
+"app.update.now" = "지금 업데이트";
+"app.update.later" = "나중에";
+"app.update.store_unavailable" = "App Store 페이지를 열 수 없습니다. 잠시 후 다시 시도하세요.";

@@ -222,7 +222,11 @@ final class PlaybackMediaContractTests: XCTestCase {
         let drama = FeedCardDTOMapper.toDramaItem(from: card)
         XCTAssertEqual(drama.id, "888")
         XCTAssertEqual(drama.previewEpisodeID, "101")
-        XCTAssertEqual(drama.videoURL, "https://media.example.com/e/101/fallback.mp4")
+        XCTAssertEqual(drama.videoURL, "https://media.example.com/e/101/master.m3u8")
+        XCTAssertEqual(
+            drama.toPlayerMediaItem()?.source,
+            .hls(masterURL: URL(string: "https://media.example.com/e/101/master.m3u8")!)
+        )
         XCTAssertEqual(drama.isPublicPreview, true)
 
         // 普通卡片导航默认以 preview_episode_id 为目标，进入 Series 后单独请求 /play 合同

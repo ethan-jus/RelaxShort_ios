@@ -109,9 +109,9 @@ final class PlayerCoordinator: ObservableObject {
     }
 
     /// 只有 For You 仍持有播放权时，页面生命周期才允许暂停或恢复。
-    func pauseForYou() {
+    func pauseForYou(preservingPlaybackIntent: Bool = true) {
         guard owner == .forYou else { return }
-        engine.pause(reason: .system)
+        engine.pause(reason: preservingPlaybackIntent ? .system : .user)
     }
 
     func resumeForYou() {

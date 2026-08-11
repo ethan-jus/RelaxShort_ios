@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A55B00000000000000000001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A55B00000000000000000002 /* PrivacyInfo.xcprivacy */; };
+		A55A00000000000000000001 /* AppUpdateCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A55A00000000000000000002 /* AppUpdateCoordinator.swift */; };
 		0FF1D0010000000000000001 /* OfflineDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF1F0010000000000000001 /* OfflineDownloadManager.swift */; };
 		0FF1D0020000000000000002 /* OfflineDownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FF1F0020000000000000002 /* OfflineDownloadsView.swift */; };
 		018255F83848D18F615B66FC /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E421576C8190BCF4CC8EFABD /* HomeView.swift */; };
@@ -183,6 +185,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		A55B00000000000000000002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A55A00000000000000000002 /* AppUpdateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdateCoordinator.swift; sourceTree = "<group>"; };
 		0FF1F0010000000000000001 /* OfflineDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OfflineDownloadManager.swift; path = RelaxShort/Core/Services/OfflineDownloadManager.swift; sourceTree = SOURCE_ROOT; };
 		0FF1F0020000000000000002 /* OfflineDownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = OfflineDownloadsView.swift; path = RelaxShort/Views/Profile/OfflineDownloadsView.swift; sourceTree = SOURCE_ROOT; };
 		033FA10CEF10A18521342010 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -469,6 +473,7 @@
 		2E8C8396B7272A1BBA4E1DC2 /* RelaxShort */ = {
 			isa = PBXGroup;
 			children = (
+				A55B00000000000000000002 /* PrivacyInfo.xcprivacy */,
 				85C47C44A64449764305DA46 /* Assets.xcassets */,
 				04B19A3AE124A47F723E734F /* Info.plist */,
 				C42000000000000000000002 /* InfoPlist.strings */,
@@ -530,6 +535,7 @@
 		5C29374A6E7484A2706B1824 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A55A00000000000000000002 /* AppUpdateCoordinator.swift */,
 				0FF1F0010000000000000001 /* OfflineDownloadManager.swift */,
 				B283C7770DFE5035A2A801EA /* AdConfig.swift */,
 				FF389AD770099338D3F8AAF2 /* AdService.swift */,
@@ -884,6 +890,11 @@
 				TargetAttributes = {
 					6AF8E8CF85EC9647DF04B721 = {
 						DevelopmentTeam = P7QAX68962;
+						SystemCapabilities = {
+							com.apple.SignInWithApple = {
+								enabled = 1;
+							};
+						};
 					};
 					AAAA5DE82FF18EFF00153BF7 = {
 						CreatedOnToolsVersion = 26.6;
@@ -930,6 +941,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A55B00000000000000000001 /* PrivacyInfo.xcprivacy in Resources */,
 				3621D61EEDEABAB261DB3D9C /* Assets.xcassets in Resources */,
 				C42000000000000000000001 /* InfoPlist.strings in Resources */,
 				99ECD8A1A63D8D8A97B83282 /* Localizable.strings in Resources */,
@@ -957,6 +969,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A55A00000000000000000001 /* AppUpdateCoordinator.swift in Sources */,
 				0FF1D0010000000000000001 /* OfflineDownloadManager.swift in Sources */,
 				0FF1D0020000000000000002 /* OfflineDownloadsView.swift in Sources */,
 				479CE0557FE0EB68C8164DA2 /* APIClient.swift in Sources */,

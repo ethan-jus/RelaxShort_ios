@@ -752,3 +752,10 @@
 "downloads.error.invalid_url" = "عنوان التنزيل غير صالح.";
 "downloads.error.episode_unavailable" = "ما زالت معلومات الحلقة قيد التحميل.";
 "downloads.error.mp4_required" = "لا يتوفر ملف مناسب للتنزيل لهذه الحلقة.";
+"app.update.force_title" = "التحديث مطلوب";
+"app.update.optional_title" = "يتوفر إصدار جديد";
+"app.update.force_message" = "حدّث إلى RelaxShort %@ لمتابعة المشاهدة.";
+"app.update.optional_message" = "يتضمن RelaxShort %@ أحدث التحسينات.";
+"app.update.now" = "التحديث الآن";
+"app.update.later" = "لاحقًا";
+"app.update.store_unavailable" = "صفحة App Store غير متاحة مؤقتًا. حاول مرة أخرى.";

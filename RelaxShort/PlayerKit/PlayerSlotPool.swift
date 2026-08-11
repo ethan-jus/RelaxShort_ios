@@ -41,6 +41,11 @@ final class PlayerSlotPool {
 
     private var slots: [PlayerSlotContext?] = [nil, nil, nil]
 
+    /// 只读诊断入口：验证相邻槽在异步 preroll 完成前保持静音，不暴露槽位写权限。
+    func player(in slot: PlayerSlot) -> AVPlayer? {
+        slots[slot.rawValue]?.player
+    }
+
     // MARK: - 准备槽位
 
     func prepare(

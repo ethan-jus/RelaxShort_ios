@@ -206,7 +206,7 @@ import Combine
         guard let pIdx = playableIndex(for: new) else {
             // 极端情况下仍允许进入封面占位页并暂停旧音频，用户可以继续滑动；
             // For You 不展示解锁流程，也不能被一条坏数据困住。
-            coordinator.pauseForYou()
+            coordinator.pauseForYou(preservingPlaybackIntent: false)
             currentIndex = new
             poolVersion &+= 1
             log("attemptTransition 目标无预览源，进入封面占位页 drama=\(new)")
@@ -363,10 +363,13 @@ extension DramaItem {
             print("[PlayerKit] 跳过可播放条目 ID=\(id) 原因=缺少有效视频地址 标题=\(title) 视频地址=\(videoURL ?? "无")")
             return nil
         }
+        let source: PlayerMediaSource = url.pathExtension.lowercased() == "m3u8"
+            ? .hls(masterURL: url)
+            : .mp4(url)
         return PlayerMediaItem(
             id: PlayerMediaItem.stableID(dramaID: id, episodeNumber: episodeNumber),
             title: title, episodeNumber: episodeNumber,
-            coverURL: coverURL, source: .mp4(url), resumeTime: nil,
+            coverURL: coverURL, source: source, resumeTime: nil,
             allowsPersistentCache: true
         )
     }

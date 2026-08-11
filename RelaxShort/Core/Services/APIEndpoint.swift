@@ -292,6 +292,9 @@ extension APIEndpoint {
             "Content-Type": "application/json",
             "X-Platform": "ios",
             "X-Client-Version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0",
+            "X-App-Version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0",
+            "X-Build-Number": Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0",
+            "X-Channel": "app_store",
             "Accept-Language": AppLocalization.currentLanguage.rawValue
         ]
 

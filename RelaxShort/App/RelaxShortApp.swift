@@ -20,6 +20,7 @@ struct RelaxShortApp: App {
     @StateObject private var coinStore = CoinStore()
     @StateObject private var rewardSummaryStore = RewardSummaryStore()
     @StateObject private var storeKit = StoreKitManager()
+    @StateObject private var updateCoordinator = AppUpdateCoordinator()
     @StateObject private var dependencies = DependencyContainer()
     @StateObject private var playerCoordinator = PlayerCoordinator()
     @ObservedObject private var themeManager = ThemeManager.shared
@@ -88,6 +89,14 @@ struct RelaxShortApp: App {
                         .zIndex(2)
                 }
 
+                if let update = updateCoordinator.presentation {
+                    AppUpdatePromptView(
+                        presentation: update,
+                        coordinator: updateCoordinator
+                    )
+                    .zIndex(10)
+                }
+
             }
             .id(appStore.language)
             .environment(\.locale, Locale(identifier: appStore.language.rawValue))
@@ -100,9 +109,10 @@ struct RelaxShortApp: App {
             // 挂在稳定根视图上，避免 Splash 退出时取消尚未完成的 app/init。
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }
-                try? await Task.sleep(for: .seconds(AdConfig.brandingDuration))
-                guard !Task.isCancelled else { return }
-                await AppInitService.shared.initialize()
+                // 版本门禁属于启动安全策略，立即并发获取；不等开屏广告或品牌页结束。
+                if let result = await AppInitService.shared.initialize() {
+                    updateCoordinator.handle(result.update)
+                }
             }
             .task {
                 guard !AppRuntimeEnvironment.isUnitTesting else { return }

@@ -769,3 +769,10 @@
 "downloads.error.invalid_url" = "The download address is invalid.";
 "downloads.error.episode_unavailable" = "Episode information is still loading. Try again shortly.";
 "downloads.error.mp4_required" = "This episode does not have an eligible offline file.";
+"app.update.force_title" = "Update required";
+"app.update.optional_title" = "A new version is ready";
+"app.update.force_message" = "Update to RelaxShort %@ to keep watching.";
+"app.update.optional_message" = "RelaxShort %@ includes the latest improvements.";
+"app.update.now" = "Update now";
+"app.update.later" = "Later";
+"app.update.store_unavailable" = "The App Store page is temporarily unavailable. Please try again.";

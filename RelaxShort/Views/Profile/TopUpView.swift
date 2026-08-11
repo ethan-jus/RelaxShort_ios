@@ -171,6 +171,7 @@ struct TopUpView: View {
 
     private func packageRow(_ package: CoinPackage) -> some View {
         let selected = viewModel.selectedProductID == package.productID
+        let isAvailable = storeKitManager.isProductAvailable(package.productID)
         let bonus = viewModel.displayedBonus(for: package)
         let total = viewModel.totalCoins(for: package)
         let price = storeKitManager.displayPrice(for: package.productID)
@@ -235,6 +236,8 @@ struct TopUpView: View {
             }
         }
         .buttonStyle(.plain)
+        .disabled(!isAvailable)
+        .opacity(isAvailable || storeKitManager.isLoadingProducts ? 1 : 0.58)
         .accessibilityLabel(
             "topup.package_accessibility".localizedFormat(total, price)
         )
@@ -280,8 +283,8 @@ struct TopUpView: View {
                 .background(DT.logoRed)
                 .clipShape(RoundedRectangle(cornerRadius: 9))
             }
-            .disabled(selectedPackage == nil || viewModel.isPurchasing)
-            .opacity(selectedPackage == nil ? 0.55 : 1)
+            .disabled(!canPurchaseSelectedPackage || viewModel.isPurchasing)
+            .opacity(canPurchaseSelectedPackage ? 1 : 0.55)
         }
     }
 
@@ -302,6 +305,11 @@ struct TopUpView: View {
 
     private var selectedPackage: CoinPackage? {
         viewModel.selectedPackage(from: storeKitManager.coinPackages)
+    }
+
+    private var canPurchaseSelectedPackage: Bool {
+        guard let selectedPackage else { return false }
+        return storeKitManager.isProductAvailable(selectedPackage.productID)
     }
 
     private var purchaseButtonTitle: String {

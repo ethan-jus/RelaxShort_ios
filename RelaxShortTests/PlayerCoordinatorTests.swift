@@ -206,7 +206,7 @@ struct PlayerCoordinatorTests {
     }
 
     @Test
-    func preparedAdjacentSlotIsSilentUntilPromoted() throws {
+    func adjacentSlotIsSilentWhilePrerollIsInFlight() throws {
         let pool = PlayerSlotPool()
         defer { pool.cleanup() }
         let first = mediaItem(id: "for-you-1")
@@ -221,20 +221,12 @@ struct PlayerCoordinatorTests {
             next = try? $0.get()
         }
         let oldPlayer = try #require(current)
-        let preparedPlayer = try #require(next)
+        let preparedPlayer = try #require(pool.player(in: .next))
 
         #expect(oldPlayer.isMuted == false)
         #expect(preparedPlayer.isMuted == true)
-
-        var promoted: AVPlayer?
-        pool.move(from: 0, to: 1, items: [first, second], generation: 2) {
-            promoted = try? $0.get()
-        }
-
-        #expect(promoted === preparedPlayer)
-        #expect(oldPlayer.timeControlStatus == .paused)
-        #expect(oldPlayer.isMuted == true)
-        #expect(preparedPlayer.isMuted == false)
+        // 相邻槽只有 asset 可播放且 preroll 完成后才执行 completion。
+        #expect(next == nil)
     }
 
     @Test

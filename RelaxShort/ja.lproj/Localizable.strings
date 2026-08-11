@@ -752,3 +752,10 @@
 "downloads.error.invalid_url" = "ダウンロード URL が無効です。";
 "downloads.error.episode_unavailable" = "エピソード情報を読み込み中です。";
 "downloads.error.mp4_required" = "この話には対応するオフラインファイルがありません。";
+"app.update.force_title" = "アップデートが必要です";
+"app.update.optional_title" = "新しいバージョンがあります";
+"app.update.force_message" = "視聴を続けるには RelaxShort %@ に更新してください。";
+"app.update.optional_message" = "RelaxShort %@ には最新の改善が含まれています。";
+"app.update.now" = "今すぐ更新";
+"app.update.later" = "あとで";
+"app.update.store_unavailable" = "App Store を開けません。しばらくしてから再試行してください。";

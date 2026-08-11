@@ -752,3 +752,10 @@
 "downloads.error.invalid_url" = "La dirección de descarga no es válida.";
 "downloads.error.episode_unavailable" = "La información del episodio aún se está cargando.";
 "downloads.error.mp4_required" = "Este episodio no tiene un archivo offline compatible.";
+"app.update.force_title" = "Actualización obligatoria";
+"app.update.optional_title" = "Hay una nueva versión";
+"app.update.force_message" = "Actualiza a RelaxShort %@ para seguir viendo.";
+"app.update.optional_message" = "RelaxShort %@ incluye las últimas mejoras.";
+"app.update.now" = "Actualizar ahora";
+"app.update.later" = "Más tarde";
+"app.update.store_unavailable" = "La página de App Store no está disponible. Inténtalo de nuevo.";
