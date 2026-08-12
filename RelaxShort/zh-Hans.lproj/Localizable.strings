@@ -180,6 +180,8 @@
 "player.copy_link" = "复制链接";
 "player.speed" = "倍速";
 "player.playback_settings" = "播放设置";
+"player.quality_auto_standard" = "根据网络自动调整 · 最高 720P";
+"player.quality_auto_vip" = "根据网络自动调整 · 最高 1080P";
 "player.current_resolution" = "当前清晰度";
 "player.picture_in_picture" = "画中画";
 "player.subtitle_feedback_prefix" = "字幕语言如有错漏，";

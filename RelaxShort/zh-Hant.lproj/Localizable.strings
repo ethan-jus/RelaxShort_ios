@@ -176,6 +176,8 @@
 "player.copy_link" = "複製連結";
 "player.speed" = "倍速";
 "player.playback_settings" = "播放設定";
+"player.quality_auto_standard" = "依網路自動調整 · 最高 720P";
+"player.quality_auto_vip" = "依網路自動調整 · 最高 1080P";
 "player.current_resolution" = "目前解析度";
 "player.picture_in_picture" = "畫中畫";
 "player.subtitle_feedback_prefix" = "字幕語言如有錯漏，";

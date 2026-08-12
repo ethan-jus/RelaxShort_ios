@@ -59,6 +59,8 @@ struct EpisodePlayResponseDTO: Decodable {
     let masterUrl: String?
     let fallbackMp4Url: String?
     let qualities: [QualityDTO]?
+    let autoMaxHeight: Int?
+    let has1080Entitlement: Bool?
     let subtitleTracks: [SubtitleDTO]?
     let defaultSubtitleLanguage: String?
     let thumbnailTrack: ThumbnailDTO?

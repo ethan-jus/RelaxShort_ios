@@ -26,13 +26,17 @@ enum PlayerItemFactory {
     /// completion 型资源代理只有收到完整响应块后才能回复 AVPlayer，不能放在首帧热路径。
     static func makePlaybackItem(
         from item: PlayerMediaItem,
-        intent: PlayerItemLoadIntent = .playback
+        intent: PlayerItemLoadIntent = .playback,
+        adaptiveQualityPolicy: PlayerAdaptiveQualityPolicy = .standard
     ) -> PlayerManagedItem {
         guard intent == .preload,
               item.allowsPersistentCache,
               PlayerMediaCacheSettings.isEnabled,
               let url = mp4URL(from: item.source) else {
-            return makeDirectItem(from: item.source)
+            return makeDirectItem(
+                from: item.source,
+                adaptiveQualityPolicy: adaptiveQualityPolicy
+            )
         }
         let priority = intent == .playback
             ? PlayerPreloadPolicy.playbackNetworkPriority
@@ -46,7 +50,10 @@ enum PlayerItemFactory {
         return PlayerManagedItem(item: AVPlayerItem(asset: asset), resourceLoaderDelegate: delegate)
     }
 
-    static func makeDirectItem(from source: PlayerMediaSource) -> PlayerManagedItem {
+    static func makeDirectItem(
+        from source: PlayerMediaSource,
+        adaptiveQualityPolicy: PlayerAdaptiveQualityPolicy = .standard
+    ) -> PlayerManagedItem {
         let url: URL
         switch source {
         case .mp4(let value), .mp4WithEmbeddedSubtitles(let value):
@@ -55,12 +62,23 @@ enum PlayerItemFactory {
             url = videoURL
         case .hls(let masterURL):
             url = masterURL
-        case .hlsWithFallback(_, let fallbackMP4URL):
-            // 当前播放链路优先 MP4 fallback，HLS 作为可恢复路径保留在 source 中。
-            // 这样可以少一次 HLS master/segment 探测，提升短剧首帧速度。
-            url = fallbackMP4URL
+        case .hlsWithFallback(let masterURL, _):
+            // 新媒资优先走 HLS，才能使用 ABR、720P/1080P 上限和原生流式预热。
+            // MP4 只在 HLS 确认失败后由引擎单次降级，不能抢占正常首帧热路径。
+            url = masterURL
         }
-        return PlayerManagedItem(item: AVPlayerItem(url: url), resourceLoaderDelegate: nil)
+        let item = AVPlayerItem(url: url)
+        applyAdaptiveQualityPolicy(adaptiveQualityPolicy, to: item, source: source)
+        return PlayerManagedItem(item: item, resourceLoaderDelegate: nil)
+    }
+
+    static func applyAdaptiveQualityPolicy(
+        _ policy: PlayerAdaptiveQualityPolicy,
+        to item: AVPlayerItem,
+        source: PlayerMediaSource
+    ) {
+        guard hlsURL(from: source) != nil else { return }
+        item.preferredMaximumResolution = policy.maximumResolution
     }
 
     static func mp4URL(from source: PlayerMediaSource) -> URL? {

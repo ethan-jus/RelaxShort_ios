@@ -94,6 +94,7 @@ struct MonetizationDTO: Decodable {
 /// 这里显式兼容两类 key：后端 feed 快照的短 key（hls/mp4Fallback）与播放接口的标准 key（hlsMasterUrl/mp4FallbackUrl）。
 struct PlayAssetDTO: Decodable {
     let hlsMasterUrl: String?
+    let standardHlsMasterUrl: String?
     let mp4FallbackUrl: String?
     let qualities: [QualityDTO]?
     let subtitles: [SubtitleDTO]?
@@ -101,6 +102,8 @@ struct PlayAssetDTO: Decodable {
     private enum CodingKeys: String, CodingKey {
         case hls
         case hlsMasterUrl
+        case standardHls
+        case standardHlsMasterUrl
         case mp4Fallback
         case mp4FallbackUrl
         case qualities
@@ -111,6 +114,8 @@ struct PlayAssetDTO: Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         hlsMasterUrl = try container.decodeIfPresent(String.self, forKey: .hlsMasterUrl)
             ?? container.decodeIfPresent(String.self, forKey: .hls)
+        standardHlsMasterUrl = try container.decodeIfPresent(String.self, forKey: .standardHlsMasterUrl)
+            ?? container.decodeIfPresent(String.self, forKey: .standardHls)
         mp4FallbackUrl = try container.decodeIfPresent(String.self, forKey: .mp4FallbackUrl)
             ?? container.decodeIfPresent(String.self, forKey: .mp4Fallback)
         qualities = try container.decodeIfPresent([QualityDTO].self, forKey: .qualities)
@@ -127,6 +132,7 @@ struct QualityDTO: Decodable {
     let codec: String?
     let fileSize: Int64?
     let vipRequired: Bool?
+    let selectable: Bool?
 
     private enum CodingKeys: String, CodingKey {
         case quality
@@ -137,6 +143,7 @@ struct QualityDTO: Decodable {
         case codec
         case fileSize
         case vipRequired
+        case selectable
     }
 
     init(from decoder: Decoder) throws {
@@ -149,6 +156,7 @@ struct QualityDTO: Decodable {
         codec = try container.decodeIfPresent(String.self, forKey: .codec)
         fileSize = try container.decodeIfPresent(Int64.self, forKey: .fileSize)
         vipRequired = FlexibleBoolDecoder.decode(container, forKey: .vipRequired)
+        selectable = FlexibleBoolDecoder.decode(container, forKey: .selectable)
     }
 }
 

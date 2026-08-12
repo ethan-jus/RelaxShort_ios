@@ -64,6 +64,19 @@ struct PlayerQualityOption: Identifiable, Hashable {
     let id: String
     let displayName: String
     let bitrate: Int?
+    let maximumResolution: CGSize?
+}
+
+/// HLS Auto 的会员画质策略。Auto 允许 AVPlayer 自适应降档，只限制最高分辨率。
+struct PlayerAdaptiveQualityPolicy: Equatable {
+    let maximumResolution: CGSize
+
+    static let standard = PlayerAdaptiveQualityPolicy(
+        maximumResolution: CGSize(width: 1280, height: 720)
+    )
+    static let vip = PlayerAdaptiveQualityPolicy(
+        maximumResolution: CGSize(width: 1920, height: 1080)
+    )
 }
 
 // MARK: - 字幕选项

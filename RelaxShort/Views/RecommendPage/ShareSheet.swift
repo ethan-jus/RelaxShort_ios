@@ -2,8 +2,8 @@ import SwiftUI
 import UIKit
 
 private enum ShareMetrics {
-    static let detentHeight: CGFloat = 390
-    static let cornerRadius: CGFloat = 26
+    static let detentHeight: CGFloat = 374
+    static let cornerRadius: CGFloat = 24
 }
 
 extension View {
@@ -84,22 +84,27 @@ struct ShareSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Capsule()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 42, height: 5)
+                .padding(.top, 10)
+
             HStack {
-                Color.clear.frame(width: 40, height: 40)
-                Spacer()
                 Text("share.title".localized)
-                    .font(.system(size: 21, weight: .bold))
+                    .font(.system(size: 19, weight: .bold))
                     .foregroundColor(.white)
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.55))
-                        .frame(width: 40, height: 40)
+                        .foregroundColor(.white.opacity(0.66))
+                        .frame(width: 44, height: 44)
+                        .background(Color.white.opacity(0.055), in: Circle())
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.top, 20)
+            .padding(.leading, 20)
+            .padding(.trailing, 12)
+            .padding(.top, 7)
 
             HStack(spacing: 10) {
                 RewardCoinBadge(size: 28, motion: .bounce)
@@ -114,11 +119,12 @@ struct ShareSheet: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .frame(height: 68)
+            .padding(.vertical, 12)
+            .frame(minHeight: 84)
             .background(Color.white.opacity(0.07))
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .padding(.horizontal, 22)
-            .padding(.top, 18)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
 
             Button {
                 activityItems = [
@@ -132,10 +138,10 @@ struct ShareSheet: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(DT.logoRed)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 24)
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
 
             Button {
                 UIPasteboard.general.url = shareURL
@@ -147,10 +153,10 @@ struct ShareSheet: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
                     .background(Color.white.opacity(0.07))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 12)
+            .padding(.horizontal, 20)
+            .padding(.top, 10)
 
             if let statusText {
                 Text(statusText)
@@ -160,7 +166,8 @@ struct ShareSheet: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .background(Color(hex: "#1C1C1E"))
+        .background(Color(hex: "#111111"))
+        .presentationBackground(Color(hex: "#111111"))
         .sheet(isPresented: Binding(
             get: { activityItems != nil },
             set: { if !$0 { activityItems = nil } }

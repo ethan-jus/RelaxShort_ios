@@ -275,7 +275,9 @@ enum FeedCardDTOMapper {
         }()
 
         // HLS 分段更适合移动网络快速首播和自适应码率；旧内容缺 HLS 时才回退 MP4。
-        let resolvedVideoURL = card.playAsset?.hlsMasterUrl ?? card.playAsset?.mp4FallbackUrl
+        let resolvedVideoURL = card.playAsset?.standardHlsMasterUrl
+            ?? card.playAsset?.hlsMasterUrl
+            ?? card.playAsset?.mp4FallbackUrl
 
         var item = DramaItem(
             id: String(card.seriesId),

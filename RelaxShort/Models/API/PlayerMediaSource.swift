@@ -16,6 +16,8 @@ struct PlaybackMediaSourceDTO {
     let qualities: [QualityDTO]
     let subtitleTracks: [SubtitleDTO]
     let defaultSubtitleLanguage: String?
+    let autoMaxHeight: Int
+    let has1080Entitlement: Bool
     let thumbnailTrack: ThumbnailDTO?
     let resumeTime: Int?
 
@@ -26,6 +28,8 @@ struct PlaybackMediaSourceDTO {
         qualities: [QualityDTO] = [],
         subtitleTracks: [SubtitleDTO] = [],
         defaultSubtitleLanguage: String? = nil,
+        autoMaxHeight: Int = 720,
+        has1080Entitlement: Bool = false,
         thumbnailTrack: ThumbnailDTO? = nil,
         resumeTime: Int? = nil
     ) {
@@ -35,15 +39,17 @@ struct PlaybackMediaSourceDTO {
         self.qualities = qualities
         self.subtitleTracks = subtitleTracks
         self.defaultSubtitleLanguage = defaultSubtitleLanguage
+        self.autoMaxHeight = autoMaxHeight
+        self.has1080Entitlement = has1080Entitlement
         self.thumbnailTrack = thumbnailTrack
         self.resumeTime = resumeTime
     }
 
-    /// 兼容现有 `VideoPlayerView` 的推荐播放地址：MP4 fallback > HLS > 首个清晰度。
-    /// 短剧首播以出画速度优先，MP4 通常比 HLS 少一次 playlist/segment 探测。
+    /// 兼容现有 `VideoPlayerView` 的推荐播放地址：HLS > MP4 fallback > 首个清晰度。
+    /// 新媒资优先保留 ABR、画质上限和原生 HLS 预热；MP4 仅作为失败回退。
     var preferredPlaybackURL: String? {
-        if let mp4 = fallbackMp4Url, !mp4.isEmpty { return mp4 }
         if let hls = masterUrl, !hls.isEmpty { return hls }
+        if let mp4 = fallbackMp4Url, !mp4.isEmpty { return mp4 }
         return qualities.first?.url
     }
 
@@ -54,6 +60,8 @@ struct PlaybackMediaSourceDTO {
         self.qualities = playResponse.qualities ?? []
         self.subtitleTracks = playResponse.subtitleTracks ?? []
         self.defaultSubtitleLanguage = playResponse.defaultSubtitleLanguage
+        self.autoMaxHeight = playResponse.autoMaxHeight ?? 720
+        self.has1080Entitlement = playResponse.has1080Entitlement ?? false
         self.thumbnailTrack = playResponse.thumbnailTrack
         self.resumeTime = playResponse.resumeTime
     }

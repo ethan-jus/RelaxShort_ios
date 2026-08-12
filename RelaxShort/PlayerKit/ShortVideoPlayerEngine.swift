@@ -39,6 +39,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
     private var itemEndObserver: Any?
     private var subtitleCues: [PlayerSubtitleCue] = []
     private var desiredPlaybackRate: Float = 1
+    private var adaptiveQualityPolicy: PlayerAdaptiveQualityPolicy = .standard
     private let subtitleLanguagePreferenceKey = "player.preferredSubtitleLanguage"
     private let subtitlesDisabledPreferenceKey = "player.subtitlesDisabled"
     private let recoveryController = PlayerRecoveryController()
@@ -178,7 +179,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
             case .success(let player):
                 self.attach(player: player)
                 self.markTrace("attach播放器")
-                self.logTTFF()
             case .failure(let error):
                 self.log("内容切换提交失败: \(error.localizedDescription)")
                 self.endContentTransitionWithoutMedia()
@@ -198,6 +198,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 item: newItems[index],
                 slot: .current,
                 generation: gen,
+                adaptiveQualityPolicy: adaptiveQualityPolicy,
                 completion: attachResult
             )
         }
@@ -225,7 +226,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
         log("prepare: idx=\(index) id=\(items[index].id) gen=\(gen) url=\(String(describing: items[index].source))")
         markTrace("AVPlayer准备")
 
-        slotPool.prepare(item: items[index], slot: .current, generation: gen) { [weak self] result in
+        slotPool.prepare(
+            item: items[index], slot: .current, generation: gen,
+            adaptiveQualityPolicy: adaptiveQualityPolicy
+        ) { [weak self] result in
             guard let self, self.generation == gen else {
                 self?.log("prepare: gen过期 idx=\(index) gen=\(gen)")
                 self?.metrics.logCanceledPreload(1)
@@ -236,7 +240,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 self.log("prepare: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
                 self.markTrace("attach播放器")
-                self.logTTFF()
             case .failure(let err):
                 self.log("prepare: 失败 err=\(err.localizedDescription)")
                 self.rebuildCurrentThroughPool(for: items[index], gen: gen)
@@ -262,7 +265,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
         moveTTFFStart = CACurrentMediaTime()
         markTrace("AVPlayer准备")
 
-        slotPool.move(from: oldIndex, to: index, items: items, generation: gen) { [weak self] result in
+        slotPool.move(
+            from: oldIndex, to: index, items: items, generation: gen,
+            adaptiveQualityPolicy: adaptiveQualityPolicy
+        ) { [weak self] result in
             guard let self, self.generation == gen else {
                 self?.log("move: gen过期 gen=\(gen)")
                 self?.metrics.logCanceledPreload(1)
@@ -273,7 +279,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 self.log("move: 成功 attach player gen=\(gen)")
                 self.attach(player: player)
                 self.markTrace("attach播放器")
-                self.logTTFF()
                 // 预加载升 current 超时检测：800ms 未 ready 则重建
                 self.startReadinessTimeout(gen: gen, index: index)
             case .failure(let err):
@@ -448,12 +453,37 @@ final class ShortVideoPlayerEngine: ObservableObject {
     }
 
     func selectQuality(_ option: PlayerQualityOption?) {
-        guard let _ = currentPlayer, let item = currentPlayer?.currentItem else { return }
+        guard let item = currentPlayer?.currentItem else { return }
         if let bitrate = option?.bitrate, bitrate > 0 {
             item.preferredPeakBitRate = Double(bitrate)
         } else {
             item.preferredPeakBitRate = 0
         }
+        if let maximumResolution = option?.maximumResolution {
+            item.preferredMaximumResolution = maximumResolution
+        } else {
+            item.preferredMaximumResolution = adaptiveQualityPolicy.maximumResolution
+        }
+    }
+
+    /// Auto 模式只提高或降低 ABR 上限；不覆盖用户手动选择的固定清晰度。
+    func setAdaptiveQualityPolicy(_ policy: PlayerAdaptiveQualityPolicy) {
+        guard adaptiveQualityPolicy != policy else { return }
+        adaptiveQualityPolicy = policy
+        guard let currentItem,
+              let playerItem = currentPlayer?.currentItem,
+              PlayerItemFactory.hlsURL(from: currentItem.source) != nil else { return }
+        playerItem.preferredMaximumResolution = policy.maximumResolution
+        playerItem.preferredPeakBitRate = 0
+        log("Auto画质上限更新: \(Int(policy.maximumResolution.height))P")
+    }
+
+    func applyAutomaticQualityPolicy() {
+        guard let currentItem,
+              let playerItem = currentPlayer?.currentItem,
+              PlayerItemFactory.hlsURL(from: currentItem.source) != nil else { return }
+        playerItem.preferredPeakBitRate = 0
+        playerItem.preferredMaximumResolution = adaptiveQualityPolicy.maximumResolution
     }
 
     /// 只接受当前 AVPlayerLayer 对应 player 的首帧回调。
@@ -466,6 +496,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         guard !isReadyForDisplay else { return }
         isReadyForDisplay = true
         diagnostics.stateText = "first-frame"
+        logTTFF()
         markTrace("首帧可见")
         finishTrace()
         // 首帧一旦真正可见就立即准备 next；不再额外等待时间观察器和 100ms 延迟。
@@ -500,7 +531,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
         resetReadyState()
         log("rebuildItem: id=\(item.id)")
 
-        let managedItem = PlayerItemFactory.makePlaybackItem(from: item)
+        let managedItem = PlayerItemFactory.makePlaybackItem(
+            from: item,
+            adaptiveQualityPolicy: adaptiveQualityPolicy
+        )
         replacementResourceLoaderDelegate = managedItem.resourceLoaderDelegate
         let replacementItem = managedItem.item
         player.replaceCurrentItem(with: replacementItem)
@@ -594,7 +628,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
     /// 失败重建仍由唯一 PlayerSlotPool 创建 AVPlayer，禁止出现池外播放器实例。
     private func rebuildCurrentThroughPool(for item: PlayerMediaItem, gen: Int) {
         guard generation == gen else { return }
-        slotPool.rebuildCurrent(item: item, generation: gen) { [weak self] result in
+        slotPool.rebuildCurrent(
+            item: item, generation: gen,
+            adaptiveQualityPolicy: adaptiveQualityPolicy
+        ) { [weak self] result in
             guard let self, self.generation == gen else { return }
             switch result {
             case .success(let player):
@@ -670,7 +707,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
         itemStatusObs = nil
         recoveryController.detachObservers()
 
-        let managedItem = PlayerItemFactory.makePlaybackItem(from: item)
+        let managedItem = PlayerItemFactory.makePlaybackItem(
+            from: item,
+            adaptiveQualityPolicy: adaptiveQualityPolicy
+        )
         replacementResourceLoaderDelegate = managedItem.resourceLoaderDelegate
         let replacementItem = managedItem.item
         player.replaceCurrentItem(with: replacementItem)
@@ -773,7 +813,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
             diagnostics.preloadState = "preparing:next:\(nextItem.id)"
             let task = Task { [weak self] in
                 guard let self else { return }
-                self.slotPool.prepare(item: nextItem, slot: .next, generation: gen) { result in
+                self.slotPool.prepare(
+                    item: nextItem, slot: .next, generation: gen,
+                    adaptiveQualityPolicy: self.adaptiveQualityPolicy
+                ) { result in
                     if case .success = result {
                         Task { @MainActor in
                             self.diagnostics.preloadState = "ready:next:\(nextItem.id)"

@@ -1,284 +1,256 @@
 import SwiftUI
 
-// MARK: - Player Speed Sheet
-
-/// 倍速选择底部面板
-struct PlayerSpeedSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let selectedRate: Float
-    let onSelect: (Float) -> Void
-
-    private let speeds: [(label: String, value: Float)] = [
-        ("3.0x", 3.0), ("2.0x", 2.0), ("1.5x", 1.5),
-        ("1.25x", 1.25), ("1.0x", 1.0), ("0.75x", 0.75)
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer().frame(width: 36)
-                Spacer()
-                Text("player.speed".localized)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.78))
-                        .frame(width: 36, height: 36)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 12)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
-                ForEach(speeds, id: \.label) { speed in
-                    let isSelected = abs(selectedRate - speed.value) < 0.01
-                    Button {
-                        onSelect(speed.value)
-                        dismiss()
-                    } label: {
-                        Text(speed.label)
-                            .font(.system(size: 16, weight: isSelected ? .bold : .semibold))
-                            .foregroundColor(isSelected ? .white : .white.opacity(0.78))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 46)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(isSelected ? DB.logoRed.opacity(0.95) : Color.white.opacity(0.08))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .stroke(isSelected ? Color.white.opacity(0.22) : Color.white.opacity(0.06), lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 34)
-        }
-        .background(DB.panelElevated)
-    }
+private enum PlayerSheetStyle {
+    static let background = Color(hex: "#111111")
+    static let card = Color.white.opacity(0.065)
+    static let divider = Color.white.opacity(0.08)
+    static let secondary = Color.white.opacity(0.55)
+    static let cornerRadius: CGFloat = 24
 }
 
-// MARK: - Player Quality Sheet
-
-/// 清晰度选择底部面板
 struct PlayerQualitySheet: View {
-    @Environment(\.dismiss) private var dismiss
-    let qualities: [QualityOption]
-    let currentQuality: String
-    let onSelect: (String) -> Void
-
     struct QualityOption: Identifiable {
         let id: String
         let label: String
+        let detail: String?
         let isVIP: Bool
+        let isAvailable: Bool
         let isSelected: Bool
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer().frame(width: 36)
-                Spacer()
-                Text("player.current_resolution".localized)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 36, height: 36)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
-
-            VStack(spacing: 2) {
-                ForEach(qualities) { option in
-                    Button {
-                        onSelect(option.id)
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 10) {
-                            Text(option.label)
-                                .font(.system(size: 16, weight: option.isVIP ? .bold : .medium))
-                                .foregroundColor(option.isVIP ? DB.gold : .white)
-                            if option.isVIP {
-                                ZStack {
-                                    Image(systemName: "hexagon.fill")
-                                        .font(.system(size: 21, weight: .bold))
-                                    Text("V")
-                                        .font(.system(size: 9, weight: .black))
-                                        .foregroundColor(.black.opacity(0.86))
-                                }
-                                .foregroundColor(DB.gold)
-                            }
-                            Spacer()
-                            if option.isSelected {
-                                Circle()
-                                    .fill(option.isVIP ? DB.gold : DB.logoRed)
-                                    .frame(width: 20, height: 20)
-                                    .overlay(
-                                        Image(systemName: "checkmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(option.isVIP ? .black : .white)
-                                    )
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                        .frame(height: 50)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(option.isSelected ? Color.white.opacity(0.12) : Color.clear)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.bottom, 34)
-        }
-        .background(DB.panelElevated)
-    }
-}
-
-// MARK: - Player Subtitle Sheet
-
-struct PlayerSubtitleSheet: View {
     @Environment(\.dismiss) private var dismiss
+
+    let selectedRate: Float
+    let qualities: [QualityOption]
     let subtitles: [PlayerSubtitleOption]
     let selectedSubtitleID: String?
-    let onSelect: (String?) -> Void
+    let onSelectRate: (Float) -> Void
+    let onSelectQuality: (String) -> Void
+    let onSelectSubtitle: (String?) -> Void
+
+    private let speeds: [(String, Float)] = [
+        ("0.75x", 0.75), ("1.0x", 1.0), ("1.25x", 1.25),
+        ("1.5x", 1.5), ("2.0x", 2.0), ("3.0x", 3.0)
+    ]
+
+    init(
+        selectedRate: Float,
+        qualities: [QualityOption],
+        subtitles: [PlayerSubtitleOption],
+        selectedSubtitleID: String?,
+        onSelectRate: @escaping (Float) -> Void,
+        onSelectQuality: @escaping (String) -> Void,
+        onSelectSubtitle: @escaping (String?) -> Void
+    ) {
+        self.selectedRate = selectedRate
+        self.qualities = qualities
+        self.subtitles = subtitles
+        self.selectedSubtitleID = selectedSubtitleID
+        self.onSelectRate = onSelectRate
+        self.onSelectQuality = onSelectQuality
+        self.onSelectSubtitle = onSelectSubtitle
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ScrollView {
+            VStack(spacing: 0) {
+            Capsule()
+                .fill(Color.white.opacity(0.2))
+                .frame(width: 42, height: 5)
+                .padding(.top, 10)
+
             HStack {
-                Spacer().frame(width: 36)
-                Spacer()
-                Text("player.subtitles".localized)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
+                Text("player.playback_settings".localized)
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
                 Spacer()
                 Button { dismiss() } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
-                        .frame(width: 36, height: 36)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.66))
+                        .frame(width: 44, height: 44)
+                        .background(Color.white.opacity(0.055), in: Circle())
+                }
+                .accessibilityLabel("general.close".localized)
+            }
+            .padding(.leading, 20)
+            .padding(.trailing, 12)
+            .padding(.top, 7)
+
+                speedSection
+                    .padding(.horizontal, 20)
+
+                sectionTitle(L10n.quality)
+                    .padding(.top, 26)
+                    .padding(.horizontal, 20)
+
+                qualitySection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+
+                sectionTitle("player.subtitles".localized)
+                    .padding(.top, 26)
+                    .padding(.horizontal, 20)
+
+                subtitleSection
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 28)
+            }
+        }
+        .scrollIndicators(.hidden)
+        .background(PlayerSheetStyle.background)
+        .presentationBackground(PlayerSheetStyle.background)
+    }
+
+    private func sectionTitle(_ title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+            Spacer()
+        }
+    }
+
+    private var speedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle("player.speed".localized)
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
+                spacing: 8
+            ) {
+            ForEach(speeds, id: \.0) { label, value in
+                let selected = abs(selectedRate - value) < 0.01
+                Button {
+                    onSelectRate(value)
+                } label: {
+                    Text(label)
+                        .font(.system(size: 15, weight: selected ? .bold : .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(selected ? DT.logoRed : PlayerSheetStyle.card)
+                        .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .stroke(.white.opacity(selected ? 0.16 : 0.07), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+            }
+        }
+    }
+
+    private var qualitySection: some View {
+        VStack(spacing: 0) {
+            ForEach(qualities) { option in
+                Button {
+                    onSelectQuality(option.id)
+                    dismiss()
+                } label: {
+                    HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 7) {
+                                Text(option.label)
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                if option.isVIP {
+                                    Text("VIP")
+                                        .font(.system(size: 9, weight: .black))
+                                        .foregroundStyle(Color.black.opacity(0.86))
+                                        .padding(.horizontal, 6)
+                                        .frame(height: 17)
+                                        .background(DT.memberGold, in: Capsule())
+                                }
+                            }
+                            if let detail = option.detail {
+                                Text(detail)
+                                    .font(.system(size: 12, weight: .regular))
+                                    .foregroundStyle(PlayerSheetStyle.secondary)
+                            }
+                        }
+                        Spacer()
+                        if option.isSelected {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .black))
+                                .foregroundStyle(.white)
+                                .frame(width: 23, height: 23)
+                                .background(DT.logoRed, in: Circle())
+                        } else if !option.isAvailable {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.58))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .frame(minHeight: option.detail == nil ? 52 : 64)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if option.id != qualities.last?.id {
+                    Rectangle().fill(PlayerSheetStyle.divider).frame(height: 1)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 16)
+        }
+        .background(PlayerSheetStyle.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
 
+    private var subtitleSection: some View {
+        VStack(spacing: 0) {
             subtitleRow(id: nil, title: "player.subtitles_off".localized)
             ForEach(subtitles) { option in
+                Rectangle().fill(PlayerSheetStyle.divider).frame(height: 1)
                 subtitleRow(id: option.id, title: option.displayName)
             }
-            Spacer(minLength: 30)
         }
-        .background(DB.panelElevated)
+        .background(PlayerSheetStyle.card)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func subtitleRow(id: String?, title: String) -> some View {
         Button {
-            onSelect(id)
+            onSelectSubtitle(id)
             dismiss()
         } label: {
             HStack {
                 Text(title)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.white)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white)
                 Spacer()
                 if selectedSubtitleID == id {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(DB.logoRed)
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(DT.logoRed)
                 }
             }
-            .padding(.horizontal, 20)
-            .frame(height: 50)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Player More Sheet
-
-/// 更多选项底部面板（清晰度/字幕/反馈）
-struct PlayerMoreSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    var onSpeed: () -> Void
-    var onQuality: () -> Void
-    var onSubtitles: () -> Void
-    var onReport: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Capsule()
-                .fill(Color.white.opacity(0.14))
-                .frame(width: 40, height: 5)
-                .padding(.top, 10)
-                .padding(.bottom, 16)
-
-            VStack(spacing: 0) {
-                moreRow(icon: "timer", title: "player.speed".localized, disabled: false) {
-                    dismiss(); onSpeed()
-                }
-                Divider().background(Color.white.opacity(0.08)).padding(.leading, 56)
-
-                moreRow(icon: "4k.tv", title: L10n.quality, disabled: false) {
-                    dismiss(); onQuality()
-                }
-                Divider().background(Color.white.opacity(0.08)).padding(.leading, 56)
-
-                moreRow(icon: "captions.bubble", title: "player.subtitles".localized, disabled: false) {
-                    dismiss(); onSubtitles()
-                }
-                Divider().background(Color.white.opacity(0.08)).padding(.leading, 56)
-
-                moreRow(icon: "exclamationmark.bubble", title: "player.report_subtitle_issue".localized, disabled: false) {
-                    dismiss(); onReport()
-                }
-            }
-
-            Spacer().frame(height: 34)
-        }
-        .background(DB.panelElevated)
-    }
-
-    private func moreRow(icon: String, title: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(disabled ? .white.opacity(0.25) : .white.opacity(0.8))
-                    .frame(width: 24)
-                Text(title)
-                    .font(.system(size: 15))
-                    .foregroundColor(disabled ? .white.opacity(0.25) : .white)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.25))
-            }
-            .padding(.horizontal, 20)
-            .frame(height: 52)
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
     }
 }
 
 #if DEBUG
-struct PlayerSpeedSheet_Previews: PreviewProvider {
-    static var previews: some View {
-        PlayerSpeedSheet(selectedRate: 1.0, onSelect: { _ in })
-            .preferredColorScheme(.dark)
-    }
+#Preview {
+    PlayerQualitySheet(
+        selectedRate: 1,
+        qualities: [
+            .init(id: "auto", label: "Auto", detail: "player.quality_auto_standard".localized,
+                  isVIP: false, isAvailable: true, isSelected: true),
+            .init(id: "720p", label: "720P", detail: nil,
+                  isVIP: false, isAvailable: true, isSelected: false),
+            .init(id: "1080p", label: "1080P", detail: nil,
+                  isVIP: true, isAvailable: false, isSelected: false)
+        ],
+        subtitles: [],
+        selectedSubtitleID: nil,
+        onSelectRate: { _ in },
+        onSelectQuality: { _ in },
+        onSelectSubtitle: { _ in }
+    )
+    .preferredColorScheme(.dark)
 }
 #endif

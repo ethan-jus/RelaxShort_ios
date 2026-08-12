@@ -176,6 +176,8 @@
 "player.copy_link" = "نسخ الرابط";
 "player.speed" = "السرعة";
 "player.playback_settings" = "إعدادات التشغيل";
+"player.quality_auto_standard" = "يتكيف مع الشبكة · حتى 720P";
+"player.quality_auto_vip" = "يتكيف مع الشبكة · حتى 1080P";
 "player.current_resolution" = "الجودة الحالية";
 "player.picture_in_picture" = "صورة داخل صورة";
 "player.subtitle_feedback_prefix" = "خطأ في الترجمة؟ ";

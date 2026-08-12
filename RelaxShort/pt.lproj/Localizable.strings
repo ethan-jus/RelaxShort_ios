@@ -176,6 +176,8 @@
 "player.copy_link" = "Copiar link";
 "player.speed" = "Velocidade";
 "player.playback_settings" = "Configurações de reprodução";
+"player.quality_auto_standard" = "Ajusta à rede · até 720P";
+"player.quality_auto_vip" = "Ajusta à rede · até 1080P";
 "player.current_resolution" = "Qualidade atual";
 "player.picture_in_picture" = "Imagem em imagem";
 "player.subtitle_feedback_prefix" = "Erro nas legendas? ";

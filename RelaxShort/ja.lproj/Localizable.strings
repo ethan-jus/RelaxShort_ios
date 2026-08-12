@@ -176,6 +176,8 @@
 "player.copy_link" = "リンクをコピー";
 "player.speed" = "再生速度";
 "player.playback_settings" = "再生設定";
+"player.quality_auto_standard" = "通信状況に合わせて自動調整 · 最大720P";
+"player.quality_auto_vip" = "通信状況に合わせて自動調整 · 最大1080P";
 "player.current_resolution" = "画質";
 "player.picture_in_picture" = "ピクチャーインピクチャー";
 "player.subtitle_feedback_prefix" = "字幕に誤りがある場合は、";

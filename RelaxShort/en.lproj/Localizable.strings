@@ -181,6 +181,8 @@
 "player.copy_link" = "Copy Link";
 "player.speed" = "Speed";
 "player.playback_settings" = "Playback Settings";
+"player.quality_auto_standard" = "Adjusts to your network · up to 720P";
+"player.quality_auto_vip" = "Adjusts to your network · up to 1080P";
 "player.current_resolution" = "Resolution";
 "player.picture_in_picture" = "Picture in Picture";
 "player.subtitle_feedback_prefix" = "Subtitle issues? ";

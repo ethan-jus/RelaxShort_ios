@@ -52,12 +52,17 @@ final class PlayerSlotPool {
         item: PlayerMediaItem,
         slot: PlayerSlot,
         generation: Int,
+        adaptiveQualityPolicy: PlayerAdaptiveQualityPolicy = .standard,
         completion: @escaping (Result<AVPlayer, Error>) -> Void
     ) {
         cancel(slot)
         let idx = slot.rawValue
         let intent: PlayerItemLoadIntent = slot == .current ? .playback : .preload
-        let managedItem = PlayerItemFactory.makePlaybackItem(from: item, intent: intent)
+        let managedItem = PlayerItemFactory.makePlaybackItem(
+            from: item,
+            intent: intent,
+            adaptiveQualityPolicy: adaptiveQualityPolicy
+        )
         let playerItem = managedItem.item
         let player = AVPlayer(playerItem: playerItem)
         player.isMuted = slot != .current
@@ -136,6 +141,7 @@ final class PlayerSlotPool {
         to newIndex: Int,
         items: [PlayerMediaItem],
         generation: Int,
+        adaptiveQualityPolicy: PlayerAdaptiveQualityPolicy = .standard,
         completion: @escaping (Result<AVPlayer, Error>) -> Void
     ) {
         guard items.indices.contains(newIndex) else { return }
@@ -148,7 +154,10 @@ final class PlayerSlotPool {
             return
         }
         print("[PlayerKit] 相邻预加载未命中 idx=\(newIndex) 方向=\(newIndex > oldIndex ? "next" : "previous")")
-        prepare(item: items[newIndex], slot: .current, generation: generation, completion: completion)
+        prepare(
+            item: items[newIndex], slot: .current, generation: generation,
+            adaptiveQualityPolicy: adaptiveQualityPolicy, completion: completion
+        )
     }
 
     /// 按稳定媒体 ID 提升预加载槽，不依赖页面自己的紧凑索引。
@@ -221,10 +230,14 @@ final class PlayerSlotPool {
     func rebuildCurrent(
         item: PlayerMediaItem,
         generation: Int,
+        adaptiveQualityPolicy: PlayerAdaptiveQualityPolicy = .standard,
         completion: @escaping (Result<AVPlayer, Error>) -> Void
     ) {
         print("[PlayerKit] 重建当前播放器 媒体ID=\(item.id)")
-        prepare(item: item, slot: .current, generation: generation, completion: completion)
+        prepare(
+            item: item, slot: .current, generation: generation,
+            adaptiveQualityPolicy: adaptiveQualityPolicy, completion: completion
+        )
     }
 
     // MARK: - 取消与清理

@@ -176,6 +176,8 @@
 "player.copy_link" = "링크 복사";
 "player.speed" = "배속";
 "player.playback_settings" = "재생 설정";
+"player.quality_auto_standard" = "네트워크에 따라 자동 조절 · 최대 720P";
+"player.quality_auto_vip" = "네트워크에 따라 자동 조절 · 최대 1080P";
 "player.current_resolution" = "현재 화질";
 "player.picture_in_picture" = "PIP";
 "player.subtitle_feedback_prefix" = "자막 오류가 있으면 ";
