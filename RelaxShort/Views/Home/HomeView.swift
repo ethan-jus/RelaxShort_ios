@@ -133,13 +133,27 @@ struct HomeView: View {
                         .padding(.top, HomeMetrics.chromeTopGap)
                     tabBar.padding(.vertical, HomeMetrics.tabVerticalPadding)
                     TabView(selection: $viewModel.selectedTab) {
-                        popularContent(containerW: geo.size.width).tag(0)
-                        newTabContent(containerW: geo.size.width).tag(1)
-                        rankingsTabContent.tag(2)
-                        categoriesTabContent.tag(3)
-                        animeTabContent(containerW: geo.size.width).tag(4)
-                        homeVIPTabContent(containerW: geo.size.width).tag(5)
-                        originalPlusTabContent(containerW: geo.size.width).tag(6)
+                        popularContent(containerW: geo.size.width)
+                            .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 0)
+                            .tag(0)
+                        newTabContent(containerW: geo.size.width)
+                            .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 1)
+                            .tag(1)
+                        rankingsTabContent
+                            .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 2)
+                            .tag(2)
+                        categoriesTabContent
+                            .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 3)
+                            .tag(3)
+                        animeTabContent(containerW: geo.size.width)
+                            .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 4)
+                            .tag(4)
+                        homeVIPTabContent(containerW: geo.size.width)
+                            .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 5)
+                            .tag(5)
+                        originalPlusTabContent(containerW: geo.size.width)
+                            .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 6)
+                            .tag(6)
                     }
                     .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                     .frame(width: geo.size.width)
@@ -921,7 +935,7 @@ private struct DramaBoxSearchHeaderView: View {
             Button {
                 onVIPTap()
             } label: {
-                AnimatedPromoButton(badge: "-25%", delay: 0) {
+                PromoButtonIcon(badge: "-25%") {
                     VIPCrownView(
                         width: 40,
                         height: 30,
@@ -937,7 +951,7 @@ private struct DramaBoxSearchHeaderView: View {
             Button {
                 onRewardTap()
             } label: {
-                AnimatedPromoButton(badge: rewardBadge, delay: 0.3) {
+                PromoButtonIcon(badge: rewardBadge) {
                     Image(systemName: "gift.fill")
                         .font(.system(size: 23, weight: .semibold))
                         .foregroundColor(Color(red: 0.9, green: 0.2, blue: 0.2))
@@ -951,13 +965,11 @@ private struct DramaBoxSearchHeaderView: View {
     }
 }
 
-// MARK: - Animated Promo Button (pure decoration, tap handled by parent)
+// MARK: - Promo Button (pure decoration, tap handled by parent)
 
-private struct AnimatedPromoButton<Icon: View>: View {
+private struct PromoButtonIcon<Icon: View>: View {
     let badge: String
-    var delay: Double = 0
     @ViewBuilder let icon: () -> Icon
-    @State private var anim = false
 
     var body: some View {
         icon()
@@ -980,11 +992,5 @@ private struct AnimatedPromoButton<Icon: View>: View {
                     .offset(x: -2, y: 10)
             }
         .frame(width: 42, height: 42, alignment: .center)
-        .scaleEffect(anim ? 1.1 : 1.0)
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true).delay(delay)) {
-                anim = true
-            }
-        }
     }
 }

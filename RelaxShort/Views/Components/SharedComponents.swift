@@ -402,6 +402,18 @@ struct VIPCrownView: View {
 }
 
 // MARK: - Cover Image View
+
+private struct CoverImageLoadingEnabledKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var coverImageLoadingEnabled: Bool {
+        get { self[CoverImageLoadingEnabledKey.self] }
+        set { self[CoverImageLoadingEnabledKey.self] = newValue }
+    }
+}
+
 /// 封面图片异步加载组件，使用项目共享 ImageLoader 内存缓存
 ///
 /// 加载中/失败均显示暗黑骨架占位，避免慢网或坏图时出现突兀色块。
@@ -412,6 +424,7 @@ struct VIPCrownView: View {
 /// CoverImageView(url: banner.imageName, aspectRatio: 16/9, cornerRadius: DT.Radius.lg)
 /// ```
 struct CoverImageView: View {
+    @Environment(\.coverImageLoadingEnabled) private var coverImageLoadingEnabled
     let url: String
     var aspectRatio: CGFloat = DT.Layout.cardAspectRatio // 默认 2:3 竖版
     var cornerRadius: CGFloat = DB.posterRadius
@@ -432,7 +445,8 @@ struct CoverImageView: View {
         }
         .applySize(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .task(id: url) {
+        .task(id: "\(coverImageLoadingEnabled):\(url)") {
+            guard coverImageLoadingEnabled else { return }
             await imageLoader.load(url)
         }
     }

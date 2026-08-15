@@ -268,7 +268,7 @@ final class StoreKitManager: ObservableObject {
         Task {
             await refreshVIPEntitlements()
             // 商品目录不参与首屏决策，避开冷启动、UMP 和首页首次渲染的资源峰值。
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled else { return }
             await requestProducts()
         }

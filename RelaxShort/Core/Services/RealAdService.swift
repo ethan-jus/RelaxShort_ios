@@ -368,19 +368,38 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
               postLaunchPreloadTask == nil else { return }
 
         postLaunchPreloadTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .seconds(AdConfig.postLaunchAdPreloadDelay))
-            guard let self, !Task.isCancelled else { return }
+            guard let self else { return }
+            defer { self.postLaunchPreloadTask = nil }
+            do {
+                try await Task.sleep(for: .seconds(AdConfig.postLaunchAdPreloadDelay))
+            } catch {
+                return
+            }
+            guard UIApplication.shared.applicationState == .active else { return }
+
+            // 解锁广告最接近核心播放链路，优先缓存；其余广告严格串行并留出间隔。
+            _ = await self.preloadRewardedAd(
+                placement: config.interstitialUnlockEpisode
+            )
+            do {
+                try await Task.sleep(for: .seconds(AdConfig.postLaunchAdPreloadSpacing))
+            } catch {
+                return
+            }
+            guard UIApplication.shared.applicationState == .active else { return }
 
             // 开屏广告只为下一次热启动缓存；现已进入首页，绝不补弹。
             _ = await self.loadAppOpenAd(using: config.appOpen)
-            async let rewarded: Bool = self.preloadRewardedAd(
+            do {
+                try await Task.sleep(for: .seconds(AdConfig.postLaunchAdPreloadSpacing))
+            } catch {
+                return
+            }
+            guard UIApplication.shared.applicationState == .active else { return }
+
+            _ = await self.preloadRewardedAd(
                 placement: config.rewardedEarnCoins
             )
-            async let rewardedInterstitial: Bool = self.preloadRewardedAd(
-                placement: config.interstitialUnlockEpisode
-            )
-            _ = await (rewarded, rewardedInterstitial)
-            self.postLaunchPreloadTask = nil
         }
     }
 

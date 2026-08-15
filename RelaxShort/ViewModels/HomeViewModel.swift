@@ -148,6 +148,9 @@ final class HomeViewModel: ObservableObject {
         isLoading = false
         schedulePlaybackWarmup(dramas: fixedDramas)
         enrichmentTask = Task { [weak self] in
+            // 先提交首屏并处理第一轮封面解码，避免推荐流更新与首帧渲染同时挤占主线程。
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
             await self?.loadSecondaryContent()
         }
     }

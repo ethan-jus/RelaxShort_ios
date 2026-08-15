@@ -30,9 +30,11 @@ final class ImageLoader: ObservableObject, @unchecked Sendable {
     private static let maxPixelSize: CGFloat = 660
 
     private static let diskCache = CoverDiskCache()
+    private static let sharedState = ImageLoaderState()
+    private static let loadGate = ImageLoadGate(limit: 4)
 
     private let cache = ImageLoader.sharedCache
-    private let state = ImageLoaderState()
+    private let state = ImageLoader.sharedState
 
     init() {
         NotificationCenter.default.addObserver(
@@ -99,7 +101,7 @@ final class ImageLoader: ObservableObject, @unchecked Sendable {
     }
 
     /// ImageIO 降采样：不解码原图到内存，直接生成展示尺寸缩略图。
-    static func downsample(data: Data, maxPixelSize: CGFloat = ImageLoader.maxPixelSize) -> UIImage? {
+    fileprivate static func downsample(data: Data, maxPixelSize: CGFloat = ImageLoader.maxPixelSize) -> UIImage? {
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else { return nil }
         let options: [CFString: Any] = [
@@ -122,28 +124,53 @@ final class ImageLoader: ObservableObject, @unchecked Sendable {
             await setImage(cached, key: key)
             return
         }
-        if let task = await state.existingTask(for: key) {
-            if let img = try? await task.value { await setImage(img, key: key) }
-            else { await setImage(nil, key: key) }
-            return
-        }
-        let task = Task<UIImage?, Error> {
-            defer { Task { await state.removeTask(for: key) } }
-            if let diskImage = await Self.diskCache.cachedImage(for: key) {
-                cache.setObject(diskImage, forKey: cacheKey, cost: diskImage.cacheCost)
-                return diskImage
+        let (taskID, task) = await state.task(for: key) {
+            await Self.loadGate.acquire()
+            do {
+                guard !Task.isCancelled else {
+                    await Self.loadGate.release()
+                    return nil
+                }
+                if let cached = Self.sharedCache.object(forKey: key as NSString) {
+                    await Self.loadGate.release()
+                    return cached
+                }
+                if let diskImage = await Self.diskCache.cachedImage(for: key) {
+                    Self.sharedCache.setObject(
+                        diskImage,
+                        forKey: key as NSString,
+                        cost: diskImage.cacheCost
+                    )
+                    await Self.loadGate.release()
+                    return diskImage
+                }
+                let (data, _) = try await URLSession.shared.data(from: url)
+                guard !Task.isCancelled else {
+                    await Self.loadGate.release()
+                    return nil
+                }
+                guard let image = Self.downsample(data: data) else {
+                    await Self.loadGate.release()
+                    return nil
+                }
+                Self.sharedCache.setObject(
+                    image,
+                    forKey: key as NSString,
+                    cost: image.cacheCost
+                )
+                await Self.diskCache.store(image, for: key)
+                await Self.loadGate.release()
+                return image
+            } catch {
+                await Self.loadGate.release()
+                throw error
             }
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard !Task.isCancelled else { return nil }
-            guard let img = Self.downsample(data: data) else { return nil }
-            cache.setObject(img, forKey: cacheKey, cost: img.cacheCost)
-            await Self.diskCache.store(img, for: key)
-            return img
         }
-        await state.registerTask(task, for: key)
+        defer { Task { await state.removeTask(for: key, id: taskID) } }
         do {
-            if let img = try await task.value { await setImage(img, key: key) }
-            else { await setImage(nil, key: key) }
+            let loadedImage = try await task.value
+            guard !Task.isCancelled else { return }
+            await setImage(loadedImage, key: key)
         } catch {
             guard !(error is CancellationError) else { return }
             await setImage(nil, key: key)
@@ -157,6 +184,8 @@ final class ImageLoader: ObservableObject, @unchecked Sendable {
     }
 
     @MainActor private func setImage(_ img: UIImage?, key: String?) {
+        // SwiftUI 的旧 `.task` 可能在 URL 已切换后才返回，不能覆盖新卡片的图片状态。
+        if let key, imageKey != key { return }
         image = img
         imageKey = key
     }
@@ -181,7 +210,8 @@ private actor CoverDiskCache {
 
     func cachedImage(for key: String) -> UIImage? {
         guard let data = try? Data(contentsOf: file(for: key)) else { return nil }
-        return UIImage(data: data)
+        // 磁盘缓存也是 JPEG；在后台 actor 内立即解码，避免首次滚动时才占用渲染线程。
+        return ImageLoader.downsample(data: data)
     }
 
     func store(_ image: UIImage, for key: String) {
@@ -211,14 +241,62 @@ private extension UIImage {
 }
 
 private actor ImageLoaderState {
-    private var inflight: [String: Task<UIImage?, Error>] = [:]
+    private struct Entry {
+        let id: UUID
+        let task: Task<UIImage?, Error>
+    }
 
-    func existingTask(for key: String) -> Task<UIImage?, Error>? { inflight[key] }
-    func registerTask(_ task: Task<UIImage?, Error>, for key: String) { inflight[key] = task }
-    func removeTask(for key: String) { inflight.removeValue(forKey: key) }
+    private var inflight: [String: Entry] = [:]
+
+    func task(
+        for key: String,
+        operation: @escaping @Sendable () async throws -> UIImage?
+    ) -> (UUID, Task<UIImage?, Error>) {
+        if let entry = inflight[key] {
+            return (entry.id, entry.task)
+        }
+        let id = UUID()
+        let task = Task { try await operation() }
+        inflight[key] = Entry(id: id, task: task)
+        return (id, task)
+    }
+
+    func removeTask(for key: String, id: UUID) {
+        guard inflight[key]?.id == id else { return }
+        inflight.removeValue(forKey: key)
+    }
 
     func cancelAll() {
-        inflight.forEach { $0.value.cancel() }
+        inflight.forEach { $0.value.task.cancel() }
         inflight.removeAll()
+    }
+}
+
+/// 限制封面网络、磁盘读取和解码的总并发，避免几十张图片同时完成时压垮主线程/GPU。
+private actor ImageLoadGate {
+    private let limit: Int
+    private var activeCount = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(limit: Int) {
+        self.limit = max(1, limit)
+    }
+
+    func acquire() async {
+        if activeCount < limit {
+            activeCount += 1
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            activeCount = max(0, activeCount - 1)
+        } else {
+            waiters.removeFirst().resume()
+        }
     }
 }
