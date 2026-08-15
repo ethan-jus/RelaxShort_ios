@@ -20,6 +20,9 @@ enum AdConfig {
     /// 品牌展示结束后额外等待开屏广告的硬上限；总预算约 2 秒。
     static let coldStartAdLoadTimeout: TimeInterval = 1.2
 
+    /// 进入首页后给首屏渲染和首次手势让出的时间，再预加载非必要全屏广告。
+    static let postLaunchAdPreloadDelay: TimeInterval = 1.5
+
     /// 广告过期时间（秒），AdMob 官方是 4 小时
     static let adExpiryInterval: TimeInterval = 4 * 3600
 

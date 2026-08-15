@@ -238,6 +238,8 @@ final class StoreKitManager: ObservableObject {
 
     /// Transaction 监听任务
     private var transactionListenerTask: Task<Void, Never>?
+    private var lastProductRequestAt: Date?
+    private let automaticProductRequestCooldown: TimeInterval = 15
 
     // MARK: - Product Metadata
 
@@ -264,8 +266,11 @@ final class StoreKitManager: ObservableObject {
         guard !AppRuntimeEnvironment.isUnitTesting else { return }
         startTransactionListener()
         Task {
-            await requestProducts()
             await refreshVIPEntitlements()
+            // 商品目录不参与首屏决策，避开冷启动、UMP 和首页首次渲染的资源峰值。
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled else { return }
+            await requestProducts()
         }
     }
 
@@ -350,8 +355,14 @@ final class StoreKitManager: ObservableObject {
     ///
     /// 成功时将产品缓存到 `storeKitProducts`，
     /// 失败时清空商品缓存并保持购买不可用，避免展示或购买伪造价格。
-    func requestProducts() async {
+    func requestProducts(force: Bool = false) async {
         guard !isLoadingProducts else { return }
+        if !force,
+           let lastProductRequestAt,
+           Date().timeIntervalSince(lastProductRequestAt) < automaticProductRequestCooldown {
+            return
+        }
+        lastProductRequestAt = Date()
         isLoadingProducts = true
         defer { isLoadingProducts = false }
         do {

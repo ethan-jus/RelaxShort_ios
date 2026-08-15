@@ -496,7 +496,7 @@ extension MemberView {
                     storeKit.storeDisplayPrice(for: $0.productID) == nil
                 }) {
                     Button {
-                        Task { await storeKit.requestProducts() }
+                        Task { await storeKit.requestProducts(force: true) }
                     } label: {
                         HStack(spacing: DT.Space.sm) {
                             if storeKit.isLoadingProducts {
@@ -1378,7 +1378,7 @@ extension MemberView {
 
         return Button {
             if shouldRetryStore {
-                Task { await storeKit.requestProducts() }
+                Task { await storeKit.requestProducts(force: true) }
             } else {
                 purchaseSelectedPlan()
             }

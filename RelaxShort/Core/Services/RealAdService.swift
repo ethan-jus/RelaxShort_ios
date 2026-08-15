@@ -21,6 +21,8 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
     private var rewardedInterstitialLoadTask: Task<RewardedInterstitialAd?, Never>?
     private var rewardedPresentation: RewardedPresentationDelegate?
     private var cachedConfig: AdsConfig?
+    private var didFinishColdStart = false
+    private var postLaunchPreloadTask: Task<Void, Never>?
     private var isShowingAppOpenAd = false
     private let adConfigRepository: AdConfigRepositoryProtocol = RealAdConfigRepository()
     @Published var isSDKReady = false
@@ -86,22 +88,30 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
                 return
             }
 
-            // 冷启动先争取开屏广告；激励广告随后并行预热，
-            // 避免三个全屏广告请求同时竞争 SDK 首次网络。
+            // SDK 若在品牌页结束后才初始化，所有全屏广告都错峰到首屏稳定后加载。
+            // 这时再立即拉起多个 WebKit 广告进程会直接抢占首次滚动和点击。
+            if didFinishColdStart {
+                schedulePostLaunchPreloads(using: config)
+                return
+            }
+
+            // 品牌页仍显示时只争取开屏广告，不同时拉起两个激励广告 WebView。
             let appOpenLoaded = await loadAppOpenAd(using: config.appOpen)
             print("🦐 [AdService] 开屏广告预加载结果: \(appOpenLoaded)")
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                async let rewarded: Bool = self.preloadRewardedAd(
-                    placement: config.rewardedEarnCoins
-                )
-                async let rewardedInterstitial: Bool = self.preloadRewardedAd(
-                    placement: config.interstitialUnlockEpisode
-                )
-                _ = await (rewarded, rewardedInterstitial)
+            if didFinishColdStart {
+                schedulePostLaunchPreloads(using: config)
             }
         } catch {
             print("🦐 [AdService] 广告配置加载失败: \(error.localizedDescription)")
+        }
+    }
+
+    /// 品牌页结束后再启动非关键广告预加载；只调度一次，避免首次手势期间争抢 WebKit/GPU。
+    func markColdStartFinished() {
+        guard !didFinishColdStart else { return }
+        didFinishColdStart = true
+        if let cachedConfig {
+            schedulePostLaunchPreloads(using: cachedConfig)
         }
     }
 
@@ -348,6 +358,30 @@ final class RealAdService: NSObject, ObservableObject, AdServiceProtocol {
         let config = try await adConfigRepository.fetchAdsConfig()
         cachedConfig = config
         return config
+    }
+
+    private func schedulePostLaunchPreloads(using config: AdsConfig) {
+        guard didFinishColdStart,
+              isSDKReady,
+              PrivacyConsentManager.shared.isAdRequestAllowed,
+              config.adsEnabled,
+              postLaunchPreloadTask == nil else { return }
+
+        postLaunchPreloadTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(AdConfig.postLaunchAdPreloadDelay))
+            guard let self, !Task.isCancelled else { return }
+
+            // 开屏广告只为下一次热启动缓存；现已进入首页，绝不补弹。
+            _ = await self.loadAppOpenAd(using: config.appOpen)
+            async let rewarded: Bool = self.preloadRewardedAd(
+                placement: config.rewardedEarnCoins
+            )
+            async let rewardedInterstitial: Bool = self.preloadRewardedAd(
+                placement: config.interstitialUnlockEpisode
+            )
+            _ = await (rewarded, rewardedInterstitial)
+            self.postLaunchPreloadTask = nil
+        }
     }
 
     private func loadAppOpenAd(using placement: AdPlacementConfig) async -> Bool {

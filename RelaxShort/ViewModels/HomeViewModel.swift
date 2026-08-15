@@ -50,6 +50,7 @@ final class HomeViewModel: ObservableObject {
     private var forYouHasMore = true
     private var forYouSessionID: String?
     private let forYouPageSize = 20
+    private var isForYouRequestInFlight = false
     private var enrichmentTask: Task<Void, Never>?
     private var playbackWarmupTask: Task<Void, Never>?
     private var categoryRequestGeneration = 0
@@ -230,16 +231,22 @@ final class HomeViewModel: ObservableObject {
 
     func loadMoreForYou() async {
         guard forYouHasMore,
+              !isForYouRequestInFlight,
               !isLoadingMoreForYou else { return }
         await loadForYouPage(reset: false)
     }
 
     private func loadForYouPage(reset: Bool) async {
+        guard !isForYouRequestInFlight else { return }
         if !reset {
             guard forYouHasMore, !isLoadingMoreForYou else { return }
             isLoadingMoreForYou = true
         }
-        defer { isLoadingMoreForYou = false }
+        isForYouRequestInFlight = true
+        defer {
+            isForYouRequestInFlight = false
+            isLoadingMoreForYou = false
+        }
 
         let contentLanguage = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")

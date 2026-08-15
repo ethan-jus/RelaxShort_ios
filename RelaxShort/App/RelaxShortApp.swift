@@ -191,15 +191,18 @@ struct RelaxShortApp: App {
     /// 超时后广告继续在后台预加载，只供后续热启动使用，绝不进入首页后补弹。
     private func runColdStartAdFlow() async {
         let startedAt = CACurrentMediaTime()
+        let deadline = startedAt
+            + AdConfig.brandingDuration
+            + AdConfig.coldStartAdLoadTimeout
         try? await Task.sleep(for: .seconds(AdConfig.brandingDuration))
         guard !Task.isCancelled else { return }
 
-        let deadline = Date().addingTimeInterval(AdConfig.coldStartAdLoadTimeout)
-        while Date() < deadline {
+        while CACurrentMediaTime() < deadline {
             guard showSplash else { return }
-            guard scenePhase == .active else {
+            // `.inactive` 也可能只是 UMP/系统弹窗切换，不能误判成用户离开 App。
+            guard scenePhase != .background else {
                 let elapsed = (CACurrentMediaTime() - startedAt) * 1000
-                Logger.store.info("冷启动场景已变化，放弃开屏广告，耗时=\(Int(elapsed))ms")
+                Logger.store.info("冷启动已进入后台，放弃开屏广告，耗时=\(Int(elapsed))ms")
                 finishColdStart()
                 return
             }
@@ -298,6 +301,7 @@ struct RelaxShortApp: App {
         withAnimation(.easeInOut(duration: 0.4)) {
             showSplash = false
         }
+        adService.markColdStartFinished()
     }
 
     /// 补偿购买后崩溃、断网或后端暂时失败留下的未完成真实 Apple 交易。
