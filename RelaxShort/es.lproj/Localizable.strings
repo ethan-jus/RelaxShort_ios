@@ -276,7 +276,8 @@
 "member.auto_renew" = "Renovación automática, cancela cuando quieras";
 "member.content.empty" = "No hay series exclusivas disponibles";
 "member.content.failed" = "Error al cargar el contenido de miembro";
-"member.promotion.weekly_intro" = "%@ por semana durante las primeras %d semanas; después se aplica el precio semanal estándar.";
+"member.promotion.monthly_intro" = "Primer mes por %1$@; después, %2$@/mes.";
+"member.plan.yearly_value" = "≈ %1$@/mes · Ahorra %2$d%%";
 "member.disclosure.access" = "La suscripción desbloquea episodios de pago y exclusivos solo mientras esté activa. Las monedas se venden por separado.";
 "member.disclosure.renewal" = "El pago se carga a tu Cuenta de Apple. La suscripción se renueva automáticamente salvo que canceles al menos 24 horas antes.";
 "member.disclosure.restore" = "Restaurar compras solo restaura suscripciones de Apple elegibles; las monedas consumibles no se pueden restaurar.";

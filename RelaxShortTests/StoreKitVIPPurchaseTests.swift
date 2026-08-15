@@ -48,20 +48,20 @@ struct StoreKitVIPPurchaseTests {
           "background_posters": [],
           "member_only_dramas": [],
           "plans": [{
-            "product_code": "vip_weekly",
-            "store_product_id": "com.relaxshort.vip.weekly",
-            "title_key": "member.plan.weekly",
-            "detail_key": "member.plan.weekly_detail",
-            "sort_order": 10,
+            "product_code": "vip_monthly",
+            "store_product_id": "com.relaxshort.vip.monthly",
+            "title_key": "membership.monthly",
+            "detail_key": "membership.monthly_detail",
+            "sort_order": 11,
             "promotion": {
-              "campaign_code": "weekly_intro_3_periods",
+              "campaign_code": "monthly_intro_1_period",
               "offer_type": "introductory",
               "payment_mode": "pay_as_you_go",
-              "period_unit": "week",
+              "period_unit": "month",
               "period_value": 1,
-              "period_count": 3,
+              "period_count": 1,
               "badge_key": "member.discount",
-              "title_key": "member.promotion.weekly_intro",
+              "title_key": "member.promotion.monthly_intro",
               "starts_at_epoch_seconds": 1782864000,
               "ends_at_epoch_seconds": 1788220799
             }
@@ -84,8 +84,8 @@ struct StoreKitVIPPurchaseTests {
 
         let content = RealMemberRepository.map(dto: dto)
 
-        #expect(content.plans.map(\.productID) == [.vipWeekly])
-        #expect(content.plans.first?.promotion?.campaignCode == "weekly_intro_3_periods")
+        #expect(content.plans.map(\.productID) == [.vipMonthly])
+        #expect(content.plans.first?.promotion?.campaignCode == "monthly_intro_1_period")
         #expect(content.benefits.map(\.id) == ["unlimited"])
         #expect(content.legalLinks?.termsURL.host == "www.relaxshort.com")
     }
@@ -93,14 +93,14 @@ struct StoreKitVIPPurchaseTests {
     @Test
     func serverPromotionRequiresActiveWindowAndAppleOffer() {
         let promotion = MemberPromotion(
-            campaignCode: "weekly_intro_3_periods",
+            campaignCode: "monthly_intro_1_period",
             offerType: .introductory,
             paymentMode: .payAsYouGo,
-            periodUnit: .week,
+            periodUnit: .month,
             periodValue: 1,
-            periodCount: 3,
+            periodCount: 1,
             badgeKey: "member.discount",
-            titleKey: "member.promotion.weekly_intro",
+            titleKey: "member.promotion.monthly_intro",
             startsAt: Date(timeIntervalSince1970: 100),
             endsAt: Date(timeIntervalSince1970: 200)
         )
@@ -122,30 +122,30 @@ struct StoreKitVIPPurchaseTests {
     @Test
     func serverPromotionMustMatchStoreKitPaymentTerms() {
         let promotion = MemberPromotion(
-            campaignCode: "weekly_intro_3_periods",
+            campaignCode: "monthly_intro_1_period",
             offerType: .introductory,
             paymentMode: .payAsYouGo,
-            periodUnit: .week,
+            periodUnit: .month,
             periodValue: 1,
-            periodCount: 3,
+            periodCount: 1,
             badgeKey: "member.discount",
-            titleKey: "member.promotion.weekly_intro",
+            titleKey: "member.promotion.monthly_intro",
             startsAt: Date(timeIntervalSince1970: 100),
             endsAt: Date(timeIntervalSince1970: 200)
         )
         let expectedOffer = VIPIntroductoryOfferDisplay(
-            displayPrice: "$12.99",
+            displayPrice: "$9.99",
             paymentMode: .payAsYouGo,
-            periodUnit: .week,
+            periodUnit: .month,
             periodValue: 1,
-            periodCount: 3
+            periodCount: 1
         )
         let freeTrial = VIPIntroductoryOfferDisplay(
             displayPrice: "$0",
             paymentMode: .freeTrial,
-            periodUnit: .week,
+            periodUnit: .month,
             periodValue: 1,
-            periodCount: 3
+            periodCount: 1
         )
 
         #expect(expectedOffer.matches(promotion))
@@ -153,7 +153,7 @@ struct StoreKitVIPPurchaseTests {
     }
 
     @Test
-    func weeklyLocalStoreKitUsesRealThreePeriodIntroductoryOffer() throws {
+    func localStoreKitUsesMonthlyFirstPeriodIntroductoryOffer() throws {
         let bundle = Bundle(for: StoreKitVIPPurchaseBundleToken.self)
         let url = try #require(bundle.url(forResource: "RelaxShort", withExtension: "storekit"))
         let data = try Data(contentsOf: url)
@@ -163,12 +163,22 @@ struct StoreKitVIPPurchaseTests {
         let weekly = try #require(subscriptions.first {
             $0["productID"] as? String == ProductID.vipWeekly.rawValue
         })
-        let offer = try #require(weekly["introductoryOffer"] as? [String: Any])
+        let monthly = try #require(subscriptions.first {
+            $0["productID"] as? String == ProductID.vipMonthly.rawValue
+        })
+        let yearly = try #require(subscriptions.first {
+            $0["productID"] as? String == ProductID.vipYearly.rawValue
+        })
+        let offer = try #require(monthly["introductoryOffer"] as? [String: Any])
 
-        #expect(weekly["displayPrice"] as? String == "19.99")
-        #expect(offer["displayPrice"] as? String == "12.99")
+        #expect(weekly["displayPrice"] as? String == "5.99")
+        #expect(weekly["introductoryOffer"] is NSNull)
+        #expect(monthly["displayPrice"] as? String == "19.99")
+        #expect(offer["displayPrice"] as? String == "9.99")
         #expect(offer["paymentMode"] as? String == "PayAsYouGo")
-        #expect(offer["periodCount"] as? Int == 3)
+        #expect(offer["periodCount"] as? Int == 1)
+        #expect(offer["subscriptionPeriod"] as? String == "P1M")
+        #expect(yearly["displayPrice"] as? String == "99.99")
     }
 
     @Test

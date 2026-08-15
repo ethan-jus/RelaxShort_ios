@@ -280,7 +280,8 @@
 "member.auto_renew" = "自动续费，可随时取消";
 "member.content.empty" = "暂无会员专属剧集";
 "member.content.failed" = "会员内容加载失败";
-"member.promotion.weekly_intro" = "前 %2$d 周每周 %1$@，之后恢复周套餐标准价格。";
+"member.promotion.monthly_intro" = "首月 %1$@，之后 %2$@/月。";
+"member.plan.yearly_value" = "约 %1$@/月 · 省约 %2$d%%";
 "member.disclosure.access" = "会员仅在订阅有效期内解锁付费剧集和会员专属剧集；金币为单独购买的消耗型商品。";
 "member.disclosure.renewal" = "费用将从 Apple 账户扣除。除非在当前周期结束前至少 24 小时取消，否则订阅会自动续费。";
 "member.disclosure.restore" = "“恢复购买”仅恢复符合条件的 Apple 会员订阅，不会恢复已购买的消耗型金币。";

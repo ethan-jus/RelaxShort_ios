@@ -276,7 +276,8 @@
 "member.auto_renew" = "自動更新、いつでもキャンセル可能";
 "member.content.empty" = "メンバー限定ドラマはありません";
 "member.content.failed" = "メンバーコンテンツの読み込みに失敗しました";
-"member.promotion.weekly_intro" = "最初の%2$d週間は週額%1$@、その後は通常の週額になります。";
+"member.promotion.monthly_intro" = "初月%1$@、以降は月額%2$@。";
+"member.plan.yearly_value" = "月額約%1$@ · %2$d%%お得";
 "member.disclosure.access" = "登録が有効な期間のみ、有料および会員限定エピソードを利用できます。コインは別売りです。";
 "member.disclosure.renewal" = "料金はApple Accountに請求されます。期間終了の24時間以上前に解約しない限り自動更新されます。";
 "member.disclosure.restore" = "「購入を復元」は対象のAppleサブスクリプションのみを復元します。消費型コインは復元できません。";

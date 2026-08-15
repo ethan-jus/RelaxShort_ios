@@ -276,7 +276,8 @@
 "member.auto_renew" = "自動續費，可隨時取消";
 "member.content.empty" = "暫無會員專屬劇集";
 "member.content.failed" = "會員內容載入失敗";
-"member.promotion.weekly_intro" = "前 %2$d 週每週 %1$@，之後恢復週方案標準價格。";
+"member.promotion.monthly_intro" = "首月 %1$@，之後 %2$@/月。";
+"member.plan.yearly_value" = "約 %1$@/月 · 省約 %2$d%%";
 "member.disclosure.access" = "會員僅在訂閱有效期內解鎖付費劇集和會員專屬劇集；金幣為另外購買的消耗型商品。";
 "member.disclosure.renewal" = "費用將從 Apple 帳戶扣除。除非在目前週期結束前至少 24 小時取消，否則訂閱會自動續訂。";
 "member.disclosure.restore" = "「恢復購買」僅恢復符合條件的 Apple 會員訂閱，不會恢復已購買的消耗型金幣。";

@@ -74,6 +74,6 @@ enum MemberPurchasePolicy {
 }
 
 enum MemberDisplayConfig {
-    /// 年套餐是标准价格下的最低长期成本；最终选项仍以服务端可售目录为准。
-    static let defaultSelectedPlanID = "vip_yearly"
+    /// 月套餐是首购转化主方案；最终选项仍以服务端可售目录为准。
+    static let defaultSelectedPlanID = "vip_monthly"
 }

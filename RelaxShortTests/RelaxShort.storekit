@@ -132,17 +132,11 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "19.99",
+          "displayPrice" : "5.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "A37A1001",
-          "introductoryOffer" : {
-            "displayPrice" : "12.99",
-            "internalID" : "A37A1101",
-            "paymentMode" : "PayAsYouGo",
-            "periodCount" : 3,
-            "subscriptionPeriod" : "P1W"
-          },
+          "introductoryOffer" : null,
           "localizations" : [
             {
               "description" : "Weekly VIP access",
@@ -171,11 +165,17 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "29.99",
+          "displayPrice" : "19.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "A37A1002",
-          "introductoryOffer" : null,
+          "introductoryOffer" : {
+            "displayPrice" : "9.99",
+            "internalID" : "A37A1102",
+            "paymentMode" : "PayAsYouGo",
+            "periodCount" : 1,
+            "subscriptionPeriod" : "P1M"
+          },
           "localizations" : [
             {
               "description" : "Monthly VIP access",
@@ -204,7 +204,7 @@
           "codeOffers" : [
 
           ],
-          "displayPrice" : "149.99",
+          "displayPrice" : "99.99",
           "familyShareable" : false,
           "groupNumber" : 1,
           "internalID" : "A37A1003",

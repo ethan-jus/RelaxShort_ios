@@ -572,7 +572,7 @@ struct EpisodeUnlockPurchaseSheet: View {
                                     .font(.system(size: 18, weight: .bold))
                                     .foregroundStyle(.white)
                                 if plan.productID == .vipMonthly {
-                                    Text("vip.recommended".localized)
+                                    Text("store.most_popular".localized)
                                         .font(.system(size: 10, weight: .bold))
                                         .foregroundStyle(.black)
                                         .padding(.horizontal, 7)

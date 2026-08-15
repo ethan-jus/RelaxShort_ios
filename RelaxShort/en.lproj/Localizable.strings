@@ -281,7 +281,8 @@
 "member.auto_renew" = "Auto-renewal, cancel anytime";
 "member.content.empty" = "No members-only dramas available";
 "member.content.failed" = "Failed to load member content";
-"member.promotion.weekly_intro" = "%@ per week for the first %d weeks, then the standard weekly price.";
+"member.promotion.monthly_intro" = "First month %1$@, then %2$@/month.";
+"member.plan.yearly_value" = "≈ %1$@/month · Save %2$d%%";
 "member.disclosure.access" = "Membership unlocks paid and members-only episodes only while the subscription is active. Coins are sold separately.";
 "member.disclosure.renewal" = "Payment is charged to your Apple Account. The subscription renews automatically unless canceled at least 24 hours before the current period ends.";
 "member.disclosure.restore" = "Restore Purchases restores eligible Apple subscriptions only; consumable coins can’t be restored.";

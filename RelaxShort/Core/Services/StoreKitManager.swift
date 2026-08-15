@@ -1,3 +1,4 @@
+import Foundation
 import StoreKit
 import SwiftUI
 
@@ -87,6 +88,12 @@ struct VIPIntroductoryOfferDisplay: Equatable {
             && periodValue == promotion.periodValue
             && periodCount == promotion.periodCount
     }
+}
+
+/// 使用当前 storefront 的真实 StoreKit 价格计算长期套餐价值。
+struct VIPSubscriptionSavingsDisplay: Equatable {
+    let equivalentMonthlyPrice: String
+    let savingsPercent: Int
 }
 
 enum StoreKitEntitlementPolicy {
@@ -291,6 +298,41 @@ final class StoreKitManager: ObservableObject {
         storeKitProducts[productID.rawValue]?.displayPrice
     }
 
+    /// 年会员相对连续购买 12 个月会员的月均价和折扣。
+    /// 金额、币种格式及区域价格全部来自当前 storefront，禁止使用美元硬编码。
+    func yearlySavingsComparedToMonthly() -> VIPSubscriptionSavingsDisplay? {
+        guard let monthly = storeKitProducts[ProductID.vipMonthly.rawValue],
+              let yearly = storeKitProducts[ProductID.vipYearly.rawValue] else {
+            return nil
+        }
+        let monthCount = Decimal(12)
+        let standardYearTotal = monthly.price * monthCount
+        guard standardYearTotal > 0,
+              yearly.price < standardYearTotal else {
+            return nil
+        }
+        let equivalentMonthlyPrice = (yearly.price / monthCount)
+            .formatted(yearly.priceFormatStyle)
+        let savings = ((standardYearTotal - yearly.price) / standardYearTotal)
+            * Decimal(100)
+        let savingsPercent = NSDecimalNumber(decimal: savings)
+            .rounding(
+                accordingToBehavior: NSDecimalNumberHandler(
+                    roundingMode: .plain,
+                    scale: 0,
+                    raiseOnExactness: false,
+                    raiseOnOverflow: false,
+                    raiseOnUnderflow: false,
+                    raiseOnDivideByZero: false
+                )
+            )
+            .intValue
+        return VIPSubscriptionSavingsDisplay(
+            equivalentMonthlyPrice: equivalentMonthlyPrice,
+            savingsPercent: savingsPercent
+        )
+    }
+
     /// 商品必须由当前 App Store storefront 返回后才允许进入购买流程。
     func isProductAvailable(_ productID: ProductID) -> Bool {
         storeKitProducts[productID.rawValue] != nil
@@ -316,6 +358,13 @@ final class StoreKitManager: ObservableObject {
             let allIDs = ProductID.allCases.map(\.rawValue)
             let products = try await Product.products(for: Set(allIDs))
             storeKitProducts = Dictionary(uniqueKeysWithValues: products.map { ($0.id, $0) })
+            let returnedIDs = Set(products.map(\.id))
+            let missingIDs = Set(allIDs).subtracting(returnedIDs).sorted()
+            if !missingIDs.isEmpty {
+                Logger.store.warning(
+                    "StoreKitManager: App Store did not return product IDs: \(missingIDs.joined(separator: ", "))"
+                )
+            }
             var eligibleOffers:
                 [ProductID: VIPIntroductoryOfferDisplay] = [:]
             for productID in ProductID.supportedVIPSubscriptions {

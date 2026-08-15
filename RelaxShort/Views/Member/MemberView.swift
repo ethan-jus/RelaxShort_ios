@@ -264,7 +264,14 @@ struct MemberView: View {
         .onAppear {
             viewModel.loadIfNeeded()
             viewModel.startPromotionCountdown()
-            Task { await synchronizeServerMembership() }
+            Task {
+                if ProductID.supportedVIPSubscriptions.contains(where: {
+                    !storeKit.isProductAvailable($0)
+                }) {
+                    await storeKit.requestProducts()
+                }
+                await synchronizeServerMembership()
+            }
         }
         .onDisappear {
             viewModel.stopPromotionCountdown()
@@ -546,6 +553,16 @@ extension MemberView {
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
 
+                    if plan.productID == .vipMonthly {
+                        Text("store.most_popular".localized)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.black)
+                            .lineLimit(1)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(memberGold, in: Capsule())
+                    }
+
                     if isSelected {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 13, weight: .semibold))
@@ -570,11 +587,23 @@ extension MemberView {
 
                 Group {
                     if let promotion = plan.promotion,
-                       offer != nil,
-                       let countdown = viewModel
-                        .formattedPromotionCountdown(for: promotion) {
+                       let offer,
+                       let standardPrice {
                         Text(
-                            "\(promotion.badgeKey.localized) · \(countdown)"
+                            String(
+                                format: promotion.titleKey.localized,
+                                offer.displayPrice,
+                                standardPrice
+                            )
+                        )
+                    } else if plan.productID == .vipYearly,
+                              let savings = storeKit.yearlySavingsComparedToMonthly() {
+                        Text(
+                            String(
+                                format: "member.plan.yearly_value".localized,
+                                savings.equivalentMonthlyPrice,
+                                savings.savingsPercent
+                            )
                         )
                     } else {
                         Text(plan.detailKey.localized)
@@ -674,7 +703,7 @@ extension MemberView {
         let offerDisclosure = String(
             format: promotion.titleKey.localized,
             offer.displayPrice,
-            offer.periodCount
+            standardPrice
         )
         return "\(plan.titleKey.localized), \(offerDisclosure), \("member.standard_price".localized) \(standardPrice)"
     }
