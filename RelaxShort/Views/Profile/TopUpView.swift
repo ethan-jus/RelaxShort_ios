@@ -16,38 +16,47 @@ struct TopUpView: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 0) {
-                CompactProfileNavigationHeader(title: "topup.title".localized)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 4)
+        VStack(spacing: 0) {
+            CompactProfileNavigationHeader(title: "topup.title".localized)
+                .padding(.horizontal, 20)
+                .padding(.top, 4)
 
-                balanceHero
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
+            balanceHero
+                .padding(.horizontal, 20)
+                .padding(.top, 14)
 
-                if viewModel.firstPurchaseBonusAvailable == true {
-                    firstPurchaseStrip
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-                } else {
-                    marketingHeadline
-                        .padding(.horizontal, 20)
-                        .padding(.top, 14)
-                }
-
-                packageList
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
-
-                purchaseButton
-                    .padding(.horizontal, 20)
-                    .padding(.top, 14)
-
-                trustNotice
+            if viewModel.firstPurchaseBonusAvailable == true {
+                firstPurchaseStrip
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
-                    .padding(.bottom, 26)
+            } else {
+                marketingHeadline
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+            }
+
+            // 页面骨架固定，只让金币列表占用剩余空间并在小屏上滚动。
+            ScrollView(.vertical, showsIndicators: false) {
+                packageList
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxHeight: .infinity)
+
+            // 购买操作与安全说明固定在屏幕底部，不跟随金币列表滚动。
+            VStack(spacing: 12) {
+                purchaseButton
+                trustNotice
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
+            .background(DB.black)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(DB.divider.opacity(0.58))
+                    .frame(height: 0.5)
             }
         }
         .background(DB.black.ignoresSafeArea())
@@ -59,7 +68,38 @@ struct TopUpView: View {
                 packages: storeKitManager.coinPackages,
                 fallbackBalance: coinStore.coinBalance
             )
+            reconcilePackageSelection()
         }
+        .task {
+            await refreshCoinProducts()
+        }
+        .onChange(of: storeKitManager.isLoadingProducts) { _, isLoading in
+            guard !isLoading else { return }
+            reconcilePackageSelection()
+        }
+    }
+
+    /// 充值页不能依赖启动后延迟加载；进入页面立即刷新，部分商品缺失时再补一次请求。
+    private func refreshCoinProducts() async {
+        await storeKitManager.requestProducts(force: true)
+
+        let hasMissingCoinProduct = storeKitManager.coinPackages.contains {
+            !storeKitManager.isProductAvailable($0.productID)
+        }
+        if hasMissingCoinProduct {
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            await storeKitManager.requestProducts(force: true)
+        }
+
+        reconcilePackageSelection()
+    }
+
+    private func reconcilePackageSelection() {
+        viewModel.ensureAvailableSelection(
+            packages: storeKitManager.coinPackages,
+            isAvailable: storeKitManager.isProductAvailable
+        )
     }
 
     private var balanceHero: some View {

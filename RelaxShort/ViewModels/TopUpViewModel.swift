@@ -52,6 +52,33 @@ final class TopUpViewModel: ObservableObject {
         return packages.first { $0.productID == selectedProductID }
     }
 
+    /// 商品刷新后保证默认选中项一定是 StoreKit 实际返回、可以购买的商品。
+    func ensureAvailableSelection(
+        packages: [CoinPackage],
+        isAvailable: (ProductID) -> Bool
+    ) {
+        if let selectedProductID, isAvailable(selectedProductID) {
+            return
+        }
+
+        let availablePackages = packages.filter { isAvailable($0.productID) }
+        guard !availablePackages.isEmpty else {
+            selectedProductID = nil
+            return
+        }
+
+        userSelectedPackage = false
+        if firstPurchaseBonusAvailable == true,
+           let firstPurchase = availablePackages.first(where: {
+               $0.productID == .coinsSmall
+           }) {
+            selectedProductID = firstPurchase.productID
+        } else {
+            selectedProductID = availablePackages.first(where: \.isPopular)?.productID
+                ?? availablePackages.first?.productID
+        }
+    }
+
     func displayedBonus(for package: CoinPackage) -> Int {
         if package.productID == .coinsSmall,
            firstPurchaseBonusAvailable != true {
