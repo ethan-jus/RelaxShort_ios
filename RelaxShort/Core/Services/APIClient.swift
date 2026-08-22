@@ -79,6 +79,55 @@ final class APIClient {
         return data
     }
 
+    /// 上传单个 multipart 文件，并自动解包后端 `ApiResponse<T>`。
+    /// 认证刷新、错误映射与普通 JSON 请求保持一致。
+    func requestMultipartData<T: Decodable>(
+        _ endpoint: APIEndpoint,
+        fieldName: String,
+        fileName: String,
+        mimeType: String,
+        fileData: Data
+    ) async throws -> T {
+        let boundary = "RelaxShort-\(UUID().uuidString)"
+        let body = Self.multipartBody(
+            boundary: boundary,
+            fieldName: fieldName,
+            fileName: fileName,
+            mimeType: mimeType,
+            fileData: fileData
+        )
+        let (data, response) = try await perform(endpoint) { request in
+            request.setValue(
+                "multipart/form-data; boundary=\(boundary)",
+                forHTTPHeaderField: "Content-Type"
+            )
+            request.httpBody = body
+        }
+        try validateResponse(response, data: data)
+        logResponse(response, data: data)
+
+        do {
+            let envelope = try decoder.decode(APIResponseEnvelope<T>.self, from: data)
+            if let apiError = envelope.error {
+                throw APIError(
+                    code: apiError.code,
+                    message: apiError.message ?? "general.unknown_error".localized
+                )
+            }
+            guard let value = envelope.data else {
+                throw NetworkError.invalidResponse
+            }
+            return value
+        } catch let error as APIError {
+            throw error
+        } catch let error as NetworkError {
+            throw error
+        } catch {
+            logger.error("解码失败: \(error.localizedDescription)")
+            throw NetworkError.decodingFailed(error)
+        }
+    }
+
     /// 发起请求，解码为 `Decodable` 数组（不解包 envelope）。
     func requestArray<T: Decodable>(_ endpoint: APIEndpoint) async throws -> [T] {
         let (data, response) = try await perform(endpoint)
@@ -117,8 +166,12 @@ final class APIClient {
     }
 
     /// 401 时只触发一次全局 refresh，并用新 access token 重放原请求。
-    private func perform(_ endpoint: APIEndpoint) async throws -> (Data, URLResponse) {
+    private func perform(
+        _ endpoint: APIEndpoint,
+        configure: ((inout URLRequest) -> Void)? = nil
+    ) async throws -> (Data, URLResponse) {
         var request = try await buildRequest(for: endpoint)
+        configure?(&request)
         logRequest(request)
         var result: (Data, URLResponse)
         do {
@@ -129,6 +182,7 @@ final class APIClient {
 
         if (result.1 as? HTTPURLResponse)?.statusCode == 401 {
             request = try await buildRequest(for: endpoint, forceRefresh: true)
+            configure?(&request)
             logRequest(request)
             do {
                 result = try await session.data(for: request)
@@ -137,6 +191,25 @@ final class APIClient {
             }
         }
         return result
+    }
+
+    private static func multipartBody(
+        boundary: String,
+        fieldName: String,
+        fileName: String,
+        mimeType: String,
+        fileData: Data
+    ) -> Data {
+        var data = Data()
+        data.append("--\(boundary)\r\n".data(using: .utf8)!)
+        data.append(
+            "Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n"
+                .data(using: .utf8)!
+        )
+        data.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        data.append(fileData)
+        data.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        return data
     }
 
     // MARK: - Response Validation

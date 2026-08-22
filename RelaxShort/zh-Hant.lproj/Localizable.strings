@@ -100,6 +100,14 @@
 "profile.login_to_view" = "登入後查看個人中心";
 "profile.login_to_sync" = "登入後即可存取個人資料、錢包等功能";
 "profile.default_user_name" = "使用者 %@";
+"profile.edit_avatar" = "修改頭像";
+"profile.nickname" = "暱稱";
+"profile.nickname_placeholder" = "輸入暱稱";
+"profile.save" = "儲存";
+"profile.nickname_updated" = "暱稱已更新";
+"profile.avatar_updated" = "頭像已更新";
+"profile.photo_unavailable" = "無法讀取所選照片";
+"profile.update_failed" = "更新失敗：%@";
 
 /* ---- Theme ---- */
 "theme.system" = "跟隨系統";
@@ -473,6 +481,8 @@
 "reward.tasks_title" = "做任務賺金幣";
 "reward.tasks_subtitle" = "完成任務後，金幣自動入帳";
 "reward.completed" = "已完成";
+"reward.claimed" = "已領取";
+"reward.claim_amount" = "領取 +%d";
 "reward.go_login" = "去登入";
 "reward.go_share" = "去分享";
 "reward.go_complete" = "去完成";

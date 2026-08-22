@@ -249,6 +249,16 @@ struct ProfileView: View {
                             name: .showMembership,
                             object: nil
                         )
+                    },
+                    onNicknameSave: { nickname in
+                        try await viewModel.updateNickname(nickname)
+                    },
+                    onAvatarUpload: { data, fileName, mimeType in
+                        try await viewModel.uploadAvatar(
+                            data: data,
+                            fileName: fileName,
+                            mimeType: mimeType
+                        )
                     }
                 )
             } else {
@@ -460,6 +470,16 @@ private struct ProfilePreviewRepository: ProfileRepositoryProtocol {
     let user: User
 
     func fetchUserProfile() async throws -> User {
+        user
+    }
+
+    func updateNickname(_ nickname: String) async throws -> User {
+        var updated = user
+        updated.nickname = nickname
+        return updated
+    }
+
+    func uploadAvatar(data: Data, fileName: String, mimeType: String) async throws -> User {
         user
     }
 }

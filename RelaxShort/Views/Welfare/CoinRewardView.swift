@@ -523,33 +523,57 @@ private extension CoinRewardView {
             Spacer(minLength: 4)
 
             HStack(spacing: 5) {
-                compactTaskRewardAmount(task.rewardCoins)
+                if !task.claimable {
+                    compactTaskRewardAmount(task.rewardCoins)
+                }
                 Button {
-                    performTaskAction(task)
-                } label: {
-                    Text(task.completed ? "reward.completed".localized : taskButtonTitle(task))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(task.completed ? .white.opacity(0.38) : rewardGold)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.88)
-                        .frame(width: 62, height: 30)
-                        .background(
-                            Capsule().fill(
-                                task.completed
-                                    ? Color.white.opacity(0.06)
-                                    : rewardGold.opacity(0.12)
-                            )
-                        )
-                        .overlay {
-                            Capsule().stroke(
-                                task.completed ? .clear : rewardGold.opacity(0.34),
-                                lineWidth: 1
+                    if task.claimable && !task.claimed {
+                        Task {
+                            await viewModel.claimTask(task)
+                            rewardSummaryStore.apply(
+                                balance: viewModel.coinBalance,
+                                remainingEarnableCoins: viewModel.remainingEarnableCoins
                             )
                         }
+                    } else {
+                        performTaskAction(task)
+                    }
+                } label: {
+                    Group {
+                        if viewModel.isClaiming(task.code) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(rewardGold)
+                        } else {
+                            Text(taskButtonTitle(task))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                        }
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(task.claimed ? .white.opacity(0.38) : rewardGold)
+                    .frame(width: task.claimable ? 96 : 68, height: 30)
+                    .background(
+                        Capsule().fill(
+                            task.claimed
+                                ? Color.white.opacity(0.06)
+                                : rewardGold.opacity(0.12)
+                        )
+                    )
+                    .overlay {
+                        Capsule().stroke(
+                            task.claimed ? .clear : rewardGold.opacity(0.34),
+                            lineWidth: 1
+                        )
+                    }
                 }
-                .disabled(task.completed)
+                .disabled(
+                    task.claimed
+                        || viewModel.isClaiming(task.code)
+                        || (task.completed && !task.claimable)
+                )
             }
-            .frame(width: 116, alignment: .trailing)
+            .frame(width: 126, alignment: .trailing)
         }
         .padding(.horizontal, 12)
         .frame(minHeight: 72)
@@ -583,6 +607,15 @@ private extension CoinRewardView {
     }
 
     func taskButtonTitle(_ task: MarketingRewardTask) -> String {
+        if task.claimed {
+            return "reward.claimed".localized
+        }
+        if task.claimable {
+            return "reward.claim_amount".localizedFormat(task.rewardCoins)
+        }
+        if task.completed {
+            return "reward.completed".localized
+        }
         switch task.action {
         case "login": return "reward.go_login".localized
         case "share": return "reward.go_share".localized

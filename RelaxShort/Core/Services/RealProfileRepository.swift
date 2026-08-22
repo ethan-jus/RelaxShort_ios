@@ -56,4 +56,30 @@ final class RealProfileRepository: ProfileRepositoryProtocol {
 
         return ProfileDTOMapper.toUser(profile: profile, wallet: wallet)
     }
+
+    func updateNickname(_ nickname: String) async throws -> User {
+        async let profileDTO: UserProfileResponseDTO = client.requestData(
+            .updateUserProfile(nickname: nickname)
+        )
+        async let walletDTO: WalletResponseDTO = client.requestData(.userWallet)
+        let (profile, wallet) = try await (profileDTO, walletDTO)
+        return ProfileDTOMapper.toUser(profile: profile, wallet: wallet)
+    }
+
+    func uploadAvatar(
+        data: Data,
+        fileName: String,
+        mimeType: String
+    ) async throws -> User {
+        async let profileDTO: UserProfileResponseDTO = client.requestMultipartData(
+            .uploadUserAvatar,
+            fieldName: "file",
+            fileName: fileName,
+            mimeType: mimeType,
+            fileData: data
+        )
+        async let walletDTO: WalletResponseDTO = client.requestData(.userWallet)
+        let (profile, wallet) = try await (profileDTO, walletDTO)
+        return ProfileDTOMapper.toUser(profile: profile, wallet: wallet)
+    }
 }

@@ -100,6 +100,14 @@
 "profile.login_to_view" = "سجّل الدخول لعرض الملف الشخصي";
 "profile.login_to_sync" = "سجّل الدخول للوصول إلى ملفك الشخصي ومحفظتك والمزيد";
 "profile.default_user_name" = "المستخدم %@";
+"profile.edit_avatar" = "تغيير صورة الملف الشخصي";
+"profile.nickname" = "الاسم المستعار";
+"profile.nickname_placeholder" = "أدخل اسمًا مستعارًا";
+"profile.save" = "حفظ";
+"profile.nickname_updated" = "تم تحديث الاسم المستعار";
+"profile.avatar_updated" = "تم تحديث صورة الملف الشخصي";
+"profile.photo_unavailable" = "تعذر قراءة الصورة المحددة";
+"profile.update_failed" = "فشل التحديث: %@";
 
 /* ---- Theme ---- */
 "theme.system" = "النظام";
@@ -473,6 +481,8 @@
 "reward.tasks_title" = "أكمل المهام واربح العملات";
 "reward.tasks_subtitle" = "تُضاف العملات تلقائيًا بعد إكمال المهمة";
 "reward.completed" = "مكتملة";
+"reward.claimed" = "تم الاستلام";
+"reward.claim_amount" = "استلام +%d";
 "reward.go_login" = "تسجيل الدخول";
 "reward.go_share" = "مشاركة";
 "reward.go_complete" = "انتقال";

@@ -148,6 +148,14 @@ protocol FavoritesRepositoryProtocol: Sendable {
 protocol ProfileRepositoryProtocol {
     /// 获取用户信息
     func fetchUserProfile() async throws -> User
+    /// 修改当前用户昵称，返回服务端最新资料。
+    func updateNickname(_ nickname: String) async throws -> User
+    /// 上传当前用户头像，返回服务端最新资料。
+    func uploadAvatar(
+        data: Data,
+        fileName: String,
+        mimeType: String
+    ) async throws -> User
 }
 
 // MARK: - Wallet
@@ -208,6 +216,7 @@ protocol MemberRepositoryProtocol {
 /// 福利中心/赚金币数据仓库协议
 protocol CoinRewardRepositoryProtocol {
     func fetchRewardCenter() async throws -> RewardCenterState
+    func claimTask(_ taskCode: String) async throws -> RewardCenterState
     func checkIn() async throws -> RewardCenterState
     func recordShare(
         seriesID: String,

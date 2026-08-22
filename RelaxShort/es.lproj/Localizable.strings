@@ -100,6 +100,14 @@
 "profile.login_to_view" = "Inicia sesión para ver tu perfil";
 "profile.login_to_sync" = "Inicia sesión para acceder a tu perfil, billetera y más";
 "profile.default_user_name" = "Usuario %@";
+"profile.edit_avatar" = "Cambiar foto de perfil";
+"profile.nickname" = "Apodo";
+"profile.nickname_placeholder" = "Introduce un apodo";
+"profile.save" = "Guardar";
+"profile.nickname_updated" = "Apodo actualizado";
+"profile.avatar_updated" = "Foto de perfil actualizada";
+"profile.photo_unavailable" = "No se pudo leer la foto seleccionada";
+"profile.update_failed" = "Error al actualizar: %@";
 
 /* ---- Theme ---- */
 "theme.system" = "Sistema";
@@ -473,6 +481,8 @@
 "reward.tasks_title" = "Completa tareas y gana monedas";
 "reward.tasks_subtitle" = "Las monedas se añaden al completar la tarea";
 "reward.completed" = "Completada";
+"reward.claimed" = "Reclamada";
+"reward.claim_amount" = "Reclamar +%d";
 "reward.go_login" = "Iniciar sesión";
 "reward.go_share" = "Compartir";
 "reward.go_complete" = "Ir";

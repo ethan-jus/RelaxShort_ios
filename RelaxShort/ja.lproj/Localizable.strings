@@ -100,6 +100,14 @@
 "profile.login_to_view" = "ログインしてプロフィールを表示";
 "profile.login_to_sync" = "ログインするとプロフィールやウォレットなどにアクセスできます";
 "profile.default_user_name" = "ユーザー %@";
+"profile.edit_avatar" = "プロフィール画像を変更";
+"profile.nickname" = "ニックネーム";
+"profile.nickname_placeholder" = "ニックネームを入力";
+"profile.save" = "保存";
+"profile.nickname_updated" = "ニックネームを更新しました";
+"profile.avatar_updated" = "プロフィール画像を更新しました";
+"profile.photo_unavailable" = "選択した写真を読み込めません";
+"profile.update_failed" = "更新に失敗しました：%@";
 
 /* ---- Theme ---- */
 "theme.system" = "システム設定";
@@ -473,6 +481,8 @@
 "reward.tasks_title" = "タスクでコインを獲得";
 "reward.tasks_subtitle" = "完了後にコインが自動追加されます";
 "reward.completed" = "完了";
+"reward.claimed" = "受取済み";
+"reward.claim_amount" = "+%d を受け取る";
 "reward.go_login" = "ログイン";
 "reward.go_share" = "共有";
 "reward.go_complete" = "移動";

@@ -1,5 +1,7 @@
 import SwiftUI
 import StoreKit
+import PhotosUI
+import UIKit
 
 // MARK: - Account Profile
 
@@ -10,16 +12,59 @@ struct AccountProfileView: View {
     let isVIP: Bool
     let vipExpireDate: Date?
     let onMembershipTap: () -> Void
+    let onNicknameSave: (String) async throws -> Void
+    let onAvatarUpload: (Data, String, String) async throws -> Void
+
+    @State private var nicknameDraft = ""
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var selectedAvatarImage: UIImage?
+    @State private var isSavingNickname = false
+    @State private var isUploadingAvatar = false
+    @State private var statusMessage: String?
+    @State private var statusIsError = false
 
     var body: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 22) {
                 VStack(spacing: 12) {
-                    ProfileAvatarView(
-                        url: user.avatarURL,
-                        initials: String(displayName.prefix(2)).uppercased(),
-                        size: 112
-                    )
+                    PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        ZStack(alignment: .bottomTrailing) {
+                            Group {
+                                if let selectedAvatarImage {
+                                    Image(uiImage: selectedAvatarImage)
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 112, height: 112)
+                                        .clipShape(Circle())
+                                } else {
+                                    ProfileAvatarView(
+                                        url: user.avatarURL,
+                                        initials: String(displayName.prefix(2)).uppercased(),
+                                        size: 112
+                                    )
+                                }
+                            }
+
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.black)
+                                .frame(width: 32, height: 32)
+                                .background(DT.memberGold)
+                                .clipShape(Circle())
+                                .overlay(Circle().stroke(DB.black, lineWidth: 3))
+                        }
+                        .overlay {
+                            if isUploadingAvatar {
+                                Circle()
+                                    .fill(.black.opacity(0.56))
+                                    .frame(width: 112, height: 112)
+                                ProgressView().tint(.white)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUploadingAvatar)
+                    .accessibilityLabel("profile.edit_avatar".localized)
 
                     Text(displayName)
                         .font(.system(size: 24, weight: .bold))
@@ -33,6 +78,16 @@ struct AccountProfileView: View {
                         .textSelection(.enabled)
                 }
                 .padding(.top, 18)
+
+                nicknameEditor
+
+                if let statusMessage {
+                    Text(statusMessage)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(statusIsError ? .red : .green)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, DT.Space.pageH)
+                }
 
                 VStack(spacing: 0) {
                     if let email = user.email, !email.isEmpty {
@@ -70,6 +125,130 @@ struct AccountProfileView: View {
         }
         .background(DB.black.ignoresSafeArea())
         .compactSecondaryNavigation(title: "profile.tab.title".localized)
+        .onAppear { synchronizeNicknameDraft() }
+        .onChange(of: user.nickname) { _, _ in synchronizeNicknameDraft() }
+        .onChange(of: selectedPhoto) { _, item in
+            guard let item else { return }
+            Task { await uploadSelectedPhoto(item) }
+        }
+    }
+
+    private var nicknameEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("profile.nickname".localized)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white.opacity(0.78))
+
+            HStack(spacing: 10) {
+                TextField("profile.nickname_placeholder".localized, text: $nicknameDraft)
+                    .font(.system(size: 15))
+                    .foregroundColor(.white)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .onSubmit { saveNickname() }
+
+                Button(action: saveNickname) {
+                    Group {
+                        if isSavingNickname {
+                            ProgressView().controlSize(.small).tint(.black)
+                        } else {
+                            Text("profile.save".localized)
+                        }
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.black)
+                    .frame(width: 62, height: 34)
+                    .background(DT.memberGold)
+                    .clipShape(Capsule())
+                }
+                .disabled(!canSaveNickname)
+                .opacity(canSaveNickname ? 1 : 0.45)
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 54)
+            .background(DB.panel.opacity(0.72))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(DB.divider, lineWidth: 0.8)
+            }
+        }
+        .padding(.horizontal, DT.Space.pageH)
+    }
+
+    private var trimmedNickname: String {
+        nicknameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canSaveNickname: Bool {
+        !isSavingNickname
+            && !trimmedNickname.isEmpty
+            && trimmedNickname != user.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func synchronizeNicknameDraft() {
+        guard !isSavingNickname else { return }
+        nicknameDraft = user.nickname
+    }
+
+    private func saveNickname() {
+        guard canSaveNickname else { return }
+        isSavingNickname = true
+        statusMessage = nil
+        Task {
+            do {
+                try await onNicknameSave(trimmedNickname)
+                statusMessage = "profile.nickname_updated".localized
+                statusIsError = false
+            } catch {
+                statusMessage = "profile.update_failed".localizedFormat(error.localizedDescription)
+                statusIsError = true
+            }
+            isSavingNickname = false
+        }
+    }
+
+    private func uploadSelectedPhoto(_ item: PhotosPickerItem) async {
+        isUploadingAvatar = true
+        statusMessage = nil
+        defer {
+            isUploadingAvatar = false
+            selectedPhoto = nil
+        }
+
+        do {
+            guard let sourceData = try await item.loadTransferable(type: Data.self),
+                  let sourceImage = UIImage(data: sourceData),
+                  let prepared = prepareAvatar(sourceImage) else {
+                throw ProfileImageError.invalidImage
+            }
+            try await onAvatarUpload(prepared.data, "avatar.jpg", "image/jpeg")
+            selectedAvatarImage = prepared.image
+            statusMessage = "profile.avatar_updated".localized
+            statusIsError = false
+        } catch {
+            statusMessage = "profile.update_failed".localizedFormat(error.localizedDescription)
+            statusIsError = true
+        }
+    }
+
+    private func prepareAvatar(_ image: UIImage) -> (data: Data, image: UIImage)? {
+        let maximumDimension: CGFloat = 1_024
+        let largestDimension = max(image.size.width, image.size.height)
+        let scale = min(1, maximumDimension / max(largestDimension, 1))
+        let targetSize = CGSize(
+            width: max(1, image.size.width * scale),
+            height: max(1, image.size.height * scale)
+        )
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        format.opaque = true
+        let resized = UIGraphicsImageRenderer(size: targetSize, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+        guard let data = resized.jpegData(compressionQuality: 0.82) else { return nil }
+        return (data, resized)
     }
 
     private var membershipDetail: String {
@@ -117,6 +296,14 @@ struct AccountProfileView: View {
                     .padding(.leading, 50)
             }
         }
+    }
+}
+
+private enum ProfileImageError: LocalizedError {
+    case invalidImage
+
+    var errorDescription: String? {
+        "profile.photo_unavailable".localized
     }
 }
 

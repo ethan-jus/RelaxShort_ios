@@ -19,6 +19,8 @@ struct MarketingTaskDTO: Decodable {
     let rewardCoins: Decimal
     let resetCycle: String
     let completed: Bool
+    let claimed: Bool
+    let claimable: Bool
     let action: String
 }
 

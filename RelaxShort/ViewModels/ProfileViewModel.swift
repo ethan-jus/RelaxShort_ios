@@ -48,6 +48,26 @@ final class ProfileViewModel: ObservableObject {
         }
     }
 
+    func updateNickname(_ nickname: String) async throws {
+        let updated = try await repository.updateNickname(nickname)
+        profile = updated
+        loadState = .loaded
+    }
+
+    func uploadAvatar(
+        data: Data,
+        fileName: String,
+        mimeType: String
+    ) async throws {
+        let updated = try await repository.uploadAvatar(
+            data: data,
+            fileName: fileName,
+            mimeType: mimeType
+        )
+        profile = updated
+        loadState = .loaded
+    }
+
     // MARK: - Computed Display Properties
 
     /// Apple 只会在首次授权时返回姓名；缺失时使用邮箱前缀或稳定用户编号兜底。

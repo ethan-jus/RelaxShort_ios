@@ -48,6 +48,8 @@ enum APIEndpoint {
     // MARK: - Task23 用户/钱包/偏好端点
 
     case userMe
+    case updateUserProfile(nickname: String)
+    case uploadUserAvatar
     case userWallet
     case walletTransactions(cursor: String?, limit: Int, month: String, category: String)
     case updateUserPreferences(uiLanguage: String?, contentLanguage: String?, subtitleLanguage: String?, defaultQuality: String?)
@@ -90,6 +92,7 @@ enum APIEndpoint {
     // MARK: - Task39 奖励中心
 
     case rewardCenter
+    case rewardTaskClaim(taskCode: String)
     case rewardCheckIn(idempotencyKey: String)
     case rewardShareComplete(
         seriesID: String,
@@ -138,11 +141,12 @@ extension APIEndpoint {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
-             .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
+             .userMe, .updateUserProfile, .uploadUserAvatar,
+             .userWallet, .walletTransactions, .updateUserPreferences,
              .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
              .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .rewardCenter, .rewardTaskClaim, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
              .supportTickets, .createSupportTicket, .supportTicket,
              .sendSupportMessage, .resolveSupportTicket:
             return APIConfig.baseURL
@@ -172,6 +176,8 @@ extension APIEndpoint {
         case .categorySeries(let code, _, _, _, _): return "/api/v2/categories/\(code)/series"
         // ── Task23 v2 ──
         case .userMe:                           return "/api/v2/users/me"
+        case .updateUserProfile:                return "/api/v2/users/me/profile"
+        case .uploadUserAvatar:                 return "/api/v2/users/me/avatar"
         case .userWallet:                       return "/api/v2/users/me/wallet"
         case .walletTransactions:               return "/api/v2/users/me/wallet/transactions"
         case .updateUserPreferences:            return "/api/v2/users/me/preferences"
@@ -190,6 +196,7 @@ extension APIEndpoint {
         case .adsRewardComplete:             return "/api/v2/ads/reward/complete"
         case .adsRewardCancel:               return "/api/v2/ads/reward/cancel"
         case .rewardCenter:                  return "/api/v2/rewards/center"
+        case .rewardTaskClaim(let taskCode): return "/api/v2/rewards/tasks/\(taskCode)/claim"
         case .rewardCheckIn:                 return "/api/v2/rewards/check-in"
         case .rewardShareComplete:           return "/api/v2/rewards/share-complete"
         case .rewardApplyInviteCode:         return "/api/v2/rewards/referral/apply"
@@ -230,11 +237,12 @@ extension APIEndpoint {
              .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
              .userMe, .userWallet, .walletTransactions,
              .supportTickets, .supportTicket: return .get
-        case .updateUserPreferences: return .patch
+        case .updateUserProfile, .updateUserPreferences: return .patch
+        case .uploadUserAvatar: return .post
         case .episodeCoinUnlock, .applePaymentVerify: return .post
         case .discoveryEvents:     return .post
         case .member, .adsConfig:  return .get
-        case .adsRewardStart, .adsRewardComplete, .adsRewardCancel, .rewardCheckIn,
+        case .adsRewardStart, .adsRewardComplete, .adsRewardCancel, .rewardTaskClaim, .rewardCheckIn,
              .rewardShareComplete, .rewardApplyInviteCode: return .post
         case .createSupportTicket, .sendSupportMessage,
              .resolveSupportTicket: return .post
@@ -258,10 +266,11 @@ extension APIEndpoint {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
              .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
-             .userMe, .userWallet, .walletTransactions, .updateUserPreferences, .discoveryEvents,
+             .userMe, .updateUserProfile, .uploadUserAvatar,
+             .userWallet, .walletTransactions, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
              .member, .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .rewardCenter, .rewardTaskClaim, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
              .supportTickets, .createSupportTicket, .supportTicket,
              .sendSupportMessage, .resolveSupportTicket:
             return true
@@ -272,11 +281,13 @@ extension APIEndpoint {
     /// 后端必须从 Bearer 会话解析用户的端点；匿名账户也属于有效会话。
     var requiresAuthenticatedSession: Bool {
         switch self {
-        case .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken, .userMe, .userWallet, .walletTransactions, .updateUserPreferences,
+        case .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
+             .userMe, .updateUserProfile, .uploadUserAvatar,
+             .userWallet, .walletTransactions, .updateUserPreferences,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress,
              .bookmarksV2, .bookmarkStatus, .setBookmark,
              .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .rewardCenter, .rewardTaskClaim, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
              .supportTickets, .createSupportTicket, .supportTicket,
              .sendSupportMessage, .resolveSupportTicket:
             return true
@@ -368,6 +379,8 @@ extension APIEndpoint {
             if let v = subLang { dict["subtitle_language"] = v }
             if let v = quality { dict["default_quality"] = v }
             params = dict
+        case .updateUserProfile(let nickname):
+            params = ["nickname": nickname]
         case .discoveryEvents(let request):
             return try? JSONEncoder.discoveryEncoder().encode(request)
         case .watchProgress(let report):
@@ -454,7 +467,7 @@ extension APIEndpoint {
             break
         case .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
              .adsConfig, .adsRewardStart, .adsRewardComplete, .adsRewardCancel,
-             .rewardCenter, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
+             .rewardCenter, .rewardTaskClaim, .rewardCheckIn, .rewardShareComplete, .rewardApplyInviteCode,
              .supportTickets, .createSupportTicket, .supportTicket,
              .sendSupportMessage, .resolveSupportTicket:
             break

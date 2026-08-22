@@ -29,6 +29,8 @@ struct MarketingRewardTask: Identifiable {
     let rewardCoins: Int
     let resetCycle: String
     let completed: Bool
+    let claimed: Bool
+    let claimable: Bool
     let action: String
 
     var id: String { code }

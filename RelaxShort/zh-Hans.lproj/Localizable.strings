@@ -94,6 +94,14 @@
 "profile.login_to_view" = "登录后查看个人中心";
 "profile.login_to_sync" = "登录后即可访问个人资料、钱包等功能";
 "profile.default_user_name" = "用户 %@";
+"profile.edit_avatar" = "修改头像";
+"profile.nickname" = "昵称";
+"profile.nickname_placeholder" = "输入昵称";
+"profile.save" = "保存";
+"profile.nickname_updated" = "昵称已更新";
+"profile.avatar_updated" = "头像已更新";
+"profile.photo_unavailable" = "无法读取所选照片";
+"profile.update_failed" = "更新失败：%@";
 
 /* ---- Favorites ---- */
 "favorites.my_favorites" = "我的收藏";
@@ -477,6 +485,8 @@
 "reward.tasks_title" = "做任务赚金币";
 "reward.tasks_subtitle" = "完成任务后，金币自动到账";
 "reward.completed" = "已完成";
+"reward.claimed" = "已领取";
+"reward.claim_amount" = "领取 +%d";
 "reward.go_login" = "去登录";
 "reward.go_share" = "去分享";
 "reward.go_complete" = "去完成";

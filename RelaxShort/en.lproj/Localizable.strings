@@ -94,6 +94,14 @@
 "profile.login_to_view" = "Login to View Profile";
 "profile.login_to_sync" = "Sign in to access your profile, wallet, and more";
 "profile.default_user_name" = "User %@";
+"profile.edit_avatar" = "Change profile photo";
+"profile.nickname" = "Nickname";
+"profile.nickname_placeholder" = "Enter a nickname";
+"profile.save" = "Save";
+"profile.nickname_updated" = "Nickname updated";
+"profile.avatar_updated" = "Profile photo updated";
+"profile.photo_unavailable" = "The selected photo could not be read";
+"profile.update_failed" = "Update failed: %@";
 
 /* ---- Favorites ---- */
 "favorites.my_favorites" = "My Favorites";
@@ -485,6 +493,8 @@
 "reward.tasks_title" = "Complete Tasks, Earn Coins";
 "reward.tasks_subtitle" = "Coins are added automatically after task completion";
 "reward.completed" = "Completed";
+"reward.claimed" = "Claimed";
+"reward.claim_amount" = "Claim +%d";
 "reward.go_login" = "Sign In";
 "reward.go_share" = "Share";
 "reward.go_complete" = "Go";

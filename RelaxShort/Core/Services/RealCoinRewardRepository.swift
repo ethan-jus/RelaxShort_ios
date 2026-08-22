@@ -8,6 +8,13 @@ final class RealCoinRewardRepository: CoinRewardRepositoryProtocol {
         return Self.map(dto)
     }
 
+    func claimTask(_ taskCode: String) async throws -> RewardCenterState {
+        let dto: RewardCenterResponseDTO = try await client.requestData(
+            .rewardTaskClaim(taskCode: taskCode)
+        )
+        return Self.map(dto)
+    }
+
     func checkIn() async throws -> RewardCenterState {
         let key = "ios-check-in-\(UUID().uuidString)"
         let dto: RewardCenterResponseDTO = try await client.requestData(
@@ -78,6 +85,8 @@ final class RealCoinRewardRepository: CoinRewardRepositoryProtocol {
                     rewardCoins: int($0.rewardCoins),
                     resetCycle: $0.resetCycle,
                     completed: $0.completed,
+                    claimed: $0.claimed,
+                    claimable: $0.claimable,
                     action: $0.action
                 )
             },

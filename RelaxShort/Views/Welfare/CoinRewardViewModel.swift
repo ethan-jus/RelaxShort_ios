@@ -28,6 +28,7 @@ final class CoinRewardViewModel: ObservableObject {
     )
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published private(set) var claimingTaskCodes: Set<String> = []
 
     // MARK: - Ad Watch State
 
@@ -113,6 +114,25 @@ final class CoinRewardViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func claimTask(_ task: MarketingRewardTask) async {
+        guard task.claimable,
+              !task.claimed,
+              !claimingTaskCodes.contains(task.code) else { return }
+        claimingTaskCodes.insert(task.code)
+        errorMessage = nil
+        defer { claimingTaskCodes.remove(task.code) }
+
+        do {
+            apply(try await repository.claimTask(task.code))
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func isClaiming(_ taskCode: String) -> Bool {
+        claimingTaskCodes.contains(taskCode)
     }
 
     /// 观看激励广告获得金币

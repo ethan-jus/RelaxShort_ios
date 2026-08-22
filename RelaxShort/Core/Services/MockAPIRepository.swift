@@ -363,6 +363,16 @@ struct MockProfileRepository: ProfileRepositoryProtocol {
     func fetchUserProfile() async throws -> User {
         try await Task.sleep(nanoseconds: MC.delay); return MockData.profile
     }
+
+    func updateNickname(_ nickname: String) async throws -> User {
+        var user = MockData.profile
+        user.nickname = nickname
+        return user
+    }
+
+    func uploadAvatar(data: Data, fileName: String, mimeType: String) async throws -> User {
+        MockData.profile
+    }
 }
 
 struct MockVIPRepository: VIPRepositoryProtocol {
@@ -378,6 +388,10 @@ struct MockCoinRewardRepository: CoinRewardRepositoryProtocol {
     func fetchRewardCenter() async throws -> RewardCenterState {
         try await Task.sleep(nanoseconds: MC.delay)
         return Self.state
+    }
+
+    func claimTask(_ taskCode: String) async throws -> RewardCenterState {
+        Self.state
     }
 
     func checkIn() async throws -> RewardCenterState {
