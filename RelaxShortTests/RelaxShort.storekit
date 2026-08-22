@@ -172,7 +172,7 @@
           "introductoryOffer" : {
             "displayPrice" : "9.99",
             "internalID" : "A37A1102",
-            "paymentMode" : "PayAsYouGo",
+            "paymentMode" : "payAsYouGo",
             "periodCount" : 1,
             "subscriptionPeriod" : "P1M"
           },
