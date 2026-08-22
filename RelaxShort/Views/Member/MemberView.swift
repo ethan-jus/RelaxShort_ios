@@ -452,7 +452,10 @@ extension MemberView {
                     }
                     await storeKit.completeVIPDelivery(receipt)
                 }
-                showPurchaseMessage("profile.membership_active".localized)
+                showPurchaseMessage(
+                    "profile.membership_active".localized,
+                    offersProfile: true
+                )
             } catch {
                 handlePurchaseError(error)
             }
@@ -1448,7 +1451,10 @@ extension MemberView {
                     }
                     await storeKit.completeVIPDelivery(receipt)
                 }
-                showPurchaseMessage("profile.membership_active".localized)
+                showPurchaseMessage(
+                    "profile.membership_active".localized,
+                    offersProfile: true
+                )
             } catch StoreKitPurchaseError.userCancelled {
                 return
             } catch {

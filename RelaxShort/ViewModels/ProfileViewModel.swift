@@ -50,9 +50,19 @@ final class ProfileViewModel: ObservableObject {
 
     // MARK: - Computed Display Properties
 
-    /// 昵称，未加载时返回空
+    /// Apple 只会在首次授权时返回姓名，之后缺失时使用邮箱前缀或品牌名兜底。
     var displayName: String {
-        profile?.nickname ?? ""
+        guard let profile else { return "" }
+        let nickname = profile.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !nickname.isEmpty { return nickname }
+
+        if let email = profile.email?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !email.lowercased().hasSuffix("@privaterelay.appleid.com"),
+           let localPart = email.split(separator: "@").first,
+           !localPart.isEmpty {
+            return String(localPart)
+        }
+        return "RelaxShort"
     }
 
 }

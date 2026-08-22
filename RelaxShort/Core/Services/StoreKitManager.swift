@@ -219,6 +219,10 @@ final class StoreKitManager: ObservableObject {
     private static let localTestingAccountToken = UUID(
         uuidString: "A37A0001-0000-4000-8000-000000000001"
     )!
+    /// Xcode StoreKit 本地交易不会写入后端，单独持久化首充是否已经使用。
+    /// Sandbox 与 Production 始终以后端钱包和购买流水为准。
+    private static let localFirstCoinPurchaseConsumedKey =
+        "com.relaxshort.storekit.localFirstCoinPurchaseConsumed"
 
     // MARK: - Published State
 
@@ -230,6 +234,8 @@ final class StoreKitManager: ObservableObject {
     @Published private(set) var vipPurchaseState = VIPPurchaseState()
     @Published private(set) var vipIntroductoryOffers:
         [ProductID: VIPIntroductoryOfferDisplay] = [:]
+    @Published private(set) var isUsingXcodeStoreKit = false
+    @Published private(set) var localFirstCoinPurchaseBonusAvailable: Bool
 
     // MARK: - Private State
 
@@ -263,9 +269,14 @@ final class StoreKitManager: ObservableObject {
     // MARK: - Init
 
     init() {
+        localFirstCoinPurchaseBonusAvailable = !UserDefaults.standard.bool(
+            forKey: Self.localFirstCoinPurchaseConsumedKey
+        )
         guard !AppRuntimeEnvironment.isUnitTesting else { return }
         startTransactionListener()
         Task {
+            await refreshStoreKitEnvironment()
+            await restoreLocalCoinPurchaseStateIfAvailable()
             await refreshVIPEntitlements()
             // 商品目录不参与首屏决策，避开冷启动、UMP 和首页首次渲染的资源峰值。
             try? await Task.sleep(for: .seconds(10))
@@ -284,12 +295,21 @@ final class StoreKitManager: ObservableObject {
     func resolveAppAccountToken(
         using fetchFromServer: () async throws -> UUID
     ) async throws -> UUID {
-        if let result = try? await StoreKit.AppTransaction.shared,
-           case .verified(let appTransaction) = result,
-           appTransaction.environment == .xcode {
+        await refreshStoreKitEnvironment()
+        if isUsingXcodeStoreKit {
             return Self.localTestingAccountToken
         }
         return try await fetchFromServer()
+    }
+
+    /// 刷新当前 StoreKit 环境，供页面只在 Xcode 本地测试时采用本地资格。
+    func refreshStoreKitEnvironment() async {
+        guard let result = try? await StoreKit.AppTransaction.shared,
+              case .verified(let appTransaction) = result else {
+            isUsingXcodeStoreKit = false
+            return
+        }
+        isUsingXcodeStoreKit = appTransaction.environment == .xcode
     }
 
     /// 获取产品显示价格。真实金额和货币符号只能来自当前 storefront 的 StoreKit Product。
@@ -423,21 +443,34 @@ final class StoreKitManager: ObservableObject {
         _ package: CoinPackage,
         appAccountToken: UUID
     ) async throws -> ApplePurchaseReceipt {
+        guard !isPurchasing else { throw StoreKitPurchaseError.pending }
         isPurchasing = true
         purchaseError = nil
         defer { isPurchasing = false }
 
-        let totalCoins = package.amount + (package.bonus ?? 0)
-
         // ── StoreKit 2 真实购买 ──
         if let product = storeKitProducts[package.productID.rawValue] {
+            let localFirstBonusWasAvailable = localFirstCoinPurchaseBonusAvailable
             let result = try await product.purchase(options: [
                 .appAccountToken(appAccountToken)
             ])
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
+                let isXcodeTransaction = transaction.environment == .xcode
+                isUsingXcodeStoreKit = isXcodeTransaction
+                let bonus = if isXcodeTransaction,
+                               package.productID == .coinsSmall,
+                               !localFirstBonusWasAvailable {
+                    0
+                } else {
+                    package.bonus ?? 0
+                }
+                let totalCoins = package.amount + bonus
                 let receipt = purchaseReceipt(from: transaction, coins: totalCoins)
+                if isXcodeTransaction {
+                    markLocalFirstCoinPurchaseConsumed()
+                }
                 if !receipt.requiresBackendVerification {
                     await transaction.finish()
                 }
@@ -677,6 +710,10 @@ final class StoreKitManager: ObservableObject {
                         }
                         Logger.store.info("StoreKitManager: transaction awaits server verification for \(transaction.productID)")
                     } else {
+                        if transaction.environment == .xcode,
+                           ProductID(rawValue: transaction.productID)?.isCoinPackage == true {
+                            self.markLocalFirstCoinPurchaseConsumed()
+                        }
                         await transaction.finish()
                         await self.refreshVIPEntitlements()
                         Logger.store.info("StoreKitManager: local transaction finished for \(transaction.productID)")
@@ -698,6 +735,31 @@ final class StoreKitManager: ObservableObject {
         case .unverified:
             throw StoreKitPurchaseError.unverified
         }
+    }
+
+    /// 已安装版本可能已有尚可查询的 Xcode 购买历史；能找到时补齐本地首充状态。
+    /// 消耗型交易若已从历史移除，则后续成功购买仍会通过 UserDefaults 持久化。
+    private func restoreLocalCoinPurchaseStateIfAvailable() async {
+        guard isUsingXcodeStoreKit,
+              localFirstCoinPurchaseBonusAvailable else { return }
+        for await result in Transaction.all {
+            guard case .verified(let transaction) = result,
+                  transaction.environment == .xcode,
+                  ProductID(rawValue: transaction.productID)?.isCoinPackage == true else {
+                continue
+            }
+            markLocalFirstCoinPurchaseConsumed()
+            break
+        }
+    }
+
+    private func markLocalFirstCoinPurchaseConsumed() {
+        guard localFirstCoinPurchaseBonusAvailable else { return }
+        localFirstCoinPurchaseBonusAvailable = false
+        UserDefaults.standard.set(
+            true,
+            forKey: Self.localFirstCoinPurchaseConsumedKey
+        )
     }
 
     private func purchaseReceipt(from transaction: StoreKit.Transaction, coins: Int) -> ApplePurchaseReceipt {

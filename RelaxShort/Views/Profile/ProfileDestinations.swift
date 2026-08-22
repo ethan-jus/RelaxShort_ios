@@ -1,6 +1,125 @@
 import SwiftUI
 import StoreKit
 
+// MARK: - Account Profile
+
+/// Apple 登录不提供头像 URL；资料页展示服务端头像，缺失时使用稳定的品牌首字母头像。
+struct AccountProfileView: View {
+    let user: User
+    let displayName: String
+    let isVIP: Bool
+    let vipExpireDate: Date?
+    let onMembershipTap: () -> Void
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 22) {
+                VStack(spacing: 12) {
+                    ProfileAvatarView(
+                        url: user.avatarURL,
+                        initials: String(displayName.prefix(2)).uppercased(),
+                        size: 112
+                    )
+
+                    Text(displayName)
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+
+                    Text("ID \(user.id)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(DB.mutedText)
+                        .textSelection(.enabled)
+                }
+                .padding(.top, 18)
+
+                VStack(spacing: 0) {
+                    if let email = user.email, !email.isEmpty {
+                        accountRow(
+                            icon: "envelope.fill",
+                            title: "profile.email".localized,
+                            value: email
+                        )
+                    }
+
+                    accountRow(
+                        icon: "crown.fill",
+                        title: isVIP
+                            ? "profile.membership_active".localized
+                            : "profile.join_membership".localized,
+                        value: membershipDetail,
+                        showsDivider: false
+                    )
+                }
+                .background(DB.panel.opacity(0.72))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(DB.divider, lineWidth: 0.8)
+                }
+                .padding(.horizontal, DT.Space.pageH)
+
+                ProfileMembershipCard(
+                    isVIP: isVIP,
+                    vipExpireDate: vipExpireDate,
+                    onJoin: onMembershipTap
+                )
+            }
+            .padding(.bottom, 36)
+        }
+        .background(DB.black.ignoresSafeArea())
+        .compactSecondaryNavigation(title: "profile.tab.title".localized)
+    }
+
+    private var membershipDetail: String {
+        guard isVIP else { return "vip.unlock_all".localized }
+        guard let vipExpireDate else { return "vip.unlock_all".localized }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return "profile.membership_active_until".localizedFormat(
+            formatter.string(from: vipExpireDate)
+        )
+    }
+
+    private func accountRow(
+        icon: String,
+        title: String,
+        value: String,
+        showsDivider: Bool = true
+    ) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(DT.memberGold)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                    Text(value)
+                        .font(.system(size: 12))
+                        .foregroundColor(DB.mutedText)
+                        .lineLimit(2)
+                        .textSelection(.enabled)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 62)
+
+            if showsDivider {
+                Divider()
+                    .overlay(DB.divider)
+                    .padding(.leading, 50)
+            }
+        }
+    }
+}
+
 // MARK: - Settings View
 
 /// DramaBox 风格设置页。Task33 保持原有实现不变。

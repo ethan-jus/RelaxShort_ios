@@ -165,7 +165,9 @@ struct ProfileAvatarView: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [Color(hex: "#202124"), Color(hex: "#0D0E10")],
+                                colors: showsGuestIcon
+                                    ? [Color(hex: "#202124"), Color(hex: "#0D0E10")]
+                                    : [DT.logoRed, Color(hex: "#4A090D")],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -200,7 +202,7 @@ struct ProfileMembershipCard: View {
     let onJoin: () -> Void
 
     private var expiryText: String {
-        guard let date = vipExpireDate else { return "" }
+        guard let date = vipExpireDate else { return "vip.unlock_all".localized }
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return String(format: "profile.membership_active_until".localized, formatter.string(from: date))

@@ -64,10 +64,17 @@ struct TopUpView: View {
         .interactivePopGestureEnabled()
         .preferredColorScheme(.dark)
         .task {
+            await storeKitManager.refreshStoreKitEnvironment()
             await viewModel.load(
                 packages: storeKitManager.coinPackages,
                 fallbackBalance: coinStore.coinBalance
             )
+            if storeKitManager.isUsingXcodeStoreKit {
+                viewModel.reconcileLocalFirstPurchaseBonus(
+                    available: storeKitManager.localFirstCoinPurchaseBonusAvailable,
+                    packages: storeKitManager.coinPackages
+                )
+            }
             reconcilePackageSelection()
         }
         .task {

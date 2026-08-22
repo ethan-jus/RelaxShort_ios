@@ -79,6 +79,16 @@ final class TopUpViewModel: ObservableObject {
         }
     }
 
+    /// Xcode StoreKit 不经过后端，使用独立的本地持久化首充资格。
+    /// 真实 Sandbox/Production 不调用此方法，继续以后端返回值为准。
+    func reconcileLocalFirstPurchaseBonus(
+        available: Bool,
+        packages: [CoinPackage]
+    ) {
+        firstPurchaseBonusAvailable = available
+        selectDefaultPackage(from: packages)
+    }
+
     func displayedBonus(for package: CoinPackage) -> Int {
         if package.productID == .coinsSmall,
            firstPurchaseBonusAvailable != true {
@@ -119,7 +129,8 @@ final class TopUpViewModel: ObservableObject {
                 verifiedBalance = try await detailRepository.verifyCoinPurchase(receipt)
                 await storeKit.completeCoinDelivery(receipt)
             } else {
-                verifiedBalance = coinStore.coinBalance + totalCoins(for: package)
+                verifiedBalance = coinStore.coinBalance + receipt.coins
+                firstPurchaseBonusAvailable = false
             }
 
             coinStore.synchronize(balance: verifiedBalance)

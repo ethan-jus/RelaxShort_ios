@@ -102,7 +102,7 @@ struct CoinRewardView: View {
                         coinStore: coinStore,
                         storeKit: storeKitManager,
                         firstPurchaseBonusAvailable:
-                            viewModel.firstCoinPurchaseBonusAvailable,
+                            effectiveFirstCoinPurchaseBonusAvailable,
                         onDismiss: {
                             withAnimation(.easeInOut(duration: 0.25)) {
                                 showCoinPurchase = false
@@ -123,7 +123,10 @@ struct CoinRewardView: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task { await viewModel.loadIfNeeded() }
+        .task {
+            await storeKitManager.refreshStoreKitEnvironment()
+            await viewModel.loadIfNeeded()
+        }
         .navigationBarBackButtonHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .interactivePopGestureEnabled(mode == .pushed)
@@ -727,7 +730,7 @@ private extension CoinRewardView {
 
     var firstPurchaseSection: some View {
         Button {
-            guard viewModel.firstCoinPurchaseBonusAvailable else { return }
+            guard effectiveFirstCoinPurchaseBonusAvailable else { return }
             withAnimation(.easeInOut(duration: 0.25)) {
                 showCoinPurchase = true
             }
@@ -754,20 +757,20 @@ private extension CoinRewardView {
                 Spacer(minLength: 8)
 
                 Text(
-                    viewModel.firstCoinPurchaseBonusAvailable
+                    effectiveFirstCoinPurchaseBonusAvailable
                         ? "reward.go_buy".localized
                         : "reward.used".localized
                 )
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(
-                    viewModel.firstCoinPurchaseBonusAvailable
+                    effectiveFirstCoinPurchaseBonusAvailable
                         ? .white
                         : .white.opacity(0.35)
                 )
                 .padding(.horizontal, 13)
                 .frame(height: 32)
                 .background(
-                    viewModel.firstCoinPurchaseBonusAvailable
+                    effectiveFirstCoinPurchaseBonusAvailable
                         ? DT.logoRed
                         : Color.white.opacity(0.08)
                 )
@@ -784,8 +787,15 @@ private extension CoinRewardView {
             }
         }
         .buttonStyle(.plain)
-        .disabled(!viewModel.firstCoinPurchaseBonusAvailable)
+        .disabled(!effectiveFirstCoinPurchaseBonusAvailable)
         .padding(.horizontal, pageInset)
+    }
+
+    private var effectiveFirstCoinPurchaseBonusAvailable: Bool {
+        if storeKitManager.isUsingXcodeStoreKit {
+            return storeKitManager.localFirstCoinPurchaseBonusAvailable
+        }
+        return viewModel.firstCoinPurchaseBonusAvailable
     }
 
     var rewardRulesRow: some View {

@@ -13,7 +13,7 @@ struct CoinPurchaseSheet: View {
     // MARK: - Dependencies
 
     let coinStore: CoinStore
-    let storeKit: StoreKitManager
+    @ObservedObject var storeKit: StoreKitManager
     var firstPurchaseBonusAvailable: Bool? = nil
 
     // MARK: - Callbacks
@@ -190,17 +190,24 @@ struct CoinPurchaseSheet: View {
     }
 
     private func displayedBonus(for package: CoinPackage) -> Int? {
-        if package.productID == .coinsSmall, firstPurchaseBonusAvailable == false {
+        if package.productID == .coinsSmall, !effectiveFirstPurchaseBonusAvailable {
             return nil
         }
         return package.bonus
     }
 
     private func displayedLabel(for package: CoinPackage) -> String? {
-        if package.productID == .coinsSmall, firstPurchaseBonusAvailable == false {
+        if package.productID == .coinsSmall, !effectiveFirstPurchaseBonusAvailable {
             return nil
         }
         return package.label
+    }
+
+    private var effectiveFirstPurchaseBonusAvailable: Bool {
+        if storeKit.isUsingXcodeStoreKit {
+            return storeKit.localFirstCoinPurchaseBonusAvailable
+        }
+        return firstPurchaseBonusAvailable != false
     }
 
     // MARK: - Purchase Button
@@ -400,7 +407,16 @@ struct EpisodeUnlockPurchaseSheet: View {
 
         let shortfall = max(0, coinCost - balance)
         let package = storeKit.coinPackages.first {
-            $0.amount + ($0.bonus ?? 0) >= shortfall
+            let bonus: Int
+            if $0.productID == .coinsSmall {
+                bonus = storeKit.isUsingXcodeStoreKit
+                    && storeKit.localFirstCoinPurchaseBonusAvailable
+                    ? ($0.bonus ?? 0)
+                    : 0
+            } else {
+                bonus = $0.bonus ?? 0
+            }
+            return $0.amount + bonus >= shortfall
         } ?? storeKit.coinPackages.last
         _selectedPackage = State(initialValue: package)
         _selectedSubscription = State(
@@ -530,7 +546,8 @@ struct EpisodeUnlockPurchaseSheet: View {
                             Text("\(package.amount)")
                                 .font(.system(size: 24, weight: .bold))
                                 .foregroundStyle(.white)
-                            if let bonus = package.bonus, bonus > 0 {
+                            if displayedEpisodeUnlockBonus(for: package) > 0 {
+                                let bonus = displayedEpisodeUnlockBonus(for: package)
                                 Text("+\(bonus)")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundStyle(gold)
@@ -616,6 +633,17 @@ struct EpisodeUnlockPurchaseSheet: View {
 
     private var vipPlans: [VIPSubscription] {
         storeKit.vipSubscriptions
+    }
+
+    private func displayedEpisodeUnlockBonus(for package: CoinPackage) -> Int {
+        if package.productID == .coinsSmall {
+            guard storeKit.isUsingXcodeStoreKit,
+                  storeKit.localFirstCoinPurchaseBonusAvailable else {
+                // 该入口没有服务端首充资格，不在真实环境承诺额外 400 金币。
+                return 0
+            }
+        }
+        return package.bonus ?? 0
     }
 
     private var purchaseFooter: some View {

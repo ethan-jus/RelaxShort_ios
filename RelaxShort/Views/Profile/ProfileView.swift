@@ -4,6 +4,7 @@ import SwiftUI
 
 /// Profile 菜单导航目标
 enum ProfileSheet: Identifiable, Hashable {
+    case account
     case recharge
     case wallet
     case welfare
@@ -16,6 +17,7 @@ enum ProfileSheet: Identifiable, Hashable {
 
     var id: String {
         switch self {
+        case .account: return "account"
         case .recharge: return "recharge"
         case .wallet: return "wallet"
         case .welfare: return "welfare"
@@ -30,6 +32,7 @@ enum ProfileSheet: Identifiable, Hashable {
 
     var title: String {
         switch self {
+        case .account: return "profile.tab.title".localized
         case .recharge: return L10n.rechargeNow
         case .wallet: return L10n.myWallet
         case .welfare: return L10n.welfareCenter
@@ -54,6 +57,7 @@ struct ProfileView: View {
     @EnvironmentObject var appStore: AppStore
     @EnvironmentObject private var dependencies: DependencyContainer
     @EnvironmentObject private var rewardSummaryStore: RewardSummaryStore
+    @EnvironmentObject private var storeKitManager: StoreKitManager
 
     @State private var selectedDestination: ProfileSheet?
     @State private var showLoginSheet = false
@@ -124,9 +128,15 @@ struct ProfileView: View {
         .navigationBarHidden(true)
         .task(id: authStore.account?.publicID) {
             guard authStore.hasSession else { return }
-            async let profile: Void = viewModel.loadProfile()
-            async let rewards: Void = rewardSummaryStore.refresh()
-            _ = await (profile, rewards)
+            await refreshProfileAndRewards()
+        }
+        .onChange(of: appStore.selectedTab) { _, selectedTab in
+            guard selectedTab == .profile, authStore.hasSession else { return }
+            Task { await refreshProfileAndRewards() }
+        }
+        .onChange(of: storeKitManager.vipPurchaseState) { _, state in
+            guard state.hasActiveSubscription, authStore.hasSession else { return }
+            Task { await refreshProfileAndRewards() }
         }
         .onChange(of: viewModel.profile) { _, user in
             guard let user else { return }
@@ -142,8 +152,14 @@ struct ProfileView: View {
     @ViewBuilder
     private var loggedInHeader: some View {
         switch viewModel.loadState {
-        case .idle, .loading:
+        case .idle:
             ProfileHeaderSkeleton()
+        case .loading:
+            if viewModel.profile != nil {
+                identityHeader
+            } else {
+                ProfileHeaderSkeleton()
+            }
         case .loaded:
             if viewModel.profile != nil {
                 identityHeader
@@ -171,8 +187,8 @@ struct ProfileView: View {
             displayID: viewModel.profile?.id ?? "",
             favoriteCount: viewModel.profile?.favoriteCount ?? 0,
             isGuest: false,
-            isVIP: viewModel.profile?.isVipValid ?? false,
-            onTap: {},
+            isVIP: effectiveIsVIP,
+            onTap: { selectedDestination = .account },
             onSettings: { selectedDestination = .settings }
         )
     }
@@ -198,12 +214,23 @@ struct ProfileView: View {
     private var membershipCard: some View {
         let profile = viewModel.profile
         return ProfileMembershipCard(
-            isVIP: profile?.isVipValid ?? false,
+            isVIP: effectiveIsVIP,
             vipExpireDate: profile?.vipExpireDate,
             onJoin: {
-                NotificationCenter.default.post(name: .showMembership, object: nil)
+                if effectiveIsVIP {
+                    selectedDestination = .account
+                } else {
+                    NotificationCenter.default.post(name: .showMembership, object: nil)
+                }
             }
         )
+    }
+
+    private var effectiveIsVIP: Bool {
+        if viewModel.profile?.isVipValid == true { return true }
+        guard storeKitManager.isUsingXcodeStoreKit else { return false }
+        if case .active = storeKitManager.vipPurchaseState.phase { return true }
+        return false
     }
 
     // MARK: - Navigation Destination
@@ -211,6 +238,23 @@ struct ProfileView: View {
     @ViewBuilder
     private func profileDestination(for sheet: ProfileSheet) -> some View {
         switch sheet {
+        case .account:
+            if let profile = viewModel.profile {
+                AccountProfileView(
+                    user: profile,
+                    displayName: viewModel.displayName,
+                    isVIP: effectiveIsVIP,
+                    vipExpireDate: profile.vipExpireDate,
+                    onMembershipTap: {
+                        NotificationCenter.default.post(
+                            name: .showMembership,
+                            object: nil
+                        )
+                    }
+                )
+            } else {
+                PlaceholderView(title: sheet.title)
+            }
         case .recharge:
             PlaceholderView(title: sheet.title)
         case .wallet:
@@ -235,6 +279,12 @@ struct ProfileView: View {
     private func openWatchHistory() {
         appStore.requestedMyListSegment = .history
         appStore.selectedTab = .myList
+    }
+
+    private func refreshProfileAndRewards() async {
+        async let profile: Void = viewModel.loadProfile()
+        async let rewards: Void = rewardSummaryStore.refresh()
+        _ = await (profile, rewards)
     }
 }
 
@@ -402,6 +452,7 @@ struct ProfileView_Previews: PreviewProvider {
         )
             .environmentObject(authStore)
             .environmentObject(AppStore())
+            .environmentObject(StoreKitManager())
             .preferredColorScheme(.dark)
     }
 }
