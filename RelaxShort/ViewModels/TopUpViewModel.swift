@@ -126,7 +126,8 @@ final class TopUpViewModel: ObservableObject {
             balance = verifiedBalance
             purchaseSucceeded = true
 
-            if let refreshed = try? await rewardRepository.fetchRewardCenter() {
+            if receipt.requiresBackendVerification,
+               let refreshed = try? await rewardRepository.fetchRewardCenter() {
                 apply(refreshed, packages: storeKit.coinPackages)
             }
         } catch let error as StoreKitPurchaseError {

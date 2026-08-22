@@ -704,7 +704,7 @@ final class StoreKitManager: ObservableObject {
         ApplePurchaseReceipt(
             transactionID: String(transaction.id),
             productID: transaction.productID,
-            environment: String(describing: transaction.environment).uppercased(),
+            environment: transaction.environment.rawValue.uppercased(),
             appAccountToken: transaction.appAccountToken?.uuidString,
             coins: coins
         )
