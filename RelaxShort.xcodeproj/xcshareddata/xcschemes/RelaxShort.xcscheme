@@ -60,9 +60,6 @@
             ReferencedContainer = "container:RelaxShort.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <StoreKitConfigurationFileReference
-         identifier = "../../RelaxShortTests/RelaxShort.storekit">
-      </StoreKitConfigurationFileReference>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
