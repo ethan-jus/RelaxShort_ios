@@ -3,8 +3,8 @@ import Foundation
 // MARK: - APIConfig
 
 /// 后端 baseURL 配置。
-/// Debug 构建通过 Xcode build setting 注入 Mac 的本地网络地址；手动地址只有显式开启后才生效。
-/// 生产环境通过环境变量或 Info.plist 注入，不硬编码 IP。
+/// Debug 和 Release 通过 Xcode build setting 注入默认 API 地址；Debug 手动地址只有显式开启后才生效。
+/// 当前构建默认使用生产域名，不硬编码服务器 IP。
 enum APIConfig {
 
     /// UserDefaults 键，用于保存手动覆盖地址。

@@ -10,7 +10,7 @@ import UserMessagingPlatform
 /// 开发/调试面板：查看和修改 Real API 设置，运行冒烟测试。
 /// 仅 DEBUG 构建可用，Release 不包含此文件。
 struct DebugSettingsView: View {
-    @State private var apiBaseURL = UserDefaults.standard.string(forKey: "api_base_url") ?? ""
+    @State private var apiBaseURL = UserDefaults.standard.string(forKey: "api_base_url") ?? APIConfig.automaticBaseURL
     @State private var manualOverrideEnabled = UserDefaults.standard.bool(forKey: APIConfig.manualOverrideEnabledKey)
     @State private var effectiveBaseURL = APIConfig.baseURL
     @State private var uiLanguage = UserDefaults.standard.string(forKey: "app_ui_language") ?? "-"
@@ -38,7 +38,7 @@ struct DebugSettingsView: View {
                         }
                     HStack {
                         Text("Base URL")
-                        TextField("http://127.0.0.1:8080", text: $apiBaseURL)
+                        TextField("https://api.bjyoushi.top", text: $apiBaseURL)
                             .textInputAutocapitalization(.never)
                             .disableAutocorrection(true)
                             .disabled(!manualOverrideEnabled)
@@ -51,7 +51,7 @@ struct DebugSettingsView: View {
                     }
                     Text("自动地址: \(APIConfig.automaticBaseURL)")
                         .font(.caption).foregroundColor(.secondary)
-                    Text("关闭手动覆盖后，Debug 每次构建会自动使用 Mac 当前局域网地址。")
+                    Text("关闭手动覆盖后，Debug 使用构建配置的默认 API 地址（当前为生产环境）。")
                         .font(.caption2).foregroundColor(.secondary)
                     Text("Effective: \(effectiveBaseURL)")
                         .font(.caption).foregroundColor(.secondary)

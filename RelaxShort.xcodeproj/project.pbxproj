@@ -1293,7 +1293,7 @@
 		906D424289A84C0DE9B44533 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "http://EthandeMacBook-Pro.local:8880";
+				API_BASE_URL = "https://api.bjyoushi.top";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = RelaxShort/RelaxShort.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -1369,7 +1369,7 @@
 		EBE50F153B74515DCCA57B0A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				API_BASE_URL = "$(RELAXSHORT_API_BASE_URL)";
+				API_BASE_URL = "https://api.bjyoushi.top";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = RelaxShort/RelaxShort.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
