@@ -22,7 +22,7 @@ packages:
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    DEVELOPMENT_TEAM: P7QAX68962
+    DEVELOPMENT_TEAM: 5DC2ZV945N
 
 targets:
   RelaxShort:
