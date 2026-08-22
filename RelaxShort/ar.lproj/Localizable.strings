@@ -99,6 +99,7 @@
 "profile.copy_id" = "نسخ معرّف المستخدم";
 "profile.login_to_view" = "سجّل الدخول لعرض الملف الشخصي";
 "profile.login_to_sync" = "سجّل الدخول للوصول إلى ملفك الشخصي ومحفظتك والمزيد";
+"profile.default_user_name" = "المستخدم %@";
 
 /* ---- Theme ---- */
 "theme.system" = "النظام";

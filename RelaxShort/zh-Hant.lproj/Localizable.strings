@@ -99,6 +99,7 @@
 "profile.copy_id" = "複製用戶 ID";
 "profile.login_to_view" = "登入後查看個人中心";
 "profile.login_to_sync" = "登入後即可存取個人資料、錢包等功能";
+"profile.default_user_name" = "使用者 %@";
 
 /* ---- Theme ---- */
 "theme.system" = "跟隨系統";

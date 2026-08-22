@@ -227,10 +227,9 @@ struct ProfileView: View {
     }
 
     private var effectiveIsVIP: Bool {
-        if viewModel.profile?.isVipValid == true { return true }
-        guard storeKitManager.isUsingXcodeStoreKit else { return false }
-        if case .active = storeKitManager.vipPurchaseState.phase { return true }
-        return false
+        // 个人中心展示服务端已验单的会员权益；本地 StoreKit 交易只用于开发诊断，
+        // 不能覆盖生产账户状态。
+        viewModel.profile?.isVipValid == true
     }
 
     // MARK: - Navigation Destination

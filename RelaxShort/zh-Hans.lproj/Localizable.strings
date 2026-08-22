@@ -93,6 +93,7 @@
 "profile.copy_id" = "复制用户 ID";
 "profile.login_to_view" = "登录后查看个人中心";
 "profile.login_to_sync" = "登录后即可访问个人资料、钱包等功能";
+"profile.default_user_name" = "用户 %@";
 
 /* ---- Favorites ---- */
 "favorites.my_favorites" = "我的收藏";

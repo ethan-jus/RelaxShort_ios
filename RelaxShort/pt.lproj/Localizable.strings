@@ -99,6 +99,7 @@
 "profile.copy_id" = "Copiar ID do usuário";
 "profile.login_to_view" = "Entre para ver o perfil";
 "profile.login_to_sync" = "Entre para acessar seu perfil, carteira e muito mais";
+"profile.default_user_name" = "Usuário %@";
 
 /* ---- Theme ---- */
 "theme.system" = "Sistema";

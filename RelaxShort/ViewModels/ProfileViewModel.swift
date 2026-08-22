@@ -50,7 +50,7 @@ final class ProfileViewModel: ObservableObject {
 
     // MARK: - Computed Display Properties
 
-    /// Apple 只会在首次授权时返回姓名，之后缺失时使用邮箱前缀或品牌名兜底。
+    /// Apple 只会在首次授权时返回姓名；缺失时使用邮箱前缀或稳定用户编号兜底。
     var displayName: String {
         guard let profile else { return "" }
         let nickname = profile.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -62,7 +62,7 @@ final class ProfileViewModel: ObservableObject {
            !localPart.isEmpty {
             return String(localPart)
         }
-        return "RelaxShort"
+        return "profile.default_user_name".localizedFormat(String(profile.id.suffix(4)))
     }
 
 }

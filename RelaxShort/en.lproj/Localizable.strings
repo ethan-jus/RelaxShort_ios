@@ -93,6 +93,7 @@
 "profile.copy_id" = "Copy user ID";
 "profile.login_to_view" = "Login to View Profile";
 "profile.login_to_sync" = "Sign in to access your profile, wallet, and more";
+"profile.default_user_name" = "User %@";
 
 /* ---- Favorites ---- */
 "favorites.my_favorites" = "My Favorites";
