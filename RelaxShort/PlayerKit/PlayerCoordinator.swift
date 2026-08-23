@@ -359,13 +359,11 @@ final class PlayerCoordinator: ObservableObject {
         handoff: PlayerHandoffContext?,
         backendResumeTime: TimeInterval?
     ) {
-        let hasResumeTime = (handoff?.resumeTime ?? 0) > 0 || (backendResumeTime ?? 0) > 0
-        guard hasResumeTime else { return }
         let eng = engine
 
         seriesResumeTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let deadline = Date().addingTimeInterval(3)
+            let deadline = Date().addingTimeInterval(8)
             while (eng.state == .preparing ||
                    eng.currentPlayer?.currentItem?.status != .readyToPlay),
                   Date() < deadline {
@@ -388,7 +386,23 @@ final class PlayerCoordinator: ObservableObject {
                 duration: duration
             )
 
-            if effectiveResume == nil || effectiveResume == 0 {
+            let actualTime = eng.currentPlayer?.currentTime().seconds ?? 0
+            let isActuallyAtEnd = duration > 0
+                && actualTime.isFinite
+                && duration - actualTime <= 0.5
+
+            if effectiveResume == 0 || (effectiveResume == nil && isActuallyAtEnd) {
+                // 复用已经播完的 previous/next AVPlayer 时，play() 不会自动从片尾回到 0。
+                // 必须先完成 rewind，再恢复播放；否则会永久停留 loading 或再次触发结束事件。
+                eng.seekTime(0) { [weak self, weak eng] finished in
+                    guard finished,
+                          let self, let eng,
+                          self.isCurrentSeriesClaim(owner: seriesOwner, token: token),
+                          eng.currentItem?.id == targetID,
+                          eng.state != .preparing else { return }
+                    eng.play()
+                }
+            } else if effectiveResume == nil {
                 eng.play()
             } else if let seekTo = effectiveResume {
                 eng.seekTime(seekTo) { [weak self, weak eng] _ in

@@ -32,10 +32,12 @@ final class PlayerRecoveryController {
     private var timeControlObs: NSKeyValueObservation?
     private var recoveryTask: Task<Void, Never>?
     private var stablePlaybackTask: Task<Void, Never>?
+    private var stallTimeoutTask: Task<Void, Never>?
 
     deinit {
         recoveryTask?.cancel()
         stablePlaybackTask?.cancel()
+        stallTimeoutTask?.cancel()
         monitor.cancel()
     }
 
@@ -60,33 +62,36 @@ final class PlayerRecoveryController {
         failObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime,
             object: item, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.onFailed() }
+        ) { [weak self, weak player] _ in
+            Task { @MainActor in
+                guard let self, let player, self.engine?.currentPlayer === player else { return }
+                self.onFailed()
+            }
         }
 
         stallObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemPlaybackStalled,
             object: item, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.onStalled() }
+        ) { [weak self, weak player] _ in
+            Task { @MainActor in
+                guard let self, let player, self.engine?.currentPlayer === player else { return }
+                self.onStalled()
+            }
         }
 
         // KVO 监听 timeControlStatus
         timeControlObs = player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
-            let status = player.timeControlStatus
             Task { @MainActor in
-                guard let self else { return }
-                switch status {
+                guard let self, self.engine?.currentPlayer === player else { return }
+                switch player.timeControlStatus {
                 case .waitingToPlayAtSpecifiedRate:
                     self.onWaiting()
                 case .playing:
-                    // 从 waiting/stalled/recovering 恢复为正常播放
-                    if let e = self.engine {
-                        switch e.state {
-                        case .waitingNetwork, .stalled, .recovering:
-                            e.updateState(.playing)
-                        default: break
-                        }
+                    self.stallTimeoutTask?.cancel()
+                    self.stallTimeoutTask = nil
+                    // 播放状态只由 AVPlayer 的真实回调确认，不能由 play() 调用提前假定。
+                    if let e = self.engine, e.wantsPlayback {
+                        e.updateState(.playing)
                     }
                     // 只有稳定播放一段时间后才清除失败计数。
                     // AVPlayer 可能短暂进入 playing 后立即 failed，过早清零会让 attempt 永远停在 1/3。
@@ -106,6 +111,8 @@ final class PlayerRecoveryController {
         timeControlObs = nil
         stablePlaybackTask?.cancel()
         stablePlaybackTask = nil
+        stallTimeoutTask?.cancel()
+        stallTimeoutTask = nil
     }
 
     // MARK: - 取消挂起恢复
@@ -115,6 +122,8 @@ final class PlayerRecoveryController {
         recoveryTask = nil
         stablePlaybackTask?.cancel()
         stablePlaybackTask = nil
+        stallTimeoutTask?.cancel()
+        stallTimeoutTask = nil
         wasPlaying = false
         wasUserPaused = false
         lastItem = nil
@@ -149,6 +158,7 @@ final class PlayerRecoveryController {
         snapshot()
         print("[PlayerKit] playback stalled at time=\(lastTime)")
         engine?.updateState(.stalled)
+        scheduleStallRecovery()
     }
 
     private func onWaiting() {
@@ -159,6 +169,7 @@ final class PlayerRecoveryController {
               e.state != .pausedBySystem else { return }
 
         e.updateState(isOnline ? .stalled : .waitingNetwork)
+        if isOnline { scheduleStallRecovery() }
     }
 
     private func onNetworkChange(_ ok: Bool) {
@@ -169,6 +180,8 @@ final class PlayerRecoveryController {
 
         // 断网时 snapshot 播放中的状态
         if !ok {
+            stallTimeoutTask?.cancel()
+            stallTimeoutTask = nil
             if engine.state == .playing {
                 snapshot()
                 engine.updateState(.waitingNetwork)
@@ -186,6 +199,28 @@ final class PlayerRecoveryController {
             }
         default:
             break
+        }
+    }
+
+    /// AVPlayer 可自行熬过短暂抖动；连续 8 秒仍无播放进度才重建当前 item。
+    /// 这为 loading 提供确定的恢复出口，同时避免短卡顿频繁断链。
+    private func scheduleStallRecovery() {
+        stallTimeoutTask?.cancel()
+        guard isOnline,
+              let engine,
+              let expectedItemID = engine.currentItem?.id,
+              engine.wantsPlayback else { return }
+        stallTimeoutTask = Task { @MainActor [weak self, weak engine] in
+            do { try await Task.sleep(nanoseconds: 8_000_000_000) }
+            catch { return }
+            guard let self, let engine,
+                  !Task.isCancelled,
+                  self.isOnline,
+                  engine.wantsPlayback,
+                  engine.currentItem?.id == expectedItemID,
+                  engine.state == .stalled || engine.state == .waitingNetwork else { return }
+            self.snapshot()
+            self.attemptRecovery(reason: .stalledTimeout)
         }
     }
 
@@ -239,7 +274,14 @@ final class PlayerRecoveryController {
 
             guard self.recoveryGeneration == token,
                   currentItem.status == .readyToPlay,
-                  engine.currentItem?.id == expectedItemID else { return }
+                  engine.currentItem?.id == expectedItemID else {
+                if self.recoveryGeneration == token,
+                   engine.currentItem?.id == expectedItemID {
+                    engine.updateState(.failed(message: "player.recovery_failed".localizedFormat(count)))
+                    print("[PlayerKit] recovery failed reason=ready-timeout id=\(expectedItemID)")
+                }
+                return
+            }
 
             print("[PlayerKit] recovery ready id=\(expectedItemID)")
 
@@ -255,7 +297,7 @@ final class PlayerRecoveryController {
                         }
                         print("[PlayerKit] recovery seek complete time=\(recoverTime) finished=\(finished)")
                         if finished, engine.wantsPlayback {
-                            player.play(); engine.updateState(.playing)
+                            engine.play()
                             print("[PlayerKit] recovery play resumed")
                         }
                         continuation.resume()

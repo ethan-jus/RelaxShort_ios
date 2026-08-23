@@ -106,10 +106,17 @@ final class ShortVideoPlayerEngine: ObservableObject {
         guard let currentID = currentItem?.id,
               let newIndex = newItems.firstIndex(where: { $0.id == currentID }) else { return }
         cancelAllPreloadTasks()
+        let previousItem = newItems[safe: newIndex - 1]
         let nextItem = newItems[safe: newIndex + 1]
+        let keepsPreparedPrevious = previousItem.map {
+            slotPool.contains(item: $0, in: .previous)
+        } ?? false
         let keepsPreparedNext = nextItem.map { slotPool.contains(item: $0, in: .next) } ?? false
+        if !keepsPreparedPrevious {
+            slotPool.cancel(.previous)
+        }
         if !keepsPreparedNext {
-            slotPool.cancelAdjacent()
+            slotPool.cancel(.next)
         }
         items = newItems
         currentIndex = newIndex
@@ -160,6 +167,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
         clearCurrentSourceUpgrade()
         cancelAllPreloadTasks()
+        let oldIndex = currentIndex
         items = newItems
         currentIndex = index
         currentItem = newItems[index]
@@ -185,23 +193,16 @@ final class ShortVideoPlayerEngine: ObservableObject {
             }
         }
 
-        if let preloadState = slotPool.promotePrepared(
-            item: newItems[index],
+        // Series 的异步切集也必须走与 For You 相同的三槽旋转：命中时提升相邻槽，
+        // 未命中时把旧 current 停放到反向槽，保证用户回滑不会重新建链。
+        slotPool.move(
+            from: oldIndex,
+            to: index,
+            items: newItems,
             generation: gen,
+            adaptiveQualityPolicy: adaptiveQualityPolicy,
             completion: attachResult
-        ) {
-            diagnostics.preloadState = "promoted:\(preloadState.rawValue):\(newItems[index].id)"
-            log("内容切换复用相邻播放器: id=\(newItems[index].id) 状态=\(preloadState.rawValue)")
-        } else {
-            log("内容切换未命中相邻 preroll，使用共享 current 槽: id=\(newItems[index].id)")
-            slotPool.prepare(
-                item: newItems[index],
-                slot: .current,
-                generation: gen,
-                adaptiveQualityPolicy: adaptiveQualityPolicy,
-                completion: attachResult
-            )
-        }
+        )
     }
 
     func prepare(items: [PlayerMediaItem], index: Int) {
@@ -293,8 +294,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
         log("play: wantsPlayback=\(wantsPlayback) hasPlayer=\(currentPlayer != nil)")
 
         if let player = currentPlayer {
+            if state == .pausedByUser || state == .pausedBySystem { state = .ready }
             startPlayback(player)
-            state = .playing
             log("play: player.play() called rate=\(player.rate) status=\(statusString(player.currentItem?.status))")
         }
         // else: 等 attach 后由 wantsPlayback 驱动自动播放
@@ -307,8 +308,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
         }
         wantsPlayback = true
         if let player = currentPlayer {
+            if state == .pausedBySystem { state = .ready }
             startPlayback(player)
-            state = .playing
             log("playFromSystemResume: 恢复播放")
         }
     }
@@ -397,11 +398,19 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
     /// seek 带 completion 确认（handoff 场景使用），completion 在 MainActor 回调
     func seekTime(_ time: TimeInterval, completion: @escaping @MainActor (Bool) -> Void) {
-        guard let player = currentPlayer else { completion(false); return }
+        guard let player = currentPlayer,
+              let item = player.currentItem else { completion(false); return }
+        let observedGeneration = generation
         let target = CMTime(seconds: time, preferredTimescale: 600)
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { finished in
             Task { @MainActor [weak self] in
-                guard let self else { completion(finished); return }
+                guard let self,
+                      self.generation == observedGeneration,
+                      self.currentPlayer === player,
+                      player.currentItem === item else {
+                    completion(false)
+                    return
+                }
                 var nextProgress = self.progress
                 nextProgress.currentTime = time
                 self.progress = nextProgress
@@ -499,8 +508,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
         logTTFF()
         markTrace("首帧可见")
         finishTrace()
-        // 首帧一旦真正可见就立即准备 next；不再额外等待时间观察器和 100ms 延迟。
-        schedulePreloadAdjacent(gen: generation, delayMs: 0)
         // 媒资探测只能由开发者显式触发；首帧热路径不再自动发送 HEAD/Range 请求抢占带宽。
         if moveTTFFStart > 0 {
             let ms = (CACurrentMediaTime() - moveTTFFStart) * 1000
@@ -516,7 +523,7 @@ final class ShortVideoPlayerEngine: ObservableObject {
         case .waitingNetwork, .stalled, .recovering:
             // 当前播放一旦发生网络压力，立即释放相邻预加载带宽。
             cancelAllPreloadTasks()
-            slotPool.cancelAdjacent()
+            slotPool.cancelPreparingAdjacent()
             diagnostics.preloadState = "paused-for-current"
         case .playing where hasVisiblePlaybackStarted:
             schedulePreloadAdjacent(gen: generation, delayMs: 0)
@@ -531,6 +538,11 @@ final class ShortVideoPlayerEngine: ObservableObject {
         resetReadyState()
         log("rebuildItem: id=\(item.id)")
 
+        removeObservers()
+        itemStatusObs?.invalidate()
+        itemStatusObs = nil
+        recoveryController.detachObservers()
+
         let managedItem = PlayerItemFactory.makePlaybackItem(
             from: item,
             adaptiveQualityPolicy: adaptiveQualityPolicy
@@ -538,27 +550,19 @@ final class ShortVideoPlayerEngine: ObservableObject {
         replacementResourceLoaderDelegate = managedItem.resourceLoaderDelegate
         let replacementItem = managedItem.item
         player.replaceCurrentItem(with: replacementItem)
+        slotPool.updateCurrentMetadata(
+            player: player,
+            playerItem: replacementItem,
+            mediaItem: item,
+            resourceLoaderDelegate: managedItem.resourceLoaderDelegate
+        )
 
-        if let o = itemEndObserver {
-            NotificationCenter.default.removeObserver(o); itemEndObserver = nil
-        }
-        itemEndObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: replacementItem, queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in
-                self?.state = .pausedBySystem
-                self?.onPlaybackFinished?()
-            }
-        }
-
-        recoveryController.detachObservers()
         recoveryController.attachObservers(to: player)
         setupItemStatusKVO(player)
+        startObserving()
 
         if autoplay, wantsPlayback {
             startPlayback(player)
-            state = .playing
             log("rebuildItem: 恢复播放")
         }
     }
@@ -653,10 +657,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
         startObserving()
         recoveryController.attachObservers(to: player)
 
-        // 设置播放策略：短剧优先快速出画，卡顿恢复由状态机兜底。
-        // 不等待大缓冲，避免用户点击后长时间停留在封面。
+        // 让 AVPlayer 基于当前吞吐量决定首帧缓冲；相邻集由槽位池预热保障秒开。
+        // 禁止用关闭自动等待来换取表面速度，否则弱网下会 ready 但实际停在 paused。
         player.currentItem?.preferredForwardBufferDuration = 0
-        player.automaticallyWaitsToMinimizeStalling = false
+        player.automaticallyWaitsToMinimizeStalling = true
 
         // 自动加载字幕。播放合同中的外挂字幕优先于媒体内封字幕。
         if let item = currentItem {
@@ -686,7 +690,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
             replaceCurrentItemForSourceUpgrade(pendingItem, on: player)
         } else if wantsPlayback {
             startPlayback(player)
-            state = .playing
             log("attach: 自动播放（wantsPlayback=true）")
         }
     }
@@ -714,6 +717,12 @@ final class ShortVideoPlayerEngine: ObservableObject {
         replacementResourceLoaderDelegate = managedItem.resourceLoaderDelegate
         let replacementItem = managedItem.item
         player.replaceCurrentItem(with: replacementItem)
+        slotPool.updateCurrentMetadata(
+            player: player,
+            playerItem: replacementItem,
+            mediaItem: item,
+            resourceLoaderDelegate: managedItem.resourceLoaderDelegate
+        )
         recoveryController.attachObservers(to: player)
         setupItemStatusKVO(player)
         startObserving()
@@ -730,7 +739,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
     }
 
     private func restoreSourceUpgradeProgressIfNeeded(on player: AVPlayer) {
-        guard isCurrentSourceUpgradePending, currentPlayer === player else { return }
+        guard isCurrentSourceUpgradePending,
+              currentPlayer === player,
+              let expectedItem = player.currentItem else { return }
+        let expectedGeneration = generation
         isCurrentSourceUpgradePending = false
         let resumeTime = sourceUpgradeResumeTime
         sourceUpgradeResumeTime = 0
@@ -738,7 +750,10 @@ final class ShortVideoPlayerEngine: ObservableObject {
         let resume = CMTime(seconds: resumeTime, preferredTimescale: 600)
         player.seek(to: resume, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self, weak player] finished in
             Task { @MainActor in
-                guard let self, let player, self.currentPlayer === player else { return }
+                guard let self, let player,
+                      self.generation == expectedGeneration,
+                      self.currentPlayer === player,
+                      player.currentItem === expectedItem else { return }
                 if finished {
                     var nextProgress = self.progress
                     nextProgress.currentTime = resumeTime
@@ -746,7 +761,6 @@ final class ShortVideoPlayerEngine: ObservableObject {
                 }
                 if self.wantsPlayback {
                     self.startPlayback(player)
-                    self.state = .playing
                 }
                 self.log("正式播放源升级完成: 续播=\(String(format: "%.2f", resumeTime))s 成功=\(finished)")
             }
@@ -762,21 +776,25 @@ final class ShortVideoPlayerEngine: ObservableObject {
     /// 监听 AVPlayerItem.status，failed 时触发 fallback
     private func setupItemStatusKVO(_ player: AVPlayer) {
         itemStatusObs?.invalidate()
+        let observedGeneration = generation
         itemStatusObs = player.currentItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
             Task { @MainActor [weak self] in
-                guard let self, self.currentPlayer === player else { return }
+                guard let self,
+                      self.generation == observedGeneration,
+                      self.currentPlayer === player,
+                      player.currentItem === item else { return }
                 if item.status == .readyToPlay {
                     if self.isCurrentSourceUpgradePending {
                         self.restoreSourceUpgradeProgressIfNeeded(on: player)
                     } else if self.wantsPlayback,
                               self.state != .pausedByUser,
                               self.state != .pausedBySystem,
+                              self.state != .recovering,
                               player.timeControlStatus != .playing {
                         // playImmediately 在 item 仍为 unknown 时可能不会保留播放意图：
                         // item 后续虽已 ready，player 仍会无错误地停在 paused，UI 因而永久转圈。
                         // ready 后补发一次播放命令，同时尊重用户/系统暂停状态。
                         self.startPlayback(player)
-                        self.state = .playing
                         self.log("itemStatusKVO: ready 后恢复播放")
                     }
                     return
@@ -789,14 +807,19 @@ final class ShortVideoPlayerEngine: ObservableObject {
                     self.log("itemStatusKVO: HLS→MP4 fallback url=\(mp4URL)")
                     replacementResourceLoaderDelegate = nil
                     let fallbackItem = PlayerItemFactory.makeDirectItem(from: .mp4(mp4URL)).item
-                    player.replaceCurrentItem(with: fallbackItem)
-                    // 重建观察者：end observer + recovery observer + status KVO
-                    if let o = self.itemEndObserver { NotificationCenter.default.removeObserver(o); self.itemEndObserver = nil }
-                    self.itemEndObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: fallbackItem, queue: .main) { [weak self] _ in Task { @MainActor in self?.state = .pausedBySystem; self?.onPlaybackFinished?() } }
+                    self.removeObservers()
                     self.recoveryController.detachObservers()
+                    player.replaceCurrentItem(with: fallbackItem)
+                    self.slotPool.updateCurrentMetadata(
+                        player: player,
+                        playerItem: fallbackItem,
+                        mediaItem: cur,
+                        resourceLoaderDelegate: nil
+                    )
                     self.recoveryController.attachObservers(to: player)
                     self.setupItemStatusKVO(player)
-                    if self.wantsPlayback { self.startPlayback(player); self.state = .playing }
+                    self.startObserving()
+                    if self.wantsPlayback { self.startPlayback(player) }
                 } else {
                     if !self.directFallbackMediaIDs.contains(cur.id) {
                         self.directFallbackMediaIDs.insert(cur.id)
@@ -905,14 +928,19 @@ final class ShortVideoPlayerEngine: ObservableObject {
     // MARK: - 时间观察者
 
     private func startObserving() {
-        guard let player = currentPlayer else { return }
+        guard let player = currentPlayer,
+              let observedItem = player.currentItem else { return }
+        let observedGeneration = generation
 
         let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: interval, queue: .main
         ) { [weak self] time in
             Task { @MainActor in
-                guard let self, let player = self.currentPlayer else { return }
+                guard let self,
+                      self.generation == observedGeneration,
+                      self.currentPlayer === player,
+                      player.currentItem === observedItem else { return }
                 // 正式源替换尚未完成 seek 时，不能让新 item 的 0 秒回调覆盖页面上的续播进度。
                 guard !self.isCurrentSourceUpgradePending else { return }
                 var nextProgress = self.progress
@@ -933,6 +961,8 @@ final class ShortVideoPlayerEngine: ObservableObject {
                    time.seconds > 0.05 {
                     self.hasVisiblePlaybackStarted = true
                     self.diagnostics.stateText = "visible-playback"
+                    // 当前视频确认已经前进后再预热 next，避免与首个 HLS 分片争抢带宽。
+                    self.schedulePreloadAdjacent(gen: self.generation, delayMs: 0)
                     let totalMs = (CACurrentMediaTime() - self.ttffStart) * 1000
                     self.log("首帧可见: 播放进度=\(String(format: "%.2f", time.seconds))s 总耗时=\(String(format: "%.0f", totalMs))ms")
                 }
@@ -941,11 +971,15 @@ final class ShortVideoPlayerEngine: ObservableObject {
 
         itemEndObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime,
-            object: player.currentItem, queue: .main
+            object: observedItem, queue: .main
         ) { [weak self] _ in
             Task { @MainActor in
-                self?.state = .pausedBySystem
-                self?.onPlaybackFinished?()
+                guard let self,
+                      self.generation == observedGeneration,
+                      self.currentPlayer === player,
+                      player.currentItem === observedItem else { return }
+                self.state = .pausedBySystem
+                self.onPlaybackFinished?()
             }
         }
     }

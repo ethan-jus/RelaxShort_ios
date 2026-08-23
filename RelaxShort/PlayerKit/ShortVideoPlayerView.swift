@@ -224,7 +224,7 @@ private struct PlayerLayerViewRepresentable: UIViewRepresentable {
         func startObserving(_ layer: AVPlayerLayer?) {
             stopObserving()
             let observedPlayer = layer?.player
-            observation = layer?.observe(\.isReadyForDisplay, options: [.new]) { [weak self] layer, _ in
+            observation = layer?.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] layer, _ in
                 guard let self, layer.isReadyForDisplay else { return }
                 Task { @MainActor in
                     guard let observedPlayer else { return }

@@ -357,6 +357,9 @@ struct SeriesPlayerView: View {
                 resetAutoHide()
             }
             else if state == .pausedByUser { autoHideTask?.cancel() }
+            else if case .failed(let message) = state, !isCurrentEpisodeVisible {
+                episodeLoadError = message ?? "player.episode_load_failed_retry".localized
+            }
         }
         .onReceive(playerCoordinator.engine.$hasVisiblePlaybackStarted) { started in
             guard started else { return }
@@ -1847,7 +1850,7 @@ struct SeriesPlayerView: View {
         // Episode 自带 videoURL
         if let url = URL(string: ep.videoURL),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-            episodeMediaSources[episodeId] = .mp4(url)
+            episodeMediaSources[episodeId] = playerSource(for: url)
             if recordTrace, episodeNumber == currentEpisode { episodeLoadError = nil }
             Logger.player.info("SeriesTrace 播放源使用剧集URL 集数=\(episodeNumber)")
             if recordTrace { playerCoordinator.engine.markTrace("剧集URL") }
@@ -1938,9 +1941,13 @@ struct SeriesPlayerView: View {
     private func sourceForEpisode(_ ep: Episode) -> PlayerMediaSource? {
         if let cached = episodeMediaSources[ep.id] { return cached }
         if let url = URL(string: ep.videoURL), ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
-            return .mp4(url)
+            return playerSource(for: url)
         }
         return nil
+    }
+
+    private func playerSource(for url: URL) -> PlayerMediaSource {
+        url.pathExtension.lowercased() == "m3u8" ? .hls(masterURL: url) : .mp4(url)
     }
 
     private func buildPlayableItems(from eps: [Episode]) -> [EpisodePlayableItem] {
