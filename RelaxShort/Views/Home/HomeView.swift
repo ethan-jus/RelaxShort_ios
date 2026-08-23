@@ -159,9 +159,13 @@ struct HomeView: View {
                     .frame(width: geo.size.width)
                     .ignoresSafeArea(.container, edges: .bottom)
                 }
-                if viewModel.isLoading, !viewModel.hasContent { loadingView }
-                else if let msg = viewModel.errorMessage, !viewModel.hasContent { errorView(message: msg) }
-                else if !viewModel.hasContent, !viewModel.isLoading { emptyView }
+                // 分类、榜单、漫剧等 Tab 各自加载并管理空态；首页当前语言为空时，
+                // 不能用热门/新剧的全局空态遮住这些仍可独立使用的页面。
+                if usesPrimaryHomeStateOverlay {
+                    if viewModel.isLoading, !selectedPrimaryTabHasContent { loadingView }
+                    else if let msg = viewModel.errorMessage, !selectedPrimaryTabHasContent { errorView(message: msg) }
+                    else if !selectedPrimaryTabHasContent, !viewModel.isLoading { emptyView }
+                }
             }
         }
         .navigationDestination(isPresented: $showVIP) {
@@ -238,6 +242,23 @@ struct HomeView: View {
             }
         } else {
             DT.Color.bgPrimary
+        }
+    }
+
+    private var usesPrimaryHomeStateOverlay: Bool {
+        viewModel.selectedTab == 0 || viewModel.selectedTab == 1
+    }
+
+    private var selectedPrimaryTabHasContent: Bool {
+        switch viewModel.selectedTab {
+        case 0:
+            return !viewModel.fixedDramas.isEmpty
+                || !viewModel.forYouDramas.isEmpty
+                || !viewModel.homeCategoryCollections.isEmpty
+        case 1:
+            return !viewModel.dramasForNewTab.isEmpty
+        default:
+            return true
         }
     }
 
