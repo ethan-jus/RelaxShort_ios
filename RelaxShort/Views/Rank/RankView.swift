@@ -30,6 +30,9 @@ struct RankView: View {
             onCategoryChange(viewModel.selectedCategory)
             await viewModel.loadData()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .discoveryCountryDidChange)) { _ in
+            Task { await viewModel.reloadForDiscoveryCountryChange() }
+        }
     }
 
     // MARK: - Category Tabs

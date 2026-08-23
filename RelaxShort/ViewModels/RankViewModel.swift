@@ -17,6 +17,7 @@ final class RankViewModel: ObservableObject {
     // MARK: - Dependencies
 
     private let repository: HomeRepositoryProtocol
+    private var requestGate = LatestRequestGate()
 
     // MARK: - Init
 
@@ -27,19 +28,30 @@ final class RankViewModel: ObservableObject {
     // MARK: - Load Data
 
     func loadData() async {
+        let requestGeneration = requestGate.begin()
+        let type = mapToRankingType(selectedCategory)
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            if requestGate.accepts(requestGeneration) {
+                isLoading = false
+            }
+        }
 
         do {
-            let type = mapToRankingType(selectedCategory)
             let entries = try await repository.fetchRankingEntries(type: type)
+            guard requestGate.accepts(requestGeneration) else { return }
             self.dramas = entries.map(RankDrama.init(entry:))
         } catch {
+            guard requestGate.accepts(requestGeneration), !Task.isCancelled else { return }
             errorMessage = "排行榜数据加载失败"
             logError("RankViewModel.loadData failed: \(error)")
             // 保持现有数据显示，不清空
         }
+    }
+
+    func reloadForDiscoveryCountryChange() async {
+        await loadData()
     }
 
     func switchCategory(_ category: RankCategory) {

@@ -276,6 +276,9 @@ struct MemberView: View {
         .onDisappear {
             viewModel.stopPromotionCountdown()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .discoveryCountryDidChange)) { _ in
+            Task { await viewModel.reloadForDiscoveryCountryChange() }
+        }
         .alert(purchaseMessage ?? "", isPresented: $showsPurchaseMessage) {
             if purchaseAlertOffersProfile {
                 Button("member.go_to_profile".localized) {

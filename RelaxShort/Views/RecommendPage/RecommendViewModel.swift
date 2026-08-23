@@ -24,6 +24,15 @@ final class RecommendViewModel: ObservableObject {
     private var isLoadingMore: Bool = false
     /// 当前页面会话已经展示过的 seriesId，用于 seed 耗尽后换 seed 续流时去重。
     private var displayedSeriesIDs = Set<String>()
+    /// replace 与 append 共用同一 latest-wins 门禁，语言/国家切换会立即使全部旧响应失效。
+    private var requestGate = LatestRequestGate()
+
+    private struct PendingPage {
+        let items: [DramaItem]
+        let sessionID: String?
+        let nextCursor: String?
+        let hasMore: Bool
+    }
 
     /// TASK-0001-D: 关联的 RecommendSession，用于 generation 同步
     weak var session: RecommendSession?
@@ -40,22 +49,41 @@ final class RecommendViewModel: ObservableObject {
     /// 首次加载（或下拉刷新）→ 生成新种子，清空旧数据。
     /// TASK-0001-D: replace 创建新 generation，旧分页回调被 generation 门禁丢弃。
     func loadData() async {
+        let requestGeneration = requestGate.begin()
+        let contentLanguage = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
+        let seed = UUID().uuidString
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            if requestGate.accepts(requestGeneration) {
+                isLoading = false
+            }
+        }
 
-        feedSessionId = nil
+        feedSessionId = seed
         nextCursor = nil
         hasMore = true
         isLoadingMore = false
         displayedSeriesIDs.removeAll()
 
         do {
-            let result = try await loadFirstPage()
-            let unique = rememberUnique(result)
+            let result = try await repository.fetchForYouPaginated(
+                contentLang: contentLanguage,
+                country: country,
+                cursor: nil,
+                limit: pageSize,
+                feedSeed: seed
+            )
+            guard requestGate.accepts(requestGeneration) else { return }
+            feedSessionId = seed
+            nextCursor = result.nextCursor
+            hasMore = result.hasMore
+            let unique = rememberUnique(result.items)
             dramas = unique
             onReplaceCompleted?(unique)
         } catch {
+            guard requestGate.accepts(requestGeneration), !Task.isCancelled else { return }
             errorMessage = L10n.recommendLoadFailed
             #if DEBUG
             Logger.viewModel.error("RecommendViewModel.loadData failed: \(error)")
@@ -66,6 +94,15 @@ final class RecommendViewModel: ObservableObject {
 
     /// 内容语言切换时立即清除旧语言播放列表，再请求新的严格语言 Feed。
     func reloadForContentLanguageChange() async {
+        await reloadForDiscoveryContextChange()
+    }
+
+    /// 国家变化与内容语言变化使用相同 replace 语义：先清旧播放列表，再加载最新发现上下文。
+    func reloadForDiscoveryCountryChange() async {
+        await reloadForDiscoveryContextChange()
+    }
+
+    private func reloadForDiscoveryContextChange() async {
         dramas = []
         onReplaceCompleted?([])
         await loadData()
@@ -75,32 +112,56 @@ final class RecommendViewModel: ObservableObject {
     /// 当前 seed 耗尽后自动生成新 seed 续流，并过滤已展示剧集，避免用户滑到末尾卡死。
     /// TASK-0001-D: append 绑定发起时 generation，过期自动丢弃。
     func loadNextPageIfNeeded(currentIndex: Int) async {
-        guard !isLoadingMore, !dramas.isEmpty else { return }
+        guard !isLoading, !isLoadingMore, !dramas.isEmpty else { return }
         // 当距离末尾剩余 3 个以内时触发预加载
         let threshold = max(0, dramas.count - 3)
         guard currentIndex >= threshold else { return }
 
-        isLoadingMore = true
-        defer { isLoadingMore = false }
-
-        let appendGen = session?.feedGeneration
+        let appendGeneration = requestGate.generation
+        let appendSessionGeneration = session?.feedGeneration
         let appendStartIndex = dramas.count
+        let contentLanguage = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
+        let startingSessionID = feedSessionId
+        let startingCursor = nextCursor
+        let startingHasMore = hasMore
+        isLoadingMore = true
+        defer {
+            if requestGate.accepts(appendGeneration) {
+                isLoadingMore = false
+            }
+        }
 
         do {
-            let newItems = try await loadNextPage()
-            guard !newItems.isEmpty else { return }
+            let page = try await loadNextPage(
+                contentLanguage: contentLanguage,
+                country: country,
+                sessionID: startingSessionID,
+                cursor: startingCursor,
+                hasMore: startingHasMore,
+                requestGeneration: appendGeneration
+            )
 
-            // generation 门禁：请求期间若发生 replace，丢弃结果
-            if let ag = appendGen, let currentGen = session?.feedGeneration, ag != currentGen {
+            // ViewModel replace 与播放器 Session replace 任一发生，都丢弃旧分页响应及游标。
+            guard requestGate.accepts(appendGeneration) else { return }
+            if let appendSessionGeneration,
+               let currentGeneration = session?.feedGeneration,
+               appendSessionGeneration != currentGeneration {
                 #if DEBUG
-                print("[RecommendVM] loadNextPage 被丢弃 gen=\(ag) 当前gen=\(currentGen) — feed 已被 replace")
+                print("[RecommendVM] loadNextPage 被丢弃 gen=\(appendSessionGeneration) 当前gen=\(currentGeneration) — feed 已被 replace")
                 #endif
                 return
             }
 
+            feedSessionId = page.sessionID
+            nextCursor = page.nextCursor
+            hasMore = page.hasMore
+            let newItems = rememberUnique(page.items)
+            guard !newItems.isEmpty else { return }
             dramas.append(contentsOf: newItems)
             onAppendCompleted?(newItems, appendStartIndex)
         } catch {
+            guard requestGate.accepts(appendGeneration), !Task.isCancelled else { return }
             #if DEBUG
             Logger.viewModel.error("RecommendViewModel.loadNextPage failed: \(error)")
             #endif
@@ -110,63 +171,78 @@ final class RecommendViewModel: ObservableObject {
 
     // MARK: - Private
 
-    /// 生成种子并请求首页。
-    /// For You 页面直接使用 /api/v2/feed/for-you（不优先走 Home），确保 seed 真正生效。
-    private func loadFirstPage() async throws -> [DramaItem] {
-        let seed = UUID().uuidString
-        feedSessionId = seed
-
-        let contentLang = ContentLanguagePreference.effectiveLanguage
-        let country = ContentLanguagePreference.countryCode
-
-        return try await fetchForYouFirstPage(contentLang: contentLang, country: country, seed: seed)
-    }
-
-    /// 请求 For You 首页（带 seed）
-    private func fetchForYouFirstPage(contentLang: String?, country: String?, seed: String) async throws -> [DramaItem] {
-        let result = try await repository.fetchForYouPaginated(
-            contentLang: contentLang, country: country,
-            cursor: nil, limit: pageSize, feedSeed: seed
-        )
-        nextCursor = result.nextCursor
-        hasMore = result.hasMore
-        return result.items
-    }
-
-    /// 加载下一页；当前 seed 耗尽后自动开启新 seed。
-    private func loadNextPage() async throws -> [DramaItem] {
-        let contentLang = ContentLanguagePreference.effectiveLanguage
-        let country = ContentLanguagePreference.countryCode
+    /// 加载下一页；所有游标先在局部推进，通过 generation 门禁后才提交到页面状态。
+    private func loadNextPage(
+        contentLanguage: String,
+        country: String?,
+        sessionID: String?,
+        cursor: String?,
+        hasMore: Bool,
+        requestGeneration: Int
+    ) async throws -> PendingPage {
+        var workingSessionID = sessionID
+        var workingCursor = cursor
+        var workingHasMore = hasMore
 
         // 最多连续探测 3 页：如果新 seed 首页全是已看内容，继续翻一页找新内容。
         for _ in 0..<3 {
-            if feedSessionId == nil || (!hasMore && nextCursor == nil) {
-                feedSessionId = UUID().uuidString
-                nextCursor = nil
-                hasMore = true
+            guard requestGate.accepts(requestGeneration) else {
+                return PendingPage(
+                    items: [],
+                    sessionID: workingSessionID,
+                    nextCursor: workingCursor,
+                    hasMore: workingHasMore
+                )
+            }
+            if workingSessionID == nil || (!workingHasMore && workingCursor == nil) {
+                workingSessionID = UUID().uuidString
+                workingCursor = nil
+                workingHasMore = true
             }
 
             let result = try await repository.fetchForYouPaginated(
-                contentLang: contentLang, country: country,
-                cursor: nextCursor, limit: pageSize,
-                feedSeed: feedSessionId
+                contentLang: contentLanguage,
+                country: country,
+                cursor: workingCursor,
+                limit: pageSize,
+                feedSeed: workingSessionID
             )
-            nextCursor = result.nextCursor
-            hasMore = result.hasMore
+            guard requestGate.accepts(requestGeneration) else {
+                return PendingPage(
+                    items: [],
+                    sessionID: workingSessionID,
+                    nextCursor: workingCursor,
+                    hasMore: workingHasMore
+                )
+            }
+            workingCursor = result.nextCursor
+            workingHasMore = result.hasMore
 
-            let uniqueItems = rememberUnique(result.items)
+            let uniqueItems = result.items.filter {
+                $0.toPlayerMediaItem() != nil && !displayedSeriesIDs.contains($0.id)
+            }
             if !uniqueItems.isEmpty {
-                return uniqueItems
+                return PendingPage(
+                    items: uniqueItems,
+                    sessionID: workingSessionID,
+                    nextCursor: workingCursor,
+                    hasMore: workingHasMore
+                )
             }
 
-            if !hasMore {
+            if !workingHasMore {
                 // 当前 seed 没有更多内容且本页也没有新内容，下一轮换 seed 再试。
-                feedSessionId = nil
-                nextCursor = nil
+                workingSessionID = nil
+                workingCursor = nil
             }
         }
 
-        return []
+        return PendingPage(
+            items: [],
+            sessionID: workingSessionID,
+            nextCursor: workingCursor,
+            hasMore: workingHasMore
+        )
     }
 
     /// 记录并返回本页面会话尚未展示过的剧集。

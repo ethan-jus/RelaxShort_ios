@@ -37,6 +37,7 @@ final class MemberViewModel: ObservableObject {
 
     /// 是否已成功加载过数据（Tab 常驻期间避免重复请求）
     private var hasLoaded = false
+    private var requestGate = LatestRequestGate()
     /// 倒计时 Timer
     private var countdownTask: Task<Void, Never>?
 
@@ -57,6 +58,12 @@ final class MemberViewModel: ObservableObject {
     /// 用户主动重试（失败后可用）
     func retry() {
         Task { await loadContent() }
+    }
+
+    /// 仅刷新会员页的运营发现内容；购买状态、账户权益和历史数据由各自 Store 持有，不清理。
+    func reloadForDiscoveryCountryChange() async {
+        hasLoaded = false
+        await loadContent()
     }
 
     /// 页面出现时启动促销倒计时
@@ -94,12 +101,16 @@ final class MemberViewModel: ObservableObject {
     // MARK: - Private
 
     private func loadContent() async {
+        let requestGeneration = requestGate.begin()
+        let contentLanguage = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
         loadState = .loading
         do {
             let content = try await repository.fetchMemberContent(
-                contentLanguage: nil,  // 由 APIClient headers 自动携带
-                countryCode: nil
+                contentLanguage: contentLanguage,
+                countryCode: country
             )
+            guard requestGate.accepts(requestGeneration) else { return }
             backgroundPosters = content.backgroundPosters
             memberOnlyDramas = content.memberOnlyDramas
             // 服务端可售目录是唯一依据；空数组表示当前没有可售套餐。
@@ -113,6 +124,7 @@ final class MemberViewModel: ObservableObject {
             hasLoaded = true
             loadState = (content.backgroundPosters.isEmpty && content.memberOnlyDramas.isEmpty) ? .empty : .loaded
         } catch {
+            guard requestGate.accepts(requestGeneration), !Task.isCancelled else { return }
             plans = []
             benefits = []
             legalLinks = nil

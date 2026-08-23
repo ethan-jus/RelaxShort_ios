@@ -2,6 +2,11 @@ import Foundation
 
 // MARK: - App Init Service
 
+struct DiscoveryCountryChange: Equatable {
+    let previousCountryCode: String?
+    let countryCode: String
+}
+
 /// 启动初始化服务：调用 `POST /api/v2/app/init` 获取语言/内容/广告决策，
 /// 保存到 UserDefaults 供后续请求头使用。
 /// 超时/失败不阻塞 App 进入主界面。
@@ -43,12 +48,42 @@ final class AppInitService {
         return true
     }
 
+    /// 国家代码按请求合同规范化后比较，大小写或首尾空格变化不触发重复刷新。
+    static func discoveryCountryChange(
+        previousCountryCode: String?,
+        updatedCountryCode: String
+    ) -> DiscoveryCountryChange? {
+        let previous = normalizedCountryCode(previousCountryCode)
+        guard let updated = normalizedCountryCode(updatedCountryCode),
+              previous != updated else { return nil }
+        return DiscoveryCountryChange(
+            previousCountryCode: previous,
+            countryCode: updated
+        )
+    }
+
+    private static func normalizedCountryCode(_ rawValue: String?) -> String? {
+        guard let normalized = rawValue?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased(),
+              !normalized.isEmpty else { return nil }
+        return normalized
+    }
+
     /// 将后端语言决策写入 UserDefaults
     private func apply(_ dto: AppInitResponseDTO) {
+        // 无效空值不应静默清掉既有国家；首次无有效值则使用后端通用区。
+        let appliedCountryCode = Self.normalizedCountryCode(dto.countryCode)
+            ?? Self.normalizedCountryCode(ContentLanguagePreference.countryCode)
+            ?? "GLOBAL"
+        let countryChange = Self.discoveryCountryChange(
+            previousCountryCode: ContentLanguagePreference.countryCode,
+            updatedCountryCode: appliedCountryCode
+        )
         UserDefaults.standard.set(dto.uiLanguage, forKey: "app_ui_language")
         ContentLanguagePreference.applyAppInit(
             contentLanguage: dto.contentLanguage,
-            countryCode: dto.countryCode
+            countryCode: appliedCountryCode
         )
         if let supportedLanguages = dto.supportedLanguages, !supportedLanguages.isEmpty {
             UserDefaults.standard.set(
@@ -65,6 +100,12 @@ final class AppInitService {
             UserDefaults.standard.set(matched, forKey: "app_matched_language")
         }
         UserDefaults.standard.set(dto.fallbackReason, forKey: "app_fallback_reason")
+        if let countryChange {
+            NotificationCenter.default.post(
+                name: .discoveryCountryDidChange,
+                object: countryChange
+            )
+        }
     }
 }
 

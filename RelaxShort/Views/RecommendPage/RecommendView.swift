@@ -106,6 +106,9 @@ struct RecommendView: View {
             .onChange(of: appStore.language) { _, _ in
                 Task { await viewModel.reloadForContentLanguageChange() }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .discoveryCountryDidChange)) { _ in
+                Task { await viewModel.reloadForDiscoveryCountryChange() }
+            }
             .onChange(of: showAbout) { _, isShowing in
                 withAnimation(.easeOut(duration: 0.18)) {
                     appStore.isBottomTabBarHidden = isShowing

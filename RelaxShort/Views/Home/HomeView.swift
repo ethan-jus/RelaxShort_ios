@@ -198,6 +198,9 @@ struct HomeView: View {
         .onChange(of: appStore.language) { _, _ in
             Task { await viewModel.reloadForContentLanguageChange() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .discoveryCountryDidChange)) { _ in
+            Task { await viewModel.reloadForDiscoveryCountryChange() }
+        }
     }
 
     /// Home 卡片直接发起全局播放页路由，避免中转 State 的写入和清空在 push 动画期间重复重建首页。

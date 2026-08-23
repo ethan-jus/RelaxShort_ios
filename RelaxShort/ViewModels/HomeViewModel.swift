@@ -62,6 +62,8 @@ final class HomeViewModel: ObservableObject {
     private var enrichmentTask: Task<Void, Never>?
     private var playbackWarmupTask: Task<Void, Never>?
     private var categoryRequestGeneration = 0
+    private var homeRequestGate = LatestRequestGate()
+    private var forYouRequestGate = LatestRequestGate()
 
     var canLoadMoreForYou: Bool { forYouHasMore }
     var canLoadMoreCategoryContent: Bool {
@@ -135,9 +137,15 @@ final class HomeViewModel: ObservableObject {
     }
 
     func loadData() async {
-        guard !isLoading else { return }
+        let requestGeneration = homeRequestGate.begin()
+        let contentLanguage = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
         enrichmentTask?.cancel()
         playbackWarmupTask?.cancel()
+        // 新 Home replace 立即使旧的二级推荐响应失效；旧请求可自然结束，但不能写回。
+        forYouRequestGate.begin()
+        isForYouRequestInFlight = false
+        isLoadingMoreForYou = false
         isLoading = true
         errorMessage = nil
         forYouDramas = []
@@ -145,20 +153,31 @@ final class HomeViewModel: ObservableObject {
         forYouCursor = nil
         forYouHasMore = true
         forYouSessionID = UUID().uuidString
+        defer {
+            if homeRequestGate.accepts(requestGeneration) {
+                isLoading = false
+            }
+        }
 
         do {
             // Home 是首页关键请求；明确失败后立即结束，不再自动请求其他 feed。
             let tabs = try await repository.fetchHomeTabs(
-                contentLang: ContentLanguagePreference.effectiveLanguage,
-                country: ContentLanguagePreference.countryCode
+                contentLang: contentLanguage,
+                country: country
             )
+            guard homeRequestGate.accepts(requestGeneration) else { return }
             let loadedTabs = Dictionary(tabs.map { ($0.code, $0) }, uniquingKeysWith: { _, latest in latest })
             let configuredDramas = loadedTabs["popular"]?.sections
                 .first(where: { !$0.items.isEmpty })?.items ?? []
-            let dramas = configuredDramas.isEmpty
-                ? try await repository.fetchDramas(category: DramaCategory.all)
-                : configuredDramas
+            let dramas: [DramaItem]
+            if configuredDramas.isEmpty {
+                dramas = try await repository.fetchDramas(category: DramaCategory.all)
+                guard homeRequestGate.accepts(requestGeneration) else { return }
+            } else {
+                dramas = configuredDramas
+            }
             let banners = try await repository.fetchBanners()
+            guard homeRequestGate.accepts(requestGeneration) else { return }
             homeTabsByCode = loadedTabs
             self.featuredDramas = dramas
             self.fixedDramas = Array(dramas.prefix(9))
@@ -168,7 +187,7 @@ final class HomeViewModel: ObservableObject {
             self.rankingDramas = dramas.sorted { $0.viewCount > $1.viewCount }
             self.banners = banners
         } catch {
-            isLoading = false
+            guard homeRequestGate.accepts(requestGeneration), !Task.isCancelled else { return }
             errorMessage = Self.userFacingLoadError(error)
             logError("HomeViewModel.loadData failed: \(error)")
             return
@@ -181,27 +200,43 @@ final class HomeViewModel: ObservableObject {
             // 先提交首屏并处理第一轮封面解码，避免推荐流更新与首帧渲染同时挤占主线程。
             try? await Task.sleep(for: .milliseconds(500))
             guard !Task.isCancelled else { return }
-            await self?.loadSecondaryContent()
+            await self?.loadSecondaryContent(
+                homeGeneration: requestGeneration,
+                contentLanguage: contentLanguage,
+                country: country
+            )
         }
     }
 
-    private func loadSecondaryContent() async {
+    private func loadSecondaryContent(
+        homeGeneration: Int,
+        contentLanguage: String,
+        country: String?
+    ) async {
+        guard homeRequestGate.accepts(homeGeneration) else { return }
         // 先补齐首屏下方的猜你喜欢，再加载筛选字典和更深层分类合集。
-        await loadForYouPage(reset: true)
-        guard !Task.isCancelled else { return }
+        await loadForYouPage(
+            reset: true,
+            homeGeneration: homeGeneration,
+            contentLanguage: contentLanguage,
+            country: country
+        )
+        guard !Task.isCancelled, homeRequestGate.accepts(homeGeneration) else { return }
         schedulePlaybackWarmup(dramas: fixedDramas + Array(forYouDramas.prefix(3)))
 
         // 分类是后端运营字典的唯一来源；真实仓库失败时不能展示另一套本地分类。
         do {
             let cats = try await repository.fetchHomeCategories()
+            guard homeRequestGate.accepts(homeGeneration) else { return }
             self.categories = cats
         } catch {
+            guard homeRequestGate.accepts(homeGeneration), !Task.isCancelled else { return }
             logError("HomeViewModel.loadCategories failed: \(error)")
             self.categories = repository.usesRemoteContentCatalog ? [] : DramaCategory.allCases.map {
                 HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0)
             }
         }
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, homeRequestGate.accepts(homeGeneration) else { return }
 
         if repository.usesRemoteContentCatalog {
             // 真实目录请求失败时不保留本地语言枚举，避免把静态数据冒充服务端目录。
@@ -209,12 +244,15 @@ final class HomeViewModel: ObservableObject {
         }
         do {
             let languages = try await repository.fetchSupportedLanguages()
+            guard homeRequestGate.accepts(homeGeneration) else { return }
             if !languages.isEmpty {
                 supportedLanguages = languages
             }
         } catch {
+            guard homeRequestGate.accepts(homeGeneration), !Task.isCancelled else { return }
             logError("HomeViewModel.loadSupportedLanguages failed: \(error)")
         }
+        guard homeRequestGate.accepts(homeGeneration) else { return }
         let selectedCategory = selectedCategoryCode.flatMap { code in
             categories.first(where: { $0.code == code })
         }
@@ -266,32 +304,46 @@ final class HomeViewModel: ObservableObject {
         guard forYouHasMore,
               !isForYouRequestInFlight,
               !isLoadingMoreForYou else { return }
-        await loadForYouPage(reset: false)
+        await loadForYouPage(
+            reset: false,
+            homeGeneration: homeRequestGate.generation,
+            contentLanguage: ContentLanguagePreference.effectiveLanguage,
+            country: ContentLanguagePreference.countryCode
+        )
     }
 
-    private func loadForYouPage(reset: Bool) async {
-        guard !isForYouRequestInFlight else { return }
+    private func loadForYouPage(
+        reset: Bool,
+        homeGeneration: Int,
+        contentLanguage: String,
+        country: String?
+    ) async {
         if !reset {
-            guard forYouHasMore, !isLoadingMoreForYou else { return }
+            guard !isForYouRequestInFlight, forYouHasMore, !isLoadingMoreForYou else { return }
             isLoadingMoreForYou = true
         }
+        let requestGeneration = forYouRequestGate.begin()
         isForYouRequestInFlight = true
         defer {
-            isForYouRequestInFlight = false
-            isLoadingMoreForYou = false
+            if forYouRequestGate.accepts(requestGeneration) {
+                isForYouRequestInFlight = false
+                isLoadingMoreForYou = false
+            }
         }
 
-        let contentLanguage = ContentLanguagePreference.effectiveLanguage
-        let country = ContentLanguagePreference.countryCode
+        let requestCursor = reset ? nil : forYouCursor
+        let requestSessionID = forYouSessionID
         do {
             let homeFallback = reset ? forYouDramas : []
             let result = try await repository.fetchForYouPaginated(
                 contentLang: contentLanguage,
                 country: country,
-                cursor: reset ? nil : forYouCursor,
+                cursor: requestCursor,
                 limit: forYouPageSize,
-                feedSeed: forYouSessionID
+                feedSeed: requestSessionID
             )
+            guard forYouRequestGate.accepts(requestGeneration),
+                  homeRequestGate.accepts(homeGeneration) else { return }
             forYouCursor = result.nextCursor
             forYouHasMore = result.hasMore
 
@@ -305,7 +357,9 @@ final class HomeViewModel: ObservableObject {
             }
             rebuildHomeCategoryCollections()
         } catch {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled,
+                  forYouRequestGate.accepts(requestGeneration),
+                  homeRequestGate.accepts(homeGeneration) else { return }
             logError("HomeViewModel.loadForYou failed: \(error)")
         }
     }
@@ -401,7 +455,24 @@ final class HomeViewModel: ObservableObject {
 
     /// follow_ui 模式下切换界面语言后，推荐型页面必须重新请求对应内容语言。
     func reloadForContentLanguageChange() async {
-        guard !isLoading else { return }
+        await reloadDiscoveryContent()
+    }
+
+    /// app/init 国家决策变化后刷新发现内容；分类页仅在当前可见时追加一次新国家请求。
+    func reloadForDiscoveryCountryChange() async {
+        categoryRequestGeneration += 1
+        isCategoryRequestInFlight = false
+        isCategoryLoading = false
+        isCategoryRefreshing = false
+        isLoadingMoreCategoryContent = false
+        let shouldReloadCategory = selectedTab == 3
+        await reloadDiscoveryContent()
+        if shouldReloadCategory {
+            await reloadCategoryContent()
+        }
+    }
+
+    private func reloadDiscoveryContent() async {
         homeTabsByCode = [:]
         featuredDramas = []
         fixedDramas = []

@@ -56,5 +56,24 @@ extension Notification.Name {
     static let showSearch = Notification.Name("com.relaxshort.showSearch")
     /// 全屏弹出会员页（无 TabBar）
     static let showMembership = Notification.Name("com.relaxshort.showMembership")
-    /// 全屏弹出金币福利页（无 TabBar）
+    /// app/init 发现国家代码实际变化；发现型页面据此刷新，用户资产页面不订阅。
+    static let discoveryCountryDidChange = Notification.Name("com.relaxshort.discoveryCountryDidChange")
+}
+
+// MARK: - Latest Request Gate
+
+/// 为同一份页面状态提供 latest-wins 写回门禁。
+/// 每个新 replace/reload 都领取新 token，旧请求即使无法取消也不能覆盖新上下文。
+struct LatestRequestGate {
+    private(set) var generation = 0
+
+    @discardableResult
+    mutating func begin() -> Int {
+        generation &+= 1
+        return generation
+    }
+
+    func accepts(_ token: Int) -> Bool {
+        token == generation
+    }
 }
