@@ -100,7 +100,9 @@ final class PlayerSlotPool {
                     return
                 }
                 let playerReady = await Self.waitUntilReadyToPlay(player)
-                guard !Task.isCancelled, playerReady, player.status == .readyToPlay else {
+                guard !Task.isCancelled,
+                      playerReady,
+                      player.currentItem?.status == .readyToPlay else {
                     if !Task.isCancelled {
                         self.finishPreload(
                             slot: slot,
@@ -218,7 +220,7 @@ final class PlayerSlotPool {
             return nil
         }
         promoted.resourceLoaderDelegate?.promoteToPlaybackPriority()
-        if promoted.player.status == .readyToPlay {
+        if promoted.player.currentItem?.status == .readyToPlay {
             promoted.player.cancelPendingPrerolls()
         }
         promoted.player.pause()
@@ -302,7 +304,7 @@ final class PlayerSlotPool {
         guard let ctx = slots[slot.rawValue] else { return }
         for task in ctx.tasks { task.cancel() }
         slots[slot.rawValue]?.tasks.removeAll()
-        if ctx.player.status == .readyToPlay {
+        if ctx.player.currentItem?.status == .readyToPlay {
             ctx.player.cancelPendingPrerolls()
         }
     }
@@ -312,12 +314,15 @@ final class PlayerSlotPool {
     private static func waitUntilReadyToPlay(_ player: AVPlayer) async -> Bool {
         for _ in 0..<160 {
             guard !Task.isCancelled else { return false }
-            switch player.status {
+            if player.status == .failed {
+                return false
+            }
+            switch player.currentItem?.status {
             case .readyToPlay:
                 return true
             case .failed:
                 return false
-            case .unknown:
+            case .unknown, .none:
                 try? await Task.sleep(nanoseconds: 50_000_000)
             @unknown default:
                 return false

@@ -289,11 +289,11 @@ struct PlayerCoordinatorTests {
     }
 
     @Test
-    func currentPlaybackDoesNotWaitForLargeBufferBeforeStarting() {
+    func currentPlaybackUsesSystemBufferingWithoutRequiringLargeFixedBuffer() {
         let coordinator = PlayerCoordinator()
         coordinator.claimForYou(items: [mediaItem(id: "series-quick-1")], index: 0)
 
-        #expect(coordinator.engine.currentPlayer?.automaticallyWaitsToMinimizeStalling == false)
+        #expect(coordinator.engine.currentPlayer?.automaticallyWaitsToMinimizeStalling == true)
         #expect(coordinator.engine.currentPlayer?.currentItem?.preferredForwardBufferDuration == 0)
     }
 

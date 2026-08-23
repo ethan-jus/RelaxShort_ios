@@ -840,26 +840,32 @@ final class ShortVideoPlayerEngine: ObservableObject {
     }
 
     private func preloadAdjacent(gen: Int) {
-        let nextIdx = currentIndex + 1
-        if nextIdx < items.count {
-            let nextItem = items[nextIdx]
-            guard !slotPool.contains(item: nextItem, in: .next) else { return }
-            log("preload: start next=\(nextIdx)")
-            diagnostics.preloadState = "preparing:next:\(nextItem.id)"
+        let candidates: [(index: Int, slot: PlayerSlot, label: String)] = [
+            (currentIndex - 1, .previous, "previous"),
+            (currentIndex + 1, .next, "next")
+        ]
+
+        for candidate in candidates where items.indices.contains(candidate.index) {
+            let item = items[candidate.index]
+            guard !slotPool.contains(item: item, in: candidate.slot) else { continue }
+
+            log("preload: start \(candidate.label)=\(candidate.index)")
+            diagnostics.preloadState = "preparing:\(candidate.label):\(item.id)"
             let task = Task { [weak self] in
                 guard let self else { return }
                 self.slotPool.prepare(
-                    item: nextItem, slot: .next, generation: gen,
+                    item: item, slot: candidate.slot, generation: gen,
                     adaptiveQualityPolicy: self.adaptiveQualityPolicy
                 ) { result in
-                    if case .success = result {
-                        Task { @MainActor in
-                            self.diagnostics.preloadState = "ready:next:\(nextItem.id)"
+                    Task { @MainActor [weak self] in
+                        guard let self, self.generation == gen else { return }
+                        let state: String
+                        if case .success = result {
+                            state = "ready"
+                        } else {
+                            state = "failed"
                         }
-                    } else {
-                        Task { @MainActor in
-                            self.diagnostics.preloadState = "failed:next:\(nextItem.id)"
-                        }
+                        self.diagnostics.preloadState = "\(state):\(candidate.label):\(item.id)"
                     }
                 }
             }
