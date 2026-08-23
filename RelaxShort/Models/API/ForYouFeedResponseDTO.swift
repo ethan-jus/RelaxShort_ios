@@ -42,6 +42,8 @@ struct FeedCardDTO: Decodable {
     let playAsset: PlayAssetDTO?
     let monetization: MonetizationDTO?
     let contentLanguage: String?
+    let contentFormat: String?
+    let productionMethod: String?
     let matchedLanguage: String?
     let countryCode: String?
     let fallbackReason: String?

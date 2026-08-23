@@ -33,8 +33,8 @@ final class RealAPISmokeRunner: ObservableObject {
         results = []
         currentStep = ""
 
-        let lang = UserDefaults.standard.string(forKey: "app_content_language") ?? "en"
-        let country = UserDefaults.standard.string(forKey: "app_country_code") ?? "GLOBAL"
+        let lang = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode ?? "GLOBAL"
         var lastSeriesId: Int64?
         var lastEpisodeId: Int64?
         var lastCategoryCode: String?

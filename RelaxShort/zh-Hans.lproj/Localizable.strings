@@ -601,7 +601,7 @@
 "exit.skip_button" = "暂不开启";
 "favorites.added_toast" = "已收藏";
 "favorites.removed_toast" = "已取消收藏";
-"home.no_anime" = "暂无动漫内容";
+"home.no_animated_content" = "暂无漫剧内容";
 "home.search_placeholder" = "搜索短剧";
 "login.title" = "RelaxShort";
 "login.guest_button" = "游客登录";
@@ -618,7 +618,11 @@
 "home.tab.new" = "新剧";
 "home.tab.rankings" = "榜单";
 "home.tab.categories" = "分类";
-"home.tab.anime" = "动漫";
+"home.tab.animated" = "漫剧";
+"home.animated.featured" = "精选";
+"home.animated.recommended" = "更多推荐";
+"badge.ai_generated" = "AI";
+"badge.ai_generated_accessibility" = "AI 生成";
 "home.tab.vip" = "会员";
 "home.tab.original_plus" = "原创+";
 "rank.category.trending" = "热门趋势";

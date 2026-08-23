@@ -17,8 +17,8 @@ struct RealMemberRepository: MemberRepositoryProtocol {
     ) async throws -> MemberContent {
         let dto: MemberResponseDTO = try await client.requestData(
             .member(
-                contentLanguage: contentLanguage,
-                countryCode: countryCode
+                contentLanguage: contentLanguage ?? ContentLanguagePreference.effectiveLanguage,
+                countryCode: countryCode ?? ContentLanguagePreference.countryCode
             )
         )
         return Self.map(dto: dto)

@@ -680,6 +680,19 @@ struct RankingRow: View {
 
 // MARK: - Badge Tag View (Task20: shared badge rendering)
 
+struct AIGeneratedBadgeView: View {
+    var body: some View {
+        Text("badge.ai_generated".localized)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color(red: 0.44, green: 0.31, blue: 0.78))
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .accessibilityLabel("badge.ai_generated_accessibility".localized)
+    }
+}
+
 /// Renders a single badge tag for player / recommend card overlays.
 /// Uses feed-style styling with configurable foreground/background colors.
 struct DramaBadgeTagView: View {
@@ -688,6 +701,8 @@ struct DramaBadgeTagView: View {
 
     var body: some View {
         switch tag {
+        case .ai:
+            feedTag(L10n.badgeTagLabel(.ai), bg: Color(red: 0.44, green: 0.31, blue: 0.78), fg: .white)
         case .vip:
             feedTag(L10n.badgeTagLabel(.vip), bg: .goldVipBadgeBg, fg: .goldVipBadgeFg)
         case .hot:

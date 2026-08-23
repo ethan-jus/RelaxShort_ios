@@ -145,7 +145,7 @@ struct HomeView: View {
                         categoriesTabContent
                             .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 3)
                             .tag(3)
-                        animeTabContent(containerW: geo.size.width)
+                        animatedTabContent(containerW: geo.size.width)
                             .environment(\.coverImageLoadingEnabled, viewModel.selectedTab == 4)
                             .tag(4)
                         homeVIPTabContent(containerW: geo.size.width)
@@ -182,7 +182,8 @@ struct HomeView: View {
         .task(id: CategoryFilterRequest(
             isActive: viewModel.selectedTab == 3,
             language: selectedLanguage,
-            genre: selectedGenre
+            genre: selectedGenre,
+            uiLanguage: appStore.language.rawValue
         )) {
             guard viewModel.selectedTab == 3 else { return }
             await viewModel.selectFilters(
@@ -195,7 +196,7 @@ struct HomeView: View {
             Task { await rewardSummaryStore.refresh() }
         }
         .onChange(of: appStore.language) { _, _ in
-            Task { await viewModel.reloadCategoryLocalizations() }
+            Task { await viewModel.reloadForContentLanguageChange() }
         }
     }
 
@@ -344,6 +345,7 @@ struct HomeView: View {
             repository: rankingRepository,
             onCategoryChange: { selectedRankCategory = $0 }
         )
+        .id("rank-\(appStore.language.rawValue)")
     }
 
     // MARK: - Categories Filter Model
@@ -357,6 +359,7 @@ struct HomeView: View {
         let isActive: Bool
         let language: String
         let genre: String
+        let uiLanguage: String
     }
 
     // MARK: - Tab 3: Categories
@@ -622,99 +625,55 @@ struct HomeView: View {
         .frame(height: 36)
     }
 
-    // MARK: - Tab 4: Anime
+    // MARK: - Tab 4: Animated
 
-    private func animeTabContent(containerW: CGFloat) -> some View {
-        let dramas = viewModel.dramasForAnimeTab
-        let heroItems = Array(dramas.prefix(3))
-        if dramas.isEmpty { return AnyView(animeEmptyState) }
-        return AnyView(ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                HomeHeroCarouselSection(dramas: heroItems, playerDrama: seriesNavigationBinding, containerW: containerW)
-                    .padding(.bottom, 24)
-                animeWeeklyFeatured(Array(dramas.prefix(8)), containerW: containerW)
-                animeMoreRecommended(Array(dramas.dropFirst(1)), containerW: containerW)
+    private func animatedTabContent(containerW: CGFloat) -> some View {
+        let heroSection = viewModel.section("animated_hero", in: "animated")
+        let featuredSection = viewModel.section("animated_featured", in: "animated")
+        let recommendedSection = viewModel.section("animated_recommended", in: "animated")
+
+        return ScrollView(showsIndicators: false) {
+            if viewModel.hasAnimatedContent {
+                LazyVStack(alignment: .leading, spacing: 28) {
+                    if !viewModel.animatedHeroDramas.isEmpty {
+                        HomeHeroCarouselSection(
+                            dramas: viewModel.animatedHeroDramas,
+                            playerDrama: seriesNavigationBinding,
+                            containerW: containerW
+                        )
+                    }
+                    if !viewModel.animatedFeaturedDramas.isEmpty {
+                        HomePosterRailSection(
+                            title: (featuredSection?.titleKey ?? "home.animated.featured").localized,
+                            dramas: viewModel.animatedFeaturedDramas,
+                            playerDrama: seriesNavigationBinding,
+                            containerW: containerW
+                        )
+                    }
+                    if !viewModel.animatedRecommendedDramas.isEmpty {
+                        HomeDramaListSection(
+                            title: (recommendedSection?.titleKey ?? "home.animated.recommended").localized,
+                            dramas: viewModel.animatedRecommendedDramas,
+                            playerDrama: seriesNavigationBinding,
+                            containerW: containerW
+                        )
+                    }
+                }
+                .padding(.top, heroSection == nil ? 6 : 0)
+            } else {
+                animatedEmptyState
             }
             Color.clear.frame(height: 64)
-        }.refreshable { await viewModel.loadData() })
+        }
+        .refreshable { await viewModel.loadData() }
     }
 
-    private var animeEmptyState: some View {
+    private var animatedEmptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "tv").font(.system(size: 40)).foregroundColor(.white.opacity(0.2))
-            Text(L10n.noAnime).font(.system(size: 14)).foregroundColor(.white.opacity(0.5))
+            Text(L10n.noAnimatedContent).font(.system(size: 14)).foregroundColor(.white.opacity(0.5))
         }.frame(maxWidth: .infinity).padding(.top, 80)
     }
-
-    private func animeWeeklyFeatured(_ dramas: [DramaItem], containerW: CGFloat) -> some View {
-        let cardW = min(max(containerW * 0.29, 112), 132)
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.featured).font(.system(size: 18, weight: .semibold)).foregroundColor(.white).padding(.horizontal, 16)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(dramas) { drama in
-                        Button { openSeries(drama) } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: cardW, height: cardW * 1.5)
-                                Text(drama.title).font(.system(size: 13, weight: .medium)).foregroundColor(.white).lineLimit(1).frame(width: cardW)
-                                Text(drama.category).font(.system(size: 12)).foregroundColor(DB.mutedText).lineLimit(1).frame(width: cardW)
-                            }
-                        }.buttonStyle(.plain)
-                    }
-                }.padding(.horizontal, 16)
-            }
-        }.padding(.bottom, 24)
-    }
-
-    private func animeMoreRecommended(_ dramas: [DramaItem], containerW: CGFloat) -> some View {
-        let coverW = min(max(containerW * 0.28, 104), 122)
-        let coverH = coverW * 1.42
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(L10n.recommended).font(.system(size: 18, weight: .semibold)).foregroundColor(.white).padding(.horizontal, 16)
-            LazyVStack(spacing: 18) {
-                ForEach(dramas) { drama in
-                    Button { openSeries(drama) } label: {
-                        HStack(alignment: .top, spacing: 14) {
-                            ZStack(alignment: .topTrailing) {
-                                CoverImageView(url: drama.coverURL, aspectRatio: 2.0/3.0, cornerRadius: DB.posterRadius, width: coverW, height: coverH)
-                                if let flag = displayFlag(for: drama) {
-                                    Text(flag).font(.system(size: 10, weight: .bold)).foregroundColor(.white)
-                                        .padding(.horizontal, 6).padding(.vertical, 3)
-                                        .background(RoundedRectangle(cornerRadius: 2).fill(Color(red: 0.52, green: 0.38, blue: 0.82))).padding(4)
-                                }
-                                VStack {
-                                    Spacer()
-                                    HStack {
-                                        Spacer()
-                                        HStack(spacing: 3) {
-                                            Image(systemName: "play.fill").font(.system(size: 8))
-                                            Text(drama.formattedViewCount).font(.system(size: 10, weight: .medium))
-                                        }.foregroundColor(.white).padding(.horizontal, 5).padding(.vertical, 3)
-                                            .background(Color.black.opacity(0.55)).cornerRadius(3).padding(4)
-                                    }
-                                }
-                            }.frame(width: coverW, height: coverH)
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(drama.title).font(.system(size: 16, weight: .semibold)).foregroundColor(.white).lineLimit(2)
-                                if !drama.synopsis.isEmpty { Text(drama.synopsis).font(.system(size: 13)).foregroundColor(DB.mutedText).lineLimit(3) }
-                                HStack(spacing: 8) {
-                                    Text(drama.category).font(.system(size: 12)).foregroundColor(DB.mutedText)
-                                    if let languageTag = drama.languageTag, !languageTag.isEmpty {
-                                        Text(languageTag).font(.system(size: 12)).foregroundColor(DB.mutedText)
-                                    }
-                                    Text("home.episode_short".localizedFormat(drama.episodeCount)).font(.system(size: 12)).foregroundColor(DB.mutedText)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
-                    }.buttonStyle(.plain)
-                }
-            }.padding(.horizontal, 16)
-        }
-    }
-
-    /// 从后端 display_flags 读取运营角标，不下发时返回 nil
-    private func displayFlag(for drama: DramaItem) -> String? { drama.displayFlags.first }
 
     // MARK: - Tab 5: VIP Content Channel
 
@@ -910,6 +869,11 @@ private struct NewDramaRow: View {
                 .frame(height: 28)
                 .background(Color.black.opacity(0.45))
                 .clipShape(RoundedCorner(radius: DB.posterRadius, corners: [.topRight, .bottomLeft]))
+        }
+        .overlay(alignment: .topLeading) {
+            if drama.showsAIGeneratedBadge {
+                AIGeneratedBadgeView().padding(4)
+            }
         }
         .frame(width: coverWidth, height: coverHeight)
     }

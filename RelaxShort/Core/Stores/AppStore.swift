@@ -23,6 +23,7 @@ final class AppStore: ObservableObject {
             if ThemeManager.shared.language != language {
                 ThemeManager.shared.selectLanguage(language)
             }
+            ContentLanguagePreference.synchronizeWithUILanguage()
         }
     }
 

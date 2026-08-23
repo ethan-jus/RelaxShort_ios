@@ -614,7 +614,7 @@
 "exit.skip_button" = "Not Now";
 "favorites.added_toast" = "Added to My List";
 "favorites.removed_toast" = "Removed from My List";
-"home.no_anime" = "No anime available";
+"home.no_animated_content" = "No animated dramas available";
 "home.search_placeholder" = "Search short dramas";
 "login.title" = "RelaxShort";
 "login.guest_button" = "Continue as Guest";
@@ -631,7 +631,11 @@
 "home.tab.new" = "New";
 "home.tab.rankings" = "Rankings";
 "home.tab.categories" = "Categories";
-"home.tab.anime" = "Anime";
+"home.tab.animated" = "Animated";
+"home.animated.featured" = "Featured";
+"home.animated.recommended" = "More Animated Dramas";
+"badge.ai_generated" = "AI";
+"badge.ai_generated_accessibility" = "AI generated";
 "home.tab.vip" = "VIP";
 "home.tab.original_plus" = "Original+";
 "rank.category.trending" = "Most Trending";

@@ -14,8 +14,8 @@ struct DebugSettingsView: View {
     @State private var manualOverrideEnabled = UserDefaults.standard.bool(forKey: APIConfig.manualOverrideEnabledKey)
     @State private var effectiveBaseURL = APIConfig.baseURL
     @State private var uiLanguage = UserDefaults.standard.string(forKey: "app_ui_language") ?? "-"
-    @State private var contentLanguage = UserDefaults.standard.string(forKey: "app_content_language") ?? "-"
-    @State private var countryCode = UserDefaults.standard.string(forKey: "app_country_code") ?? "-"
+    @State private var contentLanguage = ContentLanguagePreference.effectiveLanguage
+    @State private var countryCode = ContentLanguagePreference.countryCode ?? "-"
     @State private var matchedLanguage = UserDefaults.standard.string(forKey: "app_matched_language") ?? "-"
     @State private var fallbackReason = UserDefaults.standard.string(forKey: "app_fallback_reason") ?? "-"
     @State private var adapterDiagnostics: [AdAdapterDiagnostic] = []
@@ -193,8 +193,8 @@ struct DebugSettingsView: View {
 
     private func refreshContext() {
         uiLanguage = UserDefaults.standard.string(forKey: "app_ui_language") ?? "-"
-        contentLanguage = UserDefaults.standard.string(forKey: "app_content_language") ?? "-"
-        countryCode = UserDefaults.standard.string(forKey: "app_country_code") ?? "-"
+        contentLanguage = ContentLanguagePreference.effectiveLanguage
+        countryCode = ContentLanguagePreference.countryCode ?? "-"
         matchedLanguage = UserDefaults.standard.string(forKey: "app_matched_language") ?? "-"
         fallbackReason = UserDefaults.standard.string(forKey: "app_fallback_reason") ?? "-"
         refreshAdDiagnostics()

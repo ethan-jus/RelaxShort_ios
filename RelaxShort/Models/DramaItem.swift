@@ -13,6 +13,18 @@ struct PlacementBadge: Codable, Hashable {
     let tone: PlacementBadgeTone
 }
 
+enum ContentFormat: String, Codable, Hashable {
+    case liveAction = "live_action"
+    case animation
+    case motionComic = "motion_comic"
+}
+
+enum ProductionMethod: String, Codable, Hashable {
+    case traditional
+    case aiAssisted = "ai_assisted"
+    case aiGenerated = "ai_generated"
+}
+
 struct DramaItem: Identifiable, Codable, Hashable {
     let id: String
     let title: String
@@ -26,6 +38,9 @@ struct DramaItem: Identifiable, Codable, Hashable {
     var displayFlags: [String] = []
     /// Home 栏目条目级角标，同一剧在不同栏目可不同。
     var placementBadge: PlacementBadge? = nil
+    /// 内容形态与制作方式是独立维度；旧缓存缺字段时保持 nil，不从标签猜测。
+    var contentFormat: ContentFormat? = nil
+    var productionMethod: ProductionMethod? = nil
     /// 后端稳定主分类编码，用于客户端聚合展示；category 仅承担本地化名称展示。
     var categoryCode: String? = nil
     let category: String
@@ -73,6 +88,9 @@ struct DramaItem: Identifiable, Codable, Hashable {
 
     /// 封面图 URL（别名，保持兼容）
     var imageName: String { coverURL }
+
+    /// 只有完整 AI 生成内容显示 AI 角标；ai_assisted 不冒充全 AI。
+    var showsAIGeneratedBadge: Bool { productionMethod == .aiGenerated }
 
     var formattedViewCount: String {
         if viewCount >= 1_000_000 {

@@ -68,7 +68,7 @@ enum L10n {
     static var youAreWatching: String { loc("home.you_are_watching") }
     static var viewAll: String { loc("home.view_all") }
     static var shortEpisodeCount: String { loc("home.episode_count") }
-    static var noAnime: String { loc("home.no_anime") }
+    static var noAnimatedContent: String { loc("home.no_animated_content") }
     static var homeSearchPlaceholder: String { loc("home.search_placeholder") }
 
     // MARK: - Rank
@@ -256,7 +256,7 @@ enum L10n {
 
     /// Describes a single badge tag for player / recommend card overlays.
     enum BadgeTag: String, CaseIterable {
-        case vip, hot, trending, new, category
+        case ai, vip, hot, trending, new, category
     }
 
     /// Ordered badge tag keys for `drama`, respecting compact display rules.
@@ -267,6 +267,9 @@ enum L10n {
     /// - Category: shown when `category` is non-empty
     static func dramaBadgeTags(for drama: DramaItem) -> [BadgeTag] {
         var tags: [BadgeTag] = []
+        if drama.showsAIGeneratedBadge {
+            tags.append(.ai)
+        }
         if drama.isMemberOnly || drama.isVIPOnly || drama.badge == .vip {
             tags.append(.vip)
         }
@@ -292,6 +295,7 @@ enum L10n {
     /// Human-readable label for a `BadgeTag`.
     static func badgeTagLabel(_ tag: BadgeTag) -> String {
         switch tag {
+        case .ai:        return loc("badge.ai_generated")
         case .vip:       return loc("badge.vip")
         case .hot:       return loc("badge.hot")
         case .trending:  return loc("badge.trending")

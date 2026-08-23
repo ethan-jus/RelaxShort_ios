@@ -597,7 +597,7 @@
 "exit.skip_button" = "今はしない";
 "favorites.added_toast" = "マイリストに追加しました";
 "favorites.removed_toast" = "マイリストから削除しました";
-"home.no_anime" = "アニメはありません";
+"home.no_animated_content" = "アニメドラマはありません";
 "home.search_placeholder" = "短編ドラマを検索";
 "login.title" = "RelaxShort";
 "login.guest_button" = "ゲストとして続ける";
@@ -614,7 +614,11 @@
 "home.tab.new" = "新作";
 "home.tab.rankings" = "ランキング";
 "home.tab.categories" = "カテゴリー";
-"home.tab.anime" = "アニメ";
+"home.tab.animated" = "アニメ";
+"home.animated.featured" = "おすすめ";
+"home.animated.recommended" = "もっと見る";
+"badge.ai_generated" = "AI";
+"badge.ai_generated_accessibility" = "AI生成";
 "home.tab.vip" = "VIP";
 "home.tab.original_plus" = "オリジナル+";
 "rank.category.trending" = "急上昇";

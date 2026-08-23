@@ -75,40 +75,55 @@ final class HomeViewModel: ObservableObject {
             "home.tab.new".localized,
             "home.tab.rankings".localized,
             "home.tab.categories".localized,
-            "home.tab.anime".localized,
+            "home.tab.animated".localized,
             "home.tab.vip".localized,
             "home.tab.original_plus".localized
         ]
     }
 
-    var hasContent: Bool { !fixedDramas.isEmpty }
+    var hasContent: Bool {
+        !fixedDramas.isEmpty
+            || homeTabsByCode.values.contains { tab in
+                tab.sections.contains { !$0.items.isEmpty }
+            }
+    }
 
     // MARK: - Per-Tab Drama Lists
 
     var dramasForNewTab: [DramaItem] {
-        featuredDramas.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
+        if repository.usesRemoteContentCatalog {
+            return (homeTabsByCode["new"]?.sections.flatMap(\.items) ?? []).uniquedByID()
+        }
+        return featuredDramas.sorted { (Int($0.id) ?? 0) > (Int($1.id) ?? 0) }
     }
 
     var dramasForRankingsTab: [DramaItem] {
         rankingDramas
     }
 
-    var dramasForAnimeTab: [DramaItem] {
-        if repository.usesRemoteContentCatalog {
-            return homeTabsByCode["anime"]?.sections.flatMap(\.items) ?? []
-        }
+    var animatedHeroDramas: [DramaItem] {
+        Array((section("animated_hero", in: "animated")?.items ?? []).uniquedByID().prefix(3))
+    }
 
-        // 仅供 Mock/预览使用：真实 App 不再根据静态标签或分类名猜测动漫内容。
-        let anime = featuredDramas.filter { drama in
-            drama.tags.contains { tag in
-                let lower = tag.lowercased()
-                return lower.contains("anime") || lower.contains("animation") || lower.contains("comics")
-            }
-        }
-        if !anime.isEmpty { return anime }
-        let fantasy = featuredDramas.filter { $0.category == "玄幻" }
-        if !fantasy.isEmpty { return fantasy }
-        return Array(featuredDramas.prefix(12))
+    var animatedFeaturedDramas: [DramaItem] {
+        let heroIDs = Set(animatedHeroDramas.map(\.id))
+        let items = (section("animated_featured", in: "animated")?.items ?? [])
+            .filter { !heroIDs.contains($0.id) }
+            .uniquedByID()
+        return Array(items.prefix(8))
+    }
+
+    var animatedRecommendedDramas: [DramaItem] {
+        let reservedIDs = Set((animatedHeroDramas + animatedFeaturedDramas).map(\.id))
+        return (section("animated_recommended", in: "animated")?.items ?? [])
+            .filter { !reservedIDs.contains($0.id) }
+            .uniquedByID()
+    }
+
+    var hasAnimatedContent: Bool {
+        !animatedHeroDramas.isEmpty
+            || !animatedFeaturedDramas.isEmpty
+            || !animatedRecommendedDramas.isEmpty
     }
 
     init(repository: HomeRepositoryProtocol) {
@@ -133,7 +148,10 @@ final class HomeViewModel: ObservableObject {
 
         do {
             // Home 是首页关键请求；明确失败后立即结束，不再自动请求其他 feed。
-            let tabs = try await repository.fetchHomeTabs(contentLang: nil, country: nil)
+            let tabs = try await repository.fetchHomeTabs(
+                contentLang: ContentLanguagePreference.effectiveLanguage,
+                country: ContentLanguagePreference.countryCode
+            )
             let loadedTabs = Dictionary(tabs.map { ($0.code, $0) }, uniquingKeysWith: { _, latest in latest })
             let configuredDramas = loadedTabs["popular"]?.sections
                 .first(where: { !$0.items.isEmpty })?.items ?? []
@@ -263,8 +281,8 @@ final class HomeViewModel: ObservableObject {
             isLoadingMoreForYou = false
         }
 
-        let contentLanguage = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let contentLanguage = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
         do {
             let homeFallback = reset ? forYouDramas : []
             let result = try await repository.fetchForYouPaginated(
@@ -381,6 +399,18 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
+    /// follow_ui 模式下切换界面语言后，推荐型页面必须重新请求对应内容语言。
+    func reloadForContentLanguageChange() async {
+        guard !isLoading else { return }
+        homeTabsByCode = [:]
+        featuredDramas = []
+        fixedDramas = []
+        forYouDramas = []
+        rankingDramas = []
+        homeCategoryCollections = []
+        await loadData()
+    }
+
     private func loadCategoryContent(
         for category: HomeCategory?,
         contentLanguage: String?,
@@ -428,7 +458,7 @@ final class HomeViewModel: ObservableObject {
                 categoryHasMore = false
             } else {
                 // 四种筛选组合统一请求目录接口；任一参数为空即不限制该维度。
-                let country = UserDefaults.standard.string(forKey: "app_country_code")
+                let country = ContentLanguagePreference.countryCode
                 let page = try await repository.fetchCatalogSeries(
                     categoryCode: category?.code,
                     contentLanguage: contentLanguage,

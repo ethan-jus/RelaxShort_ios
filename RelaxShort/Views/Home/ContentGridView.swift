@@ -33,15 +33,16 @@ let categoryThemes: [CategoryTheme] = [
 // MARK: - Marketing Grid (3×3)
 struct MarketingGrid: View {
     let dramas: [DramaItem]; @Binding var playerDrama: DramaItem?; let containerW: CGFloat
+    var showLanguageTag = false
     private var colW: CGFloat { (containerW - margin*2 - hGap*2) / 3 }
     private var coverH: CGFloat { colW * 4 / 3 }; private var cardH: CGFloat { coverH + 48 }
     var body: some View {
         let cols = [GridItem(.fixed(colW),spacing:hGap),GridItem(.fixed(colW),spacing:hGap),GridItem(.fixed(colW),spacing:hGap)]
-        LazyVGrid(columns:cols,spacing:vGap){ForEach(dramas){d in MarketingCard(drama:d,colW:colW,coverH:coverH,cardH:cardH,playerDrama:$playerDrama)}}.padding(.horizontal,margin)
+        LazyVGrid(columns:cols,spacing:vGap){ForEach(dramas){d in MarketingCard(drama:d,colW:colW,coverH:coverH,cardH:cardH,showLanguageTag:showLanguageTag,playerDrama:$playerDrama)}}.padding(.horizontal,margin)
     }
 }
 struct MarketingCard: View {
-    let drama: DramaItem; let colW:CGFloat; let coverH:CGFloat; let cardH:CGFloat; @Binding var playerDrama:DramaItem?
+    let drama: DramaItem; let colW:CGFloat; let coverH:CGFloat; let cardH:CGFloat; let showLanguageTag: Bool; @Binding var playerDrama:DramaItem?
     var body: some View {
         Button{playerDrama=drama}label:{
             VStack(alignment:.leading,spacing:0){
@@ -49,6 +50,23 @@ struct MarketingCard: View {
                     CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: colW, height: coverH)
                     if let badge = drama.placementBadge {
                         HomeCardBadgeView(badge: badge)
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    if drama.showsAIGeneratedBadge {
+                        AIGeneratedBadgeView().padding(4)
+                    }
+                }
+                .overlay(alignment: .bottomLeading) {
+                    if showLanguageTag, let language = drama.languageTag, !language.isEmpty {
+                        Text(language)
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
+                            .background(Color.black.opacity(0.68))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
+                            .padding(4)
                     }
                 }
                     .frame(width:colW,height:coverH)
@@ -140,6 +158,11 @@ struct WaterfallCard: View {
                         HomeCardBadgeView(badge: badge)
                     }
                 }
+                .overlay(alignment: .topLeading) {
+                    if drama.showsAIGeneratedBadge {
+                        AIGeneratedBadgeView().padding(4)
+                    }
+                }
                 Text(drama.title).font(.system(size:14,weight:.semibold)).foregroundColor(DT.Color.textPrimary).lineLimit(2).padding(.horizontal,6).padding(.top,10).padding(.bottom,6)
                 footerRow.padding(.horizontal,6).padding(.bottom,8)
             }.frame(width:colW).background(DT.Color.bgCard).cornerRadius(2)
@@ -170,6 +193,11 @@ struct CategoryDramaCard: View {
                     CoverImageView(url: drama.coverURL, cornerRadius: DB.posterRadius, width: cardW, height: coverH)
                     if let badge = drama.placementBadge {
                         HomeCardBadgeView(badge: badge)
+                    }
+                }
+                .overlay(alignment: .topLeading) {
+                    if drama.showsAIGeneratedBadge {
+                        AIGeneratedBadgeView().padding(4)
                     }
                 }
                 Text(drama.title)

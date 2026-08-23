@@ -60,6 +60,13 @@ struct RankCardView: View {
             width: 58,
             height: 78
         )
+        .overlay(alignment: .topLeading) {
+            if drama.drama.showsAIGeneratedBadge {
+                AIGeneratedBadgeView()
+                    .scaleEffect(0.82, anchor: .topLeading)
+                    .padding(3)
+            }
+        }
     }
 
     // MARK: - Info Section

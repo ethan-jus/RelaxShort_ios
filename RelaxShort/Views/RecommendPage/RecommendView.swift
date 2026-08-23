@@ -103,6 +103,9 @@ struct RecommendView: View {
                 let ids = viewModel.dramas.map(\.id)
                 Task { await dependencies.bookmarkStore.loadStatus(seriesIDs: ids) }
             }
+            .onChange(of: appStore.language) { _, _ in
+                Task { await viewModel.reloadForContentLanguageChange() }
+            }
             .onChange(of: showAbout) { _, isShowing in
                 withAnimation(.easeOut(duration: 0.18)) {
                     appStore.isBottomTabBarHidden = isShowing

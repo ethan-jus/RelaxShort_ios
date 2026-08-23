@@ -597,7 +597,7 @@
 "exit.skip_button" = "나중에";
 "favorites.added_toast" = "내 목록에 추가됨";
 "favorites.removed_toast" = "내 목록에서 제거됨";
-"home.no_anime" = "애니메이션 콘텐츠가 없습니다";
+"home.no_animated_content" = "애니메이션 드라마가 없습니다";
 "home.search_placeholder" = "숏드라마 검색";
 "login.title" = "RelaxShort";
 "login.guest_button" = "게스트로 계속";
@@ -614,7 +614,11 @@
 "home.tab.new" = "신작";
 "home.tab.rankings" = "순위";
 "home.tab.categories" = "카테고리";
-"home.tab.anime" = "애니";
+"home.tab.animated" = "애니메이션";
+"home.animated.featured" = "추천";
+"home.animated.recommended" = "더 많은 애니메이션 드라마";
+"badge.ai_generated" = "AI";
+"badge.ai_generated_accessibility" = "AI 생성";
 "home.tab.vip" = "VIP";
 "home.tab.original_plus" = "오리지널+";
 "rank.category.trending" = "인기 급상승";

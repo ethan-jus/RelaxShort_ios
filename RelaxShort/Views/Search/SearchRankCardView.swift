@@ -72,6 +72,13 @@ struct SearchRankCardView: View {
                 )
                 .background(rankBadgeBackground)
         }
+        .overlay(alignment: .topTrailing) {
+            if item.drama.showsAIGeneratedBadge {
+                AIGeneratedBadgeView()
+                    .scaleEffect(0.8, anchor: .topTrailing)
+                    .padding(3)
+            }
+        }
     }
 
     private var rankBadgeBackground: some View {

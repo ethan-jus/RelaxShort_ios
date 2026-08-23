@@ -131,7 +131,7 @@ private struct TabContentHost: View {
                     mode: .tab,
                     repository: dependencies.memberRepository
                 )
-                    .id(AppStore.Tab.member.rawValue)
+                    .id("member-\(AppStore.Tab.member.rawValue)-\(appStore.language.rawValue)")
                     .zIndex(appStore.selectedTab == .member ? 1 : 0)
                     .opacity(appStore.selectedTab == .member ? 1 : 0)
                     .disabled(appStore.selectedTab != .member)

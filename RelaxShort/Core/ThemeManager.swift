@@ -115,6 +115,69 @@ enum AppLanguage: String, CaseIterable {
     }
 }
 
+// MARK: - Content Language Preference
+
+/// 内容语言与界面语言是两个独立维度。默认跟随界面语言；保留手动模式，
+/// 以后可在不改请求层合同的前提下支持“中文界面看英文剧”。
+enum ContentLanguageMode: String {
+    case followUI = "follow_ui"
+    case manual
+}
+
+enum ContentLanguagePreference {
+    private enum Keys {
+        static let mode = "app_content_language_mode"
+        static let language = "app_content_language"
+        static let countryCode = "app_country_code"
+    }
+
+    private static var defaults: UserDefaults { .standard }
+
+    static var mode: ContentLanguageMode {
+        defaults.string(forKey: Keys.mode)
+            .flatMap(ContentLanguageMode.init(rawValue:)) ?? .followUI
+    }
+
+    static var effectiveLanguage: String {
+        switch mode {
+        case .followUI:
+            return AppLocalization.currentLanguage.rawValue
+        case .manual:
+            return defaults.string(forKey: Keys.language)
+                .flatMap { $0.isEmpty ? nil : $0 }
+                ?? AppLocalization.currentLanguage.rawValue
+        }
+    }
+
+    static var countryCode: String? {
+        defaults.string(forKey: Keys.countryCode)
+            .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// 界面语言切换后，仅在 follow_ui 模式同步有效内容语言。
+    static func synchronizeWithUILanguage() {
+        guard mode == .followUI else { return }
+        defaults.set(ContentLanguageMode.followUI.rawValue, forKey: Keys.mode)
+        defaults.set(AppLocalization.currentLanguage.rawValue, forKey: Keys.language)
+    }
+
+    /// app/init 负责国家决策；内容语言只在手动模式尚无选择时采用服务端值。
+    static func applyAppInit(contentLanguage: String, countryCode: String) {
+        if defaults.object(forKey: Keys.mode) == nil {
+            defaults.set(ContentLanguageMode.followUI.rawValue, forKey: Keys.mode)
+        }
+        switch mode {
+        case .followUI:
+            defaults.set(AppLocalization.currentLanguage.rawValue, forKey: Keys.language)
+        case .manual:
+            if defaults.string(forKey: Keys.language)?.isEmpty != false {
+                defaults.set(contentLanguage, forKey: Keys.language)
+            }
+        }
+        defaults.set(countryCode, forKey: Keys.countryCode)
+    }
+}
+
 // MARK: - Localization Runtime
 
 /// 全 App 唯一的文案查找入口。
@@ -220,6 +283,7 @@ final class ThemeManager: ObservableObject {
         self.language = language
         applyRTLLayout()
         save()
+        ContentLanguagePreference.synchronizeWithUILanguage()
     }
 
     @discardableResult
@@ -228,6 +292,7 @@ final class ThemeManager: ObservableObject {
         language = AppLanguage.preferred()
         applyRTLLayout()
         save()
+        ContentLanguagePreference.synchronizeWithUILanguage()
         return language
     }
 

@@ -5,6 +5,25 @@ import Testing
 @Suite(.serialized)
 struct APIEndpointTests {
     @Test
+    func strictForYouCarriesEffectiveContentScope() {
+        let endpoint = APIEndpoint.forYou(
+            cursor: nil,
+            limit: 20,
+            contentLanguage: "en",
+            countryCode: "US",
+            feedSeed: "seed",
+            strictContentLanguage: true
+        )
+        let items = endpoint.url
+            .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
+            .queryItems ?? []
+
+        #expect(items.contains { $0.name == "content_language" && $0.value == "en" })
+        #expect(items.contains { $0.name == "country_code" && $0.value == "US" })
+        #expect(items.contains { $0.name == "strict_content_language" && $0.value == "true" })
+    }
+
+    @Test
     func protectedEndpointsDoNotUseLegacyUserIdentityHeader() {
         let report = WatchProgressReport(
             seriesID: "1", episodeID: "1", progressSeconds: 0, totalDuration: 1,

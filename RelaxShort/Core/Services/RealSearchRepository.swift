@@ -9,8 +9,8 @@ final class RealSearchRepository: SearchRepositoryProtocol {
     private let client = APIClient.shared
 
     func fetchSuggestions() async throws -> [String] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let contentLang = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
         let dto: SearchDefaultResponseDTO = try await client.requestData(
             .searchDefault(contentLanguage: contentLang, countryCode: country)
         )
@@ -19,8 +19,8 @@ final class RealSearchRepository: SearchRepositoryProtocol {
 
     /// 执行真实搜索
     func search(query: String, cursor: String? = nil, limit: Int = 20) async throws -> ([DramaItem], String?, Bool) {
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let contentLang = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
         let dto: SearchResponseDTO = try await client.requestData(
             .searchV2(query: query, cursor: cursor, limit: limit,
                       contentLanguage: contentLang, countryCode: country)

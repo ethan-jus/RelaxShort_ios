@@ -64,6 +64,13 @@ final class RecommendViewModel: ObservableObject {
         }
     }
 
+    /// 内容语言切换时立即清除旧语言播放列表，再请求新的严格语言 Feed。
+    func reloadForContentLanguageChange() async {
+        dramas = []
+        onReplaceCompleted?([])
+        await loadData()
+    }
+
     /// 加载下一页（接近末尾时自动触发）。
     /// 当前 seed 耗尽后自动生成新 seed 续流，并过滤已展示剧集，避免用户滑到末尾卡死。
     /// TASK-0001-D: append 绑定发起时 generation，过期自动丢弃。
@@ -109,8 +116,8 @@ final class RecommendViewModel: ObservableObject {
         let seed = UUID().uuidString
         feedSessionId = seed
 
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let contentLang = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
 
         return try await fetchForYouFirstPage(contentLang: contentLang, country: country, seed: seed)
     }
@@ -128,8 +135,8 @@ final class RecommendViewModel: ObservableObject {
 
     /// 加载下一页；当前 seed 耗尽后自动开启新 seed。
     private func loadNextPage() async throws -> [DramaItem] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let contentLang = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
 
         // 最多连续探测 3 页：如果新 seed 首页全是已看内容，继续翻一页找新内容。
         for _ in 0..<3 {

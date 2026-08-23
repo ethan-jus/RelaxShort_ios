@@ -46,8 +46,10 @@ final class AppInitService {
     /// 将后端语言决策写入 UserDefaults
     private func apply(_ dto: AppInitResponseDTO) {
         UserDefaults.standard.set(dto.uiLanguage, forKey: "app_ui_language")
-        UserDefaults.standard.set(dto.contentLanguage, forKey: "app_content_language")
-        UserDefaults.standard.set(dto.countryCode, forKey: "app_country_code")
+        ContentLanguagePreference.applyAppInit(
+            contentLanguage: dto.contentLanguage,
+            countryCode: dto.countryCode
+        )
         if let supportedLanguages = dto.supportedLanguages, !supportedLanguages.isEmpty {
             UserDefaults.standard.set(
                 supportedLanguages.map(\.code),

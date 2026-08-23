@@ -1023,6 +1023,11 @@ extension MemberView {
                                     )
                                 )
                         }
+                        .overlay(alignment: .topTrailing) {
+                            if drama.showsAIGeneratedBadge {
+                                AIGeneratedBadgeView().padding(4)
+                            }
+                        }
                         Text(drama.title)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundColor(.white)

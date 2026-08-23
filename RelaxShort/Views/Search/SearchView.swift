@@ -129,7 +129,8 @@ struct SearchView: View {
                     MarketingGrid(
                         dramas: viewModel.searchResults,
                         playerDrama: $playerDrama,
-                        containerW: proxy.size.width
+                        containerW: proxy.size.width,
+                        showLanguageTag: true
                     )
                     .padding(.top, 12)
 

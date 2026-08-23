@@ -77,8 +77,8 @@ import Foundation
         sourceScene: String
     ) -> DiscoveryEvent {
         DiscoveryEvent(eventID: UUID(), eventType: type, seriesID: seriesID, episodeID: episodeID, searchTerm: query,
-                        contentLanguage: UserDefaults.standard.string(forKey: "app_content_language") ?? "en",
-                        countryCode: UserDefaults.standard.string(forKey: "app_country_code") ?? "GLOBAL",
+                        contentLanguage: ContentLanguagePreference.effectiveLanguage,
+                        countryCode: ContentLanguagePreference.countryCode ?? "GLOBAL",
                         sourceScene: sourceScene, occurredAt: Date())
     }
 }

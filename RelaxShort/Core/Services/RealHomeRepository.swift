@@ -13,7 +13,7 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     private let client = APIClient.shared
 
     func fetchDramas(category: DramaCategory) async throws -> [DramaItem] {
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let country = ContentLanguagePreference.countryCode
         let categoryCode: String?
         switch category {
         case .all:
@@ -28,7 +28,7 @@ final class RealHomeRepository: HomeRepositoryProtocol {
 
         let page = try await fetchCatalogSeries(
             categoryCode: categoryCode,
-            contentLanguage: nil,
+            contentLanguage: ContentLanguagePreference.effectiveLanguage,
             country: country,
             cursor: nil,
             limit: 20
@@ -78,11 +78,11 @@ final class RealHomeRepository: HomeRepositoryProtocol {
                                feedSeed: String? = nil) async throws -> (
         items: [DramaItem], nextCursor: String?, hasMore: Bool
     ) {
-        let lang = contentLang ?? UserDefaults.standard.string(forKey: "app_content_language")
-        let cty = country ?? UserDefaults.standard.string(forKey: "app_country_code")
+        let lang = contentLang ?? ContentLanguagePreference.effectiveLanguage
+        let cty = country ?? ContentLanguagePreference.countryCode
         let dto: ForYouFeedResponseDTO = try await client.requestData(
             .forYou(cursor: cursor, limit: limit, contentLanguage: lang, countryCode: cty,
-                    feedSeed: feedSeed, strictContentLanguage: false)
+                    feedSeed: feedSeed, strictContentLanguage: true)
         )
         return (
             items: (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem),
@@ -95,8 +95,8 @@ final class RealHomeRepository: HomeRepositoryProtocol {
                      cursor: String? = nil, limit: Int = 10,
                      strictContentLanguage: Bool = false) async throws -> [DramaItem] {
         if strictContentLanguage {
-            let lang = contentLang ?? UserDefaults.standard.string(forKey: "app_content_language")
-            let cty = country ?? UserDefaults.standard.string(forKey: "app_country_code")
+            let lang = contentLang ?? ContentLanguagePreference.effectiveLanguage
+            let cty = country ?? ContentLanguagePreference.countryCode
             let dto: ForYouFeedResponseDTO = try await client.requestData(
                 .forYou(cursor: cursor, limit: limit, contentLanguage: lang, countryCode: cty,
                         feedSeed: nil, strictContentLanguage: true)
@@ -113,12 +113,10 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     // MARK: - Categories
 
     func fetchHomeCategories() async throws -> [HomeCategory] {
-        // 分类名称属于界面文案，必须跟随用户当前选择的 App 语言，
-        // 不能使用 app/init 早先写入、可能已经过期的语言结果。
-        let contentLang = AppLocalization.currentLanguage.rawValue
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        // 分类目录默认跨内容语言；名称由实时 X-App-Language 请求头本地化。
+        let country = ContentLanguagePreference.countryCode
         let dto: CategoriesResponseDTO = try await client.requestData(
-            .categories(contentLanguage: contentLang, countryCode: country)
+            .categories(contentLanguage: nil, countryCode: country)
         )
         return (dto.items ?? []).map { item in
             HomeCategory(
@@ -133,8 +131,8 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     // MARK: - Rankings (R4B-1: 返回 RankingEntry 领域模型)
 
     func fetchRankingEntries(type: String) async throws -> [RankingEntry] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let contentLang = ContentLanguagePreference.effectiveLanguage
+        let country = ContentLanguagePreference.countryCode
         let dto: RankingResponseDTO = try await client.requestData(
             .rankings(type: type, contentLanguage: contentLang, countryCode: country)
         )
@@ -151,10 +149,9 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     // MARK: - Categories
 
     func fetchCategories() async throws -> [CategoryItemDTO] {
-        let contentLang = AppLocalization.currentLanguage.rawValue
-        let country = UserDefaults.standard.string(forKey: "app_country_code")
+        let country = ContentLanguagePreference.countryCode
         let dto: CategoriesResponseDTO = try await client.requestData(
-            .categories(contentLanguage: contentLang, countryCode: country)
+            .categories(contentLanguage: nil, countryCode: country)
         )
         return dto.items ?? []
     }
@@ -189,8 +186,8 @@ struct HomeTabContent {
 
 extension RealHomeRepository {
     func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent] {
-        let lang = contentLang ?? UserDefaults.standard.string(forKey: "app_content_language")
-        let cty = country ?? UserDefaults.standard.string(forKey: "app_country_code")
+        let lang = contentLang ?? ContentLanguagePreference.effectiveLanguage
+        let cty = country ?? ContentLanguagePreference.countryCode
         let dto: HomeResponseDTO = try await client.requestData(
             .home(contentLanguage: lang, countryCode: cty)
         )
@@ -283,6 +280,8 @@ enum FeedCardDTOMapper {
         )
         item.bannerCoverURL = card.horizontalCoverUrl
         item.categoryCode = card.categoryCode
+        item.contentFormat = card.contentFormat.flatMap(ContentFormat.init(rawValue:))
+        item.productionMethod = card.productionMethod.flatMap(ProductionMethod.init(rawValue:))
         item.displayFlags = card.displayFlags ?? []
         item.placementBadge = card.placementBadge.map {
             PlacementBadge(

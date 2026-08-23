@@ -83,6 +83,13 @@ struct HomeHeroCarouselSection: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, horizontalPadding)
+        .overlay(alignment: .topLeading) {
+            if dramas[safe: currentIndex]?.showsAIGeneratedBadge == true {
+                AIGeneratedBadgeView()
+                    .padding(.top, 8)
+                    .padding(.leading, horizontalPadding + 8)
+            }
+        }
         .task(id: dramas.map(\.id).joined(separator: "|")) {
             guard dramas.count > 1 else { return }
             while !Task.isCancelled {
@@ -150,6 +157,11 @@ struct HomePosterRailSection: View {
                                         HomeCardBadgeView(badge: badge)
                                     }
                                 }
+                                .overlay(alignment: .topLeading) {
+                                    if drama.showsAIGeneratedBadge {
+                                        AIGeneratedBadgeView().padding(4)
+                                    }
+                                }
                                 Text(drama.title)
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundColor(.white)
@@ -201,6 +213,11 @@ struct HomeDramaListSection: View {
                                 )
                                 if let badge = drama.placementBadge {
                                     HomeCardBadgeView(badge: badge)
+                                }
+                            }
+                            .overlay(alignment: .topLeading) {
+                                if drama.showsAIGeneratedBadge {
+                                    AIGeneratedBadgeView().padding(4)
                                 }
                             }
                             VStack(alignment: .leading, spacing: 4) {

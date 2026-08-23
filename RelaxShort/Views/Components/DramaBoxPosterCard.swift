@@ -28,10 +28,15 @@ struct DramaBoxPosterCard: View {
                     )
 
                     // Badge overlay
-                    if let badge = drama.badge {
-                        badgeView(for: badge)
-                            .padding(4)
+                    VStack(alignment: .leading, spacing: 3) {
+                        if drama.showsAIGeneratedBadge {
+                            AIGeneratedBadgeView()
+                        }
+                        if let badge = drama.badge {
+                            badgeView(for: badge)
+                        }
                     }
+                    .padding(4)
                 }
                 .frame(width: width, height: height)
 

@@ -208,6 +208,8 @@ final class PlaybackMediaContractTests: XCTestCase {
               },
               "monetization": {"is_free": true, "vip_required": false, "unlock_coin_cost": 0},
               "content_language": "en",
+              "content_format": "motion_comic",
+              "production_method": "ai_generated",
               "view_count": 1234,
               "category": "Drama",
               "episode_count": 20,
@@ -237,6 +239,9 @@ final class PlaybackMediaContractTests: XCTestCase {
             .hls(masterURL: URL(string: "https://media.example.com/e/101/master-720p.m3u8")!)
         )
         XCTAssertEqual(drama.isPublicPreview, true)
+        XCTAssertEqual(drama.contentFormat, .motionComic)
+        XCTAssertEqual(drama.productionMethod, .aiGenerated)
+        XCTAssertTrue(drama.showsAIGeneratedBadge)
 
         // 普通卡片导航默认以 preview_episode_id 为目标，进入 Series 后单独请求 /play 合同
         let nav = SeriesPlayerNav(drama: drama, startEpisode: 1, sourceScene: "feed")

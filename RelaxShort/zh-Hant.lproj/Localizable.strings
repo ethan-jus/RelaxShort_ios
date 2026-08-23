@@ -597,7 +597,7 @@
 "exit.skip_button" = "暫不開啟";
 "favorites.added_toast" = "已收藏";
 "favorites.removed_toast" = "已取消收藏";
-"home.no_anime" = "暫無動漫內容";
+"home.no_animated_content" = "暫無漫劇內容";
 "home.search_placeholder" = "搜尋短劇";
 "login.title" = "RelaxShort";
 "login.guest_button" = "訪客登入";
@@ -614,7 +614,11 @@
 "home.tab.new" = "新劇";
 "home.tab.rankings" = "榜單";
 "home.tab.categories" = "分類";
-"home.tab.anime" = "動漫";
+"home.tab.animated" = "漫劇";
+"home.animated.featured" = "精選";
+"home.animated.recommended" = "更多推薦";
+"badge.ai_generated" = "AI";
+"badge.ai_generated_accessibility" = "AI 生成";
 "home.tab.vip" = "會員";
 "home.tab.original_plus" = "原創+";
 "rank.category.trending" = "熱門趨勢";

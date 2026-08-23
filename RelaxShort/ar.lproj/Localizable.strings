@@ -597,7 +597,7 @@
 "exit.skip_button" = "ليس الآن";
 "favorites.added_toast" = "تمت الإضافة إلى قائمتي";
 "favorites.removed_toast" = "تمت الإزالة من قائمتي";
-"home.no_anime" = "لا يوجد أنمي متاح";
+"home.no_animated_content" = "لا توجد دراما متحركة متاحة";
 "home.search_placeholder" = "البحث عن مسلسلات قصيرة";
 "login.title" = "RelaxShort";
 "login.guest_button" = "المتابعة كضيف";
@@ -614,7 +614,11 @@
 "home.tab.new" = "جديد";
 "home.tab.rankings" = "التصنيفات";
 "home.tab.categories" = "الفئات";
-"home.tab.anime" = "أنمي";
+"home.tab.animated" = "متحركة";
+"home.animated.featured" = "مختارات";
+"home.animated.recommended" = "المزيد من الدراما المتحركة";
+"badge.ai_generated" = "AI";
+"badge.ai_generated_accessibility" = "مولد بالذكاء الاصطناعي";
 "home.tab.vip" = "VIP";
 "home.tab.original_plus" = "أصلي+";
 "rank.category.trending" = "الأكثر رواجًا";

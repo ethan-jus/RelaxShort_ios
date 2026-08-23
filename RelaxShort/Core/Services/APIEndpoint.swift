@@ -312,11 +312,7 @@ extension APIEndpoint {
 
         // 界面语言以用户当前选择为准，避免 app/init 的旧结果覆盖实时语言设置。
         base["X-App-Language"] = AppLocalization.currentLanguage.rawValue
-        if let contentLang = UserDefaults.standard.string(forKey: "app_content_language"), !contentLang.isEmpty {
-            // 在需要时作为 query 参数使用，不单独做 header
-            _ = contentLang
-        }
-        if let country = UserDefaults.standard.string(forKey: "app_country_code"), !country.isEmpty {
+        if let country = ContentLanguagePreference.countryCode {
             base["X-Region-Code"] = country
         }
 
