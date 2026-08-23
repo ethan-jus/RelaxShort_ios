@@ -40,6 +40,70 @@ struct APIEndpointTests {
     }
 
     @Test
+    func catalogSeriesAllFiltersOmitsLanguageAndCategory() {
+        let endpoint = APIEndpoint.catalogSeries(
+            categoryCode: nil,
+            contentLanguage: nil,
+            countryCode: "GLOBAL",
+            cursor: nil,
+            limit: 20
+        )
+        let items = endpoint.url
+            .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
+            .queryItems ?? []
+
+        #expect(endpoint.path == "/api/v2/catalog/series")
+        #expect(endpoint.method == .get)
+        #expect(items.contains { $0.name == "limit" && $0.value == "20" })
+        #expect(items.contains { $0.name == "country_code" && $0.value == "GLOBAL" })
+        #expect(!items.contains { $0.name == "category_code" })
+        #expect(!items.contains { $0.name == "content_language" })
+    }
+
+    @Test
+    func catalogSeriesCarriesSelectedFiltersAndOpaqueCursor() {
+        let endpoint = APIEndpoint.catalogSeries(
+            categoryCode: "werewolf",
+            contentLanguage: "en",
+            countryCode: "US",
+            cursor: "opaque:cursor/value",
+            limit: 30
+        )
+        let items = endpoint.url
+            .flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?
+            .queryItems ?? []
+
+        #expect(items.contains { $0.name == "category_code" && $0.value == "werewolf" })
+        #expect(items.contains { $0.name == "content_language" && $0.value == "en" })
+        #expect(items.contains { $0.name == "country_code" && $0.value == "US" })
+        #expect(items.contains { $0.name == "cursor" && $0.value == "opaque:cursor/value" })
+        #expect(items.contains { $0.name == "limit" && $0.value == "30" })
+    }
+
+    @Test
+    func catalogSeriesSupportsEachFilterIndependently() {
+        let categoryOnly = APIEndpoint.catalogSeries(
+            categoryCode: "billionaire",
+            contentLanguage: nil,
+            countryCode: nil,
+            cursor: nil,
+            limit: 20
+        ).url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?.queryItems ?? []
+        let languageOnly = APIEndpoint.catalogSeries(
+            categoryCode: nil,
+            contentLanguage: "en",
+            countryCode: nil,
+            cursor: nil,
+            limit: 20
+        ).url.flatMap { URLComponents(url: $0, resolvingAgainstBaseURL: false) }?.queryItems ?? []
+
+        #expect(categoryOnly.contains { $0.name == "category_code" && $0.value == "billionaire" })
+        #expect(!categoryOnly.contains { $0.name == "content_language" })
+        #expect(!languageOnly.contains { $0.name == "category_code" })
+        #expect(languageOnly.contains { $0.name == "content_language" && $0.value == "en" })
+    }
+
+    @Test
     func watchProgressUsesSnakeCaseBody() {
         let report = WatchProgressReport(
             seriesID: "123", episodeID: "456", progressSeconds: 30, totalDuration: 120,

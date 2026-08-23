@@ -347,14 +347,19 @@ struct RecommendView: View {
                                 }
                             }
 
-                            // 简介展开和收起
-                            synopsisView(drama.synopsis, contentWidth: contentWidth)
-                                .lineSpacing(3)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    guard !pagerState.isDragging else { return }
-                                    withAnimation(.easeOut(duration: 0.2)) { isExpanded.toggle() }
+                            // 整段简介都是明确的点击目标；Button 会在拖动分页时自动取消点击，
+                            // 不再依赖分页状态门禁，滑动结束后可以立即展开或收起。
+                            Button {
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    isExpanded.toggle()
                                 }
+                            } label: {
+                                synopsisView(drama.synopsis, contentWidth: contentWidth)
+                                    .lineSpacing(4)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
                         .frame(width: contentWidth, alignment: .leading)
 
@@ -414,24 +419,33 @@ struct RecommendView: View {
     }
 
     private func synopsisView(_ text: String, contentWidth: CGFloat) -> some View {
-        Group {
+        let synopsis = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Group {
             if isExpanded {
-                (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
-                + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.82)))
-            } else if shouldShowMore(for: text, contentWidth: contentWidth) {
-                (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
-                + Text(truncatedSynopsis(text, contentWidth: contentWidth)).font(.system(size: 13)).foregroundColor(.white.opacity(0.82))
-                + Text("player.more_suffix".localized).font(.system(size: 13, weight: .medium)).foregroundColor(.white.opacity(0.96)))
+                (Text(synopsis)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.92))
+                + Text("  \("player.collapse".localized)")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white))
+            } else if shouldShowMore(for: synopsis, contentWidth: contentWidth) {
+                (Text(truncatedSynopsis(synopsis, contentWidth: contentWidth))
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.92))
+                + Text("player.more_suffix".localized)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white))
             } else {
-                (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.9))
-                + Text(text).font(.system(size: 13)).foregroundColor(.white.opacity(0.82)))
+                Text(synopsis)
+                    .font(.system(size: 14))
+                    .foregroundColor(.white.opacity(0.92))
             }
         }
         .lineLimit(isExpanded ? nil : 2)
     }
 
     private func shouldShowMore(for text: String, contentWidth: CGFloat) -> Bool {
-        synopsisTextHeight("\("player.trailer_prefix".localized)\(text.trimmedForSynopsis)", width: contentWidth) > twoLineSynopsisHeight
+        synopsisTextHeight(text.trimmedForSynopsis, width: contentWidth) > twoLineSynopsisHeight
     }
 
     private func truncatedSynopsis(_ text: String, contentWidth: CGFloat) -> String {
@@ -446,7 +460,7 @@ struct RecommendView: View {
         while low <= high {
             let mid = (low + high) / 2
             let candidate = String(characters.prefix(mid)).trimmedForSynopsis
-            let displayText = "\("player.trailer_prefix".localized)\(candidate)\("player.more_suffix".localized)"
+            let displayText = "\(candidate)\("player.more_suffix".localized)"
 
             if synopsisTextHeight(displayText, width: contentWidth) <= twoLineSynopsisHeight {
                 best = candidate
@@ -460,20 +474,20 @@ struct RecommendView: View {
     }
 
     private var twoLineSynopsisHeight: CGFloat {
-        let font = UIFont.systemFont(ofSize: 13)
-        return font.lineHeight * 2 + 3 + 1
+        let font = UIFont.systemFont(ofSize: 14)
+        return font.lineHeight * 2 + 4 + 1
     }
 
     private func synopsisTextHeight(_ text: String, width: CGFloat) -> CGFloat {
         guard width > 0 else { return 0 }
 
         let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 3
+        paragraph.lineSpacing = 4
 
         let attributed = NSAttributedString(
             string: text,
             attributes: [
-                .font: UIFont.systemFont(ofSize: 13),
+                .font: UIFont.systemFont(ofSize: 14),
                 .paragraphStyle: paragraph
             ]
         )

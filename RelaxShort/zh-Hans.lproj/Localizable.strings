@@ -415,7 +415,6 @@
 "player.report_subtitle_issue" = "反馈字幕问题";
 "player.preview_unavailable" = "预览暂不可用";
 "player.video_load_failed" = "视频加载失败";
-"player.trailer_prefix" = "预告 | ";
 "player.more_suffix" = "… 更多";
 "player.rate" = "评分";
 "player.cast" = "演员";

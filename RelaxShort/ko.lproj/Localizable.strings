@@ -411,7 +411,6 @@
 "player.report_subtitle_issue" = "자막 문제 신고";
 "player.preview_unavailable" = "미리보기를 사용할 수 없습니다";
 "player.video_load_failed" = "동영상을 불러오지 못했습니다";
-"player.trailer_prefix" = "예고편 | ";
 "player.more_suffix" = "… 더보기";
 "player.rate" = "평가";
 "player.cast" = "출연진";

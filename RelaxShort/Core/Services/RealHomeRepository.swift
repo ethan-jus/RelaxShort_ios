@@ -13,47 +13,27 @@ final class RealHomeRepository: HomeRepositoryProtocol {
     private let client = APIClient.shared
 
     func fetchDramas(category: DramaCategory) async throws -> [DramaItem] {
-        let contentLang = UserDefaults.standard.string(forKey: "app_content_language")
         let country = UserDefaults.standard.string(forKey: "app_country_code")
-
+        let categoryCode: String?
         switch category {
         case .all:
-            if let homeItems = try? await fetchHomeFirstSection(contentLang: contentLang, country: country),
-               !homeItems.isEmpty {
-                return homeItems
-            }
-            return try await fetchForYou(contentLang: contentLang, country: country)
+            categoryCode = nil
         default:
-            // 真实模式先匹配后端分类 code，再请求分类内容。
-            if let code = await matchCategoryCode(category, contentLang: contentLang, country: country) {
-                if let items = try? await fetchCategorySeries(code: code, contentLang: contentLang, country: country),
-                   !items.isEmpty {
-                    return items
-                }
-            }
-            // 降级：后端 categories 不可用或无匹配 code 时走 For You
-            return try await fetchForYou(contentLang: contentLang, country: country)
+            let categories = try await fetchHomeCategories()
+            categoryCode = categories.first {
+                $0.title.localizedCaseInsensitiveCompare(category.rawValue) == .orderedSame
+            }?.code
+            guard categoryCode != nil else { return [] }
         }
-    }
 
-    /// 将 iOS DramaCategory 枚举匹配到后端 categories code。
-    /// 优先通过后端 categories 接口返回的 localizedName 做中文名匹配。
-    private func matchCategoryCode(_ cat: DramaCategory, contentLang: String?, country: String?) async -> String? {
-        guard let categories = try? await fetchCategories() else { return nil }
-        let targetName = cat.rawValue  // "现代言情" / "古装" 等中文枚举值
-        for c in categories {
-            if c.localizedName == targetName { return c.code }
-        }
-        return nil
-    }
-
-    /// 调用 /api/v2/categories/{code}/series
-    private func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]? {
-        let dto: SearchResponseDTO = try await client.requestData(
-            .categorySeries(categoryCode: code, cursor: nil, limit: 20,
-                          contentLanguage: contentLang, countryCode: country)
+        let page = try await fetchCatalogSeries(
+            categoryCode: categoryCode,
+            contentLanguage: nil,
+            country: country,
+            cursor: nil,
+            limit: 20
         )
-        return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
+        return page.items
     }
 
     func fetchBanners() async throws -> [BannerItem] {
@@ -61,23 +41,32 @@ final class RealHomeRepository: HomeRepositoryProtocol {
         return []
     }
 
-    /// Task17：按后端 code 加载分类剧集（协议方法，替代 Task16 的 fetchDramasByCategoryCode）
-    func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
+    func fetchCatalogSeries(
+        categoryCode: String?,
+        contentLanguage: String?,
+        country: String?,
+        cursor: String?,
+        limit: Int
+    ) async throws -> (items: [DramaItem], nextCursor: String?, hasMore: Bool) {
+        let pageSize = max(1, min(limit, 30))
         let dto: SearchResponseDTO = try await client.requestData(
-            .categorySeries(categoryCode: code, cursor: nil, limit: 20,
-                          contentLanguage: contentLang, countryCode: country)
+            .catalogSeries(
+                categoryCode: categoryCode,
+                contentLanguage: contentLanguage,
+                countryCode: country,
+                cursor: cursor,
+                limit: pageSize
+            )
         )
-        return (dto.items ?? []).map(FeedCardDTOMapper.toDramaItem)
-    }
-
-    func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem] {
-        if let categoryCode, !categoryCode.isEmpty {
-            return try await fetchCategorySeries(code: categoryCode, contentLang: contentLang, country: country)
-        }
-
-        // 分类页明确选择语言时必须严格匹配，不能沿用推荐流的英语兜底。
-        return try await fetchForYou(contentLang: contentLang, country: country, limit: 20,
-                                     strictContentLanguage: contentLang?.isEmpty == false)
+        var seenSeriesIDs = Set<String>()
+        let items = (dto.items ?? [])
+            .map(FeedCardDTOMapper.toDramaItem)
+            .filter { seenSeriesIDs.insert($0.id).inserted }
+        return (
+            items: items,
+            nextCursor: dto.nextCursor,
+            hasMore: dto.hasMore ?? false
+        )
     }
 
     // MARK: - For You
@@ -119,24 +108,6 @@ final class RealHomeRepository: HomeRepositoryProtocol {
             contentLang: contentLang, country: country, cursor: cursor, limit: limit, feedSeed: nil
         )
         return result.items
-    }
-
-    // MARK: - Home
-
-    /// 解析 Home 首页第一个有 items 的 section
-    private func fetchHomeFirstSection(contentLang: String?, country: String?) async throws -> [DramaItem]? {
-        let dto: HomeResponseDTO = try await client.requestData(
-            .home(contentLanguage: contentLang, countryCode: country)
-        )
-        guard let tabs = dto.tabs else { return nil }
-        for tab in tabs {
-            for section in tab.sections ?? [] {
-                if let items = section.items, !items.isEmpty {
-                    return items.map(FeedCardDTOMapper.toDramaItem)
-                }
-            }
-        }
-        return nil
     }
 
     // MARK: - Categories

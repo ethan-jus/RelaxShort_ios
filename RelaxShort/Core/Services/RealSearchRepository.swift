@@ -49,4 +49,6 @@ struct SearchResponseDTO: Decodable {
     let items: [FeedCardDTO]?
     let nextCursor: String?
     let hasMore: Bool?
+    let matchedLanguage: String?
+    let fallbackReason: String?
 }

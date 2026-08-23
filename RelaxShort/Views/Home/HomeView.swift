@@ -545,11 +545,44 @@ struct HomeView: View {
                     .padding(.bottom, 120)
             } else {
                 VStack(spacing: 0) {
+                    if let err = viewModel.categoryErrorMessage {
+                        HStack(spacing: 12) {
+                            Text(err)
+                                .font(DT.Font.caption)
+                                .foregroundColor(DT.Color.textSecondary)
+                            Spacer(minLength: 8)
+                            Button(L10n.retry) {
+                                Task { await viewModel.reloadCategoryContent() }
+                            }
+                            .font(DT.Font.button)
+                            .foregroundColor(DT.logoRed)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(minHeight: 44)
+                    }
                     MarketingGrid(
                         dramas: viewModel.categoryDramas,
                         playerDrama: seriesNavigationBinding,
                         containerW: containerW
                     )
+                    if viewModel.isLoadingMoreCategoryContent {
+                        ProgressView()
+                            .tint(DT.Color.textSecondary)
+                            .frame(height: 52)
+                    } else if viewModel.hasCategoryLoadMoreError {
+                        Button(L10n.retry) {
+                            Task { await viewModel.loadMoreCategoryContent() }
+                        }
+                        .font(DT.Font.button)
+                        .foregroundColor(DT.logoRed)
+                        .frame(height: 52)
+                    } else if viewModel.canLoadMoreCategoryContent {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear {
+                                Task { await viewModel.loadMoreCategoryContent() }
+                            }
+                    }
                     Color.clear.frame(height: 72)
                 }
             }

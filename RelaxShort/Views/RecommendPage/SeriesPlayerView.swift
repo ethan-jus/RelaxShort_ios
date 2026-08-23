@@ -106,8 +106,12 @@ struct SeriesPlayerView: View {
     @State private var playbackProgress = PlayerProgress()
     @State private var selectedPlaybackRate: Float = 1.0
     @State private var selectedQualityID = "auto"
+    @State private var isSynopsisExpanded = false
+    @State private var activePlayerPanel: PlayerPanel?
     /// 服务端播放合同是画质权益的唯一依据；StoreKit 本地状态只负责触发合同刷新。
     @State private var lastKnownVIPSubscriptionActive = false
+    /// 会员状态变化时递增；旧代际的异步播放合同响应不得写回当前播放器。
+    @State private var qualityEntitlementGeneration = 0
     @State private var selectedSubtitleID: String?
     @State private var hasTrackedImpression = false
     @State private var qualifiedEpisodeIDs: Set<String> = []
@@ -149,14 +153,17 @@ struct SeriesPlayerView: View {
 
     private enum PlayerSheet: Identifiable {
         case share
-        case settings
 
         var id: String {
             switch self {
             case .share: "share"
-            case .settings: "settings"
             }
         }
+    }
+
+    private enum PlayerPanel {
+        case speed
+        case settings
     }
 
     private enum UnlockAction {
@@ -232,6 +239,12 @@ struct SeriesPlayerView: View {
                     SpeedHUDView()
                         .position(x: geo.size.width / 2, y: geo.size.height * 0.16)
                         .transition(.opacity)
+                }
+
+                if let activePlayerPanel, unlockState == nil {
+                    playerPanelOverlay(activePlayerPanel, in: geo)
+                        .zIndex(220)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
                 if showEpisodeList, unlockState == nil {
@@ -324,23 +337,6 @@ struct SeriesPlayerView: View {
                     episodeNumber: currentEpisode
                 )
                     .shareSheetPresentationStyle()
-            case .settings:
-                PlayerQualitySheet(
-                    selectedRate: selectedPlaybackRate,
-                    qualities: qualityOptions(),
-                    subtitles: subtitleOptions(),
-                    selectedSubtitleID: selectedSubtitleID,
-                    onSelectRate: applyPlaybackRate,
-                    onSelectQuality: applyQuality,
-                    onSelectSubtitle: { subtitleID in
-                        selectedSubtitleID = subtitleID
-                        playerCoordinator.engine.selectSubtitle(subtitleID)
-                        resetAutoHide()
-                    }
-                )
-                .presentationDetents([.fraction(0.72), .fraction(0.9)])
-                .presentationDragIndicator(.hidden)
-                .presentationCornerRadius(24)
             }
         }
         .task(id: hasCompletedNavigationTransition) {
@@ -374,12 +370,17 @@ struct SeriesPlayerView: View {
             let isActive = state.hasActiveSubscription
             defer { lastKnownVIPSubscriptionActive = isActive }
             guard isActive != lastKnownVIPSubscriptionActive else { return }
-            if !isActive, selectedQualityID == "auto" {
-                // 本地订阅刚失效时立即保守降到 720P，随后刷新合同确认服务端最终权益。
+            if !isActive {
+                downgradeCurrentPlaybackAfterLocalVIPLoss()
                 playerCoordinator.engine.setAdaptiveQualityPolicy(.standard)
                 playerCoordinator.engine.applyAutomaticQualityPolicy()
             }
-            Task { await refreshCurrentPlayContractForQualityEntitlement() }
+            let generation = invalidateCachedQualityEntitlements()
+            Task {
+                await refreshCurrentPlayContractForQualityEntitlement(
+                    expectedGeneration: generation
+                )
+            }
         }
         .onReceive(playerCoordinator.engine.$progress) { progress in
             playbackProgress = progress
@@ -424,6 +425,66 @@ struct SeriesPlayerView: View {
     private var isCurrentEpisodePlaying: Bool {
         isCurrentEpisodeVisible
             && playerCoordinator.engine.state == .playing
+    }
+
+    /// 播放设置使用页面内全宽底部面板，避免系统 Sheet 在不同设备上产生两侧留白。
+    @ViewBuilder
+    private func playerPanelOverlay(_ panel: PlayerPanel, in geo: GeometryProxy) -> some View {
+        let safeBottom = max(geo.safeAreaInsets.bottom, UIApplication.safeAreaInsets.bottom)
+
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.46)
+                .contentShape(Rectangle())
+                .onTapGesture { closePlayerPanel() }
+
+            VStack(spacing: 0) {
+                switch panel {
+                case .speed:
+                    PlayerSpeedPanel(
+                        selectedRate: selectedPlaybackRate,
+                        onSelectRate: applyPlaybackRate,
+                        onClose: closePlayerPanel
+                    )
+                case .settings:
+                    PlayerQualitySheet(
+                        selectedRate: selectedPlaybackRate,
+                        qualities: qualityOptions(),
+                        subtitles: subtitleOptions(),
+                        selectedSubtitleID: selectedSubtitleID,
+                        onSelectRate: applyPlaybackRate,
+                        onSelectQuality: applyQuality,
+                        onSelectSubtitle: { subtitleID in
+                            selectedSubtitleID = subtitleID
+                            playerCoordinator.engine.selectSubtitle(subtitleID)
+                        },
+                        onClose: closePlayerPanel
+                    )
+                    .frame(height: max(0, geo.size.height * 0.7 - safeBottom))
+                }
+
+                Color(hex: "#111111")
+                    .frame(height: safeBottom)
+            }
+            .frame(width: geo.size.width)
+            .background(Color(hex: "#111111"))
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 24, topTrailingRadius: 24))
+        }
+        .frame(width: geo.size.width, height: geo.size.height)
+    }
+
+    private func presentPlayerPanel(_ panel: PlayerPanel) {
+        autoHideTask?.cancel()
+        isUIVisible = true
+        withAnimation(.easeOut(duration: 0.2)) {
+            activePlayerPanel = panel
+        }
+    }
+
+    private func closePlayerPanel() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            activePlayerPanel = nil
+        }
+        resetAutoHide()
     }
 
     private func episodeLoadFailureOverlay(_ message: String) -> some View {
@@ -797,6 +858,7 @@ struct SeriesPlayerView: View {
             return
         }
 
+        prepareSelectedQuality(for: episodeNumber)
         let playable = buildPlayableItems(from: episodes)
         guard let playableIndex = playable.firstIndex(where: {
             $0.episodeNumber == episodeNumber
@@ -913,8 +975,9 @@ struct SeriesPlayerView: View {
 
     private func resetAutoHide() {
         autoHideTask?.cancel()
-        guard playerCoordinator.engine.state == .playing else { return }
         isUIVisible = true
+        guard playerCoordinator.engine.state == .playing,
+              activePlayerPanel == nil else { return }
         autoHideTask = Task {
             try? await Task.sleep(nanoseconds: 3_000_000_000)
             guard !Task.isCancelled else { return }
@@ -1041,11 +1104,13 @@ struct SeriesPlayerView: View {
     @MainActor
     private func fetchInitialPlayAsset(episodeID: String, episodeNumber: Int) async -> Bool {
         if episodeMediaSources[episodeID] != nil { return true }
+        let entitlementGeneration = qualityEntitlementGeneration
         let startedAt = CACurrentMediaTime()
         Logger.player.info("SeriesTrace 并行请求首屏播放源 集数=\(episodeNumber) 剧集ID=\(episodeID)")
         do {
             let dto = try await dependencies.detailRepository.fetchPlayAsset(episodeId: episodeID)
             guard !Task.isCancelled,
+                  entitlementGeneration == qualityEntitlementGeneration,
                   let source = dto.toPlayerMediaSource() else { return false }
             episodeMediaSources[episodeID] = source
             episodePlayContracts[episodeID] = dto
@@ -1099,6 +1164,7 @@ struct SeriesPlayerView: View {
     }
 
     private func initializeEpisodePlayer() {
+        prepareSelectedQuality(for: currentEpisode)
         let playable = buildPlayableItems(from: episodes)
         guard !playable.isEmpty else {
             // 正式播放接口失败时保留已启动的卡片预览，不得回落到其他剧或 Mock。
@@ -1244,10 +1310,32 @@ struct SeriesPlayerView: View {
                 }
             }
 
-            (Text("player.trailer_prefix".localized).font(.system(size: 13)).foregroundColor(.white.opacity(0.8))
-            + Text(drama.synopsis).font(.system(size: 13)).foregroundColor(.white.opacity(0.65)))
-            .lineLimit(2)
-            .lineSpacing(3)
+            let synopsis = drama.synopsis.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !synopsis.isEmpty {
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        isSynopsisExpanded.toggle()
+                    }
+                    resetAutoHide()
+                } label: {
+                    HStack(alignment: .bottom, spacing: 6) {
+                        Text(synopsis)
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.92))
+                            .lineLimit(isSynopsisExpanded ? nil : 2)
+                            .lineSpacing(4)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        Image(systemName: isSynopsisExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.white.opacity(0.88))
+                            .frame(width: 18, height: 20)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
         }
         .frame(width: width, alignment: .leading)
     }
@@ -1360,10 +1448,13 @@ struct SeriesPlayerView: View {
             if let cached = episodePlayContracts[episode.id] {
                 contract = cached
             } else {
+                let entitlementGeneration = qualityEntitlementGeneration
                 contract = try await dependencies.detailRepository.fetchPlayAsset(
                     episodeId: episode.id
                 )
-                episodePlayContracts[episode.id] = contract
+                if entitlementGeneration == qualityEntitlementGeneration {
+                    episodePlayContracts[episode.id] = contract
+                }
             }
             guard let rawURL = contract.fallbackMp4Url
                     ?? (contract.sourceType == "mp4" ? contract.preferredPlaybackURL : nil),
@@ -1508,23 +1599,155 @@ struct SeriesPlayerView: View {
             isSelected: selectedQualityID == "auto"
         )
         guard let contract = currentPlayContract else { return [auto] }
-        let renditions = contract.qualities.compactMap { quality -> PlayerQualitySheet.QualityOption? in
-            guard let id = quality.quality?.lowercased(),
-                  !id.isEmpty else { return nil }
-            return .init(
-                id: id,
-                label: quality.quality?.uppercased() ?? id.uppercased(),
-                detail: nil,
-                isVIP: quality.vipRequired == true,
-                isAvailable: quality.selectable ?? quality.vipRequired != true,
-                isSelected: selectedQualityID == id
-            )
+
+        var seen = Set<String>()
+        let renditions = contract.qualities
+            .sorted { qualityResolution($0) > qualityResolution($1) }
+            .compactMap { quality -> PlayerQualitySheet.QualityOption? in
+                guard let id = normalizedQualityID(quality.quality),
+                      id != "auto" else { return nil }
+
+                let resolution = qualityResolution(quality)
+                let isVIP = resolution == 1080
+                if isVIP {
+                    // 非会员只展示真实合同中的 1080P VIP 入口；会员合同若缺 URL
+                    // 或明确不可选，视为异常合同并隐藏，避免一个无法工作的按钮。
+                    if contract.has1080Entitlement,
+                       (quality.selectable != true || renditionURL(quality) == nil) {
+                        return nil
+                    }
+                    guard seen.insert(id).inserted else { return nil }
+                    return .init(
+                        id: id,
+                        label: qualityLabel(quality),
+                        detail: nil,
+                        isVIP: true,
+                        isAvailable: isManualRenditionAvailable(quality, in: contract),
+                        isSelected: selectedQualityID == id
+                    )
+                }
+
+                // 540P/720P 等免费档只在合同真实给出可用 URL 时出现；
+                // 异常的免费档直接隐藏，不再错误显示锁图标。
+                guard quality.vipRequired != true,
+                      quality.selectable != false,
+                      renditionURL(quality) != nil,
+                      seen.insert(id).inserted else { return nil }
+                return .init(
+                    id: id,
+                    label: qualityLabel(quality),
+                    detail: nil,
+                    isVIP: false,
+                    isAvailable: true,
+                    isSelected: selectedQualityID == id
+                )
         }
         return [auto] + renditions
     }
 
+    private func normalizedQualityID(_ rawValue: String?) -> String? {
+        guard let rawValue else { return nil }
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed.allSatisfy(\.isNumber) {
+            return "\(trimmed)p"
+        }
+        return trimmed
+    }
+
+    private func qualityResolution(_ quality: QualityDTO) -> Int {
+        if let id = normalizedQualityID(quality.quality) {
+            let digits = id.filter(\.isNumber)
+            if let value = Int(digits), value > 0 { return value }
+        }
+        let dimensions = [quality.width, quality.height].compactMap { $0 }.filter { $0 > 0 }
+        return dimensions.min() ?? 0
+    }
+
+    private func qualityLabel(_ quality: QualityDTO) -> String {
+        let resolution = qualityResolution(quality)
+        if resolution > 0 { return "\(resolution)P" }
+        return quality.quality?.uppercased() ?? ""
+    }
+
+    private func renditionURL(_ quality: QualityDTO) -> URL? {
+        guard let rawURL = quality.url?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let url = URL(string: rawURL),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
+        return url
+    }
+
+    private func source(for quality: QualityDTO) -> PlayerMediaSource? {
+        guard let url = renditionURL(quality) else { return nil }
+        return url.pathExtension.lowercased() == "m3u8"
+            ? .hls(masterURL: url)
+            : .mp4(url)
+    }
+
+    private func isManualRenditionAvailable(
+        _ quality: QualityDTO,
+        in contract: PlaybackMediaSourceDTO
+    ) -> Bool {
+        guard renditionURL(quality) != nil else { return false }
+        if qualityResolution(quality) == 1080 {
+            return contract.has1080Entitlement && quality.selectable == true
+        }
+        return quality.vipRequired != true && quality.selectable != false
+    }
+
+    private func manualSource(
+        qualityID: String,
+        in contract: PlaybackMediaSourceDTO
+    ) -> PlayerMediaSource? {
+        guard let rendition = contract.qualities.first(where: {
+            normalizedQualityID($0.quality) == qualityID
+        }), isManualRenditionAvailable(rendition, in: contract) else { return nil }
+        return source(for: rendition)
+    }
+
+    /// 将本剧用户选择的手动画质解析成目标集真实 URL。
+    /// 合同尚未拿到时保留用户选择；只有完整合同确认缺档时，切集入口才允许回 Auto。
+    @discardableResult
+    private func prepareSelectedQuality(
+        for episodeNumber: Int,
+        updateSelectionOnFallback: Bool = true
+    ) -> Bool {
+        guard let episodeID = episodeID(for: episodeNumber) else { return false }
+        guard let contract = episodePlayContracts[episodeID] else {
+            return selectedQualityID == "auto" && episodeMediaSources[episodeID] != nil
+        }
+
+        if selectedQualityID != "auto" {
+            if let selectedSource = manualSource(qualityID: selectedQualityID, in: contract) {
+                episodeMediaSources[episodeID] = selectedSource
+                applyManualQualityPolicy(selectedQualityID)
+                return true
+            }
+
+            // 预取阶段不提前改变当前页面的用户选择，也不拿 Auto 源冒充固定画质预热。
+            guard updateSelectionOnFallback else { return false }
+            selectedQualityID = "auto"
+        }
+
+        guard let automaticSource = contract.toPlayerMediaSource() else { return false }
+        episodeMediaSources[episodeID] = automaticSource
+        if episodeNumber == currentEpisode {
+            applyAutomaticQualityPolicy(from: contract)
+        }
+        return true
+    }
+
+    private func applyManualQualityPolicy(_ qualityID: String) {
+        let resolution = Int(qualityID.filter(\.isNumber)) ?? 0
+        playerCoordinator.engine.setAdaptiveQualityPolicy(
+            resolution == 1080 ? .vip : .standard
+        )
+    }
+
     private func subtitleOptions() -> [PlayerSubtitleOption] {
-        currentPlayContract?.toPlayerSubtitleTracks().map {
+        let available = playerCoordinator.engine.availableSubtitles
+        if !available.isEmpty { return available }
+        return currentPlayContract?.toPlayerSubtitleTracks().map {
             PlayerSubtitleOption(id: $0.id, displayName: $0.displayName, languageCode: $0.languageCode)
         } ?? []
     }
@@ -1537,27 +1760,36 @@ struct SeriesPlayerView: View {
     private func applyQuality(_ qualityID: String) {
         guard let episodeID = currentBackendEpisodeID,
               let contract = episodePlayContracts[episodeID],
-              let currentItem = playerCoordinator.engine.currentItem else { return }
+              let currentItem = playerCoordinator.engine.currentItem,
+              currentItem.episodeNumber == currentEpisode,
+              currentItem.id == PlayerMediaItem.stableID(
+                  dramaID: drama.id,
+                  episodeNumber: currentEpisode
+              ) else { return }
 
-        let source: PlayerMediaSource
-        if qualityID == "auto" {
+        let normalizedID = normalizedQualityID(qualityID) ?? qualityID
+        let selectedSource: PlayerMediaSource
+        if normalizedID == "auto" {
             guard let automaticSource = contract.toPlayerMediaSource() else { return }
-            source = automaticSource
+            selectedSource = automaticSource
         } else {
             guard let rendition = contract.qualities.first(where: {
-                $0.quality?.caseInsensitiveCompare(qualityID) == .orderedSame
+                normalizedQualityID($0.quality) == normalizedID
             }) else { return }
 
-            if rendition.vipRequired == true,
-               rendition.selectable != true {
-                appStore.isShowingMembership = true
+            guard isManualRenditionAvailable(rendition, in: contract) else {
+                if qualityResolution(rendition) == 1080,
+                   !contract.has1080Entitlement {
+                    appStore.isShowingMembership = true
+                }
                 return
             }
-            guard let rawURL = rendition.url,
-                  let url = URL(string: rawURL) else { return }
-            source = url.pathExtension.lowercased() == "m3u8"
-                ? .hls(masterURL: url)
-                : .mp4(url)
+            guard let renditionSource = source(for: rendition) else { return }
+            selectedSource = renditionSource
+        }
+
+        if normalizedID != "auto" {
+            applyManualQualityPolicy(normalizedID)
         }
 
         let updatedItem = PlayerMediaItem(
@@ -1565,18 +1797,20 @@ struct SeriesPlayerView: View {
             title: currentItem.title,
             episodeNumber: currentItem.episodeNumber,
             coverURL: currentItem.coverURL,
-            source: source,
+            source: selectedSource,
             externalSubtitles: contract.toPlayerSubtitleTracks(),
             resumeTime: currentItem.resumeTime,
             allowsPersistentCache: currentItem.allowsPersistentCache
         )
-        selectedQualityID = qualityID
+        selectedQualityID = normalizedID
+        episodeMediaSources[episodeID] = selectedSource
         if playerCoordinator.engine.upgradeCurrentSource(to: updatedItem) {
             playerCoordinator.engine.setRate(selectedPlaybackRate)
         }
-        if qualityID == "auto" {
+        if normalizedID == "auto" {
             applyAutomaticQualityPolicy(from: contract)
         }
+        restartNextEpisodePrefetchForQuality()
         resetAutoHide()
     }
 
@@ -1586,40 +1820,125 @@ struct SeriesPlayerView: View {
         playerCoordinator.engine.applyAutomaticQualityPolicy()
     }
 
+    /// 本地会员状态失效时先退出固定 1080P，并立即换到合同中最高的免费档。
+    /// 后端新合同返回后，再由 Auto 切到不含 1080P 的标准 master。
+    private func downgradeCurrentPlaybackAfterLocalVIPLoss() {
+        guard (Int(selectedQualityID.filter(\.isNumber)) ?? 0) == 1080 else { return }
+        selectedQualityID = "auto"
+
+        guard let episodeID = currentBackendEpisodeID,
+              let contract = episodePlayContracts[episodeID],
+              let currentItem = playerCoordinator.engine.currentItem,
+              currentItem.episodeNumber == currentEpisode,
+              currentItem.id == PlayerMediaItem.stableID(
+                  dramaID: drama.id,
+                  episodeNumber: currentEpisode
+              ),
+              let freeRendition = contract.qualities
+                  .filter({ quality in
+                      let resolution = qualityResolution(quality)
+                      return resolution > 0 && resolution <= 720
+                          && isManualRenditionAvailable(quality, in: contract)
+                  })
+                  .max(by: { qualityResolution($0) < qualityResolution($1) }),
+              let freeSource = source(for: freeRendition) else {
+            if let episodeID = currentBackendEpisodeID {
+                episodeMediaSources.removeValue(forKey: episodeID)
+            }
+            playerCoordinator.engine.pause(reason: .system)
+            return
+        }
+
+        episodeMediaSources[episodeID] = freeSource
+        let downgradedItem = PlayerMediaItem(
+            id: currentItem.id,
+            title: currentItem.title,
+            episodeNumber: currentItem.episodeNumber,
+            coverURL: currentItem.coverURL,
+            source: freeSource,
+            externalSubtitles: currentItem.externalSubtitles,
+            resumeTime: currentItem.resumeTime,
+            allowsPersistentCache: currentItem.allowsPersistentCache
+        )
+        if playerCoordinator.engine.upgradeCurrentSource(to: downgradedItem) {
+            playerCoordinator.engine.setRate(selectedPlaybackRate)
+        }
+    }
+
+    /// 会员状态变化后，所有旧合同和非当前集预取源立即失效。
+    /// 当前集媒体仅为连续播放暂存，随后必须由新一代服务端合同覆盖。
+    @discardableResult
+    private func invalidateCachedQualityEntitlements() -> Int {
+        qualityEntitlementGeneration &+= 1
+        activePlayerPanel = nil
+        episodePrefetchTask?.cancel()
+        episodePrefetchTask = nil
+        episodePrefetchTarget = nil
+        initialPlayAssetTask?.cancel()
+        initialPlayAssetTask = nil
+
+        let currentEpisodeID = currentBackendEpisodeID
+        let currentSource = currentEpisodeID.flatMap { episodeMediaSources[$0] }
+        episodePlayContracts.removeAll()
+        episodeMediaSources.removeAll()
+        if let currentEpisodeID, let currentSource {
+            episodeMediaSources[currentEpisodeID] = currentSource
+        }
+        for index in episodes.indices where episodes[index].id != currentEpisodeID {
+            episodes[index].videoURL = ""
+        }
+        return qualityEntitlementGeneration
+    }
+
     /// StoreKit 变化后重新向后端取当前集合同。服务端确认 VIP 后才下发完整 1080P master；
     /// 不用本地购买状态直接抬高画质，避免验单未完成时越权。
     @MainActor
-    private func refreshCurrentPlayContractForQualityEntitlement() async {
-        guard let episodeID = currentBackendEpisodeID else { return }
+    private func refreshCurrentPlayContractForQualityEntitlement(
+        expectedGeneration: Int
+    ) async {
+        let requestedEpisode = currentEpisode
+        guard let episodeID = episodeID(for: requestedEpisode) else { return }
         do {
             let contract = try await dependencies.detailRepository.fetchPlayAsset(
                 episodeId: episodeID
             )
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled,
+                  expectedGeneration == qualityEntitlementGeneration,
+                  currentEpisode == requestedEpisode,
+                  currentBackendEpisodeID == episodeID else { return }
             episodePlayContracts[episodeID] = contract
-            if let source = contract.toPlayerMediaSource() {
-                episodeMediaSources[episodeID] = source
-                if selectedQualityID == "auto",
-                   let currentItem = playerCoordinator.engine.currentItem,
-                   currentItem.episodeNumber == currentEpisode {
-                    let refreshedItem = PlayerMediaItem(
-                        id: currentItem.id,
-                        title: currentItem.title,
-                        episodeNumber: currentItem.episodeNumber,
-                        coverURL: currentItem.coverURL,
-                        source: source,
-                        externalSubtitles: contract.toPlayerSubtitleTracks(),
-                        resumeTime: currentItem.resumeTime,
-                        allowsPersistentCache: currentItem.allowsPersistentCache
-                    )
-                    if playerCoordinator.engine.upgradeCurrentSource(to: refreshedItem) {
-                        playerCoordinator.engine.setRate(selectedPlaybackRate)
-                    }
+            // 必须由新合同重建 source；不能在权益变化后继续复用旧 1080P 或旧 Auto master。
+            guard prepareSelectedQuality(for: requestedEpisode) else {
+                episodeMediaSources.removeValue(forKey: episodeID)
+                playerCoordinator.engine.pause(reason: .system)
+                episodeLoadError = "player.episode_load_failed_retry".localized
+                return
+            }
+            if let source = episodeMediaSources[episodeID],
+               let currentItem = playerCoordinator.engine.currentItem,
+               currentItem.episodeNumber == requestedEpisode,
+               currentItem.id == PlayerMediaItem.stableID(
+                   dramaID: drama.id,
+                   episodeNumber: requestedEpisode
+               ) {
+                let refreshedItem = PlayerMediaItem(
+                    id: currentItem.id,
+                    title: currentItem.title,
+                    episodeNumber: currentItem.episodeNumber,
+                    coverURL: currentItem.coverURL,
+                    source: source,
+                    externalSubtitles: contract.toPlayerSubtitleTracks(),
+                    resumeTime: currentItem.resumeTime,
+                    allowsPersistentCache: currentItem.allowsPersistentCache
+                )
+                if playerCoordinator.engine.upgradeCurrentSource(to: refreshedItem) {
+                    playerCoordinator.engine.setRate(selectedPlaybackRate)
                 }
             }
             if selectedQualityID == "auto" {
                 applyAutomaticQualityPolicy(from: contract)
             }
+            restartNextEpisodePrefetchForQuality()
         } catch {
             Logger.player.warning("SeriesTrace 画质权益合同刷新失败 剧集ID=\(episodeID) 错误=\(error.localizedDescription)")
         }
@@ -1641,9 +1960,9 @@ struct SeriesPlayerView: View {
         animatePage: Bool = true
     ) -> Bool {
         guard target != currentEpisode, target >= 1, target <= totalEpisodes else { return false }
+        activePlayerPanel = nil
         episodeLoadError = nil
         let previous = currentEpisode
-        selectedQualityID = "auto"
         episodeSwitchTask?.cancel()
 
         playbackTraceStartedAt = CACurrentMediaTime()
@@ -1665,6 +1984,7 @@ struct SeriesPlayerView: View {
         } else {
             currentEpisode = target
         }
+        resetAutoHide()
 
         episodeSwitchTask = Task { @MainActor in
             guard !Task.isCancelled,
@@ -1705,6 +2025,9 @@ struct SeriesPlayerView: View {
                 Logger.player.warning("SeriesTrace 切集被阻断 目标集=\(target) 原集=\(previous) 原因=播放源缺失或剧集锁定")
                 return
             }
+
+            // 当前短剧内保留用户手动画质；目标集没有同档位或权益已变化时安全回 Auto。
+            prepareSelectedQuality(for: target)
 
             guard !Task.isCancelled,
                   playerCoordinator.isCurrentSeriesEpisodeTransition(
@@ -1804,6 +2127,13 @@ struct SeriesPlayerView: View {
 
     /// 页面只提前获取下一集播放合同；真正的媒体预加载统一交给共享 PlayerSlotPool。
     /// 这样 For You 与 Series 使用完全相同的静音 next + 原生 preroll 规则。
+    private func restartNextEpisodePrefetchForQuality() {
+        episodePrefetchTask?.cancel()
+        episodePrefetchTask = nil
+        episodePrefetchTarget = nil
+        prefetchNextEpisode(after: currentEpisode)
+    }
+
     private func prefetchNextEpisode(after episodeNumber: Int) {
         guard let nextEpisode = episodes.first(where: { $0.episodeNumber == episodeNumber + 1 }) else { return }
         if episodePrefetchTarget == nextEpisode.episodeNumber, episodePrefetchTask != nil {
@@ -1814,13 +2144,17 @@ struct SeriesPlayerView: View {
         episodePrefetchTarget = nextEpisode.episodeNumber
 
         episodePrefetchTask = Task { @MainActor in
-            if episodeMediaSources[nextEpisode.id] == nil {
-                guard await ensurePlayAsset(
-                    for: nextEpisode.episodeNumber,
-                    recordTrace: false
-                ) else { return false }
-            }
+            // 手动画质必须先拿到下一集完整 /play 合同，再生成同一固定档位的 source。
+            // 仅有默认 URL 时不能把 Auto preroll 当成用户选择的画质。
+            guard await ensurePlayAsset(
+                for: nextEpisode.episodeNumber,
+                recordTrace: false
+            ) else { return false }
             guard !Task.isCancelled,
+                  prepareSelectedQuality(
+                    for: nextEpisode.episodeNumber,
+                    updateSelectionOnFallback: false
+                  ),
                   episodeMediaSources[nextEpisode.id] != nil else { return false }
             let playableItems = buildPlayableItems(from: episodes).map(\.item)
             playerCoordinator.updateSeriesPlaylist(
@@ -1838,17 +2172,21 @@ struct SeriesPlayerView: View {
         guard let epIndex = episodes.firstIndex(where: { $0.episodeNumber == episodeNumber }) else { return false }
         let ep = episodes[epIndex]
         let episodeId = ep.id
+        let requiresPlayContract = selectedQualityID != "auto"
 
-        // 内存缓存命中
-        if episodeMediaSources[episodeId] != nil {
+        // Auto 可直接复用默认源；手动画质必须同时具备完整 /play 合同，
+        // 否则无法证明目标集真实存在同一档位。
+        if episodeMediaSources[episodeId] != nil,
+           !requiresPlayContract || episodePlayContracts[episodeId] != nil {
             if recordTrace, episodeNumber == currentEpisode { episodeLoadError = nil }
             Logger.player.info("SeriesTrace 播放源命中内存缓存 集数=\(episodeNumber)")
             if recordTrace { playerCoordinator.engine.markTrace("缓存命中") }
             return true
         }
 
-        // Episode 自带 videoURL
-        if let url = URL(string: ep.videoURL),
+        // Episode 自带 videoURL 只足够支撑 Auto；固定画质仍需请求 /play 合同。
+        if !requiresPlayContract,
+           let url = URL(string: ep.videoURL),
            ["http", "https"].contains(url.scheme?.lowercased() ?? "") {
             episodeMediaSources[episodeId] = playerSource(for: url)
             if recordTrace, episodeNumber == currentEpisode { episodeLoadError = nil }
@@ -1859,27 +2197,41 @@ struct SeriesPlayerView: View {
 
         // 首屏播放合同可能正在与剧集列表并行请求；等待同一 Task，禁止重复调用 /play。
         if episodeId == (initialEpisodeID ?? drama.previewEpisodeID),
-           let initialPlayAssetTask {
-            let success = await initialPlayAssetTask.value
+           let initialTask = initialPlayAssetTask {
+            let generationBeforeAwait = qualityEntitlementGeneration
+            let success = await initialTask.value
             guard !Task.isCancelled else { return false }
-            if success, episodeMediaSources[episodeId] != nil {
+            if success, episodeMediaSources[episodeId] != nil,
+               !requiresPlayContract || episodePlayContracts[episodeId] != nil {
                 if recordTrace { playerCoordinator.engine.markTrace("首屏播放源复用") }
                 return true
             }
-            // 同一次请求已经明确失败或被权益拦截，本轮不再立即重试相同接口。
-            if recordTrace, unlockState == nil,
-               episodeNumber == currentEpisode, !isCurrentEpisodePlaying {
-                episodeLoadError = "player.episode_load_failed_retry".localized
+            if success, requiresPlayContract {
+                Logger.player.info("SeriesTrace 首屏默认源缺少手动画质合同，继续请求 /play 集数=\(episodeNumber)")
+            } else if generationBeforeAwait != qualityEntitlementGeneration {
+                // 会员状态变化取消了旧首屏请求，本轮直接按新代际继续请求。
+                self.initialPlayAssetTask = nil
+                Logger.player.info("SeriesTrace 首屏合同权益代际变化，重新请求 /play 集数=\(episodeNumber)")
+            } else {
+                // 同一次请求已经明确失败或被权益拦截，本轮不再立即重试相同接口。
+                if recordTrace, unlockState == nil,
+                   episodeNumber == currentEpisode, !isCurrentEpisodePlaying {
+                    episodeLoadError = "player.episode_load_failed_retry".localized
+                }
+                return false
             }
-            return false
         }
 
         // 请求后端播放合同
+        let entitlementGeneration = qualityEntitlementGeneration
         let startedAt = CACurrentMediaTime()
         Logger.player.info("SeriesTrace 请求播放源 集数=\(episodeNumber) 剧集ID=\(episodeId)")
         do {
             let dto = try await dependencies.detailRepository.fetchPlayAsset(episodeId: episodeId)
             guard !Task.isCancelled else { return false }
+            if entitlementGeneration != qualityEntitlementGeneration {
+                return await ensurePlayAsset(for: episodeNumber, recordTrace: recordTrace)
+            }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             if let url = dto.preferredPlaybackURL {
                 episodes[epIndex].videoURL = url
@@ -1907,6 +2259,10 @@ struct SeriesPlayerView: View {
             }
             return false
         } catch let error as APIError where error.code == "EPISODE_LOCKED" {
+            guard !Task.isCancelled else { return false }
+            if entitlementGeneration != qualityEntitlementGeneration {
+                return await ensurePlayAsset(for: episodeNumber, recordTrace: recordTrace)
+            }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 剧集被锁定 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 已进入解锁流程")
             if recordTrace, episodeNumber == currentEpisode {
@@ -1920,6 +2276,9 @@ struct SeriesPlayerView: View {
             return false
         } catch {
             guard !Task.isCancelled else { return false }
+            if entitlementGeneration != qualityEntitlementGeneration {
+                return await ensurePlayAsset(for: episodeNumber, recordTrace: recordTrace)
+            }
             let elapsed = (CACurrentMediaTime() - startedAt) * 1000
             Logger.player.warning("SeriesTrace 播放源请求失败 集数=\(episodeNumber) 耗时=\(Int(elapsed))ms 错误=\(error.localizedDescription)")
             if recordTrace, episodeNumber == currentEpisode, !isCurrentEpisodePlaying {
@@ -2023,7 +2382,7 @@ struct SeriesPlayerView: View {
             Spacer()
 
             Button {
-                activeSheet = .settings
+                presentPlayerPanel(.speed)
             } label: {
                 Label {
                     Text(speedControlTitle)
@@ -2036,24 +2395,32 @@ struct SeriesPlayerView: View {
                 .frame(height: ChromeMetrics.topBarHeight)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("player.speed".localized)
 
             Button {
-                activeSheet = .settings
+                presentPlayerPanel(.settings)
             } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
                     .rotationEffect(.degrees(90))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("player.playback_settings".localized)
         }
         .frame(height: ChromeMetrics.topBarHeight)
         .padding(.horizontal, ChromeMetrics.horizontalPadding)
     }
 
     private var speedControlTitle: String {
-        abs(selectedPlaybackRate - 1.0) < 0.01 ? "Speed" : String(format: "%.1fx", selectedPlaybackRate)
+        if abs(selectedPlaybackRate - 1.0) < 0.01 {
+            return "player.speed".localized
+        }
+        let hundredths = Int((selectedPlaybackRate * 100).rounded())
+        return hundredths.isMultiple(of: 10)
+            ? String(format: "%.1fx", selectedPlaybackRate)
+            : String(format: "%.2fx", selectedPlaybackRate)
     }
 
     private var centerPlaybackButton: some View {
@@ -2114,7 +2481,9 @@ struct SeriesPlayerView: View {
                 )
                 .allowsHitTesting(false)
 
-                if isUIVisible, !showSpeedHUD {
+                // 相邻页在拖动露出时也渲染自己的 EP/Speed/菜单；提交后当前页
+                // 立即进入 3 秒可见窗口，不等待新视频首帧或 playing 回调。
+                if (isUIVisible || !isCurrent), !showSpeedHUD {
                     topControlBar(episodeNumber: episodeNumber)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .padding(.top, topChromeTopInset(in: geo))
@@ -2159,7 +2528,8 @@ struct SeriesPlayerView: View {
     /// 但要避开左边缘返回、进度条拖动、弹层和明显横滑。
     private func canHandleEpisodeDrag(_ value: DragGesture.Value) -> Bool {
         guard unlockState == nil, !seriesIsScrubbing, !showEpisodeList,
-              activeSheet == nil, !showSpeedHUD else { return false }
+              activeSheet == nil, activePlayerPanel == nil,
+              !showSpeedHUD else { return false }
         guard value.startLocation.x > 24 else { return false }
         guard abs(value.translation.height) > abs(value.translation.width) * 1.2 else { return false }
         return true
@@ -2169,7 +2539,7 @@ struct SeriesPlayerView: View {
         LongPressGesture(minimumDuration: 0.3)
             .sequenced(before: DragGesture(minimumDistance: 0))
             .onChanged { value in
-                guard unlockState == nil else { return }
+                guard unlockState == nil, activePlayerPanel == nil else { return }
                 switch value {
                 case .second(true, _):
                     if !showSpeedHUD, playerCoordinator.engine.progress.duration > 0 {
@@ -2184,7 +2554,7 @@ struct SeriesPlayerView: View {
                 }
             }
             .onEnded { _ in
-                guard unlockState == nil else { return }
+                guard unlockState == nil, activePlayerPanel == nil else { return }
                 playerCoordinator.engine.setRate(selectedPlaybackRate)
                 withAnimation(.spring(response: 0.3)) { showSpeedHUD = false }
                 if isUIVisible, playerCoordinator.engine.state == .playing {
@@ -2226,7 +2596,7 @@ struct SeriesPlayerView: View {
     private func tapPauseGesture(in geo: GeometryProxy) -> some Gesture {
         SpatialTapGesture()
             .onEnded { value in
-                guard unlockState == nil else { return }
+                guard unlockState == nil, activePlayerPanel == nil else { return }
                 guard !isTapInsideVisibleChrome(value.location, in: geo) else { return }
                 withAnimation(.easeOut(duration: 0.25)) {
                     isUIVisible.toggle()

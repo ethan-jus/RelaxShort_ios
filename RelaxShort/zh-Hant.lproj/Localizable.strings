@@ -411,7 +411,6 @@
 "player.report_subtitle_issue" = "回報字幕問題";
 "player.preview_unavailable" = "預覽暫時無法使用";
 "player.video_load_failed" = "影片載入失敗";
-"player.trailer_prefix" = "預告 | ";
 "player.more_suffix" = "… 更多";
 "player.rate" = "評分";
 "player.cast" = "演員";

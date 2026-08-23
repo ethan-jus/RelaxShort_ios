@@ -31,6 +31,10 @@ final class HomeViewModel: ObservableObject {
     @Published var isCategoryLoading: Bool = false
     /// 切换筛选时保留旧网格，只显示轻量刷新提示，避免整页闪空。
     @Published private(set) var isCategoryRefreshing: Bool = false
+    /// 分类目录下一页加载状态。
+    @Published private(set) var isLoadingMoreCategoryContent = false
+    /// 下一页失败后停止自动触发，改由用户明确重试，避免列表底部请求循环。
+    @Published private(set) var hasCategoryLoadMoreError = false
     /// 分类错误信息
     @Published var categoryErrorMessage: String?
     /// 数据库启用的内容语言；与 App 界面语言资源范围相互独立。
@@ -44,8 +48,12 @@ final class HomeViewModel: ObservableObject {
     }
     /// 当前分类筛选请求的后端分类 code；为空表示全部分类。
     private var selectedCategoryCode: String?
-    /// 当前分类筛选请求的内容语言；为空表示使用默认内容语言。
+    /// 当前分类筛选请求的内容语言；为空表示全部语言，不回填 App 默认内容语言。
     private var selectedContentLanguage: String?
+    private var categoryCursor: String?
+    private var categoryHasMore = true
+    private let categoryPageSize = 20
+    private var isCategoryRequestInFlight = false
     private var forYouCursor: String?
     private var forYouHasMore = true
     private var forYouSessionID: String?
@@ -56,6 +64,10 @@ final class HomeViewModel: ObservableObject {
     private var categoryRequestGeneration = 0
 
     var canLoadMoreForYou: Bool { forYouHasMore }
+    var canLoadMoreCategoryContent: Bool {
+        categoryHasMore && categoryCursor != nil
+            && !isCategoryRequestInFlight && !hasCategoryLoadMoreError
+    }
 
     var tabs: [String] {
         [
@@ -320,7 +332,7 @@ final class HomeViewModel: ObservableObject {
         let category = categoryCode.flatMap { code in
             categories.first(where: { $0.code == code })
         }
-        await loadCategoryDramas(for: category, contentLanguage: contentLanguage)
+        await loadCategoryContent(for: category, contentLanguage: contentLanguage, reset: true)
     }
 
     /// 重试当前分类/语言筛选请求。
@@ -328,7 +340,25 @@ final class HomeViewModel: ObservableObject {
         let category = selectedCategoryCode.flatMap { code in
             categories.first(where: { $0.code == code })
         }
-        await loadCategoryDramas(for: category, contentLanguage: selectedContentLanguage)
+        await loadCategoryContent(for: category, contentLanguage: selectedContentLanguage, reset: true)
+    }
+
+    /// 分类网格接近底部时继续请求后端不透明游标对应的下一页。
+    func loadMoreCategoryContent() async {
+        guard categoryHasMore,
+              categoryCursor != nil,
+              !isCategoryRequestInFlight,
+              !isCategoryLoading,
+              !isCategoryRefreshing,
+              !isLoadingMoreCategoryContent else { return }
+        let category = selectedCategoryCode.flatMap { code in
+            categories.first(where: { $0.code == code })
+        }
+        await loadCategoryContent(
+            for: category,
+            contentLanguage: selectedContentLanguage,
+            reset: false
+        )
     }
 
     /// App 界面语言切换后重新请求分类字典；分类 code 和内容语言筛选保持不变。
@@ -351,44 +381,80 @@ final class HomeViewModel: ObservableObject {
         }
     }
 
-    private func loadCategoryDramas(for category: HomeCategory?, contentLanguage: String?) async {
+    private func loadCategoryContent(
+        for category: HomeCategory?,
+        contentLanguage: String?,
+        reset: Bool
+    ) async {
+        if !reset {
+            guard categoryHasMore,
+                  categoryCursor != nil,
+                  !isCategoryRequestInFlight else { return }
+        }
         categoryRequestGeneration += 1
         let requestGeneration = categoryRequestGeneration
-        isCategoryLoading = categoryDramas.isEmpty
-        isCategoryRefreshing = !categoryDramas.isEmpty
+        if reset {
+            categoryCursor = nil
+            categoryHasMore = true
+            hasCategoryLoadMoreError = false
+            isCategoryLoading = categoryDramas.isEmpty
+            isCategoryRefreshing = !categoryDramas.isEmpty
+            isLoadingMoreCategoryContent = false
+        } else {
+            hasCategoryLoadMoreError = false
+            isLoadingMoreCategoryContent = true
+        }
+        isCategoryRequestInFlight = true
         categoryErrorMessage = nil
 
-        do {
-            let loadedDramas: [DramaItem]
-            // Mock 或接口降级得到本地分类时，使用本地过滤。
-            if let localCat = category?.localCategory {
-                let matches = filterFeatured(by: localCat)
-                loadedDramas = matches.isEmpty ? featuredDramas : matches
-            } else {
-                // 真实后端按分类和内容语言查询；category 为空时请求全部分类内容。
-                let country = UserDefaults.standard.string(forKey: "app_country_code")
-                loadedDramas = try await repository.fetchCategoryContent(
-                    categoryCode: category?.code,
-                    contentLang: contentLanguage,
-                    country: country
-                )
-            }
-            guard requestGeneration == categoryRequestGeneration else { return }
-            categoryDramas = loadedDramas
-        } catch {
-            guard requestGeneration == categoryRequestGeneration else { return }
-            guard !Task.isCancelled else {
+        defer {
+            if requestGeneration == categoryRequestGeneration {
                 isCategoryLoading = false
                 isCategoryRefreshing = false
-                return
+                isLoadingMoreCategoryContent = false
+                isCategoryRequestInFlight = false
             }
-            categoryErrorMessage = "分类数据加载失败"
-            logError("HomeViewModel.loadCategoryDramas failed: \(error)")
-            // 失败时不覆盖已有数据
         }
-        if requestGeneration == categoryRequestGeneration {
-            isCategoryLoading = false
-            isCategoryRefreshing = false
+
+        do {
+            // Mock 或接口降级得到本地分类时，使用本地过滤。
+            if let localCat = category?.localCategory {
+                guard reset else { return }
+                let matches = filterFeatured(by: localCat)
+                let loadedDramas = matches.isEmpty ? featuredDramas : matches
+                guard requestGeneration == categoryRequestGeneration else { return }
+                categoryDramas = loadedDramas.uniquedByID()
+                categoryCursor = nil
+                categoryHasMore = false
+            } else {
+                // 四种筛选组合统一请求目录接口；任一参数为空即不限制该维度。
+                let country = UserDefaults.standard.string(forKey: "app_country_code")
+                let page = try await repository.fetchCatalogSeries(
+                    categoryCode: category?.code,
+                    contentLanguage: contentLanguage,
+                    country: country,
+                    cursor: reset ? nil : categoryCursor,
+                    limit: categoryPageSize
+                )
+                guard requestGeneration == categoryRequestGeneration else { return }
+                if reset {
+                    categoryDramas = page.items.uniquedByID()
+                } else {
+                    categoryDramas = (categoryDramas + page.items).uniquedByID()
+                }
+                categoryCursor = page.nextCursor
+                categoryHasMore = page.hasMore && page.nextCursor != nil
+            }
+        } catch {
+            guard requestGeneration == categoryRequestGeneration else { return }
+            guard !Task.isCancelled else { return }
+            if reset {
+                categoryErrorMessage = "分类数据加载失败"
+            } else {
+                hasCategoryLoadMoreError = true
+            }
+            logError("HomeViewModel.loadCategoryContent failed: \(error)")
+            // 失败时不覆盖已有数据
         }
     }
 

@@ -411,7 +411,6 @@
 "player.report_subtitle_issue" = "Informar de un problema";
 "player.preview_unavailable" = "Vista previa no disponible";
 "player.video_load_failed" = "No se pudo cargar el vídeo";
-"player.trailer_prefix" = "Tráiler | ";
 "player.more_suffix" = "… más";
 "player.rate" = "Puntuar";
 "player.cast" = "Reparto";

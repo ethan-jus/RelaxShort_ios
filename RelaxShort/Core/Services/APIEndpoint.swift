@@ -43,7 +43,8 @@ enum APIEndpoint {
     case categories(contentLanguage: String?, countryCode: String?)
     /// 数据库启用的语言目录（用于 App 筛选和语言选择）
     case languages
-    case categorySeries(categoryCode: String, cursor: String?, limit: Int, contentLanguage: String?, countryCode: String?)
+    /// 首页分类目录；分类和内容语言均为空时表示不限制，cursor 原样透传。
+    case catalogSeries(categoryCode: String?, contentLanguage: String?, countryCode: String?, cursor: String?, limit: Int)
 
     // MARK: - Task23 用户/钱包/偏好端点
 
@@ -140,7 +141,7 @@ extension APIEndpoint {
     var baseURL: String {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .catalogSeries,
              .userMe, .updateUserProfile, .uploadUserAvatar,
              .userWallet, .walletTransactions, .updateUserPreferences,
              .discoveryEvents,
@@ -173,7 +174,7 @@ extension APIEndpoint {
         case .rankings:                     return "/api/v2/rankings"
         case .categories:                   return "/api/v2/categories"
         case .languages:                    return "/api/v2/languages"
-        case .categorySeries(let code, _, _, _, _): return "/api/v2/categories/\(code)/series"
+        case .catalogSeries:                return "/api/v2/catalog/series"
         // ── Task23 v2 ──
         case .userMe:                           return "/api/v2/users/me"
         case .updateUserProfile:                return "/api/v2/users/me/profile"
@@ -234,7 +235,7 @@ extension APIEndpoint {
         switch self {
         case .appInit:              return .post
         case .forYou, .seriesEpisodes, .episodePlay, .appleAccountToken,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .catalogSeries,
              .userMe, .userWallet, .walletTransactions,
              .supportTickets, .supportTicket: return .get
         case .updateUserProfile, .updateUserPreferences: return .patch
@@ -265,7 +266,7 @@ extension APIEndpoint {
     private var requiresRealV2Header: Bool {
         switch self {
         case .appInit, .forYou, .seriesEpisodes, .episodePlay, .episodeCoinUnlock, .applePaymentVerify, .appleAccountToken,
-             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .categorySeries,
+             .home, .searchDefault, .searchV2, .rankings, .categories, .languages, .catalogSeries,
              .userMe, .updateUserProfile, .uploadUserAvatar,
              .userWallet, .walletTransactions, .updateUserPreferences, .discoveryEvents,
              .watchHistoryV2, .deleteWatchHistory, .watchProgress, .bookmarksV2, .bookmarkStatus, .setBookmark,
@@ -500,11 +501,18 @@ extension APIEndpoint {
             if !items.isEmpty { components?.queryItems = items }
         case .languages:
             break
-        case .categorySeries(_, let cursor, let limit, let cl, let cc):
+        case .catalogSeries(let categoryCode, let contentLanguage, let countryCode, let cursor, let limit):
             var items = [URLQueryItem(name: "limit", value: "\(limit)")]
             if let c = cursor { items.append(URLQueryItem(name: "cursor", value: c)) }
-            if let c = cl { items.append(URLQueryItem(name: "content_language", value: c)) }
-            if let c = cc { items.append(URLQueryItem(name: "country_code", value: c)) }
+            if let c = categoryCode, !c.isEmpty {
+                items.append(URLQueryItem(name: "category_code", value: c))
+            }
+            if let c = contentLanguage, !c.isEmpty {
+                items.append(URLQueryItem(name: "content_language", value: c))
+            }
+            if let c = countryCode, !c.isEmpty {
+                items.append(URLQueryItem(name: "country_code", value: c))
+            }
             components?.queryItems = items
         // ── Task31 v2 query params ──
         case .watchHistoryV2(let cursor, let limit):

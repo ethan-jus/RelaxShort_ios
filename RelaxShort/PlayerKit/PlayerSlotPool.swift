@@ -168,8 +168,8 @@ final class PlayerSlotPool {
         )
     }
 
-    /// 按稳定媒体 ID 提升预加载槽，不依赖页面自己的紧凑索引。
-    /// Series 的播放源是渐进补齐的，使用 ID 才能安全复用下一集 preroll 结果。
+    /// 按稳定媒体 ID 与实际播放源提升预加载槽，不依赖页面自己的紧凑索引。
+    /// 同一集从 Auto 改成固定画质后 source 会变化，旧 preroll 不得被误当成新画质复用。
     @discardableResult
     func promotePrepared(
         item: PlayerMediaItem,
@@ -181,9 +181,11 @@ final class PlayerSlotPool {
         current?.isMuted = true
 
         let sourceSlot: PlayerSlot
-        if slots[PlayerSlot.next.rawValue]?.mediaID == item.id {
+        if slots[PlayerSlot.next.rawValue]?.mediaID == item.id,
+           slots[PlayerSlot.next.rawValue]?.source == item.source {
             sourceSlot = .next
-        } else if slots[PlayerSlot.previous.rawValue]?.mediaID == item.id {
+        } else if slots[PlayerSlot.previous.rawValue]?.mediaID == item.id,
+                  slots[PlayerSlot.previous.rawValue]?.source == item.source {
             sourceSlot = .previous
         } else {
             return nil

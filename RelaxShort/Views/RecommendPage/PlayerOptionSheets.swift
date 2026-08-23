@@ -27,6 +27,7 @@ struct PlayerQualitySheet: View {
     let onSelectRate: (Float) -> Void
     let onSelectQuality: (String) -> Void
     let onSelectSubtitle: (String?) -> Void
+    let onClose: (() -> Void)?
 
     private let speeds: [(String, Float)] = [
         ("0.75x", 0.75), ("1.0x", 1.0), ("1.25x", 1.25),
@@ -40,7 +41,8 @@ struct PlayerQualitySheet: View {
         selectedSubtitleID: String?,
         onSelectRate: @escaping (Float) -> Void,
         onSelectQuality: @escaping (String) -> Void,
-        onSelectSubtitle: @escaping (String?) -> Void
+        onSelectSubtitle: @escaping (String?) -> Void,
+        onClose: (() -> Void)? = nil
     ) {
         self.selectedRate = selectedRate
         self.qualities = qualities
@@ -49,33 +51,29 @@ struct PlayerQualitySheet: View {
         self.onSelectRate = onSelectRate
         self.onSelectQuality = onSelectQuality
         self.onSelectSubtitle = onSelectSubtitle
+        self.onClose = onClose
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-            Capsule()
-                .fill(Color.white.opacity(0.2))
-                .frame(width: 42, height: 5)
-                .padding(.top, 10)
-
-            HStack {
-                Text("player.playback_settings".localized)
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(.white)
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.66))
-                        .frame(width: 44, height: 44)
-                        .background(Color.white.opacity(0.055), in: Circle())
+                HStack {
+                    Text("player.playback_settings".localized)
+                        .font(.system(size: 19, weight: .bold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Button { close() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.66))
+                            .frame(width: 44, height: 44)
+                            .background(Color.white.opacity(0.055), in: Circle())
+                    }
+                    .accessibilityLabel("general.close".localized)
                 }
-                .accessibilityLabel("general.close".localized)
-            }
-            .padding(.leading, 20)
-            .padding(.trailing, 12)
-            .padding(.top, 7)
+                .padding(.leading, 20)
+                .padding(.trailing, 12)
+                .padding(.top, 12)
 
                 speedSection
                     .padding(.horizontal, 20)
@@ -88,14 +86,17 @@ struct PlayerQualitySheet: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 12)
 
-                sectionTitle("player.subtitles".localized)
-                    .padding(.top, 26)
-                    .padding(.horizontal, 20)
+                if !subtitles.isEmpty {
+                    sectionTitle("player.subtitles".localized)
+                        .padding(.top, 26)
+                        .padding(.horizontal, 20)
 
-                subtitleSection
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 28)
+                    subtitleSection
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                }
+
+                Color.clear.frame(height: 28)
             }
         }
         .scrollIndicators(.hidden)
@@ -112,12 +113,20 @@ struct PlayerQualitySheet: View {
         }
     }
 
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
+    }
+
     private var speedSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionTitle("player.speed".localized)
             LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6),
-                spacing: 8
+                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
+                spacing: 10
             ) {
             ForEach(speeds, id: \.0) { label, value in
                 let selected = abs(selectedRate - value) < 0.01
@@ -146,7 +155,7 @@ struct PlayerQualitySheet: View {
             ForEach(qualities) { option in
                 Button {
                     onSelectQuality(option.id)
-                    dismiss()
+                    close()
                 } label: {
                     HStack(spacing: 10) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -176,7 +185,7 @@ struct PlayerQualitySheet: View {
                                 .foregroundStyle(.white)
                                 .frame(width: 23, height: 23)
                                 .background(DT.logoRed, in: Circle())
-                        } else if !option.isAvailable {
+                        } else if option.isVIP && !option.isAvailable {
                             Image(systemName: "lock.fill")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(Color.white.opacity(0.58))
@@ -212,7 +221,7 @@ struct PlayerQualitySheet: View {
     private func subtitleRow(id: String?, title: String) -> some View {
         Button {
             onSelectSubtitle(id)
-            dismiss()
+            close()
         } label: {
             HStack {
                 Text(title)
@@ -230,6 +239,69 @@ struct PlayerQualitySheet: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// 顶部 Speed 的快捷入口，只呈现倍速，避免用户为了一个高频操作进入完整设置。
+struct PlayerSpeedPanel: View {
+    let selectedRate: Float
+    let onSelectRate: (Float) -> Void
+    let onClose: () -> Void
+
+    private let speeds: [(String, Float)] = [
+        ("0.75x", 0.75), ("1.0x", 1.0), ("1.25x", 1.25),
+        ("1.5x", 1.5), ("2.0x", 2.0), ("3.0x", 3.0)
+    ]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text("player.speed".localized)
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(.white)
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.66))
+                        .frame(width: 44, height: 44)
+                        .background(Color.white.opacity(0.055), in: Circle())
+                }
+                .accessibilityLabel("general.close".localized)
+            }
+            .padding(.leading, 20)
+            .padding(.trailing, 12)
+            .padding(.top, 12)
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3),
+                spacing: 10
+            ) {
+                ForEach(speeds, id: \.0) { label, value in
+                    let selected = abs(selectedRate - value) < 0.01
+                    Button {
+                        onSelectRate(value)
+                        onClose()
+                    } label: {
+                        Text(label)
+                            .font(.system(size: 16, weight: selected ? .bold : .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .background(selected ? DT.logoRed : PlayerSheetStyle.card)
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .stroke(.white.opacity(selected ? 0.16 : 0.07), lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
+        }
+        .background(PlayerSheetStyle.background)
     }
 }
 

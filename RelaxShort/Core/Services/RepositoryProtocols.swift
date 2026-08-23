@@ -20,10 +20,14 @@ protocol HomeRepositoryProtocol {
     func fetchHomeCategories() async throws -> [HomeCategory]
     /// 获取首页 tab/section 运营配置内容
     func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent]
-    /// 按后端分类 code 获取剧集列表。
-    func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem]
-    /// 按分类和内容语言获取首页分类内容；categoryCode 为空时获取全部分类内容。
-    func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem]
+    /// 获取首页分类目录。分类或内容语言为空分别表示该维度不限制；cursor 是后端不透明游标。
+    func fetchCatalogSeries(
+        categoryCode: String?,
+        contentLanguage: String?,
+        country: String?,
+        cursor: String?,
+        limit: Int
+    ) async throws -> (items: [DramaItem], nextCursor: String?, hasMore: Bool)
     /// 获取数据库启用的内容语言目录；不受 App 界面语言资源范围限制。
     func fetchSupportedLanguages() async throws -> [HomeContentLanguage]
     /// 获取真实 For You 推荐流；登录用户由后端基于行为偏好重排，匿名用户使用全局推荐。
@@ -40,16 +44,20 @@ extension HomeRepositoryProtocol {
     func fetchHomeCategories() async throws -> [HomeCategory] {
         return DramaCategory.allCases.map { HomeCategory(id: $0.rawValue, code: $0.rawValue, title: $0.rawValue, localCategory: $0) }
     }
-    /// 默认实现：Mock 模式返回空或全量本地过滤
-    func fetchCategorySeries(code: String, contentLang: String?, country: String?) async throws -> [DramaItem] {
-        return try await fetchDramas(category: .all)
-    }
-    /// 默认实现：Mock 模式使用本地数据；真实分类查询由 RealHomeRepository 覆盖。
-    func fetchCategoryContent(categoryCode: String?, contentLang: String?, country: String?) async throws -> [DramaItem] {
-        if let categoryCode, !categoryCode.isEmpty {
-            return try await fetchCategorySeries(code: categoryCode, contentLang: contentLang, country: country)
-        }
-        return try await fetchDramas(category: .all)
+    /// 默认实现：Mock 模式提供相同的游标分页合同；筛选仍由 Mock 自身数据负责。
+    func fetchCatalogSeries(
+        categoryCode: String?,
+        contentLanguage: String?,
+        country: String?,
+        cursor: String?,
+        limit: Int
+    ) async throws -> (items: [DramaItem], nextCursor: String?, hasMore: Bool) {
+        let all = try await fetchDramas(category: .all)
+        let pageSize = max(1, min(limit, 30))
+        let start = cursor.flatMap(Int.init) ?? 0
+        let end = min(start + pageSize, all.count)
+        let items = start < end ? Array(all[start..<end]) : []
+        return (items, end < all.count ? String(end) : nil, end < all.count)
     }
     /// 默认实现：Mock 模式暂不提供运营 section 数据
     func fetchHomeTabs(contentLang: String?, country: String?) async throws -> [HomeTabContent] {

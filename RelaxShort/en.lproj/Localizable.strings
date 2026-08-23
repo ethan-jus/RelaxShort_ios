@@ -420,7 +420,6 @@
 "player.report_subtitle_issue" = "Report Subtitle Issue";
 "player.preview_unavailable" = "Preview unavailable";
 "player.video_load_failed" = "Video failed to load";
-"player.trailer_prefix" = "Trailer | ";
 "player.more_suffix" = "... more";
 "player.rate" = "Rate";
 "player.cast" = "Cast";

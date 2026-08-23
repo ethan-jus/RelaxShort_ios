@@ -411,7 +411,6 @@
 "player.report_subtitle_issue" = "字幕の問題を報告";
 "player.preview_unavailable" = "プレビューを利用できません";
 "player.video_load_failed" = "動画を読み込めませんでした";
-"player.trailer_prefix" = "予告 | ";
 "player.more_suffix" = "… もっと見る";
 "player.rate" = "評価";
 "player.cast" = "キャスト";

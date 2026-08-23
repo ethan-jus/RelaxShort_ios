@@ -72,18 +72,19 @@ final class RealAPISmokeRunner: ObservableObject {
             return "categories=\(dto.items?.count ?? 0)"
         }
 
-        // 5. Category Series
-        if let catCode = lastCategoryCode {
-            await step("Category Series", "GET /api/v2/categories/\(catCode)/series") {
-                let dto: SearchResponseDTO = try await self.client.requestData(
-                    .categorySeries(categoryCode: catCode, cursor: nil, limit: 5,
-                                    contentLanguage: lang, countryCode: country)
+        // 5. Catalog Series；category_code 可选，分类目录为空时仍验证 All 类型。
+        await step("Catalog Series", "GET /api/v2/catalog/series") {
+            let dto: SearchResponseDTO = try await self.client.requestData(
+                .catalogSeries(
+                    categoryCode: lastCategoryCode,
+                    contentLanguage: lang,
+                    countryCode: country,
+                    cursor: nil,
+                    limit: 5
                 )
-                return "items=\(dto.items?.count ?? 0)"
-            }
-        } else {
-            await addResult("Category Series", "GET /api/v2/categories/{code}/series",
-                          .skipped, "no category code from categories step", nil, 0)
+            )
+            if let first = dto.items?.first { lastSeriesId = lastSeriesId ?? first.seriesId }
+            return "items=\(dto.items?.count ?? 0) hasMore=\(dto.hasMore ?? false)"
         }
 
         // 6. Search Default

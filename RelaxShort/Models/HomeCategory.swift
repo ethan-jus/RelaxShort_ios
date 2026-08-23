@@ -7,7 +7,7 @@ import Foundation
 /// - Mock 模式：title 来自 `DramaCategory.rawValue`
 struct HomeCategory: Identifiable {
     let id: String          // 后端 code（如 "romance"）或 DramaCategory.rawValue
-    let code: String        // 后端 API code（categorySeries 用），Mock 时为 rawValue
+    let code: String        // 后端目录筛选 category_code，Mock 时为 rawValue
     let title: String       // 展示文案
     let localCategory: DramaCategory?   // Mock 模式时关联的本地枚举，真实模式为 nil
 }
