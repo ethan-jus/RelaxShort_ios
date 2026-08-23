@@ -40,8 +40,8 @@ struct ShortVideoPlayerView: View {
                 coverView
             }
 
-            // 真实首帧出现前持续显示加载反馈。Engine 会在 AVPlayer 调用 play() 后立即进入
-            // .playing，但此时网络仍可能没有出画，不能因此提前撤掉加载动画。
+            // 真实首帧出现前持续显示加载反馈。.playing 只由 AVPlayer 的真实状态确认，
+            // 但状态已 playing 仍不等于画面已经显示，不能因此提前撤掉加载动画。
             if shouldShowLoading {
                 VStack(spacing: 10) {
                     ProgressView()

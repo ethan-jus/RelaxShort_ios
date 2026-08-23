@@ -64,7 +64,9 @@ final class PlayerRecoveryController {
             object: item, queue: .main
         ) { [weak self, weak player] _ in
             Task { @MainActor in
-                guard let self, let player, self.engine?.currentPlayer === player else { return }
+                guard let self, let player,
+                      self.engine?.currentPlayer === player,
+                      player.currentItem === item else { return }
                 self.onFailed()
             }
         }
@@ -74,7 +76,9 @@ final class PlayerRecoveryController {
             object: item, queue: .main
         ) { [weak self, weak player] _ in
             Task { @MainActor in
-                guard let self, let player, self.engine?.currentPlayer === player else { return }
+                guard let self, let player,
+                      self.engine?.currentPlayer === player,
+                      player.currentItem === item else { return }
                 self.onStalled()
             }
         }
@@ -205,7 +209,9 @@ final class PlayerRecoveryController {
     /// AVPlayer 可自行熬过短暂抖动；连续 8 秒仍无播放进度才重建当前 item。
     /// 这为 loading 提供确定的恢复出口，同时避免短卡顿频繁断链。
     private func scheduleStallRecovery() {
-        stallTimeoutTask?.cancel()
+        // 同一轮 waiting/stalled 只从第一次事件起算，不能被 AVPlayer 的状态抖动
+        // 反复延期；playing、切集、断网或 observer detach 会统一取消并清空。
+        guard stallTimeoutTask == nil else { return }
         guard isOnline,
               let engine,
               let expectedItemID = engine.currentItem?.id,
@@ -213,7 +219,9 @@ final class PlayerRecoveryController {
         stallTimeoutTask = Task { @MainActor [weak self, weak engine] in
             do { try await Task.sleep(nanoseconds: 8_000_000_000) }
             catch { return }
-            guard let self, let engine,
+            guard let self else { return }
+            self.stallTimeoutTask = nil
+            guard let engine,
                   !Task.isCancelled,
                   self.isOnline,
                   engine.wantsPlayback,
@@ -269,14 +277,20 @@ final class PlayerRecoveryController {
                 do { try await Task.sleep(nanoseconds: 100_000_000) }
                 catch { return }
                 guard self.recoveryGeneration == token, !Task.isCancelled,
-                      engine.currentItem?.id == expectedItemID else { return }
+                      engine.currentItem?.id == expectedItemID,
+                      engine.currentPlayer === player,
+                      player.currentItem === currentItem else { return }
             }
 
             guard self.recoveryGeneration == token,
                   currentItem.status == .readyToPlay,
-                  engine.currentItem?.id == expectedItemID else {
+                  engine.currentItem?.id == expectedItemID,
+                  engine.currentPlayer === player,
+                  player.currentItem === currentItem else {
                 if self.recoveryGeneration == token,
-                   engine.currentItem?.id == expectedItemID {
+                   engine.currentItem?.id == expectedItemID,
+                   engine.currentPlayer === player,
+                   player.currentItem === currentItem {
                     engine.updateState(.failed(message: "player.recovery_failed".localizedFormat(count)))
                     print("[PlayerKit] recovery failed reason=ready-timeout id=\(expectedItemID)")
                 }
@@ -292,7 +306,8 @@ final class PlayerRecoveryController {
                         guard let self,
                               self.recoveryGeneration == token,
                               engine.currentItem?.id == expectedItemID,
-                              engine.currentPlayer === player else {
+                              engine.currentPlayer === player,
+                              player.currentItem === currentItem else {
                             continuation.resume(); return
                         }
                         print("[PlayerKit] recovery seek complete time=\(recoverTime) finished=\(finished)")
