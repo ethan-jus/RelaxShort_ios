@@ -67,15 +67,16 @@ struct PlayerQualityOption: Identifiable, Hashable {
     let maximumResolution: CGSize?
 }
 
-/// HLS Auto 的会员画质策略。Auto 允许 AVPlayer 自适应降档，只限制最高分辨率。
+/// HLS Auto 的会员画质策略。Auto 允许 AVPlayer 自适应降档，只限制最长边。
+/// 使用方形边界同时兼容 16:9 横屏与 9:16 竖屏；例如竖屏 720P 实际为 720×1280。
 struct PlayerAdaptiveQualityPolicy: Equatable {
     let maximumResolution: CGSize
 
     static let standard = PlayerAdaptiveQualityPolicy(
-        maximumResolution: CGSize(width: 1280, height: 720)
+        maximumResolution: CGSize(width: 1280, height: 1280)
     )
     static let vip = PlayerAdaptiveQualityPolicy(
-        maximumResolution: CGSize(width: 1920, height: 1080)
+        maximumResolution: CGSize(width: 1920, height: 1920)
     )
 }
 

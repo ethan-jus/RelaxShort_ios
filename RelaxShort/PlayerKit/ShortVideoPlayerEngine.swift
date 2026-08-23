@@ -766,7 +766,19 @@ final class ShortVideoPlayerEngine: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self, self.currentPlayer === player else { return }
                 if item.status == .readyToPlay {
-                    self.restoreSourceUpgradeProgressIfNeeded(on: player)
+                    if self.isCurrentSourceUpgradePending {
+                        self.restoreSourceUpgradeProgressIfNeeded(on: player)
+                    } else if self.wantsPlayback,
+                              self.state != .pausedByUser,
+                              self.state != .pausedBySystem,
+                              player.timeControlStatus != .playing {
+                        // playImmediately 在 item 仍为 unknown 时可能不会保留播放意图：
+                        // item 后续虽已 ready，player 仍会无错误地停在 paused，UI 因而永久转圈。
+                        // ready 后补发一次播放命令，同时尊重用户/系统暂停状态。
+                        self.startPlayback(player)
+                        self.state = .playing
+                        self.log("itemStatusKVO: ready 后恢复播放")
+                    }
                     return
                 }
                 guard item.status == .failed else { return }
